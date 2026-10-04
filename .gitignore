@@ -1,0 +1,34 @@
+# Credentials / private local configuration
+**/screeps.json
+.env
+.env.*
+!.env.example
+
+# Node / package manager output
+**/node_modules/
+**/npm-debug.log*
+
+# Runtime logs and telemetry captures
+logs/*
+!logs/.gitkeep
+**/*.log
+**/telemetry-*.ndjson
+**/bot-events-*.ndjson
+**/bot-status-*.json
+**/*cursor*.json
+**/*lock*.json
+
+# Generated release archives / scratch output
+*.rar
+*.zip
+*.7z
+*.tar
+*.tgz
+*.tmp
+*.bak
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

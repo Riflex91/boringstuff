@@ -1,0 +1,11 @@
+{
+  "newbieland": {
+    "protocol": "http",
+    "hostname": "screeps.newbieland.net",
+    "port": 21025,
+    "path": "/",
+    "branch": "chatgpt",
+    "email": "DEIN_LOGINNAME_ODER_EMAIL",
+    "password": "DEIN_PASSWORT"
+  }
+}

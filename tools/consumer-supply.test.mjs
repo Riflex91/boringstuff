@@ -1,0 +1,242 @@
+import assert from 'node:assert/strict';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
+import Module from 'node:module';
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+process.env.NODE_PATH = path.resolve(here, '../game');
+Module._initPaths();
+const require = createRequire(import.meta.url);
+
+global.RESOURCE_ENERGY = 'energy';
+global.FIND_MY_CREEPS = 1;
+global.OK = 0;
+global.ERR_NOT_IN_RANGE = -9;
+global.ERR_FULL = -8;
+
+const objects = new Map();
+global.Game = {
+  getObjectById(id) { return objects.get(id) || null; }
+};
+
+function makeStore(capacity, energy) {
+  return {
+    energy,
+    getFreeCapacity(resource) {
+      assert.equal(resource, RESOURCE_ENERGY);
+      return capacity - this.energy;
+    },
+    getCapacity(resource) {
+      assert.equal(resource, RESOURCE_ENERGY);
+      return capacity;
+    }
+  };
+}
+
+const room = {
+  creeps: [],
+  find(type, opts) {
+    assert.equal(type, FIND_MY_CREEPS);
+    const list = this.creeps.slice();
+    return opts && opts.filter ? list.filter(opts.filter) : list;
+  }
+};
+
+function makeConsumer(id, role, energy, waiting = 0, fallback = false, range = 5) {
+  const creep = {
+    id,
+    room,
+    memory: { role, waitingEnergyTicks: waiting, logisticsFallback: fallback },
+    store: makeStore(100, energy),
+    pos: { range },
+    spawning: false
+  };
+  objects.set(id, creep);
+  return creep;
+}
+
+function makeHauler(id, rangeMap = {}) {
+  const creep = {
+    id,
+    room,
+    memory: { role: 'hauler' },
+    name: id,
+    store: makeStore(300, 300),
+    spawning: false,
+    pos: {
+      getRangeTo(target) { return rangeMap[target.id] ?? target.pos?.range ?? 10; }
+    },
+    transfer() { return ERR_NOT_IN_RANGE; },
+    moveTo() {}
+  };
+  objects.set(id, creep);
+  return creep;
+}
+
+const energy = require('../game/energy.js');
+
+// A partially used but actively working high-priority builder must not steal a
+// delivery from an actually empty consumer. v0.2.14 targeted every consumer
+// with free capacity and therefore repeatedly topped up builders/workers.
+{
+  const builder = makeConsumer('builder-active', 'builder', 50, 0, false, 2);
+  const upgrader = makeConsumer('upgrader-empty', 'upgrader', 0, 0, false, 8);
+  const hauler = makeHauler('hauler-a');
+  room.creeps = [builder, upgrader, hauler];
+
+  assert.equal(energy.consumerNeedsDelivery(builder), false);
+  assert.equal(energy.consumerNeedsDelivery(upgrader), true);
+  assert.equal(energy._test.selectConsumerTarget(hauler).id, upgrader.id);
+}
+
+// Waiting age outranks static role priority. A long-waiting upgrader should be
+// served before a newly waiting builder.
+{
+  const builder = makeConsumer('builder-new', 'builder', 0, 2, false, 2);
+  const upgrader = makeConsumer('upgrader-old', 'upgrader', 0, 11, false, 8);
+  const hauler = makeHauler('hauler-b');
+  room.creeps = [builder, upgrader, hauler];
+
+  assert.equal(energy._test.selectConsumerTarget(hauler).id, upgrader.id);
+}
+
+// Fallback means the request already exceeded the normal wait threshold. It
+// remains urgent even though role.worker resets waitingEnergyTicks to zero when
+// fallback begins.
+{
+  const worker = makeConsumer('worker-wait', 'worker', 0, 11, false, 3);
+  const upgrader = makeConsumer('upgrader-fallback', 'upgrader', 0, 0, true, 7);
+  const hauler = makeHauler('hauler-c');
+  room.creeps = [worker, upgrader, hauler];
+
+  assert.equal(energy._test.selectConsumerTarget(hauler).id, upgrader.id);
+}
+
+// Reservation regression: after one hauler commits to the oldest request, a
+// second hauler must choose another consumer instead of dogpiling the same one.
+{
+  const builder = makeConsumer('builder-r', 'builder', 0, 8, false, 2);
+  const upgrader = makeConsumer('upgrader-r', 'upgrader', 0, 12, false, 8);
+  const hauler1 = makeHauler('hauler-r1');
+  const hauler2 = makeHauler('hauler-r2');
+  room.creeps = [builder, upgrader, hauler1, hauler2];
+
+  assert.equal(energy.deliverToConsumer(hauler1), true);
+  assert.equal(hauler1.memory.consumerTargetId, upgrader.id);
+  assert.equal(energy._test.selectConsumerTarget(hauler2).id, builder.id);
+}
+
+// Once a reserved target is fully supplied, the reservation and fallback state
+// are cleared immediately so the hauler can take a different request next tick.
+{
+  const target = makeConsumer('worker-full-after', 'worker', 0, 7, true, 2);
+  const hauler = makeHauler('hauler-fill');
+  hauler.memory.consumerTargetId = target.id;
+  hauler.transfer = (consumer) => {
+    consumer.store.energy = 100;
+    return OK;
+  };
+  room.creeps = [target, hauler];
+
+  assert.equal(energy.deliverToConsumer(hauler), true);
+  assert.equal(hauler.memory.consumerTargetId, undefined);
+  assert.equal(target.memory.waitingEnergyTicks, 0);
+  assert.equal(target.memory.logisticsFallback, false);
+}
+
+
+// Starvation guard: with redundant hauling and a consumer already waiting,
+// exactly one delivery-ready hauler is diverted from infrastructure refill.
+// The closest ready hauler is chosen so the guard resolves the wait quickly.
+{
+  const consumer = makeConsumer('worker-guard', 'worker', 0, 4, false, 5);
+  const hauler1 = makeHauler('hauler-g1', { [consumer.id]: 8 });
+  const hauler2 = makeHauler('hauler-g2', { [consumer.id]: 2 });
+  const hauler3 = makeHauler('hauler-g3', { [consumer.id]: 5 });
+  room.creeps = [consumer, hauler1, hauler2, hauler3];
+
+  assert.equal(energy.isCriticalConsumerRequest(consumer), true);
+  assert.equal(energy._test.selectConsumerGuardHauler(room).id, hauler2.id);
+  assert.equal(energy.shouldPrioritizeConsumer(hauler1), false);
+  assert.equal(energy.shouldPrioritizeConsumer(hauler2), true);
+  assert.equal(energy.shouldPrioritizeConsumer(hauler3), false);
+}
+
+// An existing reservation to a critical consumer stays sticky even if another
+// ready hauler is geometrically closer. This prevents guard oscillation while
+// the reserved hauler is already travelling to the consumer.
+{
+  const consumer = makeConsumer('upgrader-guard-reserved', 'upgrader', 0, 3, false, 5);
+  const reserved = makeHauler('hauler-gr1', { [consumer.id]: 9 });
+  const closer = makeHauler('hauler-gr2', { [consumer.id]: 1 });
+  reserved.memory.consumerTargetId = consumer.id;
+  room.creeps = [consumer, reserved, closer];
+
+  assert.equal(energy._test.selectConsumerGuardHauler(room).id, reserved.id);
+  assert.equal(energy.shouldPrioritizeConsumer(reserved), true);
+  assert.equal(energy.shouldPrioritizeConsumer(closer), false);
+}
+
+// The guard must never compromise the single-hauler recovery path. With only
+// one live hauler, hard infrastructure retains absolute first priority.
+{
+  const consumer = makeConsumer('builder-single-hauler', 'builder', 0, 0, true, 3);
+  const hauler = makeHauler('hauler-only', { [consumer.id]: 2 });
+  room.creeps = [consumer, hauler];
+
+  assert.equal(energy.isCriticalConsumerRequest(consumer), true);
+  assert.equal(energy._test.selectConsumerGuardHauler(room), null);
+  assert.equal(energy.shouldPrioritizeConsumer(hauler), false);
+}
+
+// Empty by itself is a normal request, not starvation. The guard activates
+// only after the consumer has actually waited or entered fallback.
+{
+  const consumer = makeConsumer('worker-empty-fresh', 'worker', 0, 0, false, 3);
+  const hauler1 = makeHauler('hauler-fresh-1');
+  const hauler2 = makeHauler('hauler-fresh-2');
+  room.creeps = [consumer, hauler1, hauler2];
+
+  assert.equal(energy.consumerNeedsDelivery(consumer), true);
+  assert.equal(energy.isCriticalConsumerRequest(consumer), false);
+  assert.equal(energy._test.selectConsumerGuardHauler(room), null);
+}
+
+
+// Integration of the guard into role.hauler: a selected guard must attempt a
+// consumer transfer before the normal infrastructure delivery path. A normal
+// hauler keeps infrastructure first. This protects the priority ordering from
+// future refactors of role.hauler.
+{
+  const roleHauler = require('../game/role.hauler.js');
+  const original = {
+    shouldPrioritizeConsumer: energy.shouldPrioritizeConsumer,
+    deliverToConsumer: energy.deliverToConsumer,
+    deliver: energy.deliver,
+    clearConsumerTarget: energy.clearConsumerTarget,
+    deliverToControllerBuffer: energy.deliverToControllerBuffer
+  };
+
+  const creep = makeHauler('hauler-role-order');
+  creep.memory.delivering = true;
+  const calls = [];
+
+  energy.shouldPrioritizeConsumer = () => true;
+  energy.deliverToConsumer = () => { calls.push('consumer'); return true; };
+  energy.deliver = () => { calls.push('infrastructure'); return true; };
+  energy.clearConsumerTarget = () => { calls.push('clear'); };
+  energy.deliverToControllerBuffer = () => false;
+
+  roleHauler.run(creep);
+  assert.deepEqual(calls, ['consumer']);
+
+  calls.length = 0;
+  energy.shouldPrioritizeConsumer = () => false;
+  roleHauler.run(creep);
+  assert.deepEqual(calls, ['infrastructure', 'clear']);
+
+  Object.assign(energy, original);
+}
+
+console.log('consumer supply tests passed');

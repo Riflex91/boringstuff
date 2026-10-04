@@ -1,0 +1,22 @@
+{
+  "name": "screeps-chatgpt-tools",
+  "version": "0.2.16",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=18.20.0"
+  },
+  "scripts": {
+    "logs": "node console-capture.mjs",
+    "spawn:plan": "node initial-spawn-planner.mjs",
+    "spawn:auto": "node initial-spawn-planner.mjs --place",
+    "test": "node spawn-planner.test.mjs && node spawn-safety.test.mjs && node console-capture.test.mjs && node telemetry-journal.test.mjs && node economy-model.test.mjs && node logistics-fallback.test.mjs && node consumer-supply.test.mjs && node spawn-economy.test.mjs && node colony-health.test.mjs && node colony-efficiency.test.mjs && node game-syntax-check.mjs",
+    "doctor": "node doctor.mjs",
+    "spawn:deep": "node initial-spawn-planner.mjs --from-report latest --refresh --deep-top 10 --top-rooms 10",
+    "spawn:verify": "node spawn-verify.mjs",
+    "deploy": "node deploy-live.mjs"
+  },
+  "dependencies": {
+    "ws": "8.22.0"
+  }
+}

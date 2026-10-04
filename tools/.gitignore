@@ -1,0 +1,5 @@
+node_modules/
+screeps.json
+.screeps.json
+*.log
+*.ndjson
