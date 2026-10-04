@@ -75,4 +75,43 @@ function cpuSequence(values) {
   assert.equal(sample.unattributed, 2.5);
 }
 
+{
+  // Nested/detail measurements are diagnostic only. They must be sampled on
+  // the exact tick but must not be added to top-level attribution.
+  Game.time = 100;
+  cpuSequence([1, 3, 7]);
+  profiler.detailSection('room.state', () => {});
+  profiler.finishTick();
+
+  const sample = Memory.bot.cpu.history.at(-1);
+  assert.equal(sample.details['room.state'], 2);
+  assert.equal(sample.sections.rooms, 0);
+  assert.equal(sample.attributed, 0);
+  assert.equal(sample.unattributed, 7);
+}
+
+{
+  // Detail samples are subject to the same stale-tick protection.
+  Game.time = 125;
+  cpuSequence([5]);
+  profiler.finishTick();
+
+  const sample = Memory.bot.cpu.history.at(-1);
+  assert.equal(sample.details['room.state'], 0);
+  assert.equal(sample.attributed, 0);
+  assert.equal(sample.unattributed, 5);
+}
+
+{
+  // Detail instrumentation must not swallow errors; the enclosing top-level
+  // section remains the error boundary.
+  Game.time = 126;
+  cpuSequence([0, 1]);
+  assert.throws(() => profiler.detailSection('room.fail', () => {
+    throw new Error('boom');
+  }), /boom/);
+  assert.equal(Memory.bot.cpu.details['room.fail'].last, 1);
+  assert.equal(Memory.bot.cpu.details['room.fail'].lastTick, 126);
+}
+
 console.log('profiler tests passed');
