@@ -197,6 +197,14 @@ marginalUtility + deadlineUrgency + localityBonus + carriedResourceBonus
 
 Assignment supports continuation bias and emergency preemption.
 
+Assignment boundary rules:
+
+- `*_CAPACITY` deficits are not executor jobs. They already represent missing capacity after active capacity has been counted and therefore feed E2 spawn/support planning instead of E1 creep assignment.
+- E1 consumes executable requests such as BUILD, REPAIR, UPGRADE and ENERGY_DELIVERY.
+- While authority is `SHADOW`, E1 uses an internal per-plan remaining-need ledger and does not mutate authoritative RequestRegistry reservations.
+- Shadow assignment may be deferred under CPU pressure; telemetry must expose the last plan tick and the deferral reason.
+- When E1 becomes authoritative, its reservations must move onto the canonical Reservation contract so all planners subtract the same commitments.
+
 # 13. CPU ProcessDescriptor
 
 ```text
