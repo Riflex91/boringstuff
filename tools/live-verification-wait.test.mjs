@@ -17,6 +17,16 @@ function deploymentMarker(tick, deploymentId) {
   };
 }
 
+function evidenceTick(tick) {
+  return {
+    tick,
+    capturedAt: new Date(tick * 200).toISOString(),
+    v: version,
+    code: 'BOT_HEARTBEAT',
+    ctx: { cpu: 1, bucket: 10000 }
+  };
+}
+
 function snapshot(eventTick, startTick, endTick, attribution = true) {
   const productiveFlow = attribution ? {
     consumerTicks: 400,
@@ -87,8 +97,21 @@ function snapshot(eventTick, startTick, endTick, attribution = true) {
 
 {
   const status = resolveAutoStart([versionChange(1000)], version, 'smoke', room);
+  assert.equal(status.ready, false);
+  assert.equal(status.expectedStartTick, 1001);
+  assert.equal(status.expectedEndTick, 1025);
+}
+
+{
+  const status = resolveAutoStart(
+    [versionChange(1000), evidenceTick(1025)],
+    version,
+    'smoke',
+    room
+  );
   assert.equal(status.ready, true);
   assert.equal(status.startTick, 1001);
+  assert.equal(status.endTick, 1025);
 }
 
 {
@@ -126,15 +149,44 @@ function snapshot(eventTick, startTick, endTick, attribution = true) {
 }
 
 {
-  const status = resolveAutoStart(
+  const pending = resolveAutoStart(
     [versionChange(1000), deploymentMarker(1150, 'deploy-b')],
+    version,
+    'smoke',
+    room
+  );
+  assert.equal(pending.ready, false);
+  assert.equal(pending.expectedStartTick, 1150);
+  assert.equal(pending.expectedEndTick, 1174);
+
+  const status = resolveAutoStart(
+    [versionChange(1000), deploymentMarker(1150, 'deploy-b'), evidenceTick(1174)],
     version,
     'smoke',
     room
   );
   assert.equal(status.ready, true);
   assert.equal(status.startTick, 1150);
+  assert.equal(status.endTick, 1174);
   assert.equal(status.boundarySource, 'DEPLOYMENT_MARKER');
+}
+
+
+
+{
+  let reads = 0;
+  const first = [versionChange(1000), deploymentMarker(1150, 'deploy-c'), evidenceTick(1160)];
+  const second = [...first, evidenceTick(1174)];
+  const result = await waitForAutoStart({
+    mode: 'smoke',
+    version,
+    roomName: room,
+    loadEvents() { return reads++ === 0 ? first : second; },
+    sleep: async () => {},
+    pollMs: 1
+  });
+  assert.equal(result.startTick, 1150);
+  assert.equal(result.status.endTick, 1174);
 }
 
 console.log('live verification wait tests passed');
