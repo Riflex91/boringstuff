@@ -12,6 +12,7 @@ const colonyState = require('colony.state');
 const requestShadow = require('request.shadow');
 const assignmentShadow = require('assignment.shadow');
 const assignmentEvidence = require('assignment.evidence');
+const capacitySpawnShadow = require('spawn.capacity.shadow');
 const logger = require('logger');
 const config = require('config');
 
@@ -29,6 +30,7 @@ function status(state) {
     health: state.health,
     efficiency: state.efficiency,
     requests: state.requestShadow ? state.requestShadow.summary : null,
+    capacitySpawn: state.capacitySpawnShadow ? state.capacitySpawnShadow.summary : null,
     assignments: state.assignmentShadow ? state.assignmentShadow.summary : null,
     assignmentEvidence: state.assignmentEvidence ? (state.assignmentEvidence.lastWindow || state.assignmentEvidence.current) : null,
     colonyState: state.colonyState || null
@@ -96,6 +98,11 @@ function run(room, lowCpu) {
   state.health = colonyHealth.evaluate(state);
   state.efficiency = colonyEfficiency.evaluate(state);
   state.requestShadow = requestShadow.produce(state);
+  state.capacitySpawnShadow = lowCpu
+    ? capacitySpawnShadow.deferredSnapshot('LOW_CPU')
+    : capacitySpawnShadow.plan(state, state.requestShadow.requests, Game);
+  state.capacitySpawnShadow.summary.legacyDesired = spawnManager.desired(state);
+
   state.assignmentShadow = lowCpu
     ? {
         assignments: [],

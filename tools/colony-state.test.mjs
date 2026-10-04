@@ -166,4 +166,68 @@ function creep(name, parts, ttl) {
   assert.equal(colonyState.build({ ...base, emergency: false }).mode, 'STABLE');
 }
 
+{
+  const base = {
+    room: {
+      name: 'E4N4',
+      controller: { my: true, level: 3 },
+      find() { return []; }
+    },
+    rcl: 3,
+    creeps: [],
+    hostileCreeps: [],
+    sites: [],
+    structures: [],
+    sources: [],
+    energyStored: 0,
+    energyAvailable: 300,
+    energyCapacityAvailable: 550,
+    emergency: false,
+    economyModel: null,
+    health: null,
+    efficiency: null,
+    capacitySpawnShadow: {
+      deficits: [{
+        id: 'deficit|harvest',
+        capability: 'workHarvest',
+        required: 5,
+        active: 5,
+        projectedSurviving: 0,
+        queued: 0,
+        spawning: 0,
+        deficit: 5,
+        proposedCapacity: 5,
+        uncoveredAfterPlan: 0,
+        preSpawn: true
+      }],
+      spawnRequests: [{
+        id: 'spawn|E4N4|harvest|0',
+        role: 'harvester',
+        capacityDelivered: 5
+      }],
+      summary: {
+        deferred: false,
+        requirementCount: 1,
+        deficitCount: 1,
+        spawnRequestCount: 1,
+        preSpawnCount: 1,
+        proposedCapacity: 5,
+        uncoveredAfterPlan: 0,
+        proposedByRole: { harvester: 1 },
+        bodySource: 'LEGACY_BODY_ADAPTER'
+      }
+    }
+  };
+
+  const snapshot = colonyState.build(base, { tick: 6000, bucket: 9000 });
+  assert.equal(snapshot.capacity.projected.available, true);
+  assert.equal(snapshot.capacity.projected.authority, 'SHADOW');
+  assert.equal(snapshot.capacity.projected.deficits[0].preSpawn, true);
+  assert.equal(snapshot.capacity.queued.available, false);
+  assert.equal(snapshot.capacity.queued.reason, 'SHADOW_PROPOSALS_ARE_NOT_REAL_QUEUE');
+  assert.equal(snapshot.spawnPlan.available, true);
+  assert.equal(snapshot.spawnPlan.summary.spawnRequestCount, 1);
+  assert.equal(snapshot.spawnPlan.requests[0].role, 'harvester');
+}
+
 console.log('colony state tests passed');

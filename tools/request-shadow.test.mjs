@@ -52,7 +52,9 @@ function makeCreep(id, role, carried, capacity, wait, fallback, roomName = 'E1N1
     emergency: true,
     creeps: [worker, harvester],
     economyModel: {
+      recommendedHarvesterWorkParts: 5,
       harvesterWorkDeficit: 2,
+      recommendedHaulerCarryParts: 6,
       haulerCarryDeficit: 3
     }
   };
@@ -69,8 +71,10 @@ function makeCreep(id, role, carried, capacity, wait, fallback, roomName = 'E1N1
   const requests = registry.list('E1N1', memory);
   const byKey = Object.fromEntries(requests.map(r => [r.dedupeKey, r]));
   assert.equal(byKey['recovery:bootstrap'].demand.capability, 'bootstrap');
-  assert.equal(byKey['economy:harvest-capacity'].demand.amount, 2);
-  assert.equal(byKey['logistics:haul-capacity'].demand.amount, 3);
+  assert.equal(byKey['economy:harvest-capacity'].demand.amount, 5);
+  assert.equal(byKey['economy:harvest-capacity'].utility.current, 2);
+  assert.equal(byKey['logistics:haul-capacity'].demand.amount, 6);
+  assert.equal(byKey['logistics:haul-capacity'].utility.current, 3);
   const delivery = byKey['logistics:consumer-energy:worker1'];
   assert.equal(delivery.demand.resourceType, 'energy');
   assert.equal(delivery.demand.amount, 100);
@@ -89,7 +93,7 @@ function makeCreep(id, role, carried, capacity, wait, fallback, roomName = 'E1N1
     room: { name: 'E2N2' },
     emergency: false,
     creeps: [activeWorker],
-    economyModel: { harvesterWorkDeficit: 0, haulerCarryDeficit: 0 }
+    economyModel: { recommendedHarvesterWorkParts: 0, harvesterWorkDeficit: 0, recommendedHaulerCarryParts: 0, haulerCarryDeficit: 0 }
   };
   const result = shadow.produce(state, memory, { time: 200 });
   assert.equal(result.summary.total, 0);
@@ -103,7 +107,7 @@ function makeCreep(id, role, carried, capacity, wait, fallback, roomName = 'E1N1
     room: { name: 'E3N3' },
     emergency: false,
     creeps: [worker],
-    economyModel: { harvesterWorkDeficit: 1, haulerCarryDeficit: 0 }
+    economyModel: { recommendedHarvesterWorkParts: 1, harvesterWorkDeficit: 1, recommendedHaulerCarryParts: 0, haulerCarryDeficit: 0 }
   }, memory, { time: 300 });
   assert.equal(first.summary.total, 2);
 
@@ -112,12 +116,34 @@ function makeCreep(id, role, carried, capacity, wait, fallback, roomName = 'E1N1
     room: { name: 'E3N3' },
     emergency: false,
     creeps: [worker],
-    economyModel: { harvesterWorkDeficit: 0, haulerCarryDeficit: 0 }
+    economyModel: { recommendedHarvesterWorkParts: 0, harvesterWorkDeficit: 0, recommendedHaulerCarryParts: 0, haulerCarryDeficit: 0 }
   }, memory, { time: 301 });
   assert.equal(second.summary.total, 0);
   assert.equal(second.summary.stored, 2);
   assert.equal(second.summary.terminal, 2);
   assert.equal(second.summary.byStatus.SATISFIED, 2);
+}
+
+{
+  const memory = {};
+  const result = shadow.produce({
+    room: { name: 'E5N5' },
+    emergency: false,
+    creeps: [],
+    economyModel: {
+      recommendedHarvesterWorkParts: 5,
+      harvesterWorkDeficit: 0,
+      recommendedHaulerCarryParts: 6,
+      haulerCarryDeficit: 0
+    }
+  }, memory, { time: 400 });
+  const requests = registry.list('E5N5', memory);
+  const byKey = Object.fromEntries(requests.map(r => [r.dedupeKey, r]));
+  assert.equal(result.summary.total, 2);
+  assert.equal(byKey['economy:harvest-capacity'].demand.amount, 5);
+  assert.equal(byKey['economy:harvest-capacity'].utility.current, 0);
+  assert.equal(byKey['logistics:haul-capacity'].demand.amount, 6);
+  assert.equal(byKey['logistics:haul-capacity'].utility.current, 0);
 }
 
 {
