@@ -46,6 +46,7 @@ Projektziel: Ein autonomer, adaptiver, CPU-effizienter Screeps-Bot, der vom erst
 - `verify:live` wartet automatisch auf ein vollständiges 100-Tick-Fenster und zeigt einen Countdown `Waiting for data...[MM Min SS Sec remaining]`.
 - Same-Version-Redeploy-Härtung: Jeder `npm run deploy` erhält künftig eine eindeutige `DEPLOYMENT_ID`; der erste Runtime-Tick schreibt einen persistenten `DEPLOYMENT_MARKER`. Smoke/Live-Verifikation richtet sich primär nach dem neuesten Deployment-Marker und fällt nur für historische Releases auf `VERSION_CHANGE` zurück.
 - Die nach dem Partial-Delivery-Fix erneut ausgegebenen Fenster `3684422–3684446` und `3684501–3684600` waren **keine neue Verifikation**; sie wurden wegen des bisherigen Same-Version-Redeploy-Problems erneut ausgewählt. Diese Evidence bleibt historisch erhalten, zählt aber nicht als Validation der zweiten v0.2.20-Behavior-Iteration.
+- Der neue Deployment-Marker ist live bestätigt: zweiter v0.2.20-Deploy startet bei Tick `3684877`; `verify:smoke` wählte korrekt `3684877–3684901`. Der erste Aufruf war lediglich zu früh und deshalb unvollständig. Smoke auto-wait wurde anschließend tools-only ergänzt; die laufende Live-Verifikation bleibt gültig.
 
 Wichtig: Der Bot läuft live. Änderungen weiterhin datengetrieben durchführen. Historische Verification Evidence ist append-only und darf nicht nachträglich umgeschrieben werden.
 
