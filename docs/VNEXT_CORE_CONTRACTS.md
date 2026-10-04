@@ -136,15 +136,30 @@ CapacityDeficit {
 }
 ```
 
-Projected surviving capacity excludes creeps whose TTL is below their productive-start horizon.
+`active` is present-time capacity for observability. `projectedSurviving` is the subset of currently active capacity expected to remain productive at the evaluated future horizon and is therefore **not additive with `active`**.
+
+Future deficit is computed as:
+
+```text
+required
+- projectedSurviving
+- spawningAvailableByHorizon
+- queuedCapacityAvailableByHorizon
+- externallyCommitted
+= deficit
+```
+
+Projected surviving capacity excludes creeps whose TTL is at or below their productive-start horizon.
+
+For SHADOW E2, proposed SpawnRequests are not a real queue. They must be reported separately from `queued` until the spawn scheduler becomes authoritative.
 
 # 9. SpawnRequest
 
 ```text
 SpawnRequest {
   id, sourceDeficitId, priority, deadlineTick?, targetRoom, dutyTarget?,
-  body, cost, spawnTicks, capacityDelivered,
-  predicted { queueDelay, travelTicks, productiveStartTick, productiveLifetime, expectedUtility },
+  body, cost, spawnTicks, capacityDelivered, capacityApplied?,
+  predicted { queueDelay, travelTicks, safetyMarginTicks, productiveStartTick, productiveLifetime, expectedUtility },
   fallbackBody?
 }
 ```
