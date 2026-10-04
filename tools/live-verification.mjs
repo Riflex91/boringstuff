@@ -4,11 +4,13 @@ import { fileURLToPath } from 'node:url';
 import { EXPECTED_BOT_VERSION, evaluateLive, evaluateSmoke } from './live-verification-core.mjs';
 import { filterTimestampedLogRecords } from './live-verification-log.mjs';
 import { waitForAutoStart } from './live-verification-wait.mjs';
+import { DEFAULT_VERIFICATION_LOG_DIR, readDeploymentReceipt } from './deployment-receipt.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DEFAULT_LOG_DIR = String.raw`C:\Users\hansi\AppData\Local\Screeps\scripts\screeps_newbieland_net___21025\chatgpt\logs`;
-const LOG_DIR = process.env.SCREEPS_LOG_DIR || DEFAULT_LOG_DIR;
+const LOG_DIR = process.env.SCREEPS_LOG_DIR || DEFAULT_VERIFICATION_LOG_DIR;
 const ROOM = process.env.SCREEPS_ROOM || 'E8N1';
+const SERVER = process.env.SCREEPS_SERVER || 'newbieland';
+const BRANCH = process.env.SCREEPS_BRANCH || 'chatgpt';
 
 function usage(code = 0) {
   console.log(`\nLive Verification Harness v0.2.20\n\n  node live-verification.mjs smoke [--start-tick N] [--room E8N1] [--version 0.2.20-node18]\n  node live-verification.mjs live  [--start-tick N] [--room E8N1] [--version 0.2.20-node18]\n\nThe command is read-only. It evaluates existing collector evidence and never mutates Screeps or historical telemetry.\nIf --start-tick is omitted, the latest DEPLOYMENT_MARKER is used; historical releases fall back to VERSION_CHANGE.\n`);
@@ -90,12 +92,21 @@ if (!events.length) throw new Error(`No bot-events-*.ndjson evidence found in ${
 
 let startTick = args.startTick;
 if (startTick === null) {
+  const receipt = readDeploymentReceipt({
+    logDir: LOG_DIR,
+    server: SERVER,
+    branch: BRANCH,
+    version: args.version
+  });
+  const expectedDeploymentId = receipt?.receipt?.deploymentId || null;
+
   const waited = await waitForAutoStart({
     mode: args.mode,
     version: args.version,
     roomName: args.room,
     loadEvents: () => dedupeEvents(readNdjson('bot-events-')),
-    onWait: message => console.error(message)
+    onWait: message => console.error(message),
+    expectedDeploymentId
   });
   startTick = waited.startTick;
   events = waited.events;
