@@ -1,0 +1,39 @@
+name: v0.2.20 Node 18 regression
+
+on:
+  push:
+    branches:
+      - feature/v0.2.20-critical-consumer-early-dispatch
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: tools
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use exact Node 18.20.4
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18.20.4
+          cache: npm
+          cache-dependency-path: tools/package.json
+
+      - name: Verify Node gate
+        run: |
+          test "$(node --version)" = "v18.20.4"
+          node --version
+
+      - name: Install tool dependency
+        run: npm install --ignore-scripts --no-audit --no-fund
+
+      - name: Full offline regression
+        run: npm test
