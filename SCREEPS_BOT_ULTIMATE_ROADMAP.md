@@ -356,9 +356,11 @@ Use:
 On `ERR_GCL_NOT_ENOUGH`, `ERR_FULL`, or adapter-normalized equivalent:
 
 - cancel unsafe duplicate claim requests;
-- record discovered constraint;
+- persist the failure with target/context evidence;
 - backoff;
 - reevaluate expansion budget.
+
+Do **not** infer a permanent global room cap from one claim error. Standard `ERR_GCL_NOT_ENOUGH` is dynamic GCL capacity; `ERR_FULL` may be area/server-context specific. Promote `discoveredClaimLimit` only from explicit server metadata/adapters or sufficiently strong multi-context evidence that establishes a global constraint.
 
 ## 3.3 Tick-rate independence
 
