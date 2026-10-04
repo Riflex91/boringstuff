@@ -9,6 +9,7 @@ const stats = require('stats');
 const visuals = require('visuals');
 const commands = require('commands');
 const runtimeCapabilities = require('runtime.capabilities');
+const serverProfile = require('server.profile');
 
 function bootstrapMemory() {
   if (!Memory.bot) Memory.bot = { version: config.VERSION, born: Game.time };
@@ -41,7 +42,8 @@ function bootstrapMemory() {
 
 function statusSnapshot(roomStates, tickCpu) {
   const rooms = {};
-  const capabilities = runtimeCapabilities.observe();
+  const profile = serverProfile.snapshot();
+  const capabilities = runtimeCapabilities.observe(undefined, profile);
   for (const state of roomStates) {
     const controller = state.room.controller;
     rooms[state.room.name] = {
@@ -69,6 +71,7 @@ function statusSnapshot(roomStates, tickCpu) {
     gcl: Game.gcl ? { level: Game.gcl.level, progress: Game.gcl.progress, progressTotal: Game.gcl.progressTotal } : null,
     totalCreeps: Object.keys(Game.creeps).length,
     capabilities,
+    serverProfile: profile,
     rooms
   }, { force: true, persist: false, dedupeTicks: 0 });
 }

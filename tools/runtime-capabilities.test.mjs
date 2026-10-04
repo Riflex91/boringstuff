@@ -35,7 +35,13 @@ const capabilities = require('../game/runtime.capabilities.js');
     }
   };
 
-  const observed = capabilities.observe(game);
+  const observed = capabilities.observe(game, {
+    claimPolicy: {
+      discoveredClaimLimit: 3,
+      confidence: 0.75,
+      lastFailure: { tick: 12000, result: 'CONTEXT_CAPACITY' }
+    }
+  });
   assert.equal(observed.schemaVersion, 1);
   assert.equal(observed.environment.shardName, 'shard-test');
   assert.equal(observed.cpu.limit, 20);
@@ -52,9 +58,24 @@ const capabilities = require('../game/runtime.capabilities.js');
   assert.equal(observed.ownership.gclLevel, 4);
   assert.equal(observed.ownership.ownedRooms, 2);
   assert.equal(observed.ownership.activeClaimCommitments, 0);
-  assert.equal(observed.ownership.discoveredClaimLimit, null);
+  assert.equal(observed.ownership.discoveredClaimLimit, 3);
+  assert.equal(observed.ownership.claimPolicyConfidence, 0.75);
+  assert.equal(observed.ownership.lastClaimFailure.result, 'CONTEXT_CAPACITY');
   assert.equal(observed.world.roomStatusAvailable, true);
   assert.equal(observed.observed.lastUpdatedTick, 12345);
+}
+
+{
+  const observed = capabilities.observe({
+    time: 50,
+    cpu: { limit: 5, bucket: 2500 },
+    gcl: { level: 1 },
+    rooms: {}
+  });
+  assert.equal(observed.cpu.limit, 5);
+  assert.equal(observed.cpu.bucket, 2500);
+  assert.equal(observed.ownership.gclLevel, 1);
+  assert.equal(observed.observed.lastUpdatedTick, 50);
 }
 
 {

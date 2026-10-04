@@ -1,5 +1,7 @@
 'use strict';
 
+const featureRegistry = require('feature.registry');
+
 const SCHEMA_VERSION = 1;
 
 function finiteOrNull(value) {
@@ -16,16 +18,13 @@ function ownedRoomCount(game) {
   return count;
 }
 
-function hasGlobal(name) {
-  return typeof globalThis !== 'undefined' && typeof globalThis[name] !== 'undefined';
-}
-
-function observe(game) {
+function observe(game, serverProfile) {
   game = game || (typeof Game !== 'undefined' ? Game : null);
 
   const cpu = game && game.cpu ? game.cpu : null;
   const gcl = game && game.gcl ? game.gcl : null;
-  const map = game && game.map ? game.map : null;
+  const features = featureRegistry.probe(game);
+  const claimPolicy = serverProfile && serverProfile.claimPolicy ? serverProfile.claimPolicy : null;
 
   return {
     schemaVersion: SCHEMA_VERSION,
@@ -37,30 +36,30 @@ function observe(game) {
       limit: finiteOrNull(cpu && cpu.limit),
       bucket: finiteOrNull(cpu && cpu.bucket),
       observedBucketMax: null,
-      heapStatsAvailable: !!(cpu && typeof cpu.getHeapStatistics === 'function')
+      heapStatsAvailable: features.heapStats
     },
     persistence: {
-      segmentsAvailable: hasGlobal('RawMemory') && !!globalThis.RawMemory && typeof globalThis.RawMemory.setActiveSegments === 'function',
-      interShardMemoryAvailable: hasGlobal('InterShardMemory') && !!globalThis.InterShardMemory
+      segmentsAvailable: features.segments,
+      interShardMemoryAvailable: features.interShardMemory
     },
     systems: {
-      marketAvailable: !!(game && game.market),
-      powerCreepsAvailable: !!(game && game.powerCreeps) || hasGlobal('POWER_CREEP_LIFE_TIME'),
-      factoriesAvailable: hasGlobal('STRUCTURE_FACTORY'),
-      labsAvailable: hasGlobal('STRUCTURE_LAB'),
-      observersAvailable: hasGlobal('STRUCTURE_OBSERVER'),
-      nukersAvailable: hasGlobal('STRUCTURE_NUKER')
+      marketAvailable: features.market,
+      powerCreepsAvailable: features.powerCreeps,
+      factoriesAvailable: features.factories,
+      labsAvailable: features.labs,
+      observersAvailable: features.observers,
+      nukersAvailable: features.nukers
     },
     ownership: {
       gclLevel: finiteOrNull(gcl && gcl.level),
       ownedRooms: ownedRoomCount(game),
       activeClaimCommitments: 0,
-      discoveredClaimLimit: null,
-      claimPolicyConfidence: 0,
-      lastClaimFailure: null
+      discoveredClaimLimit: claimPolicy && Number.isFinite(claimPolicy.discoveredClaimLimit) ? claimPolicy.discoveredClaimLimit : null,
+      claimPolicyConfidence: claimPolicy && Number.isFinite(claimPolicy.confidence) ? claimPolicy.confidence : 0,
+      lastClaimFailure: claimPolicy ? claimPolicy.lastFailure || null : null
     },
     world: {
-      roomStatusAvailable: !!(map && typeof map.getRoomStatus === 'function'),
+      roomStatusAvailable: features.roomStatus,
       worldStatusAvailable: false
     },
     observed: {
@@ -73,5 +72,5 @@ function observe(game) {
 module.exports = {
   SCHEMA_VERSION,
   observe,
-  _test: { ownedRoomCount, finiteOrNull, hasGlobal }
+  _test: { ownedRoomCount, finiteOrNull }
 };
