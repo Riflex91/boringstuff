@@ -110,6 +110,12 @@ const liveState = {
 const capacityDeficit = require('../game/economy.model.js').analyze(liveState);
 assert.equal(capacityDeficit.mode, 'container-logistics');
 assert.equal(capacityDeficit.dedicatedHarvestCapacityPerTick, 20);
+// Live-like 550-energy composition: 2 workers + 1 builder at 2 WORK each
+// can spend 30 e/t on construction, while the 2-WORK upgrader can spend
+// another 2 e/t. Productive capacity therefore exceeds sustainable mining by
+// 12 e/t (32 vs 20), confirming the burst/consumer-pressure mechanism.
+assert.equal(capacityDeficit.productiveDemandPerTick, 32);
+assert.equal(capacityDeficit.productiveDemandPerTick - capacityDeficit.dedicatedHarvestCapacityPerTick, 12);
 assert.equal(capacityDeficit.recommendedHaulerCarryParts, 12);
 assert.equal(capacityDeficit.haulerCarryParts, 10);
 assert.equal(capacityDeficit.nextHaulerCarryParts, 6);
