@@ -1,5 +1,7 @@
 'use strict';
 
+const config = require('config');
+
 const CONSUMER_ROLES = {
   builder: true,
   worker: true,
@@ -163,15 +165,72 @@ function isConsumer(creep) {
   return !!(creep && creep.memory && CONSUMER_ROLES[creep.memory.role] && creep.store && creep.store.getFreeCapacity);
 }
 
+function consumerEnergyUsePerTick(creep) {
+  if (!creep || !creep.memory || !creep.getActiveBodyparts || typeof WORK === 'undefined') return 0;
+  const workParts = creep.getActiveBodyparts(WORK) || 0;
+  if (workParts <= 0) return 0;
+
+  const upgradePower = typeof UPGRADE_CONTROLLER_POWER !== 'undefined' ? UPGRADE_CONTROLLER_POWER : 1;
+  if (creep.memory.role === 'upgrader') return workParts * upgradePower;
+
+  // Builders/workers can consume BUILD_POWER energy per WORK part while
+  // construction is active. Outside a construction phase their repair/upgrade
+  // burn is lower, so use the controller rate as the conservative refill need.
+  const buildPower = typeof BUILD_POWER !== 'undefined' ? BUILD_POWER : 5;
+  const hasConstruction = !!(
+    creep.room &&
+    creep.room.find &&
+    typeof FIND_MY_CONSTRUCTION_SITES !== 'undefined' &&
+    creep.room.find(FIND_MY_CONSTRUCTION_SITES).length
+  );
+  return workParts * (hasConstruction ? buildPower : upgradePower);
+}
+
+function consumerRefillTargetEnergy(creep) {
+  if (!isConsumer(creep)) return 0;
+  const capacity = energyAmount(creep) + freeEnergyCapacity(creep);
+  if (capacity <= 0) return 0;
+
+  const carryUnit = typeof CARRY_CAPACITY !== 'undefined' ? CARRY_CAPACITY : 50;
+  const burnPerTick = consumerEnergyUsePerTick(creep);
+  const horizon = Math.max(1, Number(config.CONSUMER_HAULER_WAIT_TICKS) || 1);
+
+  // Aim for enough energy to survive one complete logistics wait horizon.
+  // Clamp to carry capacity so current early-RCL consumers naturally top out
+  // at their physical store instead of introducing a fixed refill percentage.
+  if (burnPerTick <= 0) return Math.min(capacity, carryUnit);
+  return Math.min(capacity, Math.max(carryUnit, Math.ceil(burnPerTick * horizon)));
+}
+
+function consumerRefillRequestThresholdEnergy(creep) {
+  const target = consumerRefillTargetEnergy(creep);
+  const carryUnit = typeof CARRY_CAPACITY !== 'undefined' ? CARRY_CAPACITY : 50;
+  return Math.max(0, target - Math.min(target, carryUnit));
+}
+
+function consumerRefillEnergyNeeded(creep) {
+  return Math.max(0, consumerRefillTargetEnergy(creep) - energyAmount(creep));
+}
+
+function consumerHasLowRunway(creep) {
+  if (!isConsumer(creep) || !creep.memory.working || freeEnergyCapacity(creep) <= 0) return false;
+  const carried = energyAmount(creep);
+  if (carried <= 0) return false;
+  const target = consumerRefillTargetEnergy(creep);
+  return carried < target && carried <= consumerRefillRequestThresholdEnergy(creep);
+}
+
 function consumerNeedsDelivery(creep) {
   if (!isConsumer(creep) || freeEnergyCapacity(creep) <= 0) return false;
   const waiting = creep.memory.waitingEnergyTicks || 0;
-  return energyAmount(creep) === 0 || waiting > 0 || !!creep.memory.logisticsFallback;
+  return energyAmount(creep) === 0 || waiting > 0 || !!creep.memory.logisticsFallback || consumerHasLowRunway(creep);
 }
 
 function isCriticalConsumerRequest(creep) {
   if (!consumerNeedsDelivery(creep)) return false;
-  return !!creep.memory.logisticsFallback || (creep.memory.waitingEnergyTicks || 0) > 0;
+  return !!creep.memory.logisticsFallback ||
+    (creep.memory.waitingEnergyTicks || 0) > 0 ||
+    consumerHasLowRunway(creep);
 }
 
 function haulerReadyToDeliver(creep) {
@@ -257,7 +316,18 @@ function selectConsumerEarlyDispatchHauler(room) {
   });
   if (!critical.length) return null;
 
-  const partial = haulers.filter(h => !haulerReadyToDeliver(h) && energyAmount(h) > 0);
+  // A partial dispatch is useful only if it can complete the refill target in
+  // one transfer. This prevents the 50-energy oscillation seen with 2-WORK
+  // builders: 50 energy lasts only 5 build ticks, shorter than the configured
+  // 12-tick logistics wait horizon.
+  const requiredRefill = critical.reduce((maxNeeded, consumer) => {
+    return Math.max(maxNeeded, consumerRefillEnergyNeeded(consumer));
+  }, 0);
+  const partial = haulers.filter(h =>
+    !haulerReadyToDeliver(h) &&
+    energyAmount(h) > 0 &&
+    energyAmount(h) >= requiredRefill
+  );
   if (!partial.length) return null;
 
   const criticalIds = {};
@@ -367,11 +437,12 @@ function deliverToConsumer(creep) {
     return true;
   }
   if (rc === OK) {
-    // v0.2.20 live evidence showed partial emergency deliveries eliminating
-    // fallback while leaving consumers stuck in refill/waiting state. Any
-    // successful positive delivery is enough to resume productive work; the
-    // consumer can spend that energy immediately instead of waiting to be full.
-    if (energyAmount(target) > 0) {
+    // The first v0.2.20 iteration waited for a completely full consumer; the
+    // second resumed after any positive transfer. Live evidence showed that
+    // both extremes oscillate. Resume only after the consumer reaches a refill
+    // target derived from its WORK burn and the existing logistics wait SLA.
+    const refillTarget = consumerRefillTargetEnergy(target);
+    if (refillTarget > 0 && energyAmount(target) >= refillTarget) {
       target.memory.working = true;
       target.memory.waitingEnergyTicks = 0;
       target.memory.logisticsFallback = false;
@@ -417,6 +488,11 @@ module.exports = {
   _test: {
     consumerPriority,
     consumerEnergyRatio,
+    consumerEnergyUsePerTick,
+    consumerRefillTargetEnergy,
+    consumerRefillRequestThresholdEnergy,
+    consumerRefillEnergyNeeded,
+    consumerHasLowRunway,
     selectConsumerTarget,
     currentConsumerTarget,
     haulerReadyToDeliver,
