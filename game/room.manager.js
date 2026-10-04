@@ -10,6 +10,7 @@ const colonyHealth = require('colony.health');
 const colonyEfficiency = require('colony.efficiency');
 const colonyState = require('colony.state');
 const requestShadow = require('request.shadow');
+const assignmentShadow = require('assignment.shadow');
 const logger = require('logger');
 const config = require('config');
 
@@ -27,6 +28,7 @@ function status(state) {
     health: state.health,
     efficiency: state.efficiency,
     requests: state.requestShadow ? state.requestShadow.summary : null,
+    assignments: state.assignmentShadow ? state.assignmentShadow.summary : null,
     colonyState: state.colonyState || null
   };
 }
@@ -92,6 +94,19 @@ function run(room, lowCpu) {
   state.health = colonyHealth.evaluate(state);
   state.efficiency = colonyEfficiency.evaluate(state);
   state.requestShadow = requestShadow.produce(state);
+  state.assignmentShadow = lowCpu
+    ? {
+        assignments: [],
+        unfilled: [],
+        summary: assignmentShadow.deferredSnapshot(state.room.name, 'LOW_CPU')
+      }
+    : assignmentShadow.plan(
+        state.room.name,
+        state.requestShadow.requests,
+        state.creeps,
+        undefined,
+        Game
+      );
   state.colonyState = colonyState.build(state, {
     tick: Game.time,
     bucket: Game.cpu.bucket
