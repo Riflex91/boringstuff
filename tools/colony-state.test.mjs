@@ -169,6 +169,55 @@ function creep(name, parts, ttl) {
 {
   const base = {
     room: {
+      name: 'E3N3',
+      controller: { my: true, level: 2 },
+      find() { return []; }
+    },
+    rcl: 2,
+    creeps: [],
+    hostileCreeps: [],
+    sites: [],
+    structures: [],
+    sources: [],
+    energyStored: 0,
+    energyAvailable: 300,
+    energyCapacityAvailable: 550,
+    emergency: false,
+    economyModel: null,
+    health: null,
+    efficiency: null,
+    requestShadow: {
+      summary: {
+        open: 3,
+        blocked: 0,
+        total: 3,
+        stored: 3,
+        terminal: 0,
+        reservationCount: 0,
+        byStatus: { OPEN: 3 },
+        byDomain: { logistics: 3 }
+      },
+      logisticsGraph: {
+        schemaVersion: 1,
+        authority: 'SHADOW',
+        total: 3,
+        totalAmount: 650,
+        byKind: { PICKUP: 1, DELIVER: 1, RESERVE: 1 },
+        amountByKind: { PICKUP: 500, DELIVER: 100, RESERVE: 50 }
+      }
+    }
+  };
+  const snapshot = colonyState.build(base, { tick: 5500, bucket: 9000 });
+  assert.equal(snapshot.logisticsRequests.available, true);
+  assert.equal(snapshot.logisticsRequests.authority, 'SHADOW');
+  assert.equal(snapshot.logisticsRequests.total, 3);
+  assert.equal(snapshot.logisticsRequests.byKind.PICKUP, 1);
+  assert.equal(snapshot.logisticsRequests.amountByKind.DELIVER, 100);
+}
+
+{
+  const base = {
+    room: {
       name: 'E4N4',
       controller: { my: true, level: 3 },
       find() { return []; }

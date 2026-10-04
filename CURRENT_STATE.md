@@ -252,7 +252,13 @@ The first VNext shadow live gate is complete. The restriction against starting a
 
 However, the current release remains shadow/evidence-only. No authority promotion is justified yet.
 
-Per the VNext implementation order, the next architectural slice is **E3 — Logistics Requests**, followed by **E4 — Hauler Matching**. Before making either authoritative, preserve the shadow-first migration rule and use O2 / productive-flow evidence to compare candidate decisions with legacy execution.
+The first post-live follow-up is now implemented in development, but is **not yet live-verified**:
+
+- E2 spawning-capacity accounting now resolves `spawn.spawning.name` through `Game.creeps` when the in-flight creep is not yet present in `state.creeps`. This prevents duplicate future-capacity proposals observed during the live harvester/hauler replacement transitions.
+- E3 — Logistics Requests has started in SHADOW mode with explicit `PICKUP`, `DELIVER`, `BALANCE`, `RESERVE`, and `EMERGENCY_DELIVER` graph publishers.
+- Logistics requests preserve explicit source/target endpoints and expose a SHADOW summary through ColonyState telemetry.
+- E3 graph requests are intentionally excluded from E1 generic assignment. Dedicated transport matching/reservations remain the responsibility of **E4 — Hauler Matching**.
+- No gameplay authority is changed by these updates.
 
 The latest live window still exposes three optimization findings:
 
@@ -269,7 +275,7 @@ Do not respond by blindly adding mining or hauling capacity. The next logistics 
 
 The remaining issue is productive-flow execution rather than aggregate supply capacity. Consumer fallback can recur despite sufficient modeled hauling, and productive throughput still trails available mining capacity.
 
-The next architecture work should therefore move toward explicit logistics requests and matching while keeping legacy gameplay authoritative until shadow comparison shows equal-or-better output.
+The next architecture work is to validate the new E2/E3 shadow telemetry in-game, then continue into E4 hauler matching while keeping legacy gameplay authoritative until shadow comparison shows equal-or-better output.
 
 ## Development invariants
 

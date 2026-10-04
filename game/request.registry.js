@@ -68,6 +68,7 @@ function normalize(spec, roomName, tick) {
     createdTick: tick,
     updatedTick: tick,
     deadlineTick: Number.isFinite(spec.deadlineTick) ? spec.deadlineTick : null,
+    source: spec.source ? cloneTarget(spec.source, roomName) : null,
     target: cloneTarget(spec.target, roomName),
     demand: {
       resourceType: spec.demand ? spec.demand.resourceType || null : null,

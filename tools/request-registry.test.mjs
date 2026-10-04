@@ -15,6 +15,7 @@ function spec(key, amount = 5) {
     dedupeKey: key,
     domain: 'economy',
     kind: 'TEST_CAPACITY',
+    source: { roomName: 'E1N1', id: 'source1', pos: { x: 5, y: 6, roomName: 'E1N1' } },
     target: { roomName: 'E1N1' },
     demand: { capability: 'workHarvest', amount, minimumUsefulAmount: 1 },
     priority: { base: 50, urgency: 10, strategicClass: 'CORE_ECONOMY' },
@@ -31,6 +32,8 @@ function spec(key, amount = 5) {
   assert.equal(first.createdTick, 10);
   assert.equal(first.updatedTick, 10);
   assert.equal(first.demand.amount, 5);
+  assert.equal(first.source.id, 'source1');
+  assert.deepEqual(first.source.pos, { x: 5, y: 6, roomName: 'E1N1' });
 
   const same = registry.upsert('E1N1', spec('economy:test', 7), memory, { time: 11 });
   assert.equal(same.id, first.id);

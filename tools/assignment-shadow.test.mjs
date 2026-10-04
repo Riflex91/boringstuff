@@ -181,6 +181,9 @@ function request(id, kind, capability, amount, options = {}) {
 {
   const capacity = request('capacity-only', 'HAUL_CAPACITY', 'carry', 4, { base: 100 });
   assert.equal(assignment._test.requestAssignable(capacity), false);
+  for (const kind of ['PICKUP', 'DELIVER', 'BALANCE', 'RESERVE', 'EMERGENCY_DELIVER']) {
+    assert.equal(assignment._test.requestAssignable(request('e3-' + kind, kind, 'transportEnergy', 50)), false);
+  }
   const work = request('work-only', 'BUILD', 'workBuild', 2, { base: 50 });
   assert.equal(assignment._test.requestAssignable(work), true);
 }

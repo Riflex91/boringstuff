@@ -124,38 +124,67 @@ function earliestSlot(slots) {
   return best;
 }
 
-function currentAndSpawning(state, request) {
+function currentAndSpawning(state, request, game) {
+  game = game || (typeof Game !== 'undefined' ? Game : null);
   let active = 0;
   let spawning = 0;
   const activeCreeps = [];
   const spawningCreeps = [];
   const spawnRemainingByName = {};
+  const spawningNames = {};
   if (state && state.room && typeof state.room.find === 'function' && typeof FIND_MY_SPAWNS !== 'undefined') {
     let spawns = [];
     try { spawns = state.room.find(FIND_MY_SPAWNS) || []; } catch (err) {}
     for (const spawn of spawns) {
       if (spawn && spawn.spawning && spawn.spawning.name) {
-        spawnRemainingByName[spawn.spawning.name] = Number.isFinite(spawn.spawning.remainingTime)
+        const name = spawn.spawning.name;
+        spawningNames[name] = true;
+        spawnRemainingByName[name] = Number.isFinite(spawn.spawning.remainingTime)
           ? Math.max(0, spawn.spawning.remainingTime)
           : 0;
       }
     }
   }
+
+  const seenSpawning = {};
   for (const creep of state.creeps || []) {
     const capacity = capacityForCreep(creep, request);
     if (capacity <= 0) continue;
-    if (creep.spawning) {
+    const name = creep.name || creep.id;
+    const isSpawning = !!creep.spawning || !!spawningNames[name];
+    if (isSpawning) {
       spawning += capacity;
+      if (name) seenSpawning[name] = true;
       spawningCreeps.push({
         creep,
         capacity,
-        remainingTime: Number.isFinite(spawnRemainingByName[creep.name]) ? spawnRemainingByName[creep.name] : 0
+        remainingTime: Number.isFinite(spawnRemainingByName[name]) ? spawnRemainingByName[name] : 0
       });
     } else {
       active += capacity;
       activeCreeps.push({ creep, capacity });
     }
   }
+
+  // In the live runtime a creep being produced can already exist in Game.creeps
+  // while room.find(FIND_MY_CREEPS) (and therefore state.creeps) does not expose
+  // it yet. Resolve spawn.spawning.name against Game.creeps so E2 counts real
+  // in-flight legacy capacity instead of proposing a duplicate replacement.
+  for (const name in spawningNames) {
+    if (seenSpawning[name]) continue;
+    const creep = game && game.creeps ? game.creeps[name] : null;
+    if (!creep) continue;
+    const capacity = capacityForCreep(creep, request);
+    if (capacity <= 0) continue;
+    spawning += capacity;
+    seenSpawning[name] = true;
+    spawningCreeps.push({
+      creep,
+      capacity,
+      remainingTime: Number.isFinite(spawnRemainingByName[name]) ? spawnRemainingByName[name] : 0
+    });
+  }
+
   return { active, spawning, activeCreeps, spawningCreeps };
 }
 
@@ -195,7 +224,7 @@ function planRequirement(state, request, slots, planned, game) {
   const tick = now(game);
   const role = roleForRequest(request);
   const required = request.demand && Number.isFinite(request.demand.amount) ? Math.max(0, request.demand.amount) : 0;
-  const current = currentAndSpawning(state, request);
+  const current = currentAndSpawning(state, request, game);
   const energyCapacity = Math.max(0, Number(state.energyCapacityAvailable) || 0);
   const energyAvailable = Math.max(0, Number(state.energyAvailable) || 0);
   const primary = optimizeBody(role, request, Math.max(1, required), energyCapacity, state);

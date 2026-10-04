@@ -30,6 +30,7 @@ function status(state) {
     health: state.health,
     efficiency: state.efficiency,
     requests: state.requestShadow ? state.requestShadow.summary : null,
+    logisticsRequests: state.requestShadow ? state.requestShadow.logisticsGraph : null,
     capacitySpawn: state.capacitySpawnShadow ? state.capacitySpawnShadow.summary : null,
     assignments: state.assignmentShadow ? state.assignmentShadow.summary : null,
     assignmentEvidence: state.assignmentEvidence ? (state.assignmentEvidence.lastWindow || state.assignmentEvidence.current) : null,
