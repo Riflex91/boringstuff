@@ -1,5 +1,5 @@
 export const EXPECTED_NODE_VERSION = '18.20.4';
-export const EXPECTED_BOT_VERSION = '0.2.18-node18';
+export const EXPECTED_BOT_VERSION = '0.2.19-node18';
 
 const RANK = { PASS: 0, WATCH: 1, FAIL: 2 };
 
@@ -138,6 +138,29 @@ export function evaluateLive(input) {
   const eco = latest?.economy || {};
   const eff = latest?.efficiency || {};
   const last100 = eco?.last100 || {};
+  const attribution = last100?.productiveFlow || null;
+  const attributionFields = {
+    consumerTicks: finite(attribution?.consumerSupply?.consumerTicks, null),
+    waitingConsumerTicks: finite(attribution?.consumerSupply?.waitingConsumerTicks, null),
+    criticalConsumerTicks: finite(attribution?.consumerSupply?.criticalConsumerTicks, null),
+    fallbackConsumerTicks: finite(attribution?.consumerSupply?.fallbackConsumerTicks, null),
+    averageConstructionCapacityPerTick: finite(attribution?.workCapacity?.averageConstructionCapacityPerTick, null),
+    averageDedicatedControllerCapacityPerTick: finite(attribution?.workCapacity?.averageDedicatedControllerCapacityPerTick, null),
+    actualProductiveThroughputPerTick: finite(attribution?.actualThroughput?.totalPerTick, null)
+  };
+  const missingAttribution = Object.entries(attributionFields).filter(([, value]) => value === null).map(([key]) => key);
+  if (!attribution || missingAttribution.length) {
+    checks.push(check(
+      'productive-attribution',
+      selected.complete ? 'FAIL' : 'WATCH',
+      selected.complete
+        ? 'Productive-flow attribution is missing or incomplete in the complete 100-tick window.'
+        : 'Productive-flow attribution is not complete yet.',
+      { missing: missingAttribution }
+    ));
+  } else {
+    checks.push(check('productive-attribution', 'PASS', 'Productive-flow attribution is complete for the 100-tick window.', attributionFields));
+  }
 
   const haulerDeficit = finite(model.haulerCarryDeficit, null);
   if (haulerDeficit === null) checks.push(check('hauler-capacity', 'WATCH', 'No haulerCarryDeficit value was available.'));

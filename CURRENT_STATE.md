@@ -155,28 +155,32 @@ The behavior target succeeded: self-supply fallback was eliminated in the verifi
 
 ## Next release boundary
 
-v0.2.18 is live-verified and closes the measured consumer-energy churn issue. Do **not** immediately increase mining or hauling capacity: both were healthy in the verification window.
+The next intended release is **v0.2.19-node18 — Productive Flow Attribution**.
 
-The next behavior release is intentionally **not selected yet**. Fresh evidence should first explain the remaining two optimization signals:
+This is an **OBSERVABILITY-ONLY** release. It must not change creep behavior, spawn policy, mining, hauling, defense, planning, or expansion.
 
-- some consumers still become waiting/critical even though fallback stays at zero;
+The verified v0.2.18 window left two optimization signals:
+
+- consumers can still become waiting/critical while fallback remains zero;
 - productive throughput still trails available mining capacity.
 
-The next change should therefore be derived from additional telemetry that distinguishes delivery latency, consumer work-capacity limits, construction mix, and controller demand before changing creep counts or body sizes.
+v0.2.19 adds bounded current-state and 100-tick attribution that separates:
+
+- delivery latency: consumer/waiting/critical/fallback/empty creep-ticks, waiting ratios, average/max wait age;
+- consumer work capacity: average active WORK parts by productive role plus construction-capable and dedicated-controller capacity;
+- construction mix: site count, remaining progress, and remaining progress by structure type;
+- controller demand: remaining controller progress, ticks-to-downgrade, and demand-active ratio;
+- actual productive throughput split into construction and controller progress per tick.
+
+The live gate must hard-fail a complete 100-tick v0.2.19 window if this attribution is missing or incomplete. Historical telemetry is not rewritten.
 
 ## Current strategic interpretation
 
-`E8N1` remains an RCL2 two-source colony in container-logistics mode. The verified v0.2.18 window confirms:
+`E8N1` remains an RCL2 two-source colony in container-logistics mode. v0.2.18 removed the measured consumer self-supply fallback and raised Efficiency to `EFFICIENT`, while mining, hauling, CPU, telemetry continuity, controller progress, and construction progress all remained healthy.
 
-- dedicated mining is active;
-- modeled hauler capacity is sufficient;
-- consumer fallback remained at zero;
-- telemetry continuity is healthy;
-- CPU/bucket and hard-stall gates are clean;
-- controller and construction both progress;
-- Efficiency improved to `EFFICIENT`.
+The residual issue is now diagnostic rather than safety-related: some consumers still wait briefly, and aggregate productive throughput remains below mining capacity. Those signals are insufficient to justify more creeps or larger bodies because they do not identify whether the limiter is delivery latency, available WORK capacity, construction backlog composition, or controller demand.
 
-The remaining inefficiency is narrower than before: consumers can still become waiting/critical, and aggregate productive throughput still trails mining capacity, but this no longer escalates into self-supply fallback. The next release should measure that residual latency/work-capacity gap before changing fleet size or role bodies.
+v0.2.19 therefore measures those dimensions first. No control-loop decision may consume the new attribution until a clean live window has been reviewed.
 
 ## Development invariants
 

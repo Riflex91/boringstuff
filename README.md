@@ -1,3 +1,61 @@
+# Screeps Autonomous Bot v0.2.19-node18
+
+Canonical local repository:
+
+`C:\Users\hansi\AppData\Local\Screeps\scripts\screeps_newbieland_net___21025\boringstuff`
+
+Installed Screeps runtime:
+
+`C:\Users\hansi\AppData\Local\Screeps\scripts\screeps_newbieland_net___21025\chatgpt`
+
+## v0.2.19 – Productive Flow Attribution
+
+Observability-only release. No colony behavior changes.
+
+v0.2.18 eliminated consumer self-supply fallback in its verified 100-tick window and moved Efficiency to `EFFICIENT`, but consumers could still become waiting/critical and productive throughput remained below mining capacity. Those two signals do not identify the actual limiter.
+
+v0.2.19 adds bounded attribution to the existing economy telemetry:
+
+- consumer supply latency over the full 100-tick window;
+- average active WORK capacity by productive role;
+- construction-capable and dedicated-controller capacity;
+- construction backlog and remaining progress by structure type;
+- controller remaining progress and demand state;
+- actual construction/controller throughput per tick.
+
+The measurements are exposed in `economy.productiveFlow` for the current snapshot and `economy.last100.productiveFlow` for the completed 100-tick window. No additional high-frequency log stream is added.
+
+The v0.2.19 live verifier requires a complete attribution payload in the 100-tick window. Missing attribution is a hard release failure; the attribution values themselves remain observational and do not alter bot decisions.
+
+### Verification workflow
+
+```powershell
+cd "C:\Users\hansi\AppData\Local\Screeps\scripts\screeps_newbieland_net___21025\boringstuff"
+powershell -ExecutionPolicy Bypass -File .\install.ps1
+cd tools
+npm install
+npm test
+npm run doctor
+npm run deploy
+npm run logs
+```
+
+Then:
+
+```powershell
+cd "C:\Users\hansi\AppData\Local\Screeps\scripts\screeps_newbieland_net___21025\chatgpt\tools"
+npm run verify:smoke
+npm run verify:live
+```
+
+`verify:live` waits automatically for the first complete post-deploy 100-tick window.
+
+Expected runtime version after deployment: `0.2.19-node18`.
+
+---
+
+## Historical documentation
+
 # Screeps Autonomous Bot v0.2.18-node18
 
 Canonical local repository:

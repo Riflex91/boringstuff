@@ -1,7 +1,7 @@
 'use strict';
 
 module.exports = {
-  VERSION: '0.2.18-node18',
+  VERSION: '0.2.19-node18',
   BOT_NAME: 'Autonomy',
 
   // Console logging. DEBUG is noisy; INFO is a good default.

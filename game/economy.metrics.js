@@ -1,5 +1,7 @@
 'use strict';
 
+const productiveFlow = require('productive.flow');
+
 // Bounded room-economy telemetry. It records what the colony actually does so
 // control decisions can be compared against real throughput instead of fixed
 // role ratios.
@@ -23,6 +25,7 @@ function ensure(roomName) {
       windowControllerProgress: 0,
       windowConstructionProgress: 0,
       windowSitesCompleted: 0,
+      windowProductiveFlow: productiveFlow.newWindow(),
       lastWindow: null,
       lastSites: {}
     };
@@ -32,6 +35,7 @@ function ensure(roomName) {
   if (m.windowConstructionProgress === undefined) m.windowConstructionProgress = 0;
   if (m.windowSitesCompleted === undefined) m.windowSitesCompleted = 0;
   if (m.upgraderPresentStreak === undefined) m.upgraderPresentStreak = 0;
+  if (!m.windowProductiveFlow) m.windowProductiveFlow = productiveFlow.newWindow();
   return m;
 }
 
@@ -67,7 +71,7 @@ function observeConstruction(state, m) {
   m.lastSites = current;
 }
 
-function finishWindow(m) {
+function finishWindow(m, flow) {
   if (m.windowTicks < 100) return;
   m.lastWindow = {
     startTick: m.windowStart,
@@ -77,7 +81,11 @@ function finishWindow(m) {
     energyCappedRatio: Math.round((m.windowEnergyCappedTicks / Math.max(1, m.windowTicks)) * 1000) / 1000,
     controllerProgress: m.windowControllerProgress,
     constructionProgress: m.windowConstructionProgress,
-    sitesCompleted: m.windowSitesCompleted
+    sitesCompleted: m.windowSitesCompleted,
+    productiveFlow: productiveFlow.summarize(m.windowProductiveFlow, m.windowTicks, flow, {
+      controllerProgress: m.windowControllerProgress,
+      constructionProgress: m.windowConstructionProgress
+    })
   };
   m.windowStart = Game.time + 1;
   m.windowTicks = 0;
@@ -86,6 +94,7 @@ function finishWindow(m) {
   m.windowControllerProgress = 0;
   m.windowConstructionProgress = 0;
   m.windowSitesCompleted = 0;
+  m.windowProductiveFlow = productiveFlow.newWindow();
 }
 
 function observe(state) {
@@ -111,6 +120,8 @@ function observe(state) {
   }
 
   observeConstruction(state, m);
+  const flow = productiveFlow.observe(state);
+  productiveFlow.accumulate(m.windowProductiveFlow, flow);
 
   const capped = state.energyCapacityAvailable > 0 && state.energyAvailable >= state.energyCapacityAvailable;
   m.energyCappedStreak = capped ? (m.energyCappedStreak || 0) + 1 : 0;
@@ -124,19 +135,21 @@ function observe(state) {
   m.windowTicks += 1;
   if (spawnBusy) m.windowSpawnBusyTicks += 1;
   if (capped) m.windowEnergyCappedTicks += 1;
-  finishWindow(m);
+  finishWindow(m, flow);
 
-  return snapshot(state, m);
+  return snapshot(state, m, flow);
 }
 
-function snapshot(state, existing) {
+function snapshot(state, existing, currentFlow) {
   const m = existing || ensure(state.room.name);
+  const flow = currentFlow || productiveFlow.observe(state);
   return {
     energyCappedStreak: m.energyCappedStreak || 0,
     spawnIdleStreak: m.spawnIdleStreak || 0,
     upgraderPresentStreak: m.upgraderPresentStreak || 0,
     controllerIdleTicks: Math.max(0, Game.time - (m.lastProgressTick || Game.time)),
     rclAge: Math.max(0, Game.time - (m.rclStarted || Game.time)),
+    productiveFlow: flow,
     last100: m.lastWindow || null
   };
 }
