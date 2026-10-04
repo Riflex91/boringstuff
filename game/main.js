@@ -146,7 +146,7 @@ module.exports.loop = function() {
     processScheduler.run({
       id: 'world-intel',
       priorityClass: processScheduler.PRIORITY.STANDARD,
-      minimumInterval: 1,
+      minimumInterval: config.INTEL_INTERVAL,
       freshnessRequirement: config.INTEL_INTERVAL
     }, function() {
       worldIntel.observeVisibleRooms();
