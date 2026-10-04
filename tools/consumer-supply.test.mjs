@@ -208,6 +208,39 @@ const energy = require('../game/energy.js');
   assert.equal(energy.shouldPrioritizeConsumer(hauler3), false);
 }
 
+// With three live haulers and several critical consumers, two delivery-ready
+// guards may serve consumers while one hauler remains outside the guard set for
+// hard infrastructure. This is the measured v0.2.20 case: 3 haulers, 4
+// consumer requests, but only one reservation under the old single-guard rule.
+{
+  const worker = makeConsumer('worker-guard-scale', 'worker', 0, 6, false, 3);
+  const builder = makeConsumer('builder-guard-scale', 'builder', 0, 4, true, 6);
+  const upgrader = makeConsumer('upgrader-guard-scale', 'upgrader', 0, 3, false, 8);
+  const hauler1 = makeHauler('hauler-gs1', {
+    [worker.id]: 1,
+    [builder.id]: 6,
+    [upgrader.id]: 8
+  });
+  const hauler2 = makeHauler('hauler-gs2', {
+    [worker.id]: 5,
+    [builder.id]: 1,
+    [upgrader.id]: 7
+  });
+  const hauler3 = makeHauler('hauler-gs3', {
+    [worker.id]: 6,
+    [builder.id]: 7,
+    [upgrader.id]: 1
+  });
+  room.creeps = [worker, builder, upgrader, hauler1, hauler2, hauler3];
+
+  const guards = energy._test.selectConsumerGuardHaulers(room);
+  assert.equal(guards.length, 2);
+  assert.deepEqual(guards.map(h => h.id).sort(), [hauler1.id, hauler2.id].sort());
+  assert.equal(energy.shouldPrioritizeConsumer(hauler1), true);
+  assert.equal(energy.shouldPrioritizeConsumer(hauler2), true);
+  assert.equal(energy.shouldPrioritizeConsumer(hauler3), false);
+}
+
 // An existing reservation to a critical consumer stays sticky even if another
 // ready hauler is geometrically closer. This prevents guard oscillation while
 // the reserved hauler is already travelling to the consumer.
