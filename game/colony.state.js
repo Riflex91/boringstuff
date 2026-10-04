@@ -261,6 +261,27 @@ function build(state, context) {
           reservationCount: null,
           byStatus: {},
           byDomain: {}
+        },
+    assignments: state.assignmentShadow && state.assignmentShadow.summary
+      ? {
+          available: true,
+          authority: 'SHADOW',
+          requestCount: state.assignmentShadow.summary.requestCount,
+          executorCount: state.assignmentShadow.summary.executorCount,
+          assignmentCount: state.assignmentShadow.summary.assignmentCount,
+          switchCount: state.assignmentShadow.summary.switchCount,
+          unfilledCount: state.assignmentShadow.summary.unfilledCount,
+          totalUnfilled: state.assignmentShadow.summary.totalUnfilled
+        }
+      : {
+          available: false,
+          authority: 'SHADOW',
+          requestCount: null,
+          executorCount: null,
+          assignmentCount: null,
+          switchCount: null,
+          unfilledCount: null,
+          totalUnfilled: null
         }
   };
 }
