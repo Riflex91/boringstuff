@@ -49,16 +49,16 @@ function probe(game) {
 function isAvailable(capabilities, feature) {
   if (!capabilities || !feature) return false;
   switch (feature) {
-    case 'market': return !!capabilities.systems?.marketAvailable;
-    case 'powerCreeps': return !!capabilities.systems?.powerCreepsAvailable;
-    case 'factories': return !!capabilities.systems?.factoriesAvailable;
-    case 'labs': return !!capabilities.systems?.labsAvailable;
-    case 'observers': return !!capabilities.systems?.observersAvailable;
-    case 'nukers': return !!capabilities.systems?.nukersAvailable;
-    case 'segments': return !!capabilities.persistence?.segmentsAvailable;
-    case 'interShardMemory': return !!capabilities.persistence?.interShardMemoryAvailable;
-    case 'roomStatus': return !!capabilities.world?.roomStatusAvailable;
-    case 'heapStats': return !!capabilities.cpu?.heapStatsAvailable;
+    case 'market': return !!(capabilities.systems && capabilities.systems.marketAvailable);
+    case 'powerCreeps': return !!(capabilities.systems && capabilities.systems.powerCreepsAvailable);
+    case 'factories': return !!(capabilities.systems && capabilities.systems.factoriesAvailable);
+    case 'labs': return !!(capabilities.systems && capabilities.systems.labsAvailable);
+    case 'observers': return !!(capabilities.systems && capabilities.systems.observersAvailable);
+    case 'nukers': return !!(capabilities.systems && capabilities.systems.nukersAvailable);
+    case 'segments': return !!(capabilities.persistence && capabilities.persistence.segmentsAvailable);
+    case 'interShardMemory': return !!(capabilities.persistence && capabilities.persistence.interShardMemoryAvailable);
+    case 'roomStatus': return !!(capabilities.world && capabilities.world.roomStatusAvailable);
+    case 'heapStats': return !!(capabilities.cpu && capabilities.cpu.heapStatsAvailable);
     default: return false;
   }
 }
