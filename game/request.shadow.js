@@ -2,6 +2,7 @@
 
 const registry = require('request.registry');
 const energy = require('energy');
+const workRequests = require('request.work.shadow');
 
 function roomName(state) {
   return state && state.room && state.room.name ? state.room.name : null;
@@ -107,6 +108,10 @@ function produce(state, memoryRoot, game) {
       evidence: { source: 'energy.consumerNeedsDelivery', hypothesis: 'mirror legacy consumer delivery request' },
       shadow: true
     }, memoryRoot, game);
+  }
+
+  for (const spec of workRequests.specs(state)) {
+    upsertActive(active, room, spec, memoryRoot, game);
   }
 
   registry.reconcile(room, active, memoryRoot, game);
