@@ -286,6 +286,23 @@ function build(state, context) {
           byStatus: {},
           byDomain: {}
         },
+    logisticsRequests: state.requestShadow && state.requestShadow.logisticsGraph
+      ? {
+          available: true,
+          authority: 'SHADOW',
+          total: state.requestShadow.logisticsGraph.total,
+          totalAmount: state.requestShadow.logisticsGraph.totalAmount,
+          byKind: state.requestShadow.logisticsGraph.byKind,
+          amountByKind: state.requestShadow.logisticsGraph.amountByKind
+        }
+      : {
+          available: false,
+          authority: 'SHADOW',
+          total: 0,
+          totalAmount: 0,
+          byKind: {},
+          amountByKind: {}
+        },
     assignments: state.assignmentShadow && state.assignmentShadow.summary
       ? {
           available: true,
