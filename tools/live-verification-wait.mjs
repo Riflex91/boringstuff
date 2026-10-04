@@ -3,16 +3,42 @@ function finiteTick(value) {
   return Number.isFinite(n) ? n : null;
 }
 
-function latestVersionChange(events, version) {
-  return (events || [])
+function latestDeploymentBoundary(events, version, expectedDeploymentId = null) {
+  const markers = (events || [])
+    .filter(e =>
+      e?.code === 'DEPLOYMENT_MARKER' &&
+      (e?.ctx?.version === version || e?.v === version) &&
+      (!expectedDeploymentId || e?.ctx?.deploymentId === expectedDeploymentId)
+    )
+    .sort((a, b) => Number(a.tick) - Number(b.tick));
+  if (markers.length) {
+    return {
+      event: markers.at(-1),
+      inclusive: true,
+      source: 'DEPLOYMENT_MARKER'
+    };
+  }
+
+  if (expectedDeploymentId) return null;
+
+  const changes = (events || [])
     .filter(e => e?.code === 'VERSION_CHANGE' && (e?.ctx?.to === version || e?.v === version))
-    .sort((a, b) => Number(a.tick) - Number(b.tick))
-    .at(-1) || null;
+    .sort((a, b) => Number(a.tick) - Number(b.tick));
+  if (!changes.length) return null;
+  return {
+    event: changes.at(-1),
+    inclusive: false,
+    source: 'VERSION_CHANGE'
+  };
 }
 
 function requiresProductiveAttribution(version) {
-  const m = String(version || '').match(/^0\.2\.(\d+)/);
-  return !!m && Number(m[1]) >= 19;
+  const m = String(version || '').match(/^(\d+)\.(\d+)\.(\d+)/);
+  if (!m) return false;
+  const major = Number(m[1]);
+  const minor = Number(m[2]);
+  const patch = Number(m[3]);
+  return major > 0 || minor > 2 || (minor === 2 && patch >= 19);
 }
 
 function attributionReady(last100) {
@@ -64,25 +90,60 @@ function estimateSecondsPerTick(events) {
   return rates[Math.floor(rates.length / 2)];
 }
 
-export function resolveAutoStart(events, version, mode, roomName) {
-  const change = latestVersionChange(events, version);
-  if (!change) {
+export function resolveAutoStart(events, version, mode, roomName, expectedDeploymentId = null) {
+  const boundary = latestDeploymentBoundary(events, version, expectedDeploymentId);
+  if (!boundary) {
+    if (expectedDeploymentId) {
+      return {
+        ready: false,
+        waitingForDeploymentMarker: true,
+        expectedDeploymentId,
+        latestEvidenceTick: Math.max(-1, ...(events || []).map(e => finiteTick(e?.tick) ?? -1))
+      };
+    }
     return {
       ready: false,
-      fatal: `No VERSION_CHANGE to ${version} found. Deploy first or pass --start-tick explicitly.`
+      fatal: `No DEPLOYMENT_MARKER or VERSION_CHANGE to ${version} found. Deploy first or pass --start-tick explicitly.`
     };
   }
 
-  const deployTick = Number(change.tick);
+  const deployTick = Number(boundary.event.tick);
+  const minimumStartTick = boundary.inclusive ? deployTick : deployTick + 1;
+  const latestEvidenceTick = Math.max(-1, ...(events || []).map(e => finiteTick(e?.tick) ?? -1));
+
   if (mode === 'smoke') {
-    return { ready: true, startTick: deployTick + 1, deployTick };
+    const expectedStartTick = minimumStartTick;
+    const expectedEndTick = expectedStartTick + 24;
+    if (latestEvidenceTick >= expectedEndTick) {
+      return {
+        ready: true,
+        startTick: expectedStartTick,
+        endTick: expectedEndTick,
+        deployTick,
+        deploymentId: boundary.event?.ctx?.deploymentId || null,
+        boundarySource: boundary.source
+      };
+    }
+
+    const secondsPerTick = estimateSecondsPerTick(events);
+    const remainingTicks = Math.max(0, expectedEndTick - Math.max(deployTick, latestEvidenceTick));
+    return {
+      ready: false,
+      deployTick,
+      deploymentId: boundary.event?.ctx?.deploymentId || null,
+      boundarySource: boundary.source,
+      latestEvidenceTick,
+      expectedStartTick,
+      expectedEndTick,
+      remainingSeconds: Math.max(0, Math.ceil(remainingTicks * secondsPerTick))
+    };
   }
 
   const windows = snapshotWindows(events, version, roomName);
   const requireAttribution = requiresProductiveAttribution(version);
   const candidate = windows.find(x =>
     x.ticks >= 100 &&
-    x.startTick > deployTick &&
+    x.startTick >= minimumStartTick &&
     x.endTick >= x.startTick + 99 &&
     (!requireAttribution || x.attributionReady)
   );
@@ -91,11 +152,12 @@ export function resolveAutoStart(events, version, mode, roomName) {
       ready: true,
       startTick: candidate.startTick,
       endTick: candidate.endTick,
-      deployTick
+      deployTick,
+      deploymentId: boundary.event?.ctx?.deploymentId || null,
+      boundarySource: boundary.source
     };
   }
 
-  const latestEvidenceTick = Math.max(-1, ...(events || []).map(e => finiteTick(e?.tick) ?? -1));
   const latestWindow = windows.at(-1) || null;
   let expectedStartTick = null;
   let expectedEndTick = null;
@@ -104,7 +166,7 @@ export function resolveAutoStart(events, version, mode, roomName) {
     expectedStartTick = latestWindow.startTick;
     expectedEndTick = latestWindow.endTick;
     while (
-      expectedStartTick <= deployTick ||
+      expectedStartTick < minimumStartTick ||
       (requireAttribution && !latestWindow.attributionReady && expectedEndTick <= latestEvidenceTick)
     ) {
       expectedStartTick = expectedEndTick + 1;
@@ -113,7 +175,7 @@ export function resolveAutoStart(events, version, mode, roomName) {
   } else {
     expectedStartTick = Math.floor(deployTick / 100) * 100 + 101;
     expectedEndTick = expectedStartTick + 99;
-    while (expectedStartTick <= deployTick) {
+    while (expectedStartTick < minimumStartTick) {
       expectedStartTick = expectedEndTick + 1;
       expectedEndTick = expectedStartTick + 99;
     }
@@ -128,6 +190,8 @@ export function resolveAutoStart(events, version, mode, roomName) {
   return {
     ready: false,
     deployTick,
+    deploymentId: boundary.event?.ctx?.deploymentId || null,
+    boundarySource: boundary.source,
     latestEvidenceTick,
     expectedStartTick,
     expectedEndTick,
@@ -136,6 +200,9 @@ export function resolveAutoStart(events, version, mode, roomName) {
 }
 
 export function formatWaitStatus(status) {
+  if (status.waitingForDeploymentMarker) {
+    return `Waiting for deployment marker ${status.expectedDeploymentId}...`;
+  }
   const total = Math.max(0, Math.ceil(Number(status.remainingSeconds) || 0));
   const minutes = String(Math.floor(total / 60)).padStart(2, '0');
   const seconds = String(total % 60).padStart(2, '0');
@@ -149,7 +216,8 @@ export async function waitForAutoStart({
   loadEvents,
   pollMs = 5000,
   sleep = ms => new Promise(resolve => setTimeout(resolve, ms)),
-  onWait = () => {}
+  onWait = () => {},
+  expectedDeploymentId = null
 }) {
   let lastMessage = null;
 
@@ -157,7 +225,7 @@ export async function waitForAutoStart({
     const events = loadEvents();
     if (!events.length) throw new Error('No bot event evidence is available. Run the collector first.');
 
-    const status = resolveAutoStart(events, version, mode, roomName);
+    const status = resolveAutoStart(events, version, mode, roomName, expectedDeploymentId);
     if (status.fatal) throw new Error(status.fatal);
     if (status.ready) return { startTick: status.startTick, events, status };
 
