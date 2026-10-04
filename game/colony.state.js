@@ -215,11 +215,35 @@ function build(state, context) {
     spawn,
     capacity: {
       active: active.parts,
-      projected: { available: false, reason: 'E2_NOT_IMPLEMENTED' },
-      queued: { available: false, reason: 'E2_NOT_IMPLEMENTED' },
+      projected: state.capacitySpawnShadow
+        ? {
+            available: true,
+            authority: 'SHADOW',
+            deferred: !!state.capacitySpawnShadow.summary.deferred,
+            deficits: state.capacitySpawnShadow.deficits
+          }
+        : { available: false, reason: 'E2_NOT_AVAILABLE' },
+      queued: {
+        available: false,
+        authority: 'SHADOW',
+        reason: 'SHADOW_PROPOSALS_ARE_NOT_REAL_QUEUE'
+      },
       spawning: spawn.spawningParts,
       ttl: active.ttl
     },
+    spawnPlan: state.capacitySpawnShadow
+      ? {
+          available: true,
+          authority: 'SHADOW',
+          summary: state.capacitySpawnShadow.summary,
+          requests: state.capacitySpawnShadow.spawnRequests
+        }
+      : {
+          available: false,
+          authority: 'SHADOW',
+          summary: null,
+          requests: []
+        },
     logistics: logisticsSnapshot(state),
     threat: threatSnapshot(state),
     cpu: {
