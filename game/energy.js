@@ -406,6 +406,55 @@ function shouldInterruptPickupForConsumer(creep) {
   return !!guard && guard.id === creep.id;
 }
 
+function consumerSupplyDiagnostics(room) {
+  if (!room || !room.find) return null;
+
+  const haulers = room.find(FIND_MY_CREEPS, {
+    filter: c => !c.spawning && c.memory && c.memory.role === 'hauler'
+  });
+  const consumers = room.find(FIND_MY_CREEPS, {
+    filter: c => isConsumer(c)
+  });
+  const ready = haulers.filter(haulerReadyToDeliver);
+  const partial = haulers.filter(h => !haulerReadyToDeliver(h) && energyAmount(h) > 0);
+  const requests = consumers.filter(consumerNeedsDelivery);
+  const critical = consumers.filter(isCriticalConsumerRequest);
+  const waiting = consumers.filter(c => (c.memory.waitingEnergyTicks || 0) > 0);
+  const fallback = consumers.filter(c => !!c.memory.logisticsFallback);
+  const lowRunway = consumers.filter(consumerHasLowRunway);
+  const readyGuards = selectConsumerGuardHaulers(room);
+  const earlyDispatch = selectConsumerEarlyDispatchHauler(room);
+
+  const usefulNeeds = critical
+    .map(consumerUsefulDeliveryEnergyNeeded)
+    .filter(need => need > 0);
+  const minimumUsefulNeed = usefulNeeds.length ? Math.min.apply(null, usefulNeeds) : 0;
+  const usefulPartial = minimumUsefulNeed > 0
+    ? partial.filter(h => energyAmount(h) >= minimumUsefulNeed)
+    : [];
+
+  return {
+    liveHaulers: haulers.length,
+    readyHaulers: ready.length,
+    partialHaulersWithEnergy: partial.length,
+    usefulPartialHaulers: usefulPartial.length,
+    consumerRequests: requests.length,
+    dispatchCriticalConsumers: critical.length,
+    waitingConsumers: waiting.length,
+    fallbackConsumers: fallback.length,
+    lowRunwayConsumers: lowRunway.length,
+    readyConsumerGuards: readyGuards.length,
+    earlyDispatchSelected: earlyDispatch ? 1 : 0,
+    uncoveredCriticalConsumers: Math.max(
+      0,
+      critical.length - readyGuards.length - (earlyDispatch ? 1 : 0)
+    ),
+    earlyDispatchBlockedByReadyGuard: readyGuards.length > 0 &&
+      usefulPartial.length > 0 &&
+      critical.length > readyGuards.length
+  };
+}
+
 function consumerEnergyRatio(creep) {
   const carried = energyAmount(creep);
   const free = freeEnergyCapacity(creep);
@@ -536,6 +585,7 @@ module.exports = {
   consumerNeedsDelivery,
   isCriticalConsumerRequest,
   consumerCanResumeWork,
+  consumerSupplyDiagnostics,
   shouldPrioritizeConsumer,
   shouldInterruptPickupForConsumer,
   clearConsumerTarget,
