@@ -244,6 +244,8 @@ function build(state, context) {
           open: state.requestShadow.summary.open,
           blocked: state.requestShadow.summary.blocked,
           total: state.requestShadow.summary.total,
+          stored: state.requestShadow.summary.stored,
+          terminal: state.requestShadow.summary.terminal,
           reservationCount: state.requestShadow.summary.reservationCount,
           byStatus: state.requestShadow.summary.byStatus,
           byDomain: state.requestShadow.summary.byDomain
@@ -254,6 +256,8 @@ function build(state, context) {
           open: null,
           blocked: null,
           total: null,
+          stored: null,
+          terminal: null,
           reservationCount: null,
           byStatus: {},
           byDomain: {}
