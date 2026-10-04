@@ -288,6 +288,19 @@ function build(state, context) {
           switchCount: null,
           unfilledCount: null,
           totalUnfilled: null
+        },
+    assignmentEvidence: state.assignmentEvidence
+      ? {
+          available: true,
+          authority: 'SHADOW_EVIDENCE',
+          current: state.assignmentEvidence.current || null,
+          lastWindow: state.assignmentEvidence.lastWindow || null
+        }
+      : {
+          available: false,
+          authority: 'SHADOW_EVIDENCE',
+          current: null,
+          lastWindow: null
         }
   };
 }

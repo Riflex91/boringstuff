@@ -205,6 +205,30 @@ Assignment boundary rules:
 - Shadow assignment may be deferred under CPU pressure; telemetry must expose the last plan tick and the deferral reason.
 - When E1 becomes authoritative, its reservations must move onto the canonical Reservation contract so all planners subtract the same commitments.
 
+Assignment-evidence contract (O2):
+
+```text
+AssignmentEvidenceWindow {
+  schemaVersion, authority, startTick, endTick, ticks,
+  requestsOpened, requestsClosed, averageRequestLatency, maxRequestLatency,
+  averageActiveRequests, averageBlockedRequests, blockedReasons,
+  assignmentsPerTick, switchesPerTick, deferredRatio,
+  averageUnfilledRequests, averageUnfilledNeed,
+  averageCandidateExecutorsWhenUnfilled, idleCompatibleExecutorRatio,
+  controllerProgress, constructionProgress, usefulWorkPerTick
+}
+```
+
+Semantics:
+
+- request latency is measured per request episode from `createdTick` to terminal `updatedTick`;
+- reopened demand is a new episode and must not inherit prior latency;
+- blocked reason counts are request-ticks, not unique requests;
+- `idleCompatibleExecutorRatio` counts compatible, unassigned executors only while assignable demand remains unfilled;
+- `usefulWorkPerTick` follows the existing productive-throughput evidence convention: observed controller + construction progress per tick; repair output is not inferred unless direct action telemetry is added later;
+- low-CPU assignment deferral is measured explicitly and must not be mistaken for zero demand;
+- O2 is evidence only and must not modify priorities, reservations, or assignments.
+
 # 13. CPU ProcessDescriptor
 
 ```text

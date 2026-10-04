@@ -715,17 +715,27 @@ First targets:
 
 ## Slice O2 – Assignment Evidence
 
-Record:
+Record in bounded 100-tick windows:
 
-- requests opened;
-- assignments;
-- switch count;
-- blocked reasons;
-- request latency;
-- useful work/tick;
-- idle-with-open-work.
+- request episodes opened/closed;
+- average/max request latency from `createdTick` to terminal `updatedTick`;
+- active and blocked request-ticks plus blocked reasons;
+- assignments/tick and switches/tick;
+- low-CPU deferred ratio;
+- unfilled request count and remaining need;
+- compatible-but-unassigned executors while assignable work remains open;
+- controller + construction progress as observed useful-work throughput.
 
-Gate: request engine must prove equal-or-better output than legacy policy before becoming authoritative.
+Persist each completed window as `ASSIGNMENT_EVIDENCE_WINDOW` in the durable telemetry journal.
+
+Important semantics:
+
+- reopened demand is a new request episode;
+- capacity-deficit requests are excluded from executor evidence and remain E2 inputs;
+- low-CPU deferral is explicit evidence, not zero demand;
+- current `usefulWorkPerTick` follows existing productive-flow throughput semantics and does not infer repair output without direct action telemetry.
+
+Gate: request engine must prove equal-or-better output than legacy policy before becoming authoritative. O2 itself is evidence-only and may not alter request priority, reservations, assignments, or creep behavior.
 
 ---
 
