@@ -163,6 +163,10 @@ function requestActive(request) {
 function plan(roomName, requests, creeps, memoryRoot, game) {
   const now = tick(game);
   const roomState = ensureRoom(roomName, memoryRoot);
+  for (const key in roomState.failures) {
+    const failure = roomState.failures[key];
+    if (!failure || !Number.isFinite(failure.untilTick) || now >= failure.untilTick) delete roomState.failures[key];
+  }
   const activeRequests = (requests || []).filter(requestActive);
   const executors = (creeps || []).filter(c => c && !c.spawning && (c.id || c.name));
   const remaining = {};
