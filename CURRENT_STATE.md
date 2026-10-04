@@ -5,7 +5,8 @@ Canonical repository: `Riflex91/boringstuff`
 ## Canonical source baseline
 
 - Seed baseline: **v0.2.16-node18**
-- Current verified `main`: **v0.2.19-node18**
+- Current canonical `main`: **0.3.0-shadow.1-node18** at merge commit `8d368ea110229c3d82572f1f7491d01c48c22578`
+- Latest VNext live gate: **WATCH — 15 PASS / 3 WATCH / 0 FAIL**
 - Runtime target: **Node.js 18.20.4**
 - Runtime branch: `chatgpt`
 - Primary room: `E8N1`
@@ -176,26 +177,99 @@ Verification evidence:
 
 The smoke window belongs to the initial v0.2.19 deploy. The later serialization/UX patch changed observability only; the final 100-tick live window validated the patched attribution payload and all hard safety gates with zero FAIL.
 
+### 0.3.0-shadow.1-node18 — VNEXT SHADOW LIVE / WATCH
+
+First integrated VNext shadow release.
+
+Implemented shadow/evidence-only foundation:
+
+- K0 Runtime Capability Discovery;
+- K1 CPU Process Scheduler;
+- O1 Universal ColonyState Snapshot;
+- I0 World Intel + Freshness;
+- E0 Unified Request Registry SHADOW;
+- E1 Marginal Assignment Engine SHADOW;
+- O2 Assignment Evidence;
+- E2/E2A Predictive Capacity Spawn Planner SHADOW;
+- E2B Generalized Body Optimizer SHADOW.
+
+Release/deployment hardening:
+
+- exact `DEPLOYMENT_ID` injection and server-side verification;
+- persistent `DEPLOYMENT_MARKER` on activation;
+- deployment receipt scoped by server/branch/version;
+- same-version redeploy protection;
+- stale `last100` rejection;
+- exact Node gate `18.20.4`;
+- explicit live assertion that VNext remains `SHADOW` / `SHADOW_EVIDENCE`.
+
+Merged release PR #17 at:
+
+`8d368ea110229c3d82572f1f7491d01c48c22578`
+
+First 100-tick VNext shadow live window:
+
+`3690501–3690600`
+
+Verifier result:
+
+- `PASS=15`
+- `WATCH=3`
+- `FAIL=0`
+- overall: `WATCH`
+
+Hard/safety checks passed:
+
+- Node and bot version;
+- complete window;
+- runtime and collector health;
+- CPU/bucket;
+- mining;
+- hard-stall detection;
+- telemetry continuity;
+- productive attribution;
+- modeled hauler capacity;
+- controller progress;
+- construction progress;
+- K0/K1/I0 telemetry presence;
+- O1/E0/E1/E2/O2 shadow authority contract.
+
+Remaining optimization findings:
+
+- consumer self-supply fallback occurred;
+- productive throughput trails mining capacity;
+- Efficiency is `WATCH`.
+
+This is not recorded as a PASS. It is accepted as the first VNext shadow live evidence with zero hard failures. No VNext subsystem is authorized to take gameplay authority from this result alone.
+
+Append-only evidence:
+
+`docs/verification/vnext-shadow-live-0.3.0-2026-10-04.md`
+
 ## Next release boundary
 
-v0.2.19 is live-verified and closes the attribution gap. The next behavior release is intentionally **not selected yet**.
+The first VNext shadow live gate is complete. The restriction against starting another major VNext feature slice before live validation is therefore satisfied.
 
-The remaining live findings are now actionable evidence rather than generic symptoms:
+However, the current release remains shadow/evidence-only. No authority promotion is justified yet.
 
-- consumer self-supply fallback occurred again;
+Per the VNext implementation order, the next architectural slice is **E3 — Logistics Requests**, followed by **E4 — Hauler Matching**. Before making either authoritative, preserve the shadow-first migration rule and use O2 / productive-flow evidence to compare candidate decisions with legacy execution.
+
+The latest live window still exposes three optimization findings:
+
+- consumer self-supply fallback occurred;
 - productive throughput remains below mining capacity;
-- Efficiency returned to `UNDERUTILIZED`;
-- mining and modeled hauler capacity still passed.
+- Efficiency is `WATCH`;
+- mining and modeled hauler capacity nevertheless passed.
 
-The next change must be chosen from the measured v0.2.19 attribution rather than by increasing harvester/hauler counts blindly.
+Do not respond by blindly adding mining or hauling capacity. The next logistics work should explain and reduce delivery latency / assignment inefficiency using request-level evidence.
 
 ## Current strategic interpretation
 
-`E8N1` remains an RCL2 two-source colony in container-logistics mode. v0.2.19 confirms the supply side is still structurally healthy: dedicated mining is active, modeled hauler capacity is sufficient, controller and construction progress continue, CPU/bucket are safe, and telemetry is contiguous.
+`E8N1` remains structurally safe under the VNext shadow stack: dedicated mining is active, modeled hauler capacity is sufficient, controller and construction progress continue, CPU/bucket are safe, telemetry is contiguous, and no VNext subsystem gained gameplay authority.
 
-The unresolved problem is now localized to productive-flow execution. Consumer fallback can still recur even with sufficient aggregate hauling, productive throughput remains below available mining capacity, and Efficiency can fall back to `UNDERUTILIZED`.
+The remaining issue is productive-flow execution rather than aggregate supply capacity. Consumer fallback can recur despite sufficient modeled hauling, and productive throughput still trails available mining capacity.
 
-Use the v0.2.19 attribution to distinguish whether the next bottleneck is primarily delivery latency, insufficient productive WORK capacity, construction backlog composition, or controller allocation. Do not add mining or hauling capacity without attribution evidence supporting it.
+The next architecture work should therefore move toward explicit logistics requests and matching while keeping legacy gameplay authoritative until shadow comparison shows equal-or-better output.
 
 ## Development invariants
 
