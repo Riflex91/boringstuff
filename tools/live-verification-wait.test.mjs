@@ -189,4 +189,40 @@ function snapshot(eventTick, startTick, endTick, attribution = true) {
   assert.equal(result.status.endTick, 1174);
 }
 
+
+
+{
+  // Deployment receipt handshake regression: if the local deploy says the
+  // expected deployment is deploy-new but collector evidence still contains
+  // only an older marker, auto-start must wait instead of reusing the old
+  // already-complete smoke window.
+  const rows = [
+    versionChange(1000),
+    deploymentMarker(1150, 'deploy-old'),
+    evidenceTick(1174)
+  ];
+  const status = resolveAutoStart(rows, version, 'smoke', room, 'deploy-new');
+  assert.equal(status.ready, false);
+  assert.equal(status.waitingForDeploymentMarker, true);
+  assert.equal(status.expectedDeploymentId, 'deploy-new');
+  assert.match(formatWaitStatus(status), /deploy-new/);
+}
+
+{
+  // Once the exact expected marker arrives, the smoke boundary is that marker,
+  // even when an older same-version marker and complete smoke remain in logs.
+  const rows = [
+    versionChange(1000),
+    deploymentMarker(1150, 'deploy-old'),
+    evidenceTick(1174),
+    deploymentMarker(1200, 'deploy-new'),
+    evidenceTick(1224)
+  ];
+  const status = resolveAutoStart(rows, version, 'smoke', room, 'deploy-new');
+  assert.equal(status.ready, true);
+  assert.equal(status.startTick, 1200);
+  assert.equal(status.endTick, 1224);
+  assert.equal(status.deploymentId, 'deploy-new');
+}
+
 console.log('live verification wait tests passed');
