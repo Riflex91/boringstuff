@@ -165,6 +165,12 @@ function requestActive(request) {
   return !!request && !TERMINAL_REQUESTS[request.status];
 }
 
+function requestAssignable(request) {
+  if (!requestActive(request)) return false;
+  const kind = String(request.kind || '');
+  return !/_CAPACITY$/.test(kind);
+}
+
 function plan(roomName, requests, creeps, memoryRoot, game) {
   const now = tick(game);
   const roomState = ensureRoom(roomName, memoryRoot);
@@ -172,7 +178,7 @@ function plan(roomName, requests, creeps, memoryRoot, game) {
     const failure = roomState.failures[key];
     if (!failure || !Number.isFinite(failure.untilTick) || now >= failure.untilTick) delete roomState.failures[key];
   }
-  const activeRequests = (requests || []).filter(requestActive);
+  const activeRequests = (requests || []).filter(requestAssignable);
   const executors = (creeps || []).filter(c => c && !c.spawning && (c.id || c.name));
   const remaining = {};
   for (const request of activeRequests) {
@@ -248,6 +254,9 @@ function plan(roomName, requests, creeps, memoryRoot, game) {
   const summary = {
     schemaVersion: SCHEMA_VERSION,
     authority: 'SHADOW',
+    planTick: now,
+    deferred: false,
+    deferReason: null,
     requestCount: activeRequests.length,
     executorCount: executors.length,
     assignmentCount: assignments.length,
@@ -280,6 +289,9 @@ function snapshot(roomName, memoryRoot) {
   return roomState.lastSummary || {
     schemaVersion: SCHEMA_VERSION,
     authority: 'SHADOW',
+    planTick: roomState.lastPlanTick,
+    deferred: false,
+    deferReason: null,
     requestCount: 0, executorCount: 0, assignmentCount: 0, switchCount: 0, unfilledCount: 0, totalUnfilled: 0
   };
 }
@@ -292,5 +304,5 @@ module.exports = {
   score,
   recordFailure,
   snapshot,
-  _test: { bodyParts, role, carriedEnergy, capabilityFor, localRange, deadlineUrgency, pairKey, activeFailure, requestActive }
+  _test: { bodyParts, role, carriedEnergy, capabilityFor, localRange, deadlineUrgency, pairKey, activeFailure, requestActive, requestAssignable }
 };
