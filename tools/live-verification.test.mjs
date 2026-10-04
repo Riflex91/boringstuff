@@ -109,4 +109,29 @@ function evidence(start = 1000) {
   assert.equal(r.checks.find(c => c.id === 'window-complete').status, 'PASS');
 }
 
+{
+  const rows = [
+    event(1005, 'SPAWN_IDLE_SURPLUS', { room: 'E8N1' })
+  ];
+  const r = evaluateSmoke({ events: rows, startTick: 1000, nodeVersion: '18.20.4' });
+  assert.equal(r.complete, false);
+  assert.equal(r.outcome, 'WATCH');
+  assert.equal(r.checks.find(c => c.id === 'window-complete').status, 'WATCH');
+  assert.equal(r.checks.find(c => c.id === 'cpu-bucket').status, 'WATCH');
+  assert.equal(r.checks.find(c => c.id === 'mining-active').status, 'WATCH');
+  assert.equal(r.counts.fail, 0);
+}
+
+{
+  const r = evaluateSmoke({
+    events: evidence(),
+    startTick: 1000,
+    nodeVersion: '18.20.4',
+    collectorErrors: ['2026-10-04T10:21:30.000Z collector parse warning']
+  });
+  assert.equal(r.checks.find(c => c.id === 'runtime-errors').status, 'PASS');
+  assert.equal(r.checks.find(c => c.id === 'collector-health').status, 'WATCH');
+  assert.equal(r.counts.fail, 0);
+}
+
 console.log('live-verification tests passed');

@@ -57,10 +57,10 @@ export function selectTickWindow(events, { startTick, tickCount, version = EXPEC
     if (tick === null || tick < startTick || tick > endTick) return false;
     return !version || !e?.v || e.v === version;
   });
-  return { startTick, endTick, tickCount, evidenceMaxTick, events: filtered };
+  return { startTick, endTick, tickCount, evidenceMaxTick, complete: evidenceMaxTick >= endTick, events: filtered };
 }
 
-function baseChecks({ events, startTick, endTick, evidenceMaxTick = -1, nodeVersion, botVersion, roomName, rawErrors = [], droppedThroughSeq = 0 }) {
+function baseChecks({ events, startTick, endTick, evidenceMaxTick = -1, complete = false, nodeVersion, botVersion, roomName, rawErrors = [], collectorErrors = [], droppedThroughSeq = 0 }) {
   const checks = [];
   checks.push(nodeVersion === EXPECTED_NODE_VERSION
     ? check('node-version', 'PASS', `Node runtime is ${EXPECTED_NODE_VERSION}.`, { actual: nodeVersion })
@@ -71,29 +71,33 @@ function baseChecks({ events, startTick, endTick, evidenceMaxTick = -1, nodeVers
     ? check('bot-version', 'PASS', `Window contains only ${botVersion} bot events.`, { botVersion })
     : check('bot-version', 'FAIL', 'Window contains events from another bot version.', { botVersion, wrongVersions: [...new Set(wrongVersion.map(e => e.v))] }));
 
-  const reachesEnd = evidenceMaxTick >= endTick;
-  checks.push(reachesEnd
+  checks.push(complete
     ? check('window-complete', 'PASS', `Evidence reaches tick ${endTick}.`, { startTick, endTick })
-    : check('window-complete', 'FAIL', `Evidence does not yet reach tick ${endTick}.`, { startTick, endTick, maxTick: evidenceMaxTick }));
+    : check('window-complete', 'WATCH', `Evidence does not yet reach tick ${endTick}; retry after the window completes.`, { startTick, endTick, maxTick: evidenceMaxTick }));
 
   const runtimeErrors = events.filter(e => ['ERROR', 'FATAL'].includes(String(e?.level || '').toUpperCase()));
   const raw = (rawErrors || []).filter(Boolean);
   checks.push(runtimeErrors.length === 0 && raw.length === 0
-    ? check('runtime-errors', 'PASS', 'No runtime errors were observed in the window.')
-    : check('runtime-errors', 'FAIL', 'Runtime error evidence was observed.', { botErrors: runtimeErrors.map(e => ({ tick: e.tick, code: e.code, msg: e.msg })), rawErrors: raw.slice(0, 20) }));
+    ? check('runtime-errors', 'PASS', 'No bot/runtime errors were observed in the window.')
+    : check('runtime-errors', 'FAIL', 'Bot/runtime error evidence was observed.', { botErrors: runtimeErrors.map(e => ({ tick: e.tick, code: e.code, msg: e.msg })), rawErrors: raw.slice(0, 20) }));
+
+  const collector = (collectorErrors || []).filter(Boolean);
+  checks.push(collector.length === 0
+    ? check('collector-health', 'PASS', 'No collector errors were observed in the window.')
+    : check('collector-health', 'WATCH', 'Collector errors occurred in the window; verify telemetry completeness.', { collectorErrors: collector.slice(0, 20) }));
 
   const cpu = events.filter(e => e?.code === 'BOT_HEARTBEAT').map(e => ({ tick: e.tick, cpu: finite(e?.ctx?.cpu, null), bucket: finite(e?.ctx?.bucket, null) }));
   const badCpu = cpu.filter(x => x.cpu !== null && x.cpu > 20);
   const criticalBucket = cpu.filter(x => x.bucket !== null && x.bucket < 1000);
   const lowBucket = cpu.filter(x => x.bucket !== null && x.bucket >= 1000 && x.bucket < 3000);
-  if (!cpu.length) checks.push(check('cpu-bucket', 'FAIL', 'No BOT_HEARTBEAT CPU/bucket evidence was found.'));
+  if (!cpu.length) checks.push(check('cpu-bucket', complete ? 'FAIL' : 'WATCH', complete ? 'No BOT_HEARTBEAT CPU/bucket evidence was found in the complete window.' : 'No BOT_HEARTBEAT sample has arrived yet for the incomplete window.'));
   else if (badCpu.length || criticalBucket.length) checks.push(check('cpu-bucket', 'FAIL', 'CPU or bucket crossed a hard safety threshold.', { badCpu, criticalBucket }));
   else if (lowBucket.length) checks.push(check('cpu-bucket', 'WATCH', 'CPU is acceptable but bucket entered the low range.', { lowBucket }));
   else checks.push(check('cpu-bucket', 'PASS', 'CPU and bucket remained inside safety thresholds.', { samples: cpu.length }));
 
   const roomEvents = events.map(e => ({ e, room: roomFromEvent(e, roomName) })).filter(x => x.room);
   const mining = roomEvents.map(x => ({ tick: x.e.tick, dedicated: finite(x.room?.economyModel?.dedicatedHarvestCapacityPerTick, null), theoretical: finite(x.room?.economyModel?.theoreticalIncomePerTick, null) })).filter(x => x.dedicated !== null);
-  if (!mining.length) checks.push(check('mining-active', 'FAIL', `No mining-capacity evidence was found for ${roomName}.`));
+  if (!mining.length) checks.push(check('mining-active', complete ? 'FAIL' : 'WATCH', complete ? `No mining-capacity evidence was found for ${roomName} in the complete window.` : `No mining-capacity sample has arrived yet for ${roomName} in the incomplete window.`));
   else if (Math.max(...mining.map(x => x.dedicated)) <= 0) checks.push(check('mining-active', 'FAIL', 'Dedicated mining capacity is zero.', { mining }));
   else checks.push(check('mining-active', 'PASS', 'Dedicated mining is active.', { latest: mining[mining.length - 1] }));
 

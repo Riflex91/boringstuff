@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { EXPECTED_BOT_VERSION, evaluateLive, evaluateSmoke } from './live-verification-core.mjs';
+import { filterTimestampedLogRecords } from './live-verification-log.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_LOG_DIR = String.raw`C:\Users\hansi\AppData\Local\Screeps\scripts\screeps_newbieland_net___21025\chatgpt\logs`;
@@ -49,25 +50,19 @@ function readNdjson(prefix) {
   return rows;
 }
 
-function parseTime(line) {
-  const m = String(line).match(/^(\d{4}-\d{2}-\d{2}T[^ ]+)/);
-  const t = m ? Date.parse(m[1]) : NaN;
-  return Number.isFinite(t) ? t : null;
-}
-
-function readErrorLines(startAt, endAt) {
+function readErrorRecords(prefix, startAt, endAt) {
   const rows = [];
-  for (const prefix of ['screeps-errors-', 'collector-errors-']) {
-    for (const file of matchingFiles(prefix, '.log')) {
-      for (const line of fs.readFileSync(file, 'utf8').split(/\r?\n/)) {
-        if (!line.trim()) continue;
-        const t = parseTime(line);
-        if (t !== null && startAt !== null && endAt !== null && (t < startAt || t > endAt)) continue;
-        rows.push(line);
-      }
-    }
+  for (const file of matchingFiles(prefix, '.log')) {
+    rows.push(...filterTimestampedLogRecords(fs.readFileSync(file, 'utf8'), startAt, endAt));
   }
   return rows;
+}
+
+function readErrorEvidence(startAt, endAt) {
+  return {
+    runtimeErrors: readErrorRecords('screeps-errors-', startAt, endAt),
+    collectorErrors: readErrorRecords('collector-errors-', startAt, endAt)
+  };
 }
 
 function dedupeEvents(events) {
@@ -113,7 +108,7 @@ const tickCount = args.mode === 'smoke' ? 25 : 100;
 const endTick = startTick + tickCount - 1;
 const inWindow = events.filter(e => Number(e?.tick) >= startTick && Number(e?.tick) <= endTick);
 const times = inWindow.map(e => Date.parse(e?.capturedAt)).filter(Number.isFinite);
-const rawErrors = readErrorLines(times.length ? Math.min(...times) : null, times.length ? Math.max(...times) : null);
+const errorEvidence = readErrorEvidence(times.length ? Math.min(...times) : null, times.length ? Math.max(...times) : null);
 const retention = events.filter(e => e?.code === 'TELEMETRY_RETENTION_GAP' && Number(e?.tick || 0) <= endTick).map(e => Number(e?.ctx?.droppedThroughSeq) || 0);
 const input = {
   events,
@@ -121,9 +116,10 @@ const input = {
   roomName: args.room,
   nodeVersion: process.versions.node,
   botVersion: args.version,
-  rawErrors,
+  rawErrors: errorEvidence.runtimeErrors,
+  collectorErrors: errorEvidence.collectorErrors,
   droppedThroughSeq: Math.max(0, ...retention)
 };
 const result = args.mode === 'smoke' ? evaluateSmoke(input) : evaluateLive(input);
 if (args.json) console.log(JSON.stringify(result, null, 2)); else printHuman(result);
-process.exitCode = result.outcome === 'FAIL' ? 2 : 0;
+process.exitCode = result.outcome === 'FAIL' ? 2 : result.complete ? 0 : 3;
