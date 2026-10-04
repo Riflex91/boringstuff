@@ -1,0 +1,169 @@
+import assert from 'node:assert/strict';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
+import Module from 'node:module';
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+process.env.NODE_PATH = path.resolve(here, '../game');
+Module._initPaths();
+const require = createRequire(import.meta.url);
+
+global.WORK = 'work';
+global.CARRY = 'carry';
+global.MOVE = 'move';
+global.CLAIM = 'claim';
+global.ATTACK = 'attack';
+global.RANGED_ATTACK = 'ranged_attack';
+global.HEAL = 'heal';
+global.TOUGH = 'tough';
+global.FIND_MY_SPAWNS = 1;
+
+global.Memory = { creeps: {} };
+global.Game = { time: 5000, creeps: {} };
+
+const colonyState = require('../game/colony.state.js');
+
+function creep(name, parts, ttl) {
+  return {
+    name,
+    ticksToLive: ttl,
+    getActiveBodyparts(type) { return parts[type] || 0; }
+  };
+}
+
+{
+  const worker = creep('worker1', { work: 2, carry: 2, move: 2 }, 1200);
+  const hauler = creep('hauler1', { carry: 4, move: 2 }, 900);
+  const hostile = creep('enemy1', { attack: 3, move: 3, tough: 2 }, 1000);
+
+  Game.creeps.spawning1 = {
+    body: [{ type: 'work' }, { type: 'carry' }, { type: 'move' }]
+  };
+
+  const spawn = {
+    my: true,
+    structureType: 'spawn',
+    spawning: { name: 'spawning1', remainingTime: 3 }
+  };
+
+  const sourceA = { id: 'sourceA', energy: 2500, ticksToRegeneration: 100 };
+  const sourceB = { id: 'sourceB', energy: 3000, ticksToRegeneration: 200 };
+
+  const room = {
+    name: 'E1N1',
+    controller: {
+      my: true,
+      level: 3,
+      progress: 1000,
+      progressTotal: 5000,
+      ticksToDowngrade: 18000,
+      safeMode: 0,
+      safeModeAvailable: 2
+    },
+    find(type) {
+      if (type === FIND_MY_SPAWNS) return [spawn];
+      return [];
+    }
+  };
+
+  const state = {
+    room,
+    rcl: 3,
+    creeps: [worker, hauler],
+    hostileCreeps: [hostile],
+    sites: [{ structureType: 'extension', progress: 20, progressTotal: 100 }],
+    structures: [
+      spawn,
+      { my: true, structureType: 'extension' },
+      { my: false, structureType: 'road' }
+    ],
+    sources: [sourceA, sourceB],
+    energyStored: 4200,
+    energyAvailable: 300,
+    energyCapacityAvailable: 550,
+    emergency: false,
+    economyModel: {
+      mode: 'container-logistics',
+      dedicatedHarvestCapacityPerTick: 18,
+      productiveDemandPerTick: 12,
+      haulerCarryParts: 4,
+      recommendedHaulerCarryParts: 6,
+      haulerCarryDeficit: 2,
+      consumerRequestCount: 2,
+      consumerWaitingCount: 1,
+      consumerFallbackCount: 0,
+      consumerDeliveryReservations: 1,
+      sourceRoutes: [
+        { sourceId: 'sourceA', spawnDistance: 10, containerReady: true, dedicatedIncomePerTick: 10 },
+        { sourceId: 'sourceB', spawnDistance: 20, containerReady: false, dedicatedIncomePerTick: 8 }
+      ]
+    },
+    health: { status: 'HEALTHY', overallScore: 91, reasons: [] },
+    efficiency: { status: 'WATCH', overallScore: 70, reasons: ['UNDERUTILIZED'] }
+  };
+
+  const snapshot = colonyState.build(state, { tick: 5000, bucket: 8123 });
+
+  assert.equal(snapshot.schemaVersion, 1);
+  assert.equal(snapshot.authority, 'SHADOW');
+  assert.equal(snapshot.roomName, 'E1N1');
+  assert.equal(snapshot.mode, 'DEFENSE');
+  assert.equal(snapshot.controller.level, 3);
+  assert.equal(snapshot.stores.energyStored, 4200);
+  assert.equal(snapshot.structures.count, 3);
+  assert.equal(snapshot.structures.byType.spawn, 1);
+  assert.equal(snapshot.structures.byType.extension, 1);
+  assert.equal(snapshot.structures.byType.road, 1);
+  assert.equal(snapshot.structures.ownedByType.spawn, 1);
+  assert.equal(snapshot.structures.ownedByType.extension, 1);
+  assert.equal(snapshot.construction.siteCount, 1);
+  assert.equal(snapshot.construction.remainingProgress, 80);
+  assert.equal(snapshot.capacity.active.work, 2);
+  assert.equal(snapshot.capacity.active.carry, 6);
+  assert.equal(snapshot.capacity.active.move, 4);
+  assert.equal(snapshot.capacity.ttl.min, 900);
+  assert.equal(snapshot.capacity.ttl.max, 1200);
+  assert.equal(snapshot.capacity.ttl.average, 1050);
+  assert.equal(snapshot.capacity.spawning.work, 1);
+  assert.equal(snapshot.capacity.spawning.carry, 1);
+  assert.equal(snapshot.capacity.spawning.move, 1);
+  assert.equal(snapshot.capacity.projected.available, false);
+  assert.equal(snapshot.capacity.queued.available, false);
+  assert.equal(snapshot.logistics.mode, 'container-logistics');
+  assert.equal(snapshot.logistics.haulerCarryDeficit, 2);
+  assert.equal(snapshot.logistics.consumerWaiting, 1);
+  assert.equal(snapshot.sources[0].spawnDistance, 10);
+  assert.equal(snapshot.sources[1].containerReady, false);
+  assert.equal(snapshot.threat.hostileCount, 1);
+  assert.equal(snapshot.threat.hostileActiveParts.attack, 3);
+  assert.equal(snapshot.cpu.bucket, 8123);
+  assert.equal(snapshot.health.status, 'HEALTHY');
+  assert.equal(snapshot.efficiency.status, 'WATCH');
+  assert.equal(snapshot.requests.available, false);
+
+  const json = JSON.stringify(snapshot);
+  assert.equal(typeof json, 'string');
+  const parsed = JSON.parse(json);
+  assert.equal(parsed.roomName, 'E1N1');
+  assert.equal(Object.prototype.hasOwnProperty.call(parsed, 'room'), false);
+}
+
+{
+  const base = {
+    room: {
+      name: 'E2N2',
+      controller: { my: true, level: 2 },
+      find() { return []; }
+    },
+    rcl: 2, creeps: [], hostileCreeps: [], sites: [], structures: [], sources: [],
+    energyStored: 0, energyAvailable: 0, energyCapacityAvailable: 300,
+    economyModel: null, health: null, efficiency: null
+  };
+
+  assert.equal(colonyState.build({ ...base, emergency: true }).mode, 'RECOVERY');
+  assert.equal(colonyState.build({ ...base, emergency: false, rcl: 1, room: { ...base.room, controller: { my: true, level: 1 } } }).mode, 'BOOTSTRAP');
+  assert.equal(colonyState.build({ ...base, emergency: false }).mode, 'STABLE');
+}
+
+console.log('colony state tests passed');
