@@ -167,10 +167,19 @@ export function evaluateLive(input) {
   const latencyBaseline = { waitingRatio: 0.212, fallbackRatio: 0.097 };
   if (waitingRatio === null || fallbackRatio === null) {
     checks.push(check('consumer-latency-window', 'WATCH', 'No complete consumer latency ratios were available.', { waitingRatio, fallbackRatio, baseline: latencyBaseline }));
-  } else if (waitingRatio < latencyBaseline.waitingRatio && fallbackRatio < latencyBaseline.fallbackRatio) {
-    checks.push(check('consumer-latency-window', 'PASS', 'Consumer latency improved versus the v0.2.19 baseline.', { waitingRatio, fallbackRatio, baseline: latencyBaseline }));
   } else {
-    checks.push(check('consumer-latency-window', 'WATCH', 'Consumer latency has not improved on both v0.2.19 baseline ratios.', { waitingRatio, fallbackRatio, baseline: latencyBaseline }));
+    const waitingImproved = waitingRatio < latencyBaseline.waitingRatio;
+    const fallbackImproved = fallbackRatio < latencyBaseline.fallbackRatio;
+    const message = [
+      `waiting=${waitingRatio.toFixed(3)} vs ${latencyBaseline.waitingRatio.toFixed(3)} (${waitingImproved ? 'improved' : 'not improved'})`,
+      `fallback=${fallbackRatio.toFixed(3)} vs ${latencyBaseline.fallbackRatio.toFixed(3)} (${fallbackImproved ? 'improved' : 'not improved'})`
+    ].join('; ');
+    checks.push(check(
+      'consumer-latency-window',
+      waitingImproved && fallbackImproved ? 'PASS' : 'WATCH',
+      `Consumer latency: ${message}.`,
+      { waitingRatio, fallbackRatio, baseline: latencyBaseline, waitingImproved, fallbackImproved }
+    ));
   }
 
   const haulerDeficit = finite(model.haulerCarryDeficit, null);
