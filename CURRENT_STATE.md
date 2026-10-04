@@ -6,7 +6,7 @@ Canonical repository: `Riflex91/boringstuff`
 
 - Seed baseline: **v0.2.16-node18**
 - Current canonical source baseline before this release prep: `29ad209af552f0a20ea50c0e7c8ad4e32a567e05`
-- Release candidate identity: **0.3.0-shadow.2-node18**
+- Release candidate identity: **0.3.0-shadow.3-node18**
 - Latest VNext live gate: **WATCH — 15 PASS / 3 WATCH / 0 FAIL**
 - Runtime target: **Node.js 18.20.4**
 - Runtime branch: `chatgpt`
@@ -253,7 +253,7 @@ The first VNext shadow live gate is complete. The restriction against starting a
 
 However, the current release remains shadow/evidence-only. No authority promotion is justified yet.
 
-The first post-live follow-up is merged to `main` and is being prepared as **0.3.0-shadow.2-node18** for live verification:
+The E2/E3 follow-up is merged and was live-tested as **0.3.0-shadow.2-node18**. CPU attribution observability is now merged and is being prepared as **0.3.0-shadow.3-node18** for the next live verification:
 
 - E2 spawning-capacity accounting now resolves `spawn.spawning.name` through `Game.creeps` when the in-flight creep is not yet present in `state.creeps`. This prevents duplicate future-capacity proposals observed during the live harvester/hauler replacement transitions.
 - E3 — Logistics Requests has started in SHADOW mode with explicit `PICKUP`, `DELIVER`, `BALANCE`, `RESERVE`, and `EMERGENCY_DELIVER` graph publishers.
@@ -283,7 +283,7 @@ The first complete shadow.2 live window `3691601–3691700` is **FAIL**, not PAS
 - E3 Logistics Requests appeared in live telemetry as SHADOW requests;
 - the live window did not contain a spawn transition, so the E2 in-flight-spawn fix still needs a direct post-fix live replacement observation.
 
-Existing profiler maxima are lifetime maxima and cannot attribute the exact spike tick to `rooms` vs `creeps`. Before E4 starts, add per-sample section attribution to the 25-tick CPU history and re-run the live gate. Do not weaken the hard CPU threshold.
+Existing profiler maxima are lifetime maxima and cannot attribute the exact spike tick to `rooms` vs `creeps`. Per-sample section attribution has now been added to the 25-tick CPU history, including `rooms`, `creeps`, `world-intel`, `stats`, `visuals`, `attributed`, and `unattributed`. The next gate is a shadow.3 live run that captures at least one future CPU spike with this attribution. E4 remains blocked until that evidence is reviewed. Do not weaken the hard CPU threshold.
 
 ## Current strategic interpretation
 
