@@ -35,23 +35,41 @@ function baseRoom(overrides = {}) {
       metrics: { productiveThroughputPerTick: 14.8, dedicatedHarvestCapacityPerTick: 20 },
       reasons: ['ENERGY_SURPLUS_UNCONSUMED']
     },
+    colonyState: {
+      authority: 'SHADOW',
+      requests: { available: true, authority: 'SHADOW' },
+      assignments: { available: true, authority: 'SHADOW' },
+      capacity: { projected: { available: true, authority: 'SHADOW' } },
+      spawnPlan: { available: true, authority: 'SHADOW' },
+      assignmentEvidence: { available: true, authority: 'SHADOW_EVIDENCE' }
+    },
     ...overrides
   };
 }
 
 function event(tick, code, ctx, extra = {}) {
-  return { tick, v: '0.2.19-node18', level: 'INFO', code, ctx, ...extra };
+  return { tick, v: '0.3.0-shadow.1-node18', level: 'INFO', code, ctx, ...extra };
 }
 
 function evidence(start = 1000) {
   const room = baseRoom();
+  room.economy.last100.startTick = start;
+  room.economy.last100.endTick = start + 99;
   return [
-    event(start, 'VERSION_CHANGE', { from: '0.2.18-node18', to: '0.2.19-node18' }, { jseq: 20 }),
+    event(start, 'VERSION_CHANGE', { from: '0.2.19-node18', to: '0.3.0-shadow.1-node18' }, { jseq: 20 }),
     event(start, 'ROOM_HEARTBEAT', { room: 'E8N1', economyModel: room.economyModel, health: room.health }),
     event(start, 'BOT_HEARTBEAT', { cpu: 3.8, bucket: 10000 }),
     event(start + 24, 'ROOM_HEARTBEAT', { room: 'E8N1', economyModel: room.economyModel, health: room.health }),
     event(start + 24, 'BOT_HEARTBEAT', { cpu: 4.1, bucket: 10000 }),
-    event(start + 99, 'STATUS_SNAPSHOT', { rooms: { E8N1: room }, cpu: 3.9, bucket: 10000 }, { jseq: 21 })
+    event(start + 99, 'STATUS_SNAPSHOT', {
+      rooms: { E8N1: room },
+      cpu: 3.9,
+      bucket: 10000,
+      capabilities: { schemaVersion: 1 },
+      serverProfile: { schemaVersion: 1 },
+      scheduler: { schemaVersion: 1 },
+      worldIntel: { schemaVersion: 1 }
+    }, { jseq: 21 })
   ];
 }
 
@@ -67,6 +85,8 @@ function evidence(start = 1000) {
   assert.equal(r.checks.find(c => c.id === 'productive-attribution').status, 'PASS');
   assert.equal(r.checks.find(c => c.id === 'productive-throughput').status, 'WATCH');
   assert.equal(r.checks.find(c => c.id === 'efficiency-status').status, 'WATCH');
+  assert.equal(r.checks.find(c => c.id === 'vnext-platform-shadow').status, 'PASS');
+  assert.equal(r.checks.find(c => c.id === 'vnext-shadow-authority').status, 'PASS');
   assert.equal(r.counts.fail, 0);
 }
 
@@ -160,6 +180,50 @@ function evidence(start = 1000) {
   const attribution = r.checks.find(c => c.id === 'productive-attribution');
   assert.equal(attribution.status, 'FAIL');
   assert.match(attribution.message, /consumerTicks/);
+}
+
+{
+  const rows = evidence();
+  rows.at(-1).ctx.rooms.E8N1.colonyState.spawnPlan.authority = 'AUTHORITATIVE';
+  const r = evaluateLive({ events: rows, startTick: 1000, nodeVersion: '18.20.4' });
+  assert.equal(r.outcome, 'FAIL');
+  assert.equal(r.checks.find(c => c.id === 'vnext-shadow-authority').status, 'FAIL');
+}
+
+{
+  const rows = evidence();
+  delete rows.at(-1).ctx.scheduler;
+  const r = evaluateLive({ events: rows, startTick: 1000, nodeVersion: '18.20.4' });
+  assert.equal(r.outcome, 'FAIL');
+  assert.equal(r.checks.find(c => c.id === 'vnext-platform-shadow').status, 'FAIL');
+}
+
+{
+  const staleRoom = baseRoom();
+  staleRoom.economy.last100.startTick = 1000;
+  staleRoom.economy.last100.endTick = 1099;
+  staleRoom.economy.last100.ticks = 100;
+
+  const rows = [
+    event(1101, 'ROOM_HEARTBEAT', {
+      room: 'E8N1',
+      economy: staleRoom.economy,
+      economyModel: staleRoom.economyModel,
+      health: staleRoom.health,
+      efficiency: staleRoom.efficiency,
+      colonyState: staleRoom.colonyState
+    }),
+    event(1150, 'BOT_HEARTBEAT', { cpu: 3.8, bucket: 10000 })
+  ];
+
+  const r = evaluateLive({ events: rows, startTick: 1101, nodeVersion: '18.20.4' });
+  assert.equal(r.complete, false);
+  assert.equal(r.attributionWindow.matches, false);
+  assert.equal(r.attributionWindow.observedStartTick, 1000);
+  assert.equal(r.attributionWindow.observedEndTick, 1099);
+  assert.equal(r.checks.find(c => c.id === 'productive-attribution').status, 'WATCH');
+  assert.equal(r.checks.find(c => c.id === 'controller-progress').status, 'WATCH');
+  assert.equal(r.checks.find(c => c.id === 'productive-throughput').status, 'WATCH');
 }
 
 console.log('live-verification tests passed');

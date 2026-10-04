@@ -1,5 +1,5 @@
 export const EXPECTED_NODE_VERSION = '18.20.4';
-export const EXPECTED_BOT_VERSION = '0.2.19-node18';
+export const EXPECTED_BOT_VERSION = '0.3.0-shadow.1-node18';
 
 const RANK = { PASS: 0, WATCH: 1, FAIL: 2 };
 
@@ -138,7 +138,16 @@ export function evaluateLive(input) {
   const eco = latest?.economy || {};
   const eff = latest?.efficiency || {};
   const last100 = eco?.last100 || {};
-  const attribution = last100?.productiveFlow || null;
+  const last100StartTick = finite(last100?.startTick, null);
+  const last100EndTick = finite(last100?.endTick, null);
+  const last100Ticks = finite(last100?.ticks, null);
+  const last100MatchesWindow =
+    last100StartTick === selected.startTick &&
+    last100EndTick === selected.endTick &&
+    last100Ticks !== null &&
+    last100Ticks >= 100;
+  const windowLast100 = last100MatchesWindow ? last100 : null;
+  const attribution = windowLast100?.productiveFlow || null;
   const attributionFields = {
     consumerTicks: finite(attribution?.consumerTicks, null),
     waitingConsumerTicks: finite(attribution?.waitingConsumerTicks, null),
@@ -156,7 +165,12 @@ export function evaluateLive(input) {
       selected.complete
         ? `Productive-flow attribution is missing or incomplete: ${missingAttribution.join(', ') || 'payload'}.`
         : 'Productive-flow attribution is not complete yet.',
-      { missing: missingAttribution, attribution }
+      {
+        missing: missingAttribution,
+        attribution,
+        requestedWindow: { startTick: selected.startTick, endTick: selected.endTick },
+        observedLast100: { startTick: last100StartTick, endTick: last100EndTick, ticks: last100Ticks }
+      }
     ));
   } else {
     checks.push(check('productive-attribution', 'PASS', 'Productive-flow attribution is complete for the 100-tick window.', attributionFields));
@@ -175,8 +189,8 @@ export function evaluateLive(input) {
   else if ((critical || 0) > 0 || (waiting || 0) > 0) checks.push(check('consumer-supply', 'WATCH', 'Consumers were waiting/critical, but fallback remained zero.', { fallback, critical, waiting }));
   else checks.push(check('consumer-supply', 'PASS', 'No consumer fallback/waiting/critical pressure was observed in the latest snapshot.', { fallback, critical, waiting }));
 
-  const controllerProgress = finite(last100.controllerProgress, null);
-  const constructionProgress = finite(last100.constructionProgress, null);
+  const controllerProgress = finite(windowLast100?.controllerProgress, null);
+  const constructionProgress = finite(windowLast100?.constructionProgress, null);
   const sites = finite(latest?.constructionSites, 0);
   if (controllerProgress === null) checks.push(check('controller-progress', 'WATCH', 'No 100-tick controller progress metric was available.'));
   else if (controllerProgress <= 0) checks.push(check('controller-progress', 'FAIL', 'Controller made no progress during the 100-tick window.', { controllerProgress }));
@@ -186,7 +200,7 @@ export function evaluateLive(input) {
   else if (constructionProgress !== null) checks.push(check('construction-progress', 'PASS', 'Construction progress is acceptable for the current workload.', { sites, constructionProgress }));
   else checks.push(check('construction-progress', 'WATCH', 'No 100-tick construction progress metric was available.'));
 
-  const throughput = finite(eff?.metrics?.productiveThroughputPerTick, null);
+  const throughput = last100MatchesWindow ? finite(eff?.metrics?.productiveThroughputPerTick, null) : null;
   const mining = finite(eff?.metrics?.dedicatedHarvestCapacityPerTick, finite(model.dedicatedHarvestCapacityPerTick, null));
   if (throughput === null) checks.push(check('productive-throughput', 'WATCH', 'No productive throughput metric was available.'));
   else if (throughput <= 0) checks.push(check('productive-throughput', 'FAIL', 'Productive throughput is zero.', { throughput, mining }));
@@ -198,5 +212,42 @@ export function evaluateLive(input) {
   else if (effStatus) checks.push(check('efficiency-status', 'PASS', `Efficiency status is ${effStatus}.`));
   else checks.push(check('efficiency-status', 'WATCH', 'No efficiency status was available.'));
 
-  return { mode: 'live', ...selected, ...summarize(checks) };
+  const statusCtx = snapshots.at(-1)?.e?.ctx || null;
+  const platformMissing = [];
+  if (!statusCtx?.capabilities) platformMissing.push('capabilities');
+  if (!statusCtx?.serverProfile) platformMissing.push('serverProfile');
+  if (!statusCtx?.scheduler) platformMissing.push('scheduler');
+  if (!statusCtx?.worldIntel) platformMissing.push('worldIntel');
+  checks.push(platformMissing.length
+    ? check('vnext-platform-shadow', selected.complete ? 'FAIL' : 'WATCH', 'VNext platform telemetry is incomplete.', { missing: platformMissing })
+    : check('vnext-platform-shadow', 'PASS', 'K0/K1/I0 platform telemetry is present.'));
+
+  const colony = latest?.colonyState || null;
+  const shadowFailures = [];
+  if (!colony) shadowFailures.push('colonyState');
+  else {
+    if (colony.authority !== 'SHADOW') shadowFailures.push('colonyState.authority');
+    if (!colony.requests?.available || colony.requests?.authority !== 'SHADOW') shadowFailures.push('requests');
+    if (!colony.assignments?.available || colony.assignments?.authority !== 'SHADOW') shadowFailures.push('assignments');
+    if (!colony.capacity?.projected?.available || colony.capacity?.projected?.authority !== 'SHADOW') shadowFailures.push('capacity.projected');
+    if (!colony.spawnPlan?.available || colony.spawnPlan?.authority !== 'SHADOW') shadowFailures.push('spawnPlan');
+    if (!colony.assignmentEvidence?.available || colony.assignmentEvidence?.authority !== 'SHADOW_EVIDENCE') shadowFailures.push('assignmentEvidence');
+  }
+  checks.push(shadowFailures.length
+    ? check('vnext-shadow-authority', selected.complete ? 'FAIL' : 'WATCH', 'VNext shadow authority contract is incomplete or violated.', { failures: shadowFailures })
+    : check('vnext-shadow-authority', 'PASS', 'O1/E0/E1/E2/O2 remain shadow/evidence-only in live telemetry.'));
+
+  return {
+    mode: 'live',
+    ...selected,
+    attributionWindow: {
+      matches: last100MatchesWindow,
+      requestedStartTick: selected.startTick,
+      requestedEndTick: selected.endTick,
+      observedStartTick: last100StartTick,
+      observedEndTick: last100EndTick,
+      observedTicks: last100Ticks
+    },
+    ...summarize(checks)
+  };
 }

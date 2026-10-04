@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ScreepsHttpClient } from './screeps-client-node18.mjs';
+import { DEFAULT_VERIFICATION_LOG_DIR, writeDeploymentReceipt } from './deployment-receipt.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const parent = path.resolve(here, '..');
@@ -42,12 +43,21 @@ const expectedVersion = extractVersion(modules.config);
 if (expectedVersion === 'unknown') {
   throw new Error('Could not determine local VERSION from config.js');
 }
+const deploymentId = new Date().toISOString().replace(/[-:.TZ]/g, '') + '-' + process.pid;
+if (!/module\.exports\s*=\s*\{/.test(modules.config)) {
+  throw new Error('Could not inject DEPLOYMENT_ID into config.js');
+}
+modules.config = modules.config.replace(
+  /module\.exports\s*=\s*\{/,
+  match => match + "\n  DEPLOYMENT_ID: '" + deploymentId + "',"
+);
 
 console.log('Server:            ' + serverName);
 console.log('Branch:            ' + branch);
 console.log('Runtime directory: ' + runtimeDir);
 console.log('Runtime modules:   ' + files.length);
 console.log('Local version:     ' + expectedVersion);
+console.log('Deployment ID:     ' + deploymentId);
 
 const api = await ScreepsHttpClient.fromConfig(serverName);
 
@@ -86,6 +96,7 @@ fs.writeFileSync(
     server: serverName,
     branch,
     version: beforeVersion,
+    deploymentId,
     modules: before?.modules || {}
   }, null, 2),
   'utf8'
@@ -119,4 +130,19 @@ if (activeWorld === false) {
   );
 }
 
+if (!String(after?.modules?.config || '').includes("DEPLOYMENT_ID: '" + deploymentId + "'")) {
+  throw new Error('Verification failed: server config does not contain deployment ID ' + deploymentId);
+}
+
+const verificationLogDir = process.env.SCREEPS_LOG_DIR || DEFAULT_VERIFICATION_LOG_DIR;
+const receipt = writeDeploymentReceipt({
+  logDir: verificationLogDir,
+  server: serverName,
+  branch,
+  version: expectedVersion,
+  deploymentId
+});
+
 console.log('Server-side deployment verification passed.');
+console.log('Deployment receipt: ' + receipt.file);
+console.log('Deployment marker will be emitted by the first runtime tick: ' + deploymentId);
