@@ -252,8 +252,8 @@ function planRequirement(state, request, slots, planned, game) {
       bodySource: 'LEGACY_BODY_ADAPTER',
       cost: primaryCost,
       spawnTicks,
-      capacityDelivered: Math.min(delivered, remaining),
-      rawCapacityDelivered: delivered,
+      capacityDelivered: delivered,
+      capacityApplied: Math.min(delivered, remaining),
       predicted: {
         spawnId: slot.id,
         queueDelay,
