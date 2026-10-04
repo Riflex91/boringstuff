@@ -237,11 +237,27 @@ function build(state, context) {
       score: Number.isFinite(state.efficiency.overallScore) ? state.efficiency.overallScore : null,
       reasons: Array.isArray(state.efficiency.reasons) ? state.efficiency.reasons.slice(0, 12) : []
     } : null,
-    requests: {
-      available: false,
-      open: null,
-      blocked: null
-    }
+    requests: state.requestShadow && state.requestShadow.summary
+      ? {
+          available: true,
+          authority: 'SHADOW',
+          open: state.requestShadow.summary.open,
+          blocked: state.requestShadow.summary.blocked,
+          total: state.requestShadow.summary.total,
+          reservationCount: state.requestShadow.summary.reservationCount,
+          byStatus: state.requestShadow.summary.byStatus,
+          byDomain: state.requestShadow.summary.byDomain
+        }
+      : {
+          available: false,
+          authority: 'SHADOW',
+          open: null,
+          blocked: null,
+          total: null,
+          reservationCount: null,
+          byStatus: {},
+          byDomain: {}
+        }
   };
 }
 
