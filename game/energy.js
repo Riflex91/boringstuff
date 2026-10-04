@@ -454,7 +454,8 @@ function consumerSupplyDiagnostics(room) {
       0,
       critical.length - readyGuards.length - (earlyDispatch ? 1 : 0)
     ),
-    earlyDispatchBlockedByReadyGuard: readyGuards.length > 0 &&
+    earlyDispatchBlockedByReadyGuard: !earlyDispatch &&
+      readyGuards.length > 0 &&
       usefulPartial.length > 0 &&
       critical.length > readyGuards.length
   };
