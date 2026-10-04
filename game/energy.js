@@ -271,39 +271,50 @@ function stableCreepKey(creep) {
   return creep.name || creep.id || '';
 }
 
-function selectConsumerGuardHauler(room) {
+function selectConsumerGuardHaulers(room) {
   // A spawn/extension refill burst can otherwise monopolize every hauler long
-  // enough for productive creeps to cross the self-supply threshold. Keep the
-  // survival rule when only one hauler exists, but with redundant logistics
-  // reserve exactly one delivery-ready hauler for a consumer that is already
-  // waiting or has entered fallback. The other haulers keep hard
-  // infrastructure at highest priority.
-  if (!room || !room.find) return null;
+  // enough for productive creeps to cross the self-supply threshold. Preserve
+  // the single-hauler recovery invariant, but when logistics has real
+  // redundancy allow more than one delivery-ready guard if several consumers
+  // are already critical. At least one live hauler always remains outside the
+  // guard set for spawn/extensions/towers.
+  if (!room || !room.find) return [];
   const haulers = room.find(FIND_MY_CREEPS, {
     filter: c => !c.spawning && c.memory && c.memory.role === 'hauler'
   });
-  if (haulers.length < 2) return null;
+  if (haulers.length < 2) return [];
 
   const critical = room.find(FIND_MY_CREEPS, {
     filter: c => isCriticalConsumerRequest(c)
   });
-  if (!critical.length) return null;
+  if (!critical.length) return [];
 
   const ready = haulers.filter(haulerReadyToDeliver);
-  if (!ready.length) return null;
+  if (!ready.length) return [];
+
+  const guardLimit = Math.min(
+    critical.length,
+    ready.length,
+    Math.max(1, haulers.length - 1)
+  );
+  if (guardLimit <= 0) return [];
 
   const criticalIds = {};
   for (const consumer of critical) criticalIds[consumer.id] = true;
 
-  // Preserve an existing useful reservation so the guard assignment does not
-  // oscillate while a hauler is already travelling to a starved consumer.
-  const reserved = ready.filter(h => h.memory.consumerTargetId && criticalIds[h.memory.consumerTargetId]);
-  if (reserved.length) {
-    reserved.sort((a, b) => stableCreepKey(a).localeCompare(stableCreepKey(b)));
-    return reserved[0];
-  }
+  // Preserve useful reservations first so existing in-flight guards remain
+  // sticky. Remaining guard slots are filled deterministically by proximity,
+  // carried energy, then stable creep identity.
+  const reserved = ready
+    .filter(h => h.memory.consumerTargetId && criticalIds[h.memory.consumerTargetId])
+    .sort((a, b) => stableCreepKey(a).localeCompare(stableCreepKey(b)));
 
-  ready.sort((a, b) => {
+  const selected = reserved.slice(0, guardLimit);
+  const selectedIds = {};
+  for (const hauler of selected) selectedIds[hauler.id] = true;
+
+  const candidates = ready.filter(h => !selectedIds[h.id]);
+  candidates.sort((a, b) => {
     const rangeA = Math.min.apply(null, critical.map(c => a.pos && a.pos.getRangeTo ? a.pos.getRangeTo(c) : 999));
     const rangeB = Math.min.apply(null, critical.map(c => b.pos && b.pos.getRangeTo ? b.pos.getRangeTo(c) : 999));
     if (rangeA !== rangeB) return rangeA - rangeB;
@@ -312,13 +323,21 @@ function selectConsumerGuardHauler(room) {
     if (energyDelta !== 0) return energyDelta;
     return stableCreepKey(a).localeCompare(stableCreepKey(b));
   });
-  return ready[0] || null;
+
+  for (const hauler of candidates) {
+    if (selected.length >= guardLimit) break;
+    selected.push(hauler);
+  }
+  return selected;
+}
+
+function selectConsumerGuardHauler(room) {
+  return selectConsumerGuardHaulers(room)[0] || null;
 }
 
 function shouldPrioritizeConsumer(creep) {
   if (!creep || !creep.room) return false;
-  const guard = selectConsumerGuardHauler(creep.room);
-  return !!guard && guard.id === creep.id;
+  return selectConsumerGuardHaulers(creep.room).some(guard => guard.id === creep.id);
 }
 
 
@@ -533,6 +552,7 @@ module.exports = {
     selectConsumerTarget,
     currentConsumerTarget,
     haulerReadyToDeliver,
+    selectConsumerGuardHaulers,
     selectConsumerGuardHauler,
     selectConsumerEarlyDispatchHauler
   }
