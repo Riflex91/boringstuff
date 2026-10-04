@@ -423,6 +423,9 @@ https://gitlab.com/code-addicts-anonymous/screeps-bot
 Studied main source tree:
 `main`, latest source commit lineage through 2023-02-26.
 
+License status:
+no repository license was verified during this study. Treat the source as **concept-only / no-copy** unless a valid license is established separately.
+
 ## 5.1 Architectural character
 
 This bot is especially valuable because it deliberately targets:
