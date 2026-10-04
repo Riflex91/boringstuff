@@ -181,7 +181,7 @@ function migrateLegacy(memoryRoot, game) {
       },
       classification: { roomStatus: roomStatus(roomName, game) },
       controller: {
-        exists: old.owner !== undefined || old.reservation !== undefined,
+        exists: null,
         my: false,
         level: null,
         owner: old.owner || null,
@@ -219,7 +219,9 @@ function freshness(roomName, nowTick, maxAge, memoryRoot) {
   if (!record || !record.observation || !Number.isFinite(record.observation.lastSeenTick)) {
     return { known: false, fresh: false, age: null, confidence: 0 };
   }
-  const age = Math.max(0, Number(nowTick) - record.observation.lastSeenTick);
+  const fallbackNow = typeof Game !== 'undefined' && Number.isFinite(Game.time) ? Game.time : record.observation.lastSeenTick;
+  const currentTick = Number.isFinite(nowTick) ? nowTick : fallbackNow;
+  const age = Math.max(0, currentTick - record.observation.lastSeenTick);
   return {
     known: true,
     fresh: age <= maxAge,
