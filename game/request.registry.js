@@ -1,6 +1,7 @@
 'use strict';
 
 const SCHEMA_VERSION = 1;
+const DEFAULT_TERMINAL_RETENTION = 2000;
 const STATUS = Object.freeze({
   OPEN: 'OPEN',
   RESERVED: 'RESERVED',
@@ -232,13 +233,17 @@ function progress(roomName, dedupeKey, amount, memoryRoot, game) {
   return request;
 }
 
-function reconcile(roomName, activeDedupeKeys, memoryRoot, game) {
+function reconcile(roomName, activeDedupeKeys, memoryRoot, game, terminalRetention) {
   const tick = currentTick(game);
   const room = ensureRoom(roomName, memoryRoot);
   const active = {};
   for (const key of activeDedupeKeys || []) active[safeKey(key)] = true;
+  terminalRetention = Number.isFinite(terminalRetention)
+    ? Math.max(0, terminalRetention)
+    : DEFAULT_TERMINAL_RETENTION;
   let satisfied = 0;
   let expired = 0;
+  let pruned = 0;
 
   for (const key in room.requests) {
     const request = room.requests[key];
@@ -258,11 +263,16 @@ function reconcile(roomName, activeDedupeKeys, memoryRoot, game) {
       request.updatedTick = tick;
       request.reservations = [];
       satisfied += 1;
+      continue;
+    }
+    if (Number.isFinite(request.updatedTick) && tick - request.updatedTick > terminalRetention) {
+      delete room.requests[key];
+      pruned += 1;
     }
   }
 
   room.lastReconcileTick = tick;
-  return { satisfied, expired };
+  return { satisfied, expired, pruned };
 }
 
 function list(roomName, memoryRoot, options) {
@@ -301,6 +311,7 @@ function snapshot(roomName, memoryRoot) {
 
 module.exports = {
   SCHEMA_VERSION,
+  DEFAULT_TERMINAL_RETENTION,
   STATUS,
   ensure,
   ensureRoom,
