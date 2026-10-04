@@ -1609,7 +1609,240 @@ If a subsystem cannot answer those questions, it is probably too role-driven, to
 
 ---
 
-# 13. Research sources
+# 13. Deep-source algorithm refinements
+
+The first architecture pass established the major patterns. A second source-level pass produced more specific implementation lessons.
+
+## 13.1 Kasami expansion is a resource-budgeted operation, not only a GCL check
+
+Historical `ExpansionManager` demonstrates several useful principles:
+
+- refuse expansion when ownership already consumes current GCL capacity;
+- gate expansion on available CPU headroom as well as claim capacity;
+- require candidate parent colonies to be sufficiently mature and not under siege;
+- compare the best targets proposed by all eligible parent colonies;
+- modify candidate value for mineral diversity, catalyst value, nearby Source Keeper mineral diversity, proximity to existing colonies and nearby occupied rooms;
+- find an initial spawn position automatically before committing;
+- timestamp an expansion attempt and mark/abandon a candidate when establishment fails;
+- automatically order claim/bootstrap/support creeps.
+
+Canonical VNext rule:
+
+```text
+ExpansionAllowed =
+claimCapacityAvailable
+AND parentMaturitySufficient
+AND empireCpuHeadroomSufficient
+AND economySupportBudgetSufficient
+AND candidateExpectedValuePositive
+AND strategicRiskAcceptable
+```
+
+Do not copy Kasami's fixed CPU formula or maturity thresholds. VNext derives them from measured per-colony CPU, current headroom, spawn opportunity cost and recovery reserves.
+
+## 13.2 Expansion score is portfolio value, not only local room quality
+
+Keep two separate functions:
+
+```text
+RoomQuality(room)
+EmpireFit(room, empire)
+```
+
+`RoomQuality` measures the room in isolation. `EmpireFit` measures mineral/resource diversity, support distance, regional overlap, new remote frontier, threat neighborhood, route topology, CPU burden, terminal-network value and military support geometry.
+
+## 13.3 Expansion needs failure memory and retry discipline
+
+Kasami abandons attempts that fail to establish and remembers bad candidates. VNext generalizes this into operation evidence:
+
+```text
+attemptCount
+lastAttemptTick
+failureClass
+failureEvidence
+blockedUntil
+confidence
+```
+
+Failure classes include claim-policy rejection, target occupation, unsustainable bootstrap, unsafe routes, no viable planner anchor, vanished support budget and CPU pressure. Structural failures back off much longer than transient failures.
+
+## 13.4 Outposts are portfolio assets with lifecycle
+
+Kasami continually reevaluates desired outpost count, reservers, defenders/supporters, maintenance, occupancy, undefendability and next candidates.
+
+Canonical lifecycle:
+
+```text
+DISCOVERED
+→ CANDIDATE
+→ ACTIVE
+→ THREATENED
+→ SUSPENDED
+→ RETIRED
+```
+
+A historically useful remote must be abandoned automatically when its current marginal value becomes negative.
+
+## 13.5 Regional defense is a dispatch problem
+
+Kasami can request help from neighboring healthy rooms. VNext models this as an empire defense request containing target room, required effective combat capacity, latest useful arrival tick, local capacity, tower/rampart support, candidate donor colonies, donor spawn opportunity cost, travel ETA and boost readiness.
+
+The empire chooses the cheapest reinforcement plan that can arrive before the deadline.
+
+## 13.6 Threat state must be body-aware and evidence-backed
+
+Kasami evaluates hostile body parts and boosts; The International separately maintains enemy-attacker state and defense requests.
+
+Canonical pipeline:
+
+```text
+hostile observation
+→ effective body strengths after boosts/damage
+→ mobility
+→ target access / breach path
+→ tower-zone interaction
+→ projected damage/heal
+→ asset-loss probability
+→ threat state
+```
+
+Safe Mode is a predicted-loss decision, not a generic hostile-presence reaction.
+
+## 13.7 The International planner is a staged search pipeline
+
+The inspected planner proceeds broadly through:
+
+```text
+configure candidate
+→ fast-filler/core
+→ topology grid
+→ controller upgrade position
+→ source harvest positions
+→ hub
+→ labs
+→ source structures
+→ extension grid
+→ road/source paths
+→ late-game structures
+→ grid plan
+→ Min-Cut
+→ protected/unprotected classification
+→ source-plan reconciliation
+→ onboarding ramparts
+→ tower placement/paths
+→ mineral infrastructure
+→ general shield
+→ per-RCL road quotas
+→ plan score
+→ record candidate
+```
+
+VNext planner output must therefore be an inspectable sequence of subplans rather than a monolith. Each phase should expose inputs, result, score delta, CPU used, failure reason and artifacts produced.
+
+## 13.8 Planner candidate anchors should come from economic geometry
+
+The International seeds planning from meaningful points such as controller, sources and midpoints on important paths instead of uniformly searching all 2500 tiles.
+
+VNext candidate generation should use source-controller path geometry, source-source geometry, exit accessibility, logistics centrality, open-area distance transforms and defense-perimeter potential. Expensive scoring runs only for strong candidates.
+
+## 13.9 Plans encode availability over progression
+
+The International stores `minRCL` for structures and per-RCL road quotas. VNext generalizes this to:
+
+```text
+PlannedStructure
+- type
+- coord
+- earliestCapability
+- constructionPriorityClass
+- dependencies
+- replacement/migration rule
+```
+
+`earliestCapability` is preferred over only RCL so modified servers and optional structures remain compatible.
+
+## 13.10 Min-Cut comes after economic geometry
+
+The International establishes the economic/core topology before defensive Min-Cut.
+
+Canonical sequence:
+
+```text
+economic topology
+→ protected asset set
+→ traffic crossings
+→ Min-Cut candidate
+→ rampart groups
+→ tower coverage
+→ breach/repair cost
+→ defensive score
+```
+
+Do not choose a core solely because it minimizes ramparts; logistics and future expansion remain first-class objectives.
+
+## 13.11 Hauler need and hauler body sizing are separate problems
+
+The International separates haul demand from spawn-request construction.
+
+Canonical split:
+
+```text
+Transport Demand Model
+    ↓ required CARRY-over-time
+Capacity Planner
+    ↓ missing projected CARRY
+Body Optimizer
+    ↓ bodies that satisfy deficit
+Spawn Scheduler
+```
+
+No route-demand module should produce 'spawn exactly N haulers' as its primary output.
+
+## 13.12 Logistics objects publish demand; haulers consume demand
+
+The International creates logistics requests from containers, storing structures, spawn infrastructure, ruins, tombstones and dropped resources.
+
+Canonical contract:
+
+```text
+producer / buffer / consumer
+→ publishes supply or demand request
+→ logistics engine reserves/matches request
+→ executor transports
+→ request records progress
+```
+
+This removes target-selection policy from the hauler role.
+
+## 13.13 Planner and strategy obey CPU scheduling
+
+The International gates expensive planning on bucket state; Kasami schedules work by priority classes. VNext combines both:
+
+- planner search is BACKGROUND/OVERFLOW unless needed to unblock a deadline;
+- active construction execution remains STANDARD/DEADLINE;
+- emergency defense can preempt normal planner work;
+- incomplete planner state is resumable;
+- stable planner artifacts are persisted;
+- CPU pressure may defer optimization, never survival.
+
+## 13.14 Derived VNext tests from the deep pass
+
+Add fixtures for:
+
+1. expansion rejected despite free GCL because measured CPU/support budget is unsafe;
+2. equal local room quality but different empire resource diversity;
+3. failed expansion enters backoff and later reevaluation;
+4. negative-ROI remote is suspended without manual action;
+5. neighboring colony wins defense dispatch because its ETA beats local spawn ETA;
+6. boosted hostile changes threat state while equivalent unboosted body does not;
+7. planner candidate fails a late stage and an alternative candidate is tried;
+8. planner remains deterministic across restart/resume;
+9. changed capability table changes earliest planned structure availability;
+10. transport demand changes optimized hauler bodies/count without the demand module knowing creep count.
+
+---
+
+# 14. Research sources
 
 Primary public references:
 
