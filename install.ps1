@@ -31,6 +31,7 @@ $Here = Resolve-PackageRoot
 $GameDir = Join-Path $Here "game"
 $ToolsSource = Join-Path $Here "tools"
 $ToolsTarget = Join-Path $Target "tools"
+$GameTestTarget = Join-Path $Target "game"
 $LogsTarget = Join-Path $Target "logs"
 
 Write-Host "Source package: $Here"
@@ -39,11 +40,15 @@ Write-Host "Target branch:  $Target"
 New-Item -ItemType Directory -Force -Path $Target | Out-Null
 New-Item -ItemType Directory -Force -Path $LogsTarget | Out-Null
 New-Item -ItemType Directory -Force -Path $ToolsTarget | Out-Null
+New-Item -ItemType Directory -Force -Path $GameTestTarget | Out-Null
 
 $gameFiles = Get-ChildItem -Path $GameDir -Filter "*.js" -File
 if (-not $gameFiles) { throw "No game JavaScript files found in $GameDir" }
 foreach ($file in $gameFiles) {
+    # Screeps runtime loads modules from the flat branch directory.
     Copy-Item -LiteralPath $file.FullName -Destination (Join-Path $Target $file.Name) -Force
+    # Offline tests under tools/ import ../game/*.js, so keep a mirrored test tree.
+    Copy-Item -LiteralPath $file.FullName -Destination (Join-Path $GameTestTarget $file.Name) -Force
 }
 
 $toolFiles = Get-ChildItem -Path $ToolsSource -File | Where-Object {
@@ -59,9 +64,11 @@ if (Test-Path $readme) { Copy-Item -LiteralPath $readme -Destination (Join-Path 
 $installedMain = Join-Path $Target "main.js"
 $installedPlanner = Join-Path $ToolsTarget "initial-spawn-planner.mjs"
 $installedVerifier = Join-Path $ToolsTarget "spawn-verify.mjs"
+$installedTestConfig = Join-Path $GameTestTarget "config.js"
 if (-not (Test-Path $installedMain)) { throw "Installation verification failed: main.js was not copied." }
 if (-not (Test-Path $installedPlanner)) { throw "Installation verification failed: initial-spawn-planner.mjs was not copied." }
 if (-not (Test-Path $installedVerifier)) { throw "Installation verification failed: spawn-verify.mjs was not copied." }
+if (-not (Test-Path $installedTestConfig)) { throw "Installation verification failed: game\\config.js test mirror was not copied." }
 
 $installedCount = (Get-ChildItem -Path $Target -Filter "*.js" -File).Count
 Write-Host ""
@@ -72,7 +79,8 @@ Write-Host "Initial planner:  $installedPlanner"
 Write-Host "Spawn verifier:   $installedVerifier"
 Write-Host "Logs:             $LogsTarget"
 Write-Host "Tools:            $ToolsTarget"
+Write-Host "Test game mirror: $GameTestTarget"
 Write-Host ""
-Write-Host "Next: cd into tools, run npm install, npm test, npm run doctor"
+Write-Host "Next: cd `"$ToolsTarget`", run npm install, npm test, npm run doctor"
 Write-Host "Then deploy directly with: npm run deploy"
 Write-Host "After verification, start the collector with: npm run logs"
