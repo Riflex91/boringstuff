@@ -94,13 +94,19 @@ function run(room, lowCpu) {
   state.health = colonyHealth.evaluate(state);
   state.efficiency = colonyEfficiency.evaluate(state);
   state.requestShadow = requestShadow.produce(state);
-  state.assignmentShadow = assignmentShadow.plan(
-    state.room.name,
-    state.requestShadow.requests,
-    state.creeps,
-    undefined,
-    Game
-  );
+  state.assignmentShadow = lowCpu
+    ? {
+        assignments: [],
+        unfilled: [],
+        summary: assignmentShadow.deferredSnapshot(state.room.name, 'LOW_CPU')
+      }
+    : assignmentShadow.plan(
+        state.room.name,
+        state.requestShadow.requests,
+        state.creeps,
+        undefined,
+        Game
+      );
   state.colonyState = colonyState.build(state, {
     tick: Game.time,
     bucket: Game.cpu.bucket
