@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ScreepsHttpClient } from './screeps-client-node18.mjs';
+import { DEFAULT_VERIFICATION_LOG_DIR, writeDeploymentReceipt } from './deployment-receipt.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const parent = path.resolve(here, '..');
@@ -134,5 +135,15 @@ if (!String(after?.modules?.config || '').includes("DEPLOYMENT_ID: '" + deployme
   throw new Error('Verification failed: server config does not contain deployment ID ' + deploymentId);
 }
 
+const verificationLogDir = process.env.SCREEPS_LOG_DIR || DEFAULT_VERIFICATION_LOG_DIR;
+const receipt = writeDeploymentReceipt({
+  logDir: verificationLogDir,
+  server: serverName,
+  branch,
+  version: expectedVersion,
+  deploymentId
+});
+
 console.log('Server-side deployment verification passed.');
+console.log('Deployment receipt: ' + receipt.file);
 console.log('Deployment marker will be emitted by the first runtime tick: ' + deploymentId);
