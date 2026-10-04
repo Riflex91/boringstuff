@@ -173,7 +173,10 @@ function evidence(start = 1000) {
   flow.waitingRatio = 0.212;
   flow.fallbackRatio = 0.097;
   const r = evaluateLive({ events: rows, startTick: 1000, nodeVersion: '18.20.4' });
-  assert.equal(r.checks.find(c => c.id === 'consumer-latency-window').status, 'WATCH');
+  const latency = r.checks.find(c => c.id === 'consumer-latency-window');
+  assert.equal(latency.status, 'WATCH');
+  assert.match(latency.message, /waiting=0\.212 vs 0\.212 \(not improved\)/);
+  assert.match(latency.message, /fallback=0\.097 vs 0\.097 \(not improved\)/);
 }
 
 console.log('live-verification tests passed');
