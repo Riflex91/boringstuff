@@ -754,16 +754,24 @@ defense requires X effective ranged DPS
 controller needs minimum 2 WORK
 ```
 
-Planner computes:
+Capacity Requests publish **total required capacity**, not a pre-subtracted current deficit.
+
+Planner computes future availability at the candidate productive-start horizon:
 
 ```text
 required
-- active
-- queued
-- spawning
-- projected surviving
+- projected surviving active capacity
+- spawning capacity available by that horizon
+- authoritative queued capacity available by that horizon
+- externally committed capacity
 = deficit
 ```
+
+`active` remains a present-time observability field and is not added to `projected surviving`.
+
+During SHADOW E2, proposed SpawnRequests are not authoritative queued capacity and must remain separately labeled.
+
+The initial E2/E2A shadow slice may use the existing body builder through an explicit `LEGACY_BODY_ADAPTER` so capacity/pre-spawn semantics can be verified independently. E2B replaces that adapter with the generalized Body Optimizer.
 
 ## Slice E2A – Generalized Pre-spawn
 
