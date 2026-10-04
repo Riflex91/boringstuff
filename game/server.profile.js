@@ -52,8 +52,8 @@ function normalizeClaimResult(result) {
   const busy = globalCode('ERR_BUSY');
 
   if (ok !== null && result === ok) return { kind: 'SUCCESS', code: result };
-  if (gcl !== null && result === gcl) return { kind: 'CLAIM_CAPACITY', code: result };
-  if (full !== null && result === full) return { kind: 'SERVER_CAPACITY', code: result };
+  if (gcl !== null && result === gcl) return { kind: 'GCL_CAPACITY', code: result };
+  if (full !== null && result === full) return { kind: 'CONTEXT_CAPACITY', code: result };
   if (invalidTarget !== null && result === invalidTarget) return { kind: 'INVALID_TARGET', code: result };
   if (notOwner !== null && result === notOwner) return { kind: 'NOT_OWNER', code: result };
   if (busy !== null && result === busy) return { kind: 'BUSY', code: result };
@@ -89,19 +89,39 @@ function observeClaimResult(result, context, memoryRoot, game) {
 
   pushObservation(profile, observation);
 
-  if (normalized.kind === 'CLAIM_CAPACITY' || normalized.kind === 'SERVER_CAPACITY') {
-    if (ownedRooms !== null) {
-      const existing = profile.claimPolicy.discoveredClaimLimit;
-      profile.claimPolicy.discoveredClaimLimit = existing === null
-        ? ownedRooms
-        : Math.min(existing, ownedRooms);
-    }
-    profile.claimPolicy.confidence = clampConfidence(profile.claimPolicy.confidence + 0.25);
+  if (normalized.kind === 'GCL_CAPACITY' || normalized.kind === 'CONTEXT_CAPACITY') {
+    // Do not infer a persistent global room limit from a claim error alone.
+    // GCL capacity can increase over time, while ERR_FULL may represent a
+    // room/area-specific rule. Preserve the evidence for later policy logic.
     profile.claimPolicy.lastFailure = observation;
   } else if (normalized.kind === 'SUCCESS') {
-    profile.claimPolicy.confidence = clampConfidence(profile.claimPolicy.confidence + 0.05);
     profile.claimPolicy.lastFailure = null;
   }
+
+  return profile;
+}
+
+function observeGlobalClaimLimit(limit, evidence, memoryRoot, game) {
+  if (!Number.isFinite(limit) || limit < 0) return ensure(memoryRoot);
+  evidence = evidence || {};
+  game = game || (typeof Game !== 'undefined' ? Game : null);
+
+  const profile = ensure(memoryRoot);
+  profile.claimPolicy.discoveredClaimLimit = Math.floor(limit);
+  profile.claimPolicy.confidence = clampConfidence(
+    Number.isFinite(evidence.confidence) ? evidence.confidence : 1
+  );
+
+  pushObservation(profile, {
+    tick: now(game),
+    result: 'GLOBAL_LIMIT',
+    code: null,
+    roomName: null,
+    ownedRooms: Number.isFinite(evidence.ownedRooms) ? evidence.ownedRooms : null,
+    gclLevel: Number.isFinite(evidence.gclLevel) ? evidence.gclLevel : null,
+    source: evidence.source || 'explicit-server-evidence',
+    limit: Math.floor(limit)
+  });
 
   return profile;
 }
@@ -124,6 +144,7 @@ module.exports = {
   ensure,
   snapshot,
   observeClaimResult,
+  observeGlobalClaimLimit,
   normalizeClaimResult,
   _test: { createDefault, globalCode, clampConfidence }
 };
