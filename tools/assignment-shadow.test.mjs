@@ -61,12 +61,12 @@ function request(id, kind, capability, amount, options = {}) {
 {
   const h = creep('h1', 'hauler', { carry: 4, move: 2 }, 10, 10, 100);
   const harvester = creep('m1', 'harvester', { work: 5, carry: 1, move: 3 });
-  const worker = creep('w1', 'worker', { work: 3, carry: 2, move: 3 });
+  const worker = creep('w1', 'worker', { work: 3, carry: 2, move: 3 }, 10, 10, 50);
   assert.equal(assignment._test.capabilityFor(h, request('r1', 'ENERGY_DELIVERY', null, 100)), 200);
-  assert.equal(assignment._test.capabilityFor(h, request('r2', 'HAUL_CAPACITY', 'carry', 4)), 4);
-  assert.equal(assignment._test.capabilityFor(harvester, request('r3', 'HARVEST_CAPACITY', 'workHarvest', 5)), 5);
+  assert.equal(assignment._test.capabilityFor(h, request('r2', 'HAUL_CAPACITY', 'carry', 4)), 0);
+  assert.equal(assignment._test.capabilityFor(harvester, request('r3', 'HARVEST_CAPACITY', 'workHarvest', 5)), 0);
   assert.equal(assignment._test.capabilityFor(worker, request('r4', 'BUILD', 'workBuild', 3)), 3);
-  assert.equal(assignment._test.capabilityFor(worker, request('r5', 'RECOVERY_CAPACITY', 'bootstrap', 1)), 2);
+  assert.equal(assignment._test.capabilityFor(worker, request('r5', 'RECOVERY_CAPACITY', 'bootstrap', 1)), 0);
   assert.equal(assignment._test.capabilityFor(worker, request('r6', 'ENERGY_DELIVERY', null, 50)), 0);
 }
 
@@ -112,9 +112,9 @@ function request(id, kind, capability, amount, options = {}) {
 
 {
   const memory = {};
-  const w = creep('worker1', 'worker', { work: 2, carry: 2, move: 2 }, 10, 10, 0);
+  const w = creep('worker1', 'worker', { work: 2, carry: 2, move: 2 }, 10, 10, 50);
   const normal = request('build1', 'BUILD', 'workBuild', 2, { base: 95, utility: 20, pos: { x: 11, y: 10, roomName: 'E1N1' } });
-  const recovery = request('recovery1', 'RECOVERY_CAPACITY', 'bootstrap', 1, {
+  const recovery = request('recovery1', 'RECOVERY_WORK', 'workBuild', 1, {
     base: 80, utility: 1, strategicClass: 'RECOVERY', pos: { x: 40, y: 40, roomName: 'E1N1' }
   });
   const plan = assignment.plan('E1N1', [normal, recovery], [w], memory, { time: 130 });
