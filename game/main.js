@@ -11,6 +11,7 @@ const commands = require('commands');
 const runtimeCapabilities = require('runtime.capabilities');
 const serverProfile = require('server.profile');
 const processScheduler = require('process.scheduler');
+const worldIntel = require('world.intel');
 
 function bootstrapMemory() {
   if (!Memory.bot) Memory.bot = { version: config.VERSION, born: Game.time };
@@ -20,6 +21,10 @@ function bootstrapMemory() {
   }
   if (!Memory.creeps) Memory.creeps = {};
   if (!Memory.rooms) Memory.rooms = {};
+  if (!Memory.bot.worldIntelLegacyMigrated) {
+    worldIntel.migrateLegacy();
+    Memory.bot.worldIntelLegacyMigrated = true;
+  }
 
   const spawnNames = Object.keys(Game.spawns);
   if (spawnNames.length) {
@@ -46,6 +51,7 @@ function statusSnapshot(roomStates, tickCpu) {
   const profile = serverProfile.snapshot();
   const capabilities = runtimeCapabilities.observe(undefined, profile);
   const schedulerState = processScheduler.snapshot();
+  const worldIntelState = worldIntel.snapshot();
   for (const state of roomStates) {
     const controller = state.room.controller;
     rooms[state.room.name] = {
@@ -76,6 +82,7 @@ function statusSnapshot(roomStates, tickCpu) {
     capabilities,
     serverProfile: profile,
     scheduler: schedulerState,
+    worldIntel: worldIntelState,
     rooms
   }, { force: true, persist: false, dedupeTicks: 0 });
 }
@@ -134,6 +141,15 @@ module.exports.loop = function() {
       minimumInterval: 0
     }, function() {
       profiler.section('creeps', function() { creepManager.runAll(); });
+    }, schedulerContext);
+
+    processScheduler.run({
+      id: 'world-intel',
+      priorityClass: processScheduler.PRIORITY.STANDARD,
+      minimumInterval: config.INTEL_INTERVAL,
+      freshnessRequirement: config.INTEL_INTERVAL
+    }, function() {
+      worldIntel.observeVisibleRooms();
     }, schedulerContext);
 
     processScheduler.run({
