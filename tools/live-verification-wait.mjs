@@ -94,13 +94,33 @@ export function resolveAutoStart(events, version, mode, roomName) {
 
   const deployTick = Number(boundary.event.tick);
   const minimumStartTick = boundary.inclusive ? deployTick : deployTick + 1;
+  const latestEvidenceTick = Math.max(-1, ...(events || []).map(e => finiteTick(e?.tick) ?? -1));
+
   if (mode === 'smoke') {
+    const expectedStartTick = minimumStartTick;
+    const expectedEndTick = expectedStartTick + 24;
+    if (latestEvidenceTick >= expectedEndTick) {
+      return {
+        ready: true,
+        startTick: expectedStartTick,
+        endTick: expectedEndTick,
+        deployTick,
+        deploymentId: boundary.event?.ctx?.deploymentId || null,
+        boundarySource: boundary.source
+      };
+    }
+
+    const secondsPerTick = estimateSecondsPerTick(events);
+    const remainingTicks = Math.max(0, expectedEndTick - Math.max(deployTick, latestEvidenceTick));
     return {
-      ready: true,
-      startTick: minimumStartTick,
+      ready: false,
       deployTick,
       deploymentId: boundary.event?.ctx?.deploymentId || null,
-      boundarySource: boundary.source
+      boundarySource: boundary.source,
+      latestEvidenceTick,
+      expectedStartTick,
+      expectedEndTick,
+      remainingSeconds: Math.max(0, Math.ceil(remainingTicks * secondsPerTick))
     };
   }
 
@@ -123,7 +143,6 @@ export function resolveAutoStart(events, version, mode, roomName) {
     };
   }
 
-  const latestEvidenceTick = Math.max(-1, ...(events || []).map(e => finiteTick(e?.tick) ?? -1));
   const latestWindow = windows.at(-1) || null;
   let expectedStartTick = null;
   let expectedEndTick = null;
