@@ -209,18 +209,18 @@ function capacityRequest(kind, capability, amount, options = {}) {
 }
 
 {
-  // If in-flight capacity cannot become productive inside the evaluated
-  // horizon, it must not hide a real future deficit.
-  const lateMiner = makeCreep('har-late', 'harvester', { work: 3, carry: 2, move: 3 }, null, true);
-  const spawn = makeSpawn('Spawn1', 300, 'har-late');
-  const game = { time: 2575, creeps: { 'har-late': lateMiner } };
+  // Do not double count when both state.creeps and Game.creeps expose the same
+  // in-flight creep during a runtime transition.
+  const spawningMiner = makeCreep('har-both', 'harvester', { work: 3, carry: 2, move: 3 }, null, true);
+  const spawn = makeSpawn('Spawn1', 12, 'har-both');
+  const game = { time: 2575, creeps: { 'har-both': spawningMiner } };
   const plan = planner.plan(state({
-    creeps: [makeCreep('har-a', 'harvester', { work: 7, carry: 2, move: 4 }, 1000)],
+    creeps: [spawningMiner],
     spawns: [spawn],
     energyCapacity: 550,
     energyAvailable: 550
   }), [
-    capacityRequest('HARVEST_CAPACITY','workHarvest',10)
+    capacityRequest('HARVEST_CAPACITY','workHarvest',3)
   ], game);
   assert.equal(plan.deficits[0].spawning, 3);
   assert.equal(plan.deficits[0].deficit, 0);
