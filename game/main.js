@@ -10,6 +10,7 @@ const visuals = require('visuals');
 const commands = require('commands');
 const runtimeCapabilities = require('runtime.capabilities');
 const serverProfile = require('server.profile');
+const processScheduler = require('process.scheduler');
 
 function bootstrapMemory() {
   if (!Memory.bot) Memory.bot = { version: config.VERSION, born: Game.time };
@@ -44,6 +45,7 @@ function statusSnapshot(roomStates, tickCpu) {
   const rooms = {};
   const profile = serverProfile.snapshot();
   const capabilities = runtimeCapabilities.observe(undefined, profile);
+  const schedulerState = processScheduler.snapshot();
   for (const state of roomStates) {
     const controller = state.room.controller;
     rooms[state.room.name] = {
@@ -72,6 +74,7 @@ function statusSnapshot(roomStates, tickCpu) {
     totalCreeps: Object.keys(Game.creeps).length,
     capabilities,
     serverProfile: profile,
+    scheduler: schedulerState,
     rooms
   }, { force: true, persist: false, dedupeTicks: 0 });
 }
@@ -99,18 +102,54 @@ module.exports.loop = function() {
       logger.warn('CPU_BUCKET_CRITICAL', 'CPU bucket critically low; nonessential work suppressed', { bucket: Game.cpu.bucket }, { force: true, persist: true, dedupeTicks: 0 });
     }
 
-    const roomStates = [];
-    profiler.section('rooms', function() {
-      for (const name in Game.rooms) {
-        const room = Game.rooms[name];
-        if (room.controller && room.controller.my) roomStates.push(roomManager.run(room, lowCpu));
+    const schedulerContext = {
+      game: Game,
+      tick: Game.time,
+      bucket: Game.cpu.bucket,
+      thresholds: {
+        critical: config.CPU_BUCKET_CRITICAL,
+        low: config.CPU_BUCKET_LOW,
+        healthy: config.CPU_BUCKET_HEALTHY
       }
-    });
+    };
 
-    profiler.section('creeps', function() { creepManager.runAll(); });
+    const roomStates = [];
+    processScheduler.run({
+      id: 'rooms',
+      priorityClass: processScheduler.PRIORITY.CRITICAL,
+      minimumInterval: 0
+    }, function() {
+      profiler.section('rooms', function() {
+        for (const name in Game.rooms) {
+          const room = Game.rooms[name];
+          if (room.controller && room.controller.my) roomStates.push(roomManager.run(room, lowCpu));
+        }
+      });
+    }, schedulerContext);
 
-    if (!criticalCpu) profiler.section('stats', function() { stats.collect(roomStates); });
-    if (!lowCpu) profiler.section('visuals', function() { roomStates.forEach(visuals.draw); });
+    processScheduler.run({
+      id: 'creeps',
+      priorityClass: processScheduler.PRIORITY.CRITICAL,
+      minimumInterval: 0
+    }, function() {
+      profiler.section('creeps', function() { creepManager.runAll(); });
+    }, schedulerContext);
+
+    processScheduler.run({
+      id: 'stats',
+      priorityClass: processScheduler.PRIORITY.STANDARD,
+      minimumInterval: 0
+    }, function() {
+      profiler.section('stats', function() { stats.collect(roomStates); });
+    }, schedulerContext);
+
+    processScheduler.run({
+      id: 'visuals',
+      priorityClass: processScheduler.PRIORITY.BACKGROUND,
+      minimumInterval: 0
+    }, function() {
+      profiler.section('visuals', function() { roomStates.forEach(visuals.draw); });
+    }, schedulerContext);
 
     profiler.finishTick();
 
