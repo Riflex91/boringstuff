@@ -39,8 +39,11 @@ function spawningParts(spawns) {
     count += 1;
     remainingTicks += Math.max(0, Number(spawn.spawning.remainingTime) || 0);
     const name = spawn.spawning.name;
+    const live = typeof Game !== 'undefined' && Game.creeps ? Game.creeps[name] : null;
     const memory = typeof Memory !== 'undefined' && Memory.creeps ? Memory.creeps[name] : null;
-    const body = memory && Array.isArray(memory.body) ? memory.body : null;
+    const body = live && Array.isArray(live.body)
+      ? live.body
+      : (memory && Array.isArray(memory.body) ? memory.body : null);
     if (!body) continue;
     for (const part of body) {
       const type = typeof part === 'string' ? part : part && part.type;
