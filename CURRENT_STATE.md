@@ -5,7 +5,8 @@ Canonical repository: `Riflex91/boringstuff`
 ## Canonical source baseline
 
 - Seed baseline: **v0.2.16-node18**
-- Current canonical `main`: **0.3.0-shadow.1-node18** at merge commit `8d368ea110229c3d82572f1f7491d01c48c22578`
+- Current canonical source baseline before this release prep: `29ad209af552f0a20ea50c0e7c8ad4e32a567e05`
+- Release candidate identity: **0.3.0-shadow.2-node18**
 - Latest VNext live gate: **WATCH — 15 PASS / 3 WATCH / 0 FAIL**
 - Runtime target: **Node.js 18.20.4**
 - Runtime branch: `chatgpt`
@@ -252,7 +253,7 @@ The first VNext shadow live gate is complete. The restriction against starting a
 
 However, the current release remains shadow/evidence-only. No authority promotion is justified yet.
 
-The first post-live follow-up is now implemented in development, but is **not yet live-verified**:
+The first post-live follow-up is merged to `main` and is being prepared as **0.3.0-shadow.2-node18** for live verification:
 
 - E2 spawning-capacity accounting now resolves `spawn.spawning.name` through `Game.creeps` when the in-flight creep is not yet present in `state.creeps`. This prevents duplicate future-capacity proposals observed during the live harvester/hauler replacement transitions.
 - E3 — Logistics Requests has started in SHADOW mode with explicit `PICKUP`, `DELIVER`, `BALANCE`, `RESERVE`, and `EMERGENCY_DELIVER` graph publishers.
