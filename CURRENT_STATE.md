@@ -270,6 +270,21 @@ The latest live window still exposes three optimization findings:
 
 Do not respond by blindly adding mining or hauling capacity. The next logistics work should explain and reduce delivery latency / assignment inefficiency using request-level evidence.
 
+## 0.3.0-shadow.2 live follow-up
+
+The first complete shadow.2 live window `3691601–3691700` is **FAIL**, not PASS:
+
+- `PASS=15 / WATCH=2 / FAIL=1`;
+- the only hard failure is `cpu-bucket`;
+- bucket remained `10000`;
+- tick `3691625` recorded `27.351` CPU, above the hard `20` threshold;
+- a later profiler-history sample at tick `3691775` recorded another `26.78` CPU spike;
+- E2/E3 shadow authority, runtime health, collector health, mining, telemetry continuity, productive attribution, modeled hauler capacity, controller progress, and construction progress remained safe;
+- E3 Logistics Requests appeared in live telemetry as SHADOW requests;
+- the live window did not contain a spawn transition, so the E2 in-flight-spawn fix still needs a direct post-fix live replacement observation.
+
+Existing profiler maxima are lifetime maxima and cannot attribute the exact spike tick to `rooms` vs `creeps`. Before E4 starts, add per-sample section attribution to the 25-tick CPU history and re-run the live gate. Do not weaken the hard CPU threshold.
+
 ## Current strategic interpretation
 
 `E8N1` remains structurally safe under the VNext shadow stack: dedicated mining is active, modeled hauler capacity is sufficient, controller and construction progress continue, CPU/bucket are safe, telemetry is contiguous, and no VNext subsystem gained gameplay authority.
