@@ -358,6 +358,48 @@ const energy = require('../game/energy.js');
   Object.assign(energy, original);
 }
 
+// Dispatch diagnostics regression: when one ready guard exists while additional
+// partially loaded haulers could satisfy other critical consumers, expose the
+// exact blocked-early-dispatch condition instead of hiding it behind aggregate
+// CARRY capacity.
+{
+  const worker = makeConsumer('worker-diag', 'worker', 0, 6, false, 2);
+  worker.memory.working = false;
+  const builder = makeConsumer('builder-diag', 'builder', 0, 4, true, 5);
+  builder.memory.working = false;
+  const upgrader = makeConsumer('upgrader-diag', 'upgrader', 0, 3, false, 8);
+  upgrader.memory.working = false;
+
+  const ready = makeHauler('hauler-diag-ready', {
+    [worker.id]: 1,
+    [builder.id]: 5,
+    [upgrader.id]: 8
+  }, 200);
+  const partial1 = makeHauler('hauler-diag-p1', {
+    [worker.id]: 5,
+    [builder.id]: 1,
+    [upgrader.id]: 6
+  }, 50);
+  const partial2 = makeHauler('hauler-diag-p2', {
+    [worker.id]: 6,
+    [builder.id]: 6,
+    [upgrader.id]: 1
+  }, 50);
+
+  room.creeps = [worker, builder, upgrader, ready, partial1, partial2];
+
+  const diag = energy.consumerSupplyDiagnostics(room);
+  assert.equal(diag.liveHaulers, 3);
+  assert.equal(diag.readyHaulers, 1);
+  assert.equal(diag.partialHaulersWithEnergy, 2);
+  assert.equal(diag.usefulPartialHaulers, 2);
+  assert.equal(diag.dispatchCriticalConsumers, 3);
+  assert.equal(diag.readyConsumerGuards, 1);
+  assert.equal(diag.earlyDispatchSelected, 0);
+  assert.equal(diag.uncoveredCriticalConsumers, 2);
+  assert.equal(diag.earlyDispatchBlockedByReadyGuard, true);
+}
+
 // v0.2.20 role integration: a partial hauler selected for early dispatch must
 // skip the acquisition leg and attempt the consumer transfer in the same tick.
 {
