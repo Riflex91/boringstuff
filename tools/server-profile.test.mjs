@@ -31,26 +31,34 @@ let serverProfile = require('../game/server.profile.js');
     roomName: 'E1N1', ownedRooms: 3, gclLevel: 4
   }, memory, game);
 
-  assert.equal(memory.bot.serverProfile.claimPolicy.discoveredClaimLimit, 3);
-  assert.equal(memory.bot.serverProfile.claimPolicy.confidence, 0.25);
-  assert.equal(memory.bot.serverProfile.claimPolicy.lastFailure.result, 'CLAIM_CAPACITY');
+  assert.equal(memory.bot.serverProfile.claimPolicy.discoveredClaimLimit, null);
+  assert.equal(memory.bot.serverProfile.claimPolicy.confidence, 0);
+  assert.equal(memory.bot.serverProfile.claimPolicy.lastFailure.result, 'GCL_CAPACITY');
   assert.equal(memory.bot.serverProfile.claimPolicy.lastFailure.tick, 100);
 
   // Simulate a code reload/restart: module-local state disappears, Memory remains.
   delete require.cache[require.resolve('../game/server.profile.js')];
   serverProfile = require('../game/server.profile.js');
   const restarted = serverProfile.snapshot(memory);
-  assert.equal(restarted.claimPolicy.discoveredClaimLimit, 3);
-  assert.equal(restarted.claimPolicy.confidence, 0.25);
+  assert.equal(restarted.claimPolicy.discoveredClaimLimit, null);
+  assert.equal(restarted.claimPolicy.confidence, 0);
   assert.equal(restarted.claimPolicy.observationCount, 1);
 
   serverProfile.observeClaimResult(OK, {
     roomName: 'E2N2', ownedRooms: 2, gclLevel: 4
   }, memory, { time: 200 });
   const afterSuccess = serverProfile.snapshot(memory);
-  assert.equal(afterSuccess.claimPolicy.discoveredClaimLimit, 3);
-  assert.equal(afterSuccess.claimPolicy.confidence, 0.30);
+  assert.equal(afterSuccess.claimPolicy.discoveredClaimLimit, null);
+  assert.equal(afterSuccess.claimPolicy.confidence, 0);
   assert.equal(afterSuccess.claimPolicy.lastFailure, null);
+
+  serverProfile.observeGlobalClaimLimit(5, {
+    source: 'server-metadata', confidence: 0.9, ownedRooms: 2, gclLevel: 4
+  }, memory, { time: 250 });
+  const explicitLimit = serverProfile.snapshot(memory);
+  assert.equal(explicitLimit.claimPolicy.discoveredClaimLimit, 5);
+  assert.equal(explicitLimit.claimPolicy.confidence, 0.9);
+  assert.equal(explicitLimit.claimPolicy.observationCount, 3);
 }
 
 {
@@ -59,8 +67,9 @@ let serverProfile = require('../game/server.profile.js');
     roomName: 'W1N1', ownedRooms: 5, gclLevel: 10
   }, memory, { time: 300 });
   const snap = serverProfile.snapshot(memory);
-  assert.equal(snap.claimPolicy.discoveredClaimLimit, 5);
-  assert.equal(snap.claimPolicy.lastFailure.result, 'SERVER_CAPACITY');
+  assert.equal(snap.claimPolicy.discoveredClaimLimit, null);
+  assert.equal(snap.claimPolicy.confidence, 0);
+  assert.equal(snap.claimPolicy.lastFailure.result, 'CONTEXT_CAPACITY');
 }
 
 {
