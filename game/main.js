@@ -66,6 +66,7 @@ function statusSnapshot(roomStates, tickCpu) {
       spawnRemainingTime: state.spawn && state.spawn.spawning ? state.spawn.spawning.remainingTime : 0,
       economy: state.economyMetrics || null,
       economyModel: state.economyModel || null,
+      logistics: state.logisticsDiagnostics || null,
       health: state.health || null,
       efficiency: state.efficiency || null
     };
