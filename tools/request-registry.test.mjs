@@ -98,7 +98,9 @@ function spec(key, amount = 5) {
 
   request = registry.upsert('E1N1', spec('progress:test', 5), memory, { time: 43 });
   assert.equal(request.status, registry.STATUS.OPEN);
+  assert.equal(request.createdTick, 43);
   assert.equal(request.progress.amount, 0);
+  assert.equal(request.blocked.failureCount, 0);
 }
 
 {
