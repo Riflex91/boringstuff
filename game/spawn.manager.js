@@ -65,6 +65,57 @@ function countRole(room, role) {
     room.find(FIND_MY_SPAWNS, { filter: s => s.spawning && Memory.creeps[s.spawning.name] && Memory.creeps[s.spawning.name].role === role }).length;
 }
 
+function creepPartCount(creep, part) {
+  if (!creep) return 0;
+  if (creep.getActiveBodyparts) return creep.getActiveBodyparts(part) || 0;
+  return (creep.body || []).filter(p => {
+    const type = p && typeof p === 'object' ? p.type : p;
+    const hits = p && typeof p === 'object' && p.hits !== undefined ? p.hits : 100;
+    return type === part && hits > 0;
+  }).length;
+}
+
+function haulerReplacementLeadTicks(state) {
+  const model = state.economyModel || {};
+  const plannedBody = body.hauler(state.energyCapacityAvailable || state.energyAvailable || 300);
+  const spawnTimePerPart = typeof CREEP_SPAWN_TIME !== 'undefined' ? CREEP_SPAWN_TIME : 3;
+  const spawnTicks = plannedBody.length * spawnTimePerPart;
+  const longestRoute = Math.max(0, ...(model.sourceRoutes || []).map(r => Number(r.spawnDistance) || 0));
+  const roundTripTicks = longestRoute * 2;
+  const bodyCost = plannedBody.reduce((sum, part) => {
+    return sum + ((typeof BODYPART_COST !== 'undefined' && BODYPART_COST[part]) || 0);
+  }, 0);
+  const income = Math.max(1, Number(model.dedicatedHarvestCapacityPerTick) || 1);
+  const energyBuildTicks = Math.ceil(bodyCost / income);
+  const observationMargin = Math.max(1, Number(config.LOG_HEARTBEAT_INTERVAL) || 1);
+  return spawnTicks + roundTripTicks + energyBuildTicks + observationMargin;
+}
+
+function projectedHaulerCarryParts(state, leadTicks) {
+  const haulers = (state.creeps || []).filter(c => c.memory && c.memory.role === 'hauler');
+  return haulers.reduce((sum, creep) => {
+    const ttl = Number(creep.ticksToLive);
+    const survivesLead = creep.spawning || !Number.isFinite(ttl) || ttl > leadTicks;
+    return survivesLead ? sum + creepPartCount(creep, CARRY) : sum;
+  }, 0);
+}
+
+function shouldPrespawnHauler(state) {
+  if (!state || state.rcl < 2 || !state.sites || !state.sites.length || !state.economyModel) return false;
+  const model = state.economyModel;
+  const requiredCarry = Number(model.recommendedHaulerCarryParts) || 0;
+  if (requiredCarry <= 0) return false;
+
+  // Do not steal spawn time from an active mining recovery deficit. This path
+  // exists only to overlap a predictable hauler retirement with its
+  // replacement while the mining side is already healthy.
+  if ((Number(model.harvesterWorkDeficit) || 0) > 0) return false;
+
+  const leadTicks = haulerReplacementLeadTicks(state);
+  const projectedCarry = projectedHaulerCarryParts(state, leadTicks);
+  return projectedCarry < requiredCarry;
+}
+
 function bodyFor(role, energy, state) {
   switch (role) {
     case 'harvester': return body.harvester(energy, state.economyModel && state.economyModel.sourceContainersReady === state.sources.length);
@@ -108,6 +159,7 @@ function spawnOne(state) {
     else if (upgraders < want.upgrader) role = 'upgrader';
     else if (builders < want.builder) role = 'builder';
     else if (haulers < Math.min(1, want.hauler)) role = 'hauler';
+    else if (shouldPrespawnHauler(state)) role = 'hauler';
 
     if (!role && state.economyModel) {
       const workNow = state.economyModel.harvesterWorkParts || 0;
@@ -168,4 +220,13 @@ function spawnOne(state) {
   return false;
 }
 
-module.exports = { desired, spawnOne };
+module.exports = {
+  desired,
+  spawnOne,
+  _test: {
+    creepPartCount,
+    haulerReplacementLeadTicks,
+    projectedHaulerCarryParts,
+    shouldPrespawnHauler
+  }
+};
