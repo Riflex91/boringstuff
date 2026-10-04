@@ -342,14 +342,13 @@ function shouldPrioritizeConsumer(creep) {
 
 
 function selectConsumerEarlyDispatchHauler(room) {
-  // v0.2.20: aggregate CARRY can be sufficient while every hauler is still on
-  // the pickup leg. A critical consumer can then wait all the way to fallback
-  // even though one hauler already carries usable energy. With redundant
-  // logistics, let exactly one partial hauler break pickup early — but only
-  // when no normal delivery-ready guard already exists.
+  // v0.2.20: aggregate CARRY can be sufficient while some haulers are still on
+  // the pickup leg. A ready consumer guard must not globally suppress useful
+  // carried energy when additional critical consumers remain uncovered.
+  // Permit exactly one partial early-dispatch hauler only while a hard-
+  // infrastructure reserve remains: total consumer guards may never consume
+  // the final live hauler.
   if (!room || !room.find) return null;
-  const readyGuard = selectConsumerGuardHauler(room);
-  if (readyGuard) return null;
 
   const haulers = room.find(FIND_MY_CREEPS, {
     filter: c => !c.spawning && c.memory && c.memory.role === 'hauler'
@@ -360,6 +359,12 @@ function selectConsumerEarlyDispatchHauler(room) {
     filter: c => isCriticalConsumerRequest(c)
   });
   if (!critical.length) return null;
+
+  const readyGuards = selectConsumerGuardHaulers(room);
+  if (critical.length <= readyGuards.length) return null;
+
+  const maxConsumerGuards = Math.max(1, haulers.length - 1);
+  if (readyGuards.length >= maxConsumerGuards) return null;
 
   // A stalled consumer only needs enough energy to resume a meaningful work
   // burst. Low-runway hysteresis keeps the refill request active afterwards
