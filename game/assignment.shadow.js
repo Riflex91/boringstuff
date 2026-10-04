@@ -57,14 +57,23 @@ function carriedEnergy(creep) {
   return Math.max(0, Number(creep.store[key]) || 0);
 }
 
-function capabilityFor(creep, request) {
+function executorProfile(creep) {
+  return {
+    role: role(creep),
+    work: bodyParts(creep, 'WORK'),
+    carry: bodyParts(creep, 'CARRY'),
+    energy: carriedEnergy(creep)
+  };
+}
+
+function capabilityFor(creep, request, profile) {
   if (!creep || creep.spawning || !request || !request.demand) return 0;
-  const r = role(creep);
+  profile = profile || executorProfile(creep);
+  const r = profile.role;
   const capability = request.demand.capability;
   const kind = request.kind;
-  const work = bodyParts(creep, 'WORK');
-  const carry = bodyParts(creep, 'CARRY');
-  const move = bodyParts(creep, 'MOVE');
+  const work = profile.work;
+  const carry = profile.carry;
   const carryCapacity = typeof CARRY_CAPACITY !== 'undefined' ? CARRY_CAPACITY : 50;
 
   // Capacity-deficit requests already subtract currently active capacity.
@@ -76,7 +85,7 @@ function capabilityFor(creep, request) {
     return carry * carryCapacity;
   }
 
-  const hasWorkEnergy = carriedEnergy(creep) > 0;
+  const hasWorkEnergy = profile.energy > 0;
   if (capability === 'workBuild') return hasWorkEnergy && (r === 'worker' || r === 'builder' || r === 'repairer') ? work : 0;
   if (capability === 'workRepair') return hasWorkEnergy && (r === 'worker' || r === 'builder' || r === 'repairer') ? work : 0;
   if (capability === 'workUpgrade') return hasWorkEnergy && (r === 'worker' || r === 'builder' || r === 'repairer' || r === 'upgrader') ? work : 0;
@@ -119,8 +128,9 @@ function activeFailure(roomState, executorId, requestId, now) {
   return failure;
 }
 
-function score(creep, request, roomState, now) {
-  const capacity = capabilityFor(creep, request);
+function score(creep, request, roomState, now, profile) {
+  profile = profile || executorProfile(creep);
+  const capacity = capabilityFor(creep, request, profile);
   if (capacity <= 0) return null;
   const executorId = creep.id || creep.name;
   if (!executorId) return null;
@@ -135,8 +145,8 @@ function score(creep, request, roomState, now) {
   const marginal = request.utility && Number.isFinite(request.utility.current) ? Math.min(100, request.utility.current) : 0;
   const deadline = deadlineUrgency(request, now);
   const localityBonus = range <= 3 ? 15 : range <= 10 ? 8 : 0;
-  const carriedBonus = request.kind === 'ENERGY_DELIVERY' ? Math.min(30, carriedEnergy(creep) / 10) : 0;
-  const r = role(creep);
+  const carriedBonus = request.kind === 'ENERGY_DELIVERY' ? Math.min(30, profile.energy / 10) : 0;
+  const r = profile.role;
   let roleFitBonus = 0;
   if (r === 'builder' && request.kind === 'BUILD') roleFitBonus = 15;
   else if (r === 'repairer' && request.kind === 'REPAIR') roleFitBonus = 15;
@@ -145,7 +155,7 @@ function score(creep, request, roomState, now) {
   const switchCost = previous && !continuing && !emergency ? 15 : 0;
   const travelCost = Math.min(50, range * 2);
   const riskCost = Number.isFinite(request.risk) ? Math.max(0, request.risk) : 0;
-  const opportunityCost = (role(creep) === 'upgrader' && request.kind !== 'UPGRADE') ? 8 : 0;
+  const opportunityCost = (r === 'upgrader' && request.kind !== 'UPGRADE') ? 8 : 0;
   const emergencyBonus = emergency ? 100 : 0;
 
   const total = base + urgency + marginal + deadline + localityBonus + carriedBonus + roleFitBonus + continuationBonus + emergencyBonus
@@ -199,17 +209,23 @@ function plan(roomName, requests, creeps, memoryRoot, game) {
   }
 
   const unused = executors.slice();
+  const profiles = {};
+  for (const creep of executors) {
+    const executorId = creep.id || creep.name;
+    profiles[executorId] = executorProfile(creep);
+  }
   const assignments = [];
 
   while (unused.length) {
     let best = null;
     for (let ci = 0; ci < unused.length; ci++) {
       const creep = unused[ci];
+      const executorId = creep.id || creep.name;
+      const profile = profiles[executorId];
       for (const request of activeRequests) {
         if ((remaining[request.id] || 0) <= 0) continue;
-        const scored = score(creep, request, roomState, now);
+        const scored = score(creep, request, roomState, now, profile);
         if (!scored || scored.total <= 0) continue;
-        const executorId = creep.id || creep.name;
         const candidate = { creep, request, scored, ci, executorId };
         if (!best || scored.total > best.scored.total ||
           (scored.total === best.scored.total && String(request.id) < String(best.request.id)) ||
@@ -228,7 +244,7 @@ function plan(roomName, requests, creeps, memoryRoot, game) {
       requestDedupeKey: best.request.dedupeKey,
       requestKind: best.request.kind,
       executorId: best.executorId,
-      executorRole: role(best.creep),
+      executorRole: profiles[best.executorId].role,
       assignedTick: now,
       reservedCapacity,
       expectedTravel: best.scored.components.range,
@@ -331,5 +347,5 @@ module.exports = {
   recordFailure,
   snapshot,
   deferredSnapshot,
-  _test: { bodyParts, role, carriedEnergy, capabilityFor, localRange, deadlineUrgency, pairKey, activeFailure, requestActive, requestAssignable }
+  _test: { bodyParts, role, carriedEnergy, executorProfile, capabilityFor, localRange, deadlineUrgency, pairKey, activeFailure, requestActive, requestAssignable }
 };
