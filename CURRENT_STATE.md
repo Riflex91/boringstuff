@@ -211,6 +211,37 @@ The limiting signal is temporal rather than aggregate capacity. Consumers spent 
 
 v0.2.20 therefore reduces response latency inside the existing two-hauler fleet rather than adding creeps. Recovery safety remains invariant: the sole-hauler path and normal hard-infrastructure priority are unchanged.
 
+## v0.2.20 third candidate — derived consumer refill hysteresis
+
+The first two v0.2.20 behavior iterations are **not accepted**. Their historical evidence remains unchanged:
+
+- first iteration reduced fallback but increased waiting;
+- second iteration reduced waiting but increased fallback;
+- the steady-state control window confirmed that this was not merely a redeploy transient.
+
+The follow-up analysis found an additional mechanism beyond aggregate hauler capacity:
+
+- at 550 room energy, normal worker/builder bodies contain `2 WORK / 2 CARRY / 2 MOVE`;
+- with construction active, one such consumer can spend up to `10 e/t`;
+- the live-like economy regression has `32 e/t` productive capacity versus `20 e/t` sustainable dedicated mining;
+- a `50`-energy early dispatch therefore funds only about five build ticks for a 2-WORK construction consumer, shorter than the existing 12-tick logistics wait horizon.
+
+Current candidate behavior:
+
+- refill target is derived from active WORK burn multiplied by the existing `CONSUMER_HAULER_WAIT_TICKS`, capped by the consumer's carry capacity;
+- a working consumer opens a refill request at one CARRY-unit below that target, providing hysteresis before it becomes empty;
+- a partial hauler may break pickup early only if it carries enough energy to satisfy the remaining refill target in one transfer;
+- a transfer clears waiting/fallback and resumes productive work only after the derived refill target is reached;
+- miner count, hauler count/capacity planning, release thresholds, defense, planner, and expansion behavior remain unchanged.
+
+Offline verification for this candidate:
+
+- exact runtime: Node.js `18.20.4`;
+- GitHub Actions job `offline-regression` on commit `84e6802ca29c37cefe31868a34f6012f0769cf95`: **SUCCESS**;
+- full `npm test` chain passed, including `consumer-refill-hysteresis`, economy model, logistics fallback, consumer supply, live-verifier regressions, productive flow, and syntax checks for all 26 runtime modules.
+
+This candidate is **offline-verified but not live-verified**. It must not be merged until a fresh deploy, valid 25-tick smoke, and complete 100-tick live window satisfy the unchanged v0.2.20 acceptance gates.
+
 ## Development invariants
 
 Architecture:
