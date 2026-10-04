@@ -11,7 +11,7 @@ const LOG_DIR = process.env.SCREEPS_LOG_DIR || DEFAULT_LOG_DIR;
 const ROOM = process.env.SCREEPS_ROOM || 'E8N1';
 
 function usage(code = 0) {
-  console.log(`\nLive Verification Harness v0.2.20\n\n  node live-verification.mjs smoke [--start-tick N] [--room E8N1] [--version 0.2.20-node18]\n  node live-verification.mjs live  [--start-tick N] [--room E8N1] [--version 0.2.20-node18]\n\nThe command is read-only. It evaluates existing collector evidence and never mutates Screeps or historical telemetry.\nIf --start-tick is omitted, the latest VERSION_CHANGE to the requested version is used.\n`);
+  console.log(`\nLive Verification Harness v0.2.20\n\n  node live-verification.mjs smoke [--start-tick N] [--room E8N1] [--version 0.2.20-node18]\n  node live-verification.mjs live  [--start-tick N] [--room E8N1] [--version 0.2.20-node18]\n\nThe command is read-only. It evaluates existing collector evidence and never mutates Screeps or historical telemetry.\nIf --start-tick is omitted, the latest DEPLOYMENT_MARKER is used; historical releases fall back to VERSION_CHANGE.\n`);
   process.exit(code);
 }
 
