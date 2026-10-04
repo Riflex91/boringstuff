@@ -281,7 +281,7 @@ function balanceSpecs(state) {
 }
 
 function specs(state) {
-  if (!state || !state.room) return [];
+  if (!state || !state.room || !Array.isArray(state.structures)) return [];
   const result = []
     .concat(pickupSpecs(state))
     .concat(infrastructureDeliverySpecs(state))
