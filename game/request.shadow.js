@@ -3,6 +3,7 @@
 const registry = require('request.registry');
 const energy = require('energy');
 const workRequests = require('request.work.shadow');
+const logisticsRequests = require('request.logistics.shadow');
 
 function roomName(state) {
   return state && state.room && state.room.name ? state.room.name : null;
@@ -116,10 +117,16 @@ function produce(state, memoryRoot, game) {
     upsertActive(active, room, spec, memoryRoot, game);
   }
 
+  const e3Specs = logisticsRequests.specs(state);
+  for (const spec of e3Specs) {
+    upsertActive(active, room, spec, memoryRoot, game);
+  }
+
   registry.reconcile(room, active, memoryRoot, game);
   return {
     activeDedupeKeys: active,
     summary: registry.snapshot(room, memoryRoot),
+    logisticsGraph: logisticsRequests.summary(e3Specs),
     requests: registry.list(room, memoryRoot)
   };
 }
