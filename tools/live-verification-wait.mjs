@@ -3,11 +3,12 @@ function finiteTick(value) {
   return Number.isFinite(n) ? n : null;
 }
 
-function latestDeploymentBoundary(events, version) {
+function latestDeploymentBoundary(events, version, expectedDeploymentId = null) {
   const markers = (events || [])
     .filter(e =>
       e?.code === 'DEPLOYMENT_MARKER' &&
-      (e?.ctx?.version === version || e?.v === version)
+      (e?.ctx?.version === version || e?.v === version) &&
+      (!expectedDeploymentId || e?.ctx?.deploymentId === expectedDeploymentId)
     )
     .sort((a, b) => Number(a.tick) - Number(b.tick));
   if (markers.length) {
@@ -17,6 +18,8 @@ function latestDeploymentBoundary(events, version) {
       source: 'DEPLOYMENT_MARKER'
     };
   }
+
+  if (expectedDeploymentId) return null;
 
   const changes = (events || [])
     .filter(e => e?.code === 'VERSION_CHANGE' && (e?.ctx?.to === version || e?.v === version))
@@ -83,9 +86,17 @@ function estimateSecondsPerTick(events) {
   return rates[Math.floor(rates.length / 2)];
 }
 
-export function resolveAutoStart(events, version, mode, roomName) {
-  const boundary = latestDeploymentBoundary(events, version);
+export function resolveAutoStart(events, version, mode, roomName, expectedDeploymentId = null) {
+  const boundary = latestDeploymentBoundary(events, version, expectedDeploymentId);
   if (!boundary) {
+    if (expectedDeploymentId) {
+      return {
+        ready: false,
+        waitingForDeploymentMarker: true,
+        expectedDeploymentId,
+        latestEvidenceTick: Math.max(-1, ...(events || []).map(e => finiteTick(e?.tick) ?? -1))
+      };
+    }
     return {
       ready: false,
       fatal: `No DEPLOYMENT_MARKER or VERSION_CHANGE to ${version} found. Deploy first or pass --start-tick explicitly.`
@@ -185,6 +196,9 @@ export function resolveAutoStart(events, version, mode, roomName) {
 }
 
 export function formatWaitStatus(status) {
+  if (status.waitingForDeploymentMarker) {
+    return `Waiting for deployment marker ${status.expectedDeploymentId}...`;
+  }
   const total = Math.max(0, Math.ceil(Number(status.remainingSeconds) || 0));
   const minutes = String(Math.floor(total / 60)).padStart(2, '0');
   const seconds = String(total % 60).padStart(2, '0');
@@ -198,7 +212,8 @@ export async function waitForAutoStart({
   loadEvents,
   pollMs = 5000,
   sleep = ms => new Promise(resolve => setTimeout(resolve, ms)),
-  onWait = () => {}
+  onWait = () => {},
+  expectedDeploymentId = null
 }) {
   let lastMessage = null;
 
@@ -206,7 +221,7 @@ export async function waitForAutoStart({
     const events = loadEvents();
     if (!events.length) throw new Error('No bot event evidence is available. Run the collector first.');
 
-    const status = resolveAutoStart(events, version, mode, roomName);
+    const status = resolveAutoStart(events, version, mode, roomName, expectedDeploymentId);
     if (status.fatal) throw new Error(status.fatal);
     if (status.ready) return { startTick: status.startTick, events, status };
 
