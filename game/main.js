@@ -64,7 +64,8 @@ function statusSnapshot(roomStates, tickCpu) {
       economy: state.economyMetrics || null,
       economyModel: state.economyModel || null,
       health: state.health || null,
-      efficiency: state.efficiency || null
+      efficiency: state.efficiency || null,
+      colonyState: state.colonyState || null
     };
   }
   logger.info('STATUS_SNAPSHOT', 'Structured bot status snapshot', {
