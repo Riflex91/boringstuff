@@ -121,6 +121,38 @@ const optimizer = require('../game/body.optimizer.js');
   assert.ok(capped.capacityDelivered < 100);
 }
 
+
+{
+  const spec = optimizer._test.specFor({ role: 'harvester', capability: 'workHarvest' });
+  const body = optimizer._test.composeBody(spec, 4, 3);
+  assert.equal(optimizer._test.candidateCost(spec, 4, 3), optimizer._test.bodyCost(body));
+
+  const workerSpec = optimizer._test.specFor({ role: 'worker', capability: 'bootstrap' });
+  const workerBody = optimizer._test.composeBody(workerSpec, 2, 2);
+  assert.equal(optimizer._test.candidateCost(workerSpec, 2, 2), optimizer._test.bodyCost(workerBody));
+}
+
+{
+  optimizer._test.clearOptimizeCache();
+  const input = {
+    role: 'hauler', capability: 'carry', requestedCapacity: 7,
+    energyBudget: 700, routeDistance: 13, terrainProfile: { road: 3, plain: 7 }
+  };
+  const first = optimizer.optimize(input);
+  assert.ok(first);
+  assert.equal(optimizer._test.optimizeCacheSize(), 1);
+  const expectedBody = first.body.slice();
+  const expectedTerrain = { ...first.terrainProfile };
+
+  first.body[0] = 'mutated';
+  first.terrainProfile.road = 99;
+
+  const second = optimizer.optimize(input);
+  assert.deepEqual(second.body, expectedBody);
+  assert.deepEqual(second.terrainProfile, expectedTerrain);
+  assert.equal(optimizer._test.optimizeCacheSize(), 1);
+}
+
 {
   assert.equal(optimizer.optimize({ role:'harvester', capability:'workHarvest', requestedCapacity:1, energyBudget:0 }), null);
   assert.equal(optimizer.optimize({ role:'unknown', capability:'unknown', requestedCapacity:1, energyBudget:1000 }), null);

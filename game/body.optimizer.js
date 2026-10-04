@@ -2,6 +2,8 @@
 
 const SCHEMA_VERSION = 1;
 const MAX_PARTS = 50;
+const OPTIMIZE_CACHE_LIMIT = 64;
+const optimizeCache = new Map();
 
 function part(name) {
   if (typeof globalThis !== 'undefined' && typeof globalThis[name] !== 'undefined') return globalThis[name];
@@ -106,13 +108,25 @@ function deliveredCapacity(spec, primaryCount, moveCount, multiplier) {
   return primaryCount * multiplier;
 }
 
-function candidateMetrics(input, spec, body, delivered) {
+function candidateCost(spec, primaryCount, moveCount) {
+  const moveCost = partCost(part('MOVE')) * moveCount;
+  if (spec.mode === 'BALANCED_WORK_CARRY') {
+    return primaryCount * partCost(part('WORK')) +
+      primaryCount * partCost(part('CARRY')) +
+      moveCost;
+  }
+  return primaryCount * partCost(spec.primary) +
+    (spec.support.carryMinimum || 0) * partCost(part('CARRY')) +
+    moveCost;
+}
+
+function candidateMetrics(input, spec, body, delivered, precomputedCost) {
   const counts = countParts(body);
   const moveCount = counts[part('MOVE')] || 0;
   const nonMove = Math.max(0, body.length - moveCount);
   const travelTicks = estimatedTravelTicks(input.routeDistance, nonMove, moveCount, input.terrainProfile);
   if (!Number.isFinite(travelTicks)) return null;
-  const cost = bodyCost(body);
+  const cost = Number.isFinite(precomputedCost) ? precomputedCost : bodyCost(body);
   const spawnTicks = body.length * spawnTimePerPart();
   const desired = Math.max(0, Number(input.requestedCapacity) || 0);
   const applied = Math.min(desired, delivered);
@@ -157,6 +171,47 @@ function better(a, b, desired) {
   return a.body.join(',') < b.body.join(',');
 }
 
+function cloneResult(result) {
+  if (!result) return null;
+  return Object.assign({}, result, {
+    body: result.body.slice(),
+    terrainProfile: Object.assign({}, result.terrainProfile)
+  });
+}
+
+function cacheKey(input, desired, budget, maxParts, spec, multiplier) {
+  const terrain = normalizeTerrain(input.terrainProfile);
+  const expectedLife = Number.isFinite(input.expectedLifetime) ? Math.max(0, input.expectedLifetime) : lifeTime();
+  return [
+    spec.role,
+    spec.capability,
+    desired,
+    budget,
+    maxParts,
+    Math.max(0, Number(input.routeDistance) || 0),
+    terrain.road,
+    terrain.plain,
+    terrain.swamp,
+    expectedLife,
+    multiplier,
+    spawnTimePerPart(),
+    partCost(part('WORK')),
+    partCost(part('CARRY')),
+    partCost(part('MOVE'))
+  ].join('|');
+}
+
+function remember(key, result) {
+  optimizeCache.set(key, result);
+  if (optimizeCache.size <= OPTIMIZE_CACHE_LIMIT) return;
+  const oldest = optimizeCache.keys().next();
+  if (!oldest.done) optimizeCache.delete(oldest.value);
+}
+
+function clearOptimizeCache() {
+  optimizeCache.clear();
+}
+
 function optimize(input) {
   input = input || {};
   const desired = Math.max(0, Number(input.requestedCapacity) || 0);
@@ -166,6 +221,10 @@ function optimize(input) {
   if (!spec || desired <= 0 || budget <= 0) return null;
   const multiplier = boostMultiplier(input);
   if (multiplier <= 0) return null;
+
+  const key = cacheKey(input, desired, budget, maxParts, spec, multiplier);
+  const cached = optimizeCache.get(key);
+  if (cached) return cloneResult(cached);
 
   let best = null;
   const targetPrimary = Math.max(1, Math.ceil(desired / multiplier));
@@ -178,19 +237,19 @@ function optimize(input) {
     if (baseParts >= maxParts) break;
     const maxMove = maxParts - baseParts;
     for (let moveCount = 1; moveCount <= maxMove; moveCount++) {
-      const body = composeBody(spec, primaryCount, moveCount);
-      const cost = bodyCost(body);
+      const cost = candidateCost(spec, primaryCount, moveCount);
       if (cost > budget) continue;
       const delivered = deliveredCapacity(spec, primaryCount, moveCount, multiplier);
       if (delivered <= 0) continue;
-      const candidate = candidateMetrics(input, spec, body, delivered);
+      const body = composeBody(spec, primaryCount, moveCount);
+      const candidate = candidateMetrics(input, spec, body, delivered, cost);
       if (!candidate) continue;
       if (better(candidate, best, desired)) best = candidate;
     }
   }
 
   if (!best) return null;
-  return {
+  const result = {
     schemaVersion: SCHEMA_VERSION,
     role: spec.role,
     capability: spec.capability,
@@ -210,6 +269,8 @@ function optimize(input) {
     expectedRoi: Math.round(best.expectedRoi * 10000) / 10000,
     lifecycleCost: Math.round(best.lifecycleCost * 100) / 100
   };
+  remember(key, result);
+  return cloneResult(result);
 }
 
 module.exports = {
@@ -228,7 +289,11 @@ module.exports = {
     specFor,
     composeBody,
     deliveredCapacity,
+    candidateCost,
     candidateMetrics,
-    better
+    better,
+    cacheKey,
+    clearOptimizeCache,
+    optimizeCacheSize: () => optimizeCache.size
   }
 };
