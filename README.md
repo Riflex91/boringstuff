@@ -57,6 +57,11 @@ npm run verify:live
 
 Expected runtime version: `0.2.20-node18`.
 
+### Same-version redeploy verification
+
+Every `npm run deploy` now injects a unique runtime `DEPLOYMENT_ID`. On the first tick after upload the bot emits a durable `DEPLOYMENT_MARKER`. The verification harness uses the newest marker as its evidence boundary, so a second deploy of the same version cannot accidentally reuse an older smoke/live window. Historical releases without deployment markers continue to fall back to `VERSION_CHANGE`.
+
+
 ---
 
 ## Historical documentation
