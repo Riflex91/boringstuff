@@ -267,6 +267,26 @@ Capabilities
 → Replanning
 ```
 
+## 2.6 Deep-source refinements that are now architectural requirements
+
+The second source-level pass adds these concrete rules:
+
+- **Expansion is budgeted, not merely permitted by GCL.** Free claim capacity is insufficient if CPU headroom, parent maturity, recovery reserve, spawn opportunity cost or support budget cannot safely sustain another colony.
+- **Expansion uses `RoomQuality` plus `EmpireFit`.** Resource diversity, support geometry, hostile neighborhood, frontier value, CPU burden and empire topology change a candidate's marginal value.
+- **Expansion and remotes remember failure.** Failed operations store failure class/evidence and enter bounded backoff; transient failures may later be reconsidered automatically.
+- **Remotes are dynamic portfolio assets.** They move through candidate/active/threatened/suspended/retired states and are automatically dropped when expected net value turns negative.
+- **Regional defense is deadline dispatch.** Donor colonies are scored by reinforcement ETA, spawn opportunity cost, available combat/boost capacity and the target room's latest useful arrival tick.
+- **Threat strength is body/boost/path aware.** Safe Mode is based on predicted protected-asset loss, not simple hostile presence.
+- **Planner is staged and resumable.** Core/logistics geometry, harvest positions, hub/labs/extensions, routes, Min-Cut, towers and late-game structures are separate inspectable phases with failure reasons and CPU cost.
+- **Planner anchors come from economic geometry.** Sources, controller, important path midpoints, open-space geometry and exit/defense geometry seed candidates; do not brute-force all tiles at full cost.
+- **Defense Min-Cut follows economic topology.** First decide which efficient assets/routes must be protected, then optimize the perimeter.
+- **Structure progression is capability-based.** Plans store an `earliestCapability`, not a server-specific assumption that RCL alone fully determines availability.
+- **Transport demand, capacity deficit, body optimization and spawn scheduling are separate layers.** A route model outputs required CARRY-over-time; it does not directly decide a fixed hauler count.
+- **Structures publish logistics demand.** Haulers consume reserved requests; target-selection policy must not live inside permanent hauler roles.
+- **Expensive strategy/planner work obeys the CPU OS.** It is resumable BACKGROUND/OVERFLOW work unless a deadline makes it urgent; survival is never skipped because optimization used the budget.
+
+These rules are mandatory when implementing U3-U11. The detailed algorithms and derived fixtures are in `docs/ULTIMATE_AUTONOMY_KNOWLEDGE_BASE.md`.
+
 ---
 
 # 3. Universal runtime model
