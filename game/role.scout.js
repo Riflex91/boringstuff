@@ -1,5 +1,7 @@
 'use strict';
 
+const worldIntel = require('world.intel');
+
 function adjacentRooms(roomName) {
   const exits = Game.map.describeExits(roomName) || {};
   return Object.keys(exits).map(k => exits[k]);
@@ -15,6 +17,7 @@ function run(creep) {
     sources: room.find(FIND_SOURCES).length,
     hostileCreeps: room.find(FIND_HOSTILE_CREEPS).length
   };
+  worldIntel.observeRoom(room, undefined, Game, 'scout');
 
   if (!creep.memory.targetRoom || creep.room.name === creep.memory.targetRoom) {
     const candidates = adjacentRooms(room.name).filter(r => !Memory.intel[r] || Game.time - Memory.intel[r].tick > 1500);
