@@ -10,6 +10,7 @@ const colonyHealth = require('colony.health');
 const colonyEfficiency = require('colony.efficiency');
 const logger = require('logger');
 const config = require('config');
+const energy = require('energy');
 
 function status(state) {
   return {
@@ -22,6 +23,7 @@ function status(state) {
     hostiles: state.hostileCreeps.length,
     economy: state.economyMetrics,
     economyModel: state.economyModel,
+    logistics: state.logisticsDiagnostics,
     health: state.health,
     efficiency: state.efficiency
   };
@@ -63,6 +65,7 @@ function run(room, lowCpu) {
   const state = stateBuilder.get(room);
   state.economyMetrics = economyMetrics.observe(state);
   state.economyModel = economyModel.analyze(state);
+  state.logisticsDiagnostics = energy.consumerSupplyDiagnostics(room);
 
   const roomMemory = Memory.rooms[room.name] || (Memory.rooms[room.name] = {});
   const currentMode = state.economyModel ? state.economyModel.mode : null;
