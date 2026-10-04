@@ -25,13 +25,13 @@ function baseRoom(overrides = {}) {
 }
 
 function event(tick, code, ctx, extra = {}) {
-  return { tick, v: '0.2.17-node18', level: 'INFO', code, ctx, ...extra };
+  return { tick, v: '0.2.18-node18', level: 'INFO', code, ctx, ...extra };
 }
 
 function evidence(start = 1000) {
   const room = baseRoom();
   return [
-    event(start, 'VERSION_CHANGE', { from: '0.2.16-node18', to: '0.2.17-node18' }, { jseq: 20 }),
+    event(start, 'VERSION_CHANGE', { from: '0.2.16-node18', to: '0.2.18-node18' }, { jseq: 20 }),
     event(start, 'ROOM_HEARTBEAT', { room: 'E8N1', economyModel: room.economyModel, health: room.health }),
     event(start, 'BOT_HEARTBEAT', { cpu: 3.8, bucket: 10000 }),
     event(start + 24, 'ROOM_HEARTBEAT', { room: 'E8N1', economyModel: room.economyModel, health: room.health }),

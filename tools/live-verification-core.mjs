@@ -1,5 +1,5 @@
 export const EXPECTED_NODE_VERSION = '18.20.4';
-export const EXPECTED_BOT_VERSION = '0.2.17-node18';
+export const EXPECTED_BOT_VERSION = '0.2.18-node18';
 
 const RANK = { PASS: 0, WATCH: 1, FAIL: 2 };
 

@@ -4,7 +4,8 @@ Canonical repository: `Riflex91/boringstuff`
 
 ## Canonical source baseline
 
-- Source baseline: **v0.2.16-node18**
+- Seed baseline: **v0.2.16-node18**
+- Current verified `main`: **v0.2.17-node18**
 - Runtime target: **Node.js 18.20.4**
 - Runtime branch: `chatgpt`
 - Primary room: `E8N1`
@@ -104,47 +105,63 @@ Observed result:
 - Dedicated/theoretical mining `20 e/t`
 - 3 haulers / 16 CARRY / 12 required
 
+### v0.2.17 — VERIFIED / CLOSED
+
+Live Verification Harness. Tools/observability only; no colony behavior change.
+
+- `npm run verify:smoke` — 25-tick safety gate.
+- `npm run verify:live` — complete 100-tick performance gate.
+- Timestamp-aware multiline error parsing separates bot/runtime failures from collector faults.
+- Collector faults are reported independently as `collector-health`.
+- Incomplete evidence windows cannot be mistaken for completed passes.
+- Installer mirrors `game/*.js` under the installed test tree while preserving the flat Screeps runtime layout.
+
+Verified live evidence on Node.js `18.20.4`:
+
+- smoke ticks `3682644–3682668`: `PASS=8 / WATCH=1 / FAIL=0`;
+- live ticks `3682701–3682800`: `PASS=12 / WATCH=3 / FAIL=0`;
+- runtime errors, collector health, CPU/bucket, mining, hard-stall, telemetry continuity, hauler capacity, controller progress, and construction progress all passed in the full live gate;
+- remaining WATCH findings: consumer self-supply fallback, productive throughput below mining capacity, and Efficiency `INEFFICIENT`; these are optimization findings, not safety failures.
+
 ## Next release boundary
 
-The next intended release is **v0.2.17-node18 — Live Verification Harness**.
+The next intended release is **v0.2.18-node18 — Dedicated Productive Work**.
 
-It is a **TOOLS-ONLY / OBSERVABILITY** release. It must not alter colony, spawn, economy, logistics, role, room-planning, or strategic decision behavior.
+Measured v0.2.17 evidence shows that mining and aggregate hauling are sufficient, but productive consumers can still spend their carried work energy refilling spawn/extensions, then wait for a hauler to deliver energy back to them. That churn is consistent with the simultaneous WATCH signals for consumer fallback and productive throughput below mining capacity.
 
-Intended commands:
+The v0.2.18 behavior change is deliberately narrow:
 
-- `npm run verify:smoke` — 25-tick safety smoke window.
-- `npm run verify:live` — 100-tick performance window.
+- with **two or more live haulers**, `builder`, `worker`, and `repairer` creeps keep carried energy for productive work instead of assisting spawn/extension refill;
+- with **zero or one live hauler**, the existing infrastructure-first recovery behavior is preserved exactly;
+- upgrader behavior is unchanged;
+- mining, hauler sizing, spawn counts, defense, planner/layout, and expansion policy are unchanged.
 
-Expected gate outcomes: `PASS`, `WATCH`, `FAIL`.
+Acceptance target after deployment:
 
-Smoke checks should cover runtime version, runtime errors, CPU/bucket, mining active, no hard spawn/economy stall, and telemetry continuity.
-
-Live checks should cover hauler deficit, consumer fallback/critical/waiting, controller/construction progress, productive throughput, telemetry continuity, CPU/bucket, runtime errors, and hard stalls.
-
-Policy:
-
-- `UNDERUTILIZED` alone must not block progression.
-- Optimization findings produce `WATCH`.
-- Safety/runtime/stall failures produce `FAIL`.
-- A behavior release may follow only after smoke and the full 100-tick live gate have passed without hard failure.
-
-A previously reconstructed v0.2.17 candidate existed outside this repository, but it is **not** the canonical original source and must not silently replace this v0.2.16 baseline.
+- zero hard FAIL in the 25-tick smoke gate;
+- zero hard FAIL in a complete 100-tick live gate;
+- `haulerCarryDeficit = 0`;
+- no regression in runtime/CPU/stall/controller/construction safety;
+- consumer fallback should decline and productive throughput should improve or at minimum not regress materially.
 
 ## Current strategic interpretation
 
-`E8N1` is at RCL2 with two sources and both source containers completed. Economy mode is container logistics.
+`E8N1` remains an RCL2 two-source colony in container-logistics mode. The verified v0.2.17 live gate shows that the supply side is not the primary bottleneck:
 
-Current verified signals indicate the mining side is no longer the primary bottleneck:
+- dedicated mining is active;
+- modeled hauler capacity is sufficient;
+- telemetry continuity is healthy;
+- CPU/bucket and hard-stall gates are clean;
+- controller and construction both make progress.
 
-- dedicated/theoretical mining is about `20 e/t`;
-- hauling is sufficient;
-- consumer starvation is resolved;
-- energy is often capped;
-- spawn can be idle;
-- productive throughput was measured around `14.8 e/t`;
-- Efficiency can report `UNDERUTILIZED` while Health remains `HEALTHY`.
+The remaining optimization signals point at the productive-consumer side instead:
 
-Do **not** blindly spawn more creeps from this signal. After v0.2.17 live verification, use fresh telemetry to determine whether the next behavior change should target productive consumer capacity, Builder/Upgrader sizing, dynamic demand, or RCL3/RCL4 transition behavior.
+- consumer self-supply fallback still occurs;
+- productive throughput trails available mining capacity;
+- Efficiency reports `INEFFICIENT`;
+- the spawn can remain idle while energy is available.
+
+The next change therefore removes avoidable energy churn before considering more creeps or larger bodies. Do **not** increase mining or hauling capacity solely from the current WATCH state.
 
 ## Development invariants
 
