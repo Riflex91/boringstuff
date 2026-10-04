@@ -1,0 +1,112 @@
+import assert from 'node:assert/strict';
+import { detectJseqGaps, evaluateLive, evaluateSmoke } from './live-verification-core.mjs';
+
+function baseRoom(overrides = {}) {
+  return {
+    rcl: 2,
+    constructionSites: 3,
+    economy: { last100: { ticks: 100, controllerProgress: 180, constructionProgress: 1300 } },
+    economyModel: {
+      theoreticalIncomePerTick: 20,
+      dedicatedHarvestCapacityPerTick: 20,
+      haulerCarryDeficit: 0,
+      consumerFallbackCount: 0,
+      consumerWaitingCount: 0,
+      consumerCriticalCount: 0
+    },
+    health: { status: 'HEALTHY' },
+    efficiency: {
+      status: 'UNDERUTILIZED',
+      metrics: { productiveThroughputPerTick: 14.8, dedicatedHarvestCapacityPerTick: 20 },
+      reasons: ['ENERGY_SURPLUS_UNCONSUMED']
+    },
+    ...overrides
+  };
+}
+
+function event(tick, code, ctx, extra = {}) {
+  return { tick, v: '0.2.17-node18', level: 'INFO', code, ctx, ...extra };
+}
+
+function evidence(start = 1000) {
+  const room = baseRoom();
+  return [
+    event(start, 'VERSION_CHANGE', { from: '0.2.16-node18', to: '0.2.17-node18' }, { jseq: 20 }),
+    event(start, 'ROOM_HEARTBEAT', { room: 'E8N1', economyModel: room.economyModel, health: room.health }),
+    event(start, 'BOT_HEARTBEAT', { cpu: 3.8, bucket: 10000 }),
+    event(start + 24, 'ROOM_HEARTBEAT', { room: 'E8N1', economyModel: room.economyModel, health: room.health }),
+    event(start + 24, 'BOT_HEARTBEAT', { cpu: 4.1, bucket: 10000 }),
+    event(start + 99, 'STATUS_SNAPSHOT', { rooms: { E8N1: room }, cpu: 3.9, bucket: 10000 }, { jseq: 21 })
+  ];
+}
+
+{
+  const r = evaluateSmoke({ events: evidence(), startTick: 1000, nodeVersion: '18.20.4' });
+  assert.equal(r.outcome, 'PASS');
+  assert.equal(r.endTick, 1024);
+}
+
+{
+  const r = evaluateLive({ events: evidence(), startTick: 1000, nodeVersion: '18.20.4' });
+  assert.equal(r.outcome, 'WATCH');
+  assert.equal(r.checks.find(c => c.id === 'productive-throughput').status, 'WATCH');
+  assert.equal(r.checks.find(c => c.id === 'efficiency-status').status, 'WATCH');
+  assert.equal(r.counts.fail, 0);
+}
+
+{
+  const rows = evidence();
+  rows.push(event(1010, 'UNCAUGHT_RUNTIME', { error: 'boom' }, { level: 'ERROR', jseq: 22 }));
+  const r = evaluateSmoke({ events: rows, startTick: 1000, nodeVersion: '18.20.4' });
+  assert.equal(r.outcome, 'FAIL');
+  assert.equal(r.checks.find(c => c.id === 'runtime-errors').status, 'FAIL');
+}
+
+{
+  const rows = evidence();
+  rows[2] = event(1000, 'BOT_HEARTBEAT', { cpu: 3.8, bucket: 500 });
+  const r = evaluateSmoke({ events: rows, startTick: 1000, nodeVersion: '18.20.4' });
+  assert.equal(r.outcome, 'FAIL');
+  assert.equal(r.checks.find(c => c.id === 'cpu-bucket').status, 'FAIL');
+}
+
+{
+  const rows = evidence();
+  rows[0].jseq = 20;
+  rows.at(-1).jseq = 23;
+  const r = evaluateLive({ events: rows, startTick: 1000, nodeVersion: '18.20.4', droppedThroughSeq: 0 });
+  assert.equal(r.outcome, 'FAIL');
+  assert.equal(r.checks.find(c => c.id === 'telemetry-continuity').status, 'FAIL');
+}
+
+{
+  const gap = detectJseqGaps([{ jseq: 20 }, { jseq: 23 }], 22);
+  assert.deepEqual(gap.gaps, [{ from: 21, to: 22, coveredByRetention: true }]);
+}
+
+{
+  const rows = evidence();
+  const status = rows.at(-1);
+  status.ctx.rooms.E8N1.economyModel.consumerWaitingCount = 3;
+  status.ctx.rooms.E8N1.economyModel.consumerCriticalCount = 3;
+  const r = evaluateLive({ events: rows, startTick: 1000, nodeVersion: '18.20.4' });
+  assert.equal(r.outcome, 'WATCH');
+  assert.equal(r.checks.find(c => c.id === 'consumer-supply').status, 'WATCH');
+  assert.equal(r.counts.fail, 0);
+}
+
+{
+  const r = evaluateSmoke({ events: evidence(), startTick: 1000, nodeVersion: '22.16.0' });
+  assert.equal(r.outcome, 'FAIL');
+  assert.equal(r.checks.find(c => c.id === 'node-version').status, 'FAIL');
+}
+
+{
+  const rows = evidence();
+  const sparse = rows.filter(e => e.tick === 1000 || e.tick === 1024 || e.tick === 1099);
+  const r = evaluateSmoke({ events: sparse, startTick: 1000, nodeVersion: '18.20.4' });
+  assert.equal(r.outcome, 'PASS');
+  assert.equal(r.checks.find(c => c.id === 'window-complete').status, 'PASS');
+}
+
+console.log('live-verification tests passed');
