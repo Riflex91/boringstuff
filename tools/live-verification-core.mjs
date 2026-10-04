@@ -1,5 +1,5 @@
 export const EXPECTED_NODE_VERSION = '18.20.4';
-export const EXPECTED_BOT_VERSION = '0.2.19-node18';
+export const EXPECTED_BOT_VERSION = '0.3.0-shadow.1-node18';
 
 const RANK = { PASS: 0, WATCH: 1, FAIL: 2 };
 
@@ -197,6 +197,31 @@ export function evaluateLive(input) {
   if (effStatus === 'UNDERUTILIZED' || effStatus === 'INEFFICIENT' || effStatus === 'WATCH') checks.push(check('efficiency-status', 'WATCH', `Efficiency is ${effStatus}; optimization finding only.`, { reasons: eff?.reasons || [] }));
   else if (effStatus) checks.push(check('efficiency-status', 'PASS', `Efficiency status is ${effStatus}.`));
   else checks.push(check('efficiency-status', 'WATCH', 'No efficiency status was available.'));
+
+  const statusCtx = snapshots.at(-1)?.e?.ctx || null;
+  const platformMissing = [];
+  if (!statusCtx?.capabilities) platformMissing.push('capabilities');
+  if (!statusCtx?.serverProfile) platformMissing.push('serverProfile');
+  if (!statusCtx?.scheduler) platformMissing.push('scheduler');
+  if (!statusCtx?.worldIntel) platformMissing.push('worldIntel');
+  checks.push(platformMissing.length
+    ? check('vnext-platform-shadow', selected.complete ? 'FAIL' : 'WATCH', 'VNext platform telemetry is incomplete.', { missing: platformMissing })
+    : check('vnext-platform-shadow', 'PASS', 'K0/K1/I0 platform telemetry is present.'));
+
+  const colony = latest?.colonyState || null;
+  const shadowFailures = [];
+  if (!colony) shadowFailures.push('colonyState');
+  else {
+    if (colony.authority !== 'SHADOW') shadowFailures.push('colonyState.authority');
+    if (!colony.requests?.available || colony.requests?.authority !== 'SHADOW') shadowFailures.push('requests');
+    if (!colony.assignments?.available || colony.assignments?.authority !== 'SHADOW') shadowFailures.push('assignments');
+    if (!colony.capacity?.projected?.available || colony.capacity?.projected?.authority !== 'SHADOW') shadowFailures.push('capacity.projected');
+    if (!colony.spawnPlan?.available || colony.spawnPlan?.authority !== 'SHADOW') shadowFailures.push('spawnPlan');
+    if (!colony.assignmentEvidence?.available || colony.assignmentEvidence?.authority !== 'SHADOW_EVIDENCE') shadowFailures.push('assignmentEvidence');
+  }
+  checks.push(shadowFailures.length
+    ? check('vnext-shadow-authority', selected.complete ? 'FAIL' : 'WATCH', 'VNext shadow authority contract is incomplete or violated.', { failures: shadowFailures })
+    : check('vnext-shadow-authority', 'PASS', 'O1/E0/E1/E2/O2 remain shadow/evidence-only in live telemetry.'));
 
   return { mode: 'live', ...selected, ...summarize(checks) };
 }
