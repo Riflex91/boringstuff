@@ -1,6 +1,6 @@
 {
   "name": "screeps-chatgpt-tools",
-  "version": "0.3.0-shadow.4",
+  "version": "0.3.0-shadow.5",
   "private": true,
   "type": "module",
   "engines": {
