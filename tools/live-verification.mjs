@@ -3,15 +3,17 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { EXPECTED_BOT_VERSION, evaluateLive, evaluateSmoke } from './live-verification-core.mjs';
 import { filterTimestampedLogRecords } from './live-verification-log.mjs';
-import { resolveAutoStart, waitForAutoStart } from './live-verification-wait.mjs';
+import { waitForAutoStart } from './live-verification-wait.mjs';
+import { DEFAULT_VERIFICATION_LOG_DIR, readDeploymentReceipt } from './deployment-receipt.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DEFAULT_LOG_DIR = String.raw`C:\Users\hansi\AppData\Local\Screeps\scripts\screeps_newbieland_net___21025\chatgpt\logs`;
-const LOG_DIR = process.env.SCREEPS_LOG_DIR || DEFAULT_LOG_DIR;
+const LOG_DIR = process.env.SCREEPS_LOG_DIR || DEFAULT_VERIFICATION_LOG_DIR;
 const ROOM = process.env.SCREEPS_ROOM || 'E8N1';
+const SERVER = process.env.SCREEPS_SERVER || 'newbieland';
+const BRANCH = process.env.SCREEPS_BRANCH || 'chatgpt';
 
 function usage(code = 0) {
-  console.log(`\nLive Verification Harness v0.2.19\n\n  node live-verification.mjs smoke [--start-tick N] [--room E8N1] [--version 0.2.19-node18]\n  node live-verification.mjs live  [--start-tick N] [--room E8N1] [--version 0.2.19-node18]\n\nThe command is read-only. It evaluates existing collector evidence and never mutates Screeps or historical telemetry.\nIf --start-tick is omitted, the latest VERSION_CHANGE to the requested version is used.\n`);
+  console.log(`\nLive Verification Harness v0.3.0-shadow.1\n\n  node live-verification.mjs smoke [--start-tick N] [--room E8N1] [--version 0.3.0-shadow.1-node18]\n  node live-verification.mjs live  [--start-tick N] [--room E8N1] [--version 0.3.0-shadow.1-node18]\n\nThe command is read-only. It evaluates existing collector evidence and never mutates Screeps or historical telemetry.\nIf --start-tick is omitted, the deployment receipt requires the exact matching DEPLOYMENT_MARKER; historical runs without a matching receipt may still fall back to VERSION_CHANGE.\n`);
   process.exit(code);
 }
 
@@ -78,13 +80,6 @@ function dedupeEvents(events) {
   return out.sort((a, b) => (Number(a.tick) || 0) - (Number(b.tick) || 0) || (Number(a.jseq) || 0) - (Number(b.jseq) || 0));
 }
 
-function autoStart(events, version, mode, roomName) {
-  const status = resolveAutoStart(events, version, mode, roomName);
-  if (status.fatal) throw new Error(status.fatal);
-  if (!status.ready) throw new Error('No complete live verification window is available yet.');
-  return status.startTick;
-}
-
 function printHuman(result) {
   console.log(`VERIFY ${result.mode.toUpperCase()} ${result.startTick}-${result.endTick}: ${result.outcome}`);
   for (const c of result.checks) console.log(`${c.status.padEnd(5)} ${c.id.padEnd(24)} ${c.message}`);
@@ -96,18 +91,25 @@ let events = dedupeEvents(readNdjson('bot-events-'));
 if (!events.length) throw new Error(`No bot-events-*.ndjson evidence found in ${LOG_DIR}. Run the collector first.`);
 
 let startTick = args.startTick;
-if (startTick === null && args.mode === 'live') {
+if (startTick === null) {
+  const receipt = readDeploymentReceipt({
+    logDir: LOG_DIR,
+    server: SERVER,
+    branch: BRANCH,
+    version: args.version
+  });
+  const expectedDeploymentId = receipt?.receipt?.deploymentId || null;
+
   const waited = await waitForAutoStart({
     mode: args.mode,
     version: args.version,
     roomName: args.room,
     loadEvents: () => dedupeEvents(readNdjson('bot-events-')),
-    onWait: message => console.error(message)
+    onWait: message => console.error(message),
+    expectedDeploymentId
   });
   startTick = waited.startTick;
   events = waited.events;
-} else if (startTick === null) {
-  startTick = autoStart(events, args.version, args.mode, args.room);
 }
 
 const tickCount = args.mode === 'smoke' ? 25 : 100;
