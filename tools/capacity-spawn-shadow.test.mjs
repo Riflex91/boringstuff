@@ -198,6 +198,13 @@ function capacityRequest(kind, capability, amount, options = {}) {
 }
 
 {
+  const fallback = planner._test.emergencyFallbackBody('worker', 200);
+  assert.deepEqual(fallback, [WORK, CARRY, MOVE]);
+  assert.deepEqual(planner._test.emergencyFallbackBody('harvester', 300), []);
+  assert.deepEqual(planner._test.emergencyFallbackBody('hauler', 300), []);
+}
+
+{
   const deferred = planner.deferredSnapshot('LOW_CPU');
   assert.equal(deferred.summary.deferred, true);
   assert.equal(deferred.summary.deferReason, 'LOW_CPU');
