@@ -19,6 +19,15 @@ function bootstrapMemory() {
     logger.info('VERSION_CHANGE', 'Bot code version changed', { from: Memory.bot.version, to: config.VERSION }, { force: true, persist: true, dedupeTicks: 0 });
     Memory.bot.version = config.VERSION;
   }
+  if (config.DEPLOYMENT_ID && Memory.bot.deploymentId !== config.DEPLOYMENT_ID) {
+    logger.info('DEPLOYMENT_MARKER', 'Bot deployment activated', {
+      deploymentId: config.DEPLOYMENT_ID,
+      previousDeploymentId: Memory.bot.deploymentId || null,
+      version: config.VERSION
+    }, { force: true, persist: true, dedupeTicks: 0 });
+    Memory.bot.deploymentId = config.DEPLOYMENT_ID;
+    Memory.bot.deploymentTick = Game.time;
+  }
   if (!Memory.creeps) Memory.creeps = {};
   if (!Memory.rooms) Memory.rooms = {};
   if (!Memory.bot.worldIntelLegacyMigrated) {
