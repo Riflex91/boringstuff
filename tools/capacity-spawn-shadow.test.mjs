@@ -87,9 +87,11 @@ function capacityRequest(kind, capability, amount, options = {}) {
 {
   const s = state({ energyCapacity: 550 });
   const r = capacityRequest('HARVEST_CAPACITY', 'workHarvest', 5);
-  const body = planner._test.bodyFor('harvester', 550, s, false);
-  assert.equal(planner._test.bodyCost(body), 550);
-  assert.equal(planner._test.capacityForBody(body, 'harvester', r), 3);
+  const optimized = planner._test.optimizeBody('harvester', r, 5, 550, s);
+  assert.ok(optimized);
+  assert.ok(optimized.cost <= 550);
+  assert.ok(optimized.capacityDelivered > 0);
+  assert.equal(planner._test.capacityForBody(optimized.body, 'harvester', r), optimized.capacityDelivered);
 }
 
 {
@@ -99,10 +101,10 @@ function capacityRequest(kind, capability, amount, options = {}) {
   const plan = planner.plan(s, [r], { time: 1000 });
   assert.equal(plan.summary.requirementCount, 1);
   assert.equal(plan.summary.deficitCount, 1);
-  assert.equal(plan.spawnRequests.length, 2);
-  assert.equal(plan.spawnRequests[0].capacityDelivered, 3);
-  assert.equal(plan.spawnRequests[1].capacityDelivered, 3);
-  assert.equal(plan.spawnRequests[1].capacityApplied, 2);
+  assert.ok(plan.spawnRequests.length >= 1);
+  assert.ok(plan.spawnRequests.reduce((sum, r) => sum + r.capacityDelivered, 0) >= 5);
+  assert.ok(plan.spawnRequests.every(r => r.bodySource === 'OPTIMIZER_V1'));
+  assert.ok(plan.spawnRequests.every(r => r.optimizer && r.optimizer.expectedRoi > 0));
   assert.equal(plan.deficits[0].active, 0);
   assert.equal(plan.deficits[0].queued, 0);
   assert.equal(plan.deficits[0].uncoveredAfterPlan, 0);
@@ -118,6 +120,7 @@ function capacityRequest(kind, capability, amount, options = {}) {
   assert.equal(plan.deficits[0].projectedSurviving, 0);
   assert.equal(plan.deficits[0].preSpawn, true);
   assert.equal(plan.spawnRequests.length, 1);
+  assert.equal(plan.spawnRequests[0].bodySource, 'OPTIMIZER_V1');
   assert.ok(plan.spawnRequests[0].predicted.productiveStartTick > 2000);
 }
 
@@ -154,7 +157,7 @@ function capacityRequest(kind, capability, amount, options = {}) {
   const plan = planner.plan(state({ creeps: [a,b] }), [
     capacityRequest('HARVEST_CAPACITY','workHarvest',6)
   ], { time: 2300 });
-  assert.equal(plan.spawnRequests.length, 2);
+  assert.ok(plan.spawnRequests.length >= 2);
   assert.equal(plan.spawnRequests[0].predicted.queueDelay, 0);
   assert.ok(plan.spawnRequests[1].predicted.queueDelay > 0);
 }
@@ -164,7 +167,7 @@ function capacityRequest(kind, capability, amount, options = {}) {
   const plan = planner.plan(state({ spawns: [makeSpawn('A'), makeSpawn('B')] }), [
     capacityRequest('HARVEST_CAPACITY','workHarvest',6)
   ], { time: 2400 });
-  assert.equal(plan.spawnRequests.length, 2);
+  assert.ok(plan.spawnRequests.length >= 2);
   assert.equal(plan.spawnRequests[0].predicted.queueDelay, 0);
   assert.equal(plan.spawnRequests[1].predicted.queueDelay, 0);
   assert.notEqual(plan.spawnRequests[0].predicted.spawnId, plan.spawnRequests[1].predicted.spawnId);
@@ -192,6 +195,13 @@ function capacityRequest(kind, capability, amount, options = {}) {
   assert.ok(plan.spawnRequests.slice(1).some(x => x.sourceRequestId === 'mining'));
   const miningRequest = plan.spawnRequests.find(x => x.sourceRequestId === 'mining');
   assert.ok(miningRequest.predicted.queueDelay > 0);
+}
+
+{
+  const fallback = planner._test.emergencyFallbackBody('worker', 200);
+  assert.deepEqual(fallback, [WORK, CARRY, MOVE]);
+  assert.deepEqual(planner._test.emergencyFallbackBody('harvester', 300), []);
+  assert.deepEqual(planner._test.emergencyFallbackBody('hauler', 300), []);
 }
 
 {

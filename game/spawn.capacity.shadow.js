@@ -1,6 +1,7 @@
 'use strict';
 
 const bodyBuilder = require('body.builder');
+const bodyOptimizer = require('body.optimizer');
 const capacityVector = require('capacity.vector');
 
 const SCHEMA_VERSION = 1;
@@ -30,14 +31,43 @@ function bodyCost(body) {
   return total;
 }
 
-function bodyFor(role, energy, state, emergency) {
-  if (role === 'harvester') {
-    const containersReady = !!(state.economyModel && state.sources && state.economyModel.sourceContainersReady === state.sources.length);
-    return bodyBuilder.harvester(energy, containersReady);
+function emergencyFallbackBody(role, energy) {
+  if (role !== 'worker') return [];
+  return bodyBuilder.worker(energy, true);
+}
+
+function routeContext(state, request) {
+  if (!state || !state.economyModel || !Array.isArray(state.economyModel.sourceRoutes)) {
+    return { distance: 0, terrainProfile: null };
   }
-  if (role === 'hauler') return bodyBuilder.hauler(energy);
-  if (role === 'worker') return bodyBuilder.worker(energy, !!emergency);
-  return [];
+  if (request.kind !== 'HARVEST_CAPACITY' && request.kind !== 'HAUL_CAPACITY') {
+    return { distance: 0, terrainProfile: null };
+  }
+  let selected = null;
+  for (const route of state.economyModel.sourceRoutes) {
+    if (!Number.isFinite(route.spawnDistance)) continue;
+    if (!selected || route.spawnDistance > selected.spawnDistance) selected = route;
+  }
+  return {
+    distance: selected ? Math.max(0, selected.spawnDistance) : 0,
+    terrainProfile: selected && selected.terrainProfile ? selected.terrainProfile : null
+  };
+}
+
+function optimizeBody(role, request, requestedCapacity, energyBudget, state) {
+  const route = routeContext(state, request);
+  return bodyOptimizer.optimize({
+    role,
+    capability: request && request.demand ? request.demand.capability : null,
+    requestedCapacity,
+    energyBudget,
+    currentEnergy: state ? state.energyAvailable : null,
+    routeDistance: route.distance,
+    terrainProfile: route.terrainProfile,
+    expectedLifetime: typeof CREEP_LIFE_TIME !== 'undefined' ? CREEP_LIFE_TIME : 1500,
+    boosts: request && request.boosts ? request.boosts : null,
+    maxParts: 50
+  });
 }
 
 function capacityForRequestFromVector(vector, request, role) {
@@ -62,13 +92,7 @@ function capacityForBody(body, role, request) {
 }
 
 function sourceTravelTicks(state, request) {
-  if (!state || !state.economyModel || !Array.isArray(state.economyModel.sourceRoutes)) return 0;
-  if (request.kind !== 'HARVEST_CAPACITY' && request.kind !== 'HAUL_CAPACITY') return 0;
-  let max = 0;
-  for (const route of state.economyModel.sourceRoutes) {
-    if (Number.isFinite(route.spawnDistance)) max = Math.max(max, route.spawnDistance);
-  }
-  return max;
+  return routeContext(state, request).distance;
 }
 
 function safetyMarginTicks(queueDelay, spawnTicks, travelTicks) {
@@ -174,14 +198,12 @@ function planRequirement(state, request, slots, planned, game) {
   const current = currentAndSpawning(state, request);
   const energyCapacity = Math.max(0, Number(state.energyCapacityAvailable) || 0);
   const energyAvailable = Math.max(0, Number(state.energyAvailable) || 0);
-  const primaryBody = bodyFor(role, energyCapacity, state, request.kind === 'RECOVERY_CAPACITY');
-  const primaryCost = bodyCost(primaryBody);
-  const fallbackBody = bodyFor(role, energyAvailable, state, true);
-  const fallbackCost = bodyCost(fallbackBody);
-  const delivered = capacityForBody(primaryBody, role, request);
-  const spawnTimePerPart = typeof CREEP_SPAWN_TIME !== 'undefined' ? CREEP_SPAWN_TIME : 3;
-  const spawnTicks = primaryBody.length * spawnTimePerPart;
-  const travelTicks = sourceTravelTicks(state, request);
+  const primary = optimizeBody(role, request, Math.max(1, required), energyCapacity, state);
+  const primaryBody = primary ? primary.body : [];
+  const primaryCost = primary ? primary.cost : 0;
+  const delivered = primary ? primary.capacityDelivered : 0;
+  const spawnTicks = primary ? primary.spawnTicks : 0;
+  const travelTicks = primary ? primary.travelTicks : sourceTravelTicks(state, request);
 
   const firstSlot = earliestSlot(slots);
   const firstQueue = firstSlot ? firstSlot.availableIn : 0;
@@ -236,8 +258,32 @@ function planRequirement(state, request, slots, planned, game) {
     const remaining = Math.max(0, required - surviving - arrivingSpawning - priorPlanned);
     if (remaining <= 0) { lastRemaining = 0; break; }
 
+    const optimized = optimizeBody(role, request, remaining, energyCapacity, state);
+    if (!optimized || !optimized.body.length || optimized.capacityDelivered <= 0) {
+      deficit.unresolvedReason = 'NO_OPTIMIZED_BODY';
+      break;
+    }
+    const optimizedSpawnTicks = optimized.spawnTicks;
+    const optimizedTravelTicks = optimized.travelTicks;
+    const optimizedSafety = safetyMarginTicks(queueDelay, optimizedSpawnTicks, optimizedTravelTicks);
+    const optimizedHorizon = queueDelay + optimizedSpawnTicks + optimizedTravelTicks + optimizedSafety;
+    const optimizedSurviving = projectedSurviving(current.activeCreeps, optimizedHorizon);
+    const optimizedSpawning = spawningAvailableBy(current.spawningCreeps, optimizedHorizon, optimizedTravelTicks);
+    let optimizedPriorPlanned = 0;
+    for (const item of planned) {
+      if (item.sourceDeficitId === deficit.id && item.predicted.productiveStartTick <= tick + optimizedHorizon) optimizedPriorPlanned += item.capacityDelivered;
+    }
+    const optimizedRemaining = Math.max(0, required - optimizedSurviving - optimizedSpawning - optimizedPriorPlanned);
+    if (optimizedRemaining <= 0) { lastRemaining = 0; break; }
+
+    const fallback = optimizeBody(role, request, optimizedRemaining, energyAvailable, state);
+    let fallbackBody = fallback && fallback.body.length ? fallback.body.slice() : null;
+    if (!fallbackBody && request.kind === 'RECOVERY_CAPACITY') {
+      const emergencyBody = emergencyFallbackBody(role, energyAvailable);
+      if (emergencyBody.length && bodyCost(emergencyBody) <= energyAvailable) fallbackBody = emergencyBody;
+    }
+
     const index = proposals.length;
-    const productiveLifetime = Math.max(0, (typeof CREEP_LIFE_TIME !== 'undefined' ? CREEP_LIFE_TIME : 1500) - travelTicks);
     const proposal = {
       schemaVersion: SCHEMA_VERSION,
       id: 'spawn|' + String(state.room && state.room.name || 'room') + '|' + String(request.dedupeKey || request.id) + '|' + index,
@@ -248,28 +294,34 @@ function planRequirement(state, request, slots, planned, game) {
       deadlineTick: Number.isFinite(request.deadlineTick) ? request.deadlineTick : null,
       targetRoom: state.room && state.room.name || null,
       dutyTarget: request.target || null,
-      body: primaryBody.slice(),
-      bodySource: 'LEGACY_BODY_ADAPTER',
-      cost: primaryCost,
-      spawnTicks,
-      capacityDelivered: delivered,
-      capacityApplied: Math.min(delivered, remaining),
+      body: optimized.body.slice(),
+      bodySource: 'OPTIMIZER_V1',
+      optimizer: {
+        expectedRoi: optimized.expectedRoi,
+        lifecycleCost: optimized.lifecycleCost,
+        terrainProfile: optimized.terrainProfile,
+        boostMultiplier: optimized.boostMultiplier
+      },
+      cost: optimized.cost,
+      spawnTicks: optimizedSpawnTicks,
+      capacityDelivered: optimized.capacityDelivered,
+      capacityApplied: Math.min(optimized.capacityDelivered, optimizedRemaining),
       predicted: {
         spawnId: slot.id,
         queueDelay,
-        travelTicks,
-        safetyMarginTicks: safety,
-        productiveStartTick: tick + horizon,
-        productiveLifetime,
-        expectedUtility: Math.round(Math.min(delivered, remaining) * productiveLifetime * 100) / 100
+        travelTicks: optimizedTravelTicks,
+        safetyMarginTicks: optimizedSafety,
+        productiveStartTick: tick + optimizedHorizon,
+        productiveLifetime: optimized.productiveLifetime,
+        expectedUtility: optimized.expectedValue
       },
-      fallbackBody: fallbackBody.length && fallbackCost <= energyAvailable ? fallbackBody.slice() : null
+      fallbackBody
     };
     proposals.push(proposal);
     planned.push(proposal);
     deficit.proposedCapacity += proposal.capacityDelivered;
-    lastRemaining = Math.max(0, remaining - proposal.capacityDelivered);
-    slot.availableIn += spawnTicks;
+    lastRemaining = Math.max(0, optimizedRemaining - proposal.capacityDelivered);
+    slot.availableIn += optimizedSpawnTicks;
   }
 
   deficit.queued = 0;
@@ -315,7 +367,7 @@ function plan(state, requests, game) {
       proposedCapacity: Math.round(proposedCapacity * 100) / 100,
       uncoveredAfterPlan: Math.round(uncovered * 100) / 100,
       proposedByRole,
-      bodySource: 'LEGACY_BODY_ADAPTER'
+      bodySource: 'OPTIMIZER_V1'
     }
   };
 }
@@ -338,7 +390,7 @@ function deferredSnapshot(reason) {
       proposedCapacity: 0,
       uncoveredAfterPlan: 0,
       proposedByRole: {},
-      bodySource: 'LEGACY_BODY_ADAPTER'
+      bodySource: 'OPTIMIZER_V1'
     }
   };
 }
@@ -351,7 +403,9 @@ module.exports = {
     roleForRequest,
     requestIsCapacity,
     bodyCost,
-    bodyFor,
+    emergencyFallbackBody,
+    routeContext,
+    optimizeBody,
     capacityForRequestFromVector,
     capacityForCreep,
     capacityForBody,

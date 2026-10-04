@@ -811,12 +811,25 @@ Inputs:
 Outputs:
 
 - body;
-- delivered capacity;
+- delivered/applied capacity;
 - cost;
 - spawn ticks;
+- body-aware route travel ticks;
+- productive lifetime;
+- lifecycle cost;
 - expected ROI.
 
-Avoid fixed body tables except emergency fallbacks.
+Implementation rules:
+
+- enumerate capability-valid compositions up to the 50-part/energy budget instead of selecting a fixed role table;
+- use normalized road/plain/swamp fatigue when a route terrain profile exists;
+- default terrain assumptions must be explicit in telemetry;
+- maximize requested capacity first, then compare lifecycle opportunity cost / ROI;
+- boost multipliers require boost evidence/reservation; no evidence means unboosted capacity;
+- primary and normal fallback bodies come from the optimizer;
+- fixed legacy bodies are allowed only as explicit recovery/survival fallbacks.
+
+E2B remains SHADOW until body proposals have regression and live comparison evidence. It does not change the authoritative legacy `spawn.manager`.
 
 ---
 

@@ -172,6 +172,31 @@ SpawnRequest {
 
 The spawn scheduler may reorder for deadline/safety but may not silently change strategic demand.
 
+Body-optimizer contract (E2B):
+
+```text
+BodyOptimizationInput {
+  role, capability, requestedCapacity, energyBudget, currentEnergy?,
+  routeDistance, terrainProfile?, expectedLifetime, boosts?, maxParts
+}
+
+BodyOptimizationResult {
+  body, cost, parts, spawnTicks, capacityDelivered, capacityApplied,
+  travelTicks, productiveLifetime, expectedValue, expectedRoi, lifecycleCost,
+  terrainProfile, boostMultiplier
+}
+```
+
+Rules:
+
+- primary bodies are generated from capability demand rather than fixed role tables;
+- candidate bodies must respect energy budget and the 50-part limit;
+- travel estimate uses body composition plus normalized road/plain/swamp fatigue when available;
+- missing route terrain degrades explicitly to a conservative/default profile and is surfaced in optimizer metadata;
+- optimization first maximizes useful requested capacity, then minimizes lifecycle opportunity cost through ROI/tie-break rules;
+- boost multipliers may be used only when the request carries corresponding boost assumptions/reservations; absent boost evidence means multiplier `1`;
+- fixed legacy bodies are permitted only as explicit survival/recovery fallbacks and may not become normal planning policy.
+
 # 10. TransportLane
 
 ```text
