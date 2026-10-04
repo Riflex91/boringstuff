@@ -1842,7 +1842,303 @@ Add fixtures for:
 
 ---
 
-# 14. Research sources
+# 14. Recovery, industry and empire-economy refinements
+
+## 14.1 Recovery is an explicit colony mode
+
+Kasami's CrisisManager provides an important structural lesson: recovery should not be hidden inside normal spawning.
+
+Observed concepts:
+
+- detect colonies that have lost most of their local workforce;
+- clear stale/irrelevant queued work when the colony state has fundamentally collapsed;
+- spawn emergency generalists using currently available energy;
+- request support workers from another colony when local infrastructure cannot bootstrap;
+- create inter-room emergency energy hauling when a mature room lacks local terminal support;
+- abandon strategically failed colonies only under explicit conditions.
+
+VNext must model a first-class `RECOVERY` colony mode.
+
+```text
+RECOVERY_ENTER when:
+- productive capacity falls below survival floor
+- local spawn path cannot restore it before deadline
+- energy acquisition loop is broken
+- controller / spawn survival is at risk
+
+RECOVERY actions:
+1. cancel or deprioritize non-survival requests
+2. reserve spawn energy for bootstrap bodies
+3. create minimum mining/logistics/control requests
+4. request external aid if cheaper/faster
+5. rebuild normal capacity
+6. exit only after hysteresis-confirmed stability
+```
+
+Do not use Kasami's fixed creep-count thresholds. Use capacity floors and estimated time-to-recovery.
+
+## 14.2 Cross-colony aid is a general request type
+
+Kasami's crisis worker and energy-convoy behavior should be generalized into `SupportRequest` rather than implemented as special cases.
+
+```text
+SupportRequest
+- targetColony
+- capability/resource needed
+- amount
+- latestUsefulArrivalTick
+- expectedRecoveryBenefit
+- candidateProviders
+- providerOpportunityCost
+- routeRisk
+- transport/spawn plan
+```
+
+This same mechanism can later carry defense reinforcement, bootstrap labor, emergency energy, boost compounds and evacuation support.
+
+## 14.3 Memory is a cache/database with lifecycle, not an infinite dump
+
+TooAngel persists serialized paths/cost matrices; Kasami actively garbage-collects dead creep state, old intel, expired power-bank claims and abandoned-room state; The International version-controls memory and large segment-backed artifacts.
+
+Canonical VNext state classes:
+
+```text
+EPHEMERAL     per-tick cache; never persisted
+SHORT_LIVED   reservations, transient threats, current requests
+COLONY        current operational state
+WORLD_INTEL   freshness/confidence governed
+ARTIFACT      plans/routes/models with schema version
+HISTORY       compact telemetry aggregates/evidence
+```
+
+Every persistent schema must have:
+
+- schema version;
+- migration path;
+- ownership/source;
+- freshness or explicit permanence;
+- garbage-collection rule.
+
+A code deploy must never depend on manually clearing Memory.
+
+## 14.4 Segments are an optional persistence backend
+
+Kasami stores road information/stats in RawMemory segments. The International stores base plans and ID data and explicitly activates segments before use.
+
+VNext uses a storage abstraction:
+
+```text
+ArtifactStore
+- get(key)
+- put(key, value, schemaVersion)
+- delete(key)
+- availableCapacity()
+- capability = memory | segment | none
+```
+
+Segments are preferred for large stable artifacts but are never required for basic survival. If unavailable, the bot falls back to compact Memory or recomputation.
+
+## 14.5 Market is part of the resource allocator
+
+TooAngel already accounts for transaction energy when selecting orders. Kasami separates market-price observation from strategic distribution/trade. The International caches market orders, filters hostile actors and maintains/optimizes orders.
+
+VNext market logic must not optimize nominal credits alone.
+
+Define an internal energy shadow price and effective values:
+
+```text
+effectiveBuyCost =
+creditCost
++ transactionEnergy * energyShadowPrice
++ terminalOpportunityCost
+
+effectiveSellValue =
+creditIncome
+- transactionEnergy * energyShadowPrice
+- reserveOpportunityCost
+```
+
+First compare internal empire transfer against external market trade. Market usage is capability-gated and must tolerate an empty/nonfunctional market.
+
+## 14.6 Strategic reserves replace arbitrary fixed stock thresholds
+
+Historical bots commonly use fixed mineral/energy thresholds. They are useful as reference behavior but are not portable enough for VNext.
+
+Each resource instead has:
+
+```text
+ResourceReserve
+- survivalReserve
+- forecastDemand
+- operationReservations
+- productionPipelineDemand
+- desiredBuffer
+- excess
+```
+
+Forecast horizon is expressed in ticks and expected consumption/production.
+
+## 14.7 Labs become demand-driven reaction planning
+
+The International models reaction decomposition and boost ordering; Kasami separates Lab and Boost management and distributes boost resources between rooms.
+
+VNext pipeline:
+
+```text
+future capability demand
+→ required boosts/compounds
+→ inventory deficit
+→ reaction dependency DAG
+→ reagent deficit
+→ internal transfer / market acquisition
+→ lab assignment
+→ logistics requests
+→ reaction execution
+→ boost appointment
+```
+
+Lab reactions are not run merely because labs are idle. Production must have a downstream demand or strategic reserve objective.
+
+## 14.8 Boosts are reserved capacity attached to an operation
+
+A combat or economic operation may request a capability that can be satisfied with more body parts or with boosts.
+
+Body optimizer therefore evaluates alternatives:
+
+```text
+unboosted spawn cost + spawn time + travel
+vs
+boosted body + compound cost + lab time + boost logistics + strategic scarcity
+```
+
+Boost stock is reserved when an operation commits so unrelated jobs cannot consume it.
+
+## 14.9 Factory production is a graph problem
+
+The International's factory manager chooses products from available production possibilities. VNext generalizes this into a production DAG.
+
+For each candidate product:
+
+```text
+expectedNetValue =
+outputStrategicValue
+- ingredientShadowValue
+- energyCost
+- terminalTransferCost
+- factoryCooldownOpportunityCost
+- CPU/logistics cost
+```
+
+Only positive-value or strategically required production enters the queue.
+
+## 14.10 Power processing is subordinate to economy health
+
+The International explicitly avoids power processing when stored energy is below its colony minimum. This is the correct priority relationship.
+
+Canonical rule:
+
+```text
+processPower only if
+power available
+AND powerSpawn logistics satisfied
+AND energy above dynamic survival/growth reserve
+AND processing has positive strategic value
+```
+
+Power must never starve core economy.
+
+## 14.11 Power-bank harvesting is an Operation with synchronized phases
+
+Kasami records power-bank value, distance, decay deadline and available attack positions, reserves a bank globally and delays haulers until bank HP is low.
+
+VNext Operation phases:
+
+```text
+DISCOVER
+→ VALUE
+→ RESERVE_TARGET
+→ ASSEMBLE_DAMAGE/HEAL
+→ TRAVEL
+→ ATTACK
+→ DISPATCH_HAULERS_JIT
+→ COLLECT
+→ RETURN
+→ SETTLE_ROI
+```
+
+Profitability uses current power shadow value rather than a fixed historical market price.
+
+## 14.12 Requests need responder selection and abandonment/backoff
+
+The International maintains empire-level work/combat/haul requests and assigns responders according to suitability/distance, temporarily abandoning requests that are unreachable, occupied or incompatible with room status.
+
+VNext generalizes responder selection:
+
+```text
+request
+→ candidate responders
+→ cheap feasibility filter
+→ expensive route/capability validation
+→ expected value / deadline score
+→ reserve responder
+→ execute
+```
+
+Always perform inexpensive rejection tests before costly path/search calculations.
+
+## 14.13 Remote accounting should use credit/debt, not only snapshots
+
+The International keeps per-source remote credit, credit change and reservations. This is a useful model for transport backpressure.
+
+VNext should maintain for each producer lane:
+
+```text
+producedButUnmoved
+reservedForPickup
+expectedProductionUntilArrival
+transported
+lost/decayed
+```
+
+This allows hauler assignment to reason about future pickup value, not merely current container energy.
+
+## 14.14 Migration and respawn are first-class lifecycle events
+
+The International explicitly detects respawn and has versioned Memory migrations.
+
+VNext requires:
+
+- deterministic boot with empty Memory;
+- soft schema migration when compatible;
+- hard migration fallback that preserves only explicitly portable data;
+- respawn detection independent of server name;
+- invalidation of stale room ownership/operation reservations;
+- reconstruction from observable Game state.
+
+Deployment should never silently interpret old memory under a new incompatible schema.
+
+## 14.15 Derived fixtures from recovery/industry research
+
+Add scenario fixtures for:
+
+1. colony loses all miners/haulers but retains spawn and enough energy for a bootstrap body;
+2. local recovery is slower than aid from a neighboring colony;
+3. stale spawn queue is cleared when colony enters RECOVERY;
+4. unavailable RawMemory segments cause graceful artifact fallback;
+5. schema upgrade migrates requests without duplicating reservations;
+6. market unavailable / empty produces no exception and no required manual configuration;
+7. internal terminal transfer beats cheaper nominal market price after transaction energy;
+8. lab demand DAG produces a missing compound from base reagents;
+9. boost reservation prevents another operation from consuming committed stock;
+10. factory candidate is rejected when ingredient shadow value exceeds output value;
+11. power processing pauses below dynamic energy reserve;
+12. power-bank haulers launch just in time for expected bank destruction;
+13. unreachable empire request enters backoff without repeated expensive pathfinding;
+14. remote source accounting reserves future pickup and prevents multiple haulers from overcommitting.
+
+---
+
+# 15. Research sources
 
 Primary public references:
 
