@@ -125,6 +125,28 @@ function makeCreep(id, role, carried, capacity, wait, fallback, roomName = 'E1N1
 }
 
 {
+  const memory = {};
+  const result = shadow.produce({
+    room: { name: 'E5N5' },
+    emergency: false,
+    creeps: [],
+    economyModel: {
+      recommendedHarvesterWorkParts: 5,
+      harvesterWorkDeficit: 0,
+      recommendedHaulerCarryParts: 6,
+      haulerCarryDeficit: 0
+    }
+  }, memory, { time: 400 });
+  const requests = registry.list('E5N5', memory);
+  const byKey = Object.fromEntries(requests.map(r => [r.dedupeKey, r]));
+  assert.equal(result.summary.total, 2);
+  assert.equal(byKey['economy:harvest-capacity'].demand.amount, 5);
+  assert.equal(byKey['economy:harvest-capacity'].utility.current, 0);
+  assert.equal(byKey['logistics:haul-capacity'].demand.amount, 6);
+  assert.equal(byKey['logistics:haul-capacity'].utility.current, 0);
+}
+
+{
   const normal = makeCreep('w-normal', 'worker', 0, 100, 0, false);
   const waiting = makeCreep('w-wait', 'worker', 0, 100, 4, false);
   const fallback = makeCreep('w-fallback', 'worker', 0, 100, 2, true);
