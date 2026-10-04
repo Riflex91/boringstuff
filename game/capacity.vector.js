@@ -64,7 +64,7 @@ function fromCounts(counts, role) {
     v.workRepair = work;
   }
   if (role === 'worker' || role === 'builder' || role === 'repairer' || role === 'upgrader') v.workUpgrade = work;
-  if (role === 'hauler') v.carry = carry;
+  v.carry = carry;
   v.moveEffective = move;
   v.claim = claim;
   v.reserve = claim;
@@ -110,8 +110,8 @@ function deliveredForRequest(vector, request) {
   const name = requestCapability(request);
   if (name === 'bootstrap') {
     return Math.min(
-      capability(vector, 'workHarvest') + capability(vector, 'workBuild'),
-      capability(vector, 'carry') || capability(vector, 'moveEffective'),
+      Math.max(capability(vector, 'workHarvest'), capability(vector, 'workBuild')),
+      capability(vector, 'carry'),
       capability(vector, 'moveEffective')
     );
   }
