@@ -53,6 +53,8 @@ function event(tick, code, ctx, extra = {}) {
 
 function evidence(start = 1000) {
   const room = baseRoom();
+  room.economy.last100.startTick = start;
+  room.economy.last100.endTick = start + 99;
   return [
     event(start, 'VERSION_CHANGE', { from: '0.2.19-node18', to: '0.3.0-shadow.1-node18' }, { jseq: 20 }),
     event(start, 'ROOM_HEARTBEAT', { room: 'E8N1', economyModel: room.economyModel, health: room.health }),
@@ -194,6 +196,34 @@ function evidence(start = 1000) {
   const r = evaluateLive({ events: rows, startTick: 1000, nodeVersion: '18.20.4' });
   assert.equal(r.outcome, 'FAIL');
   assert.equal(r.checks.find(c => c.id === 'vnext-platform-shadow').status, 'FAIL');
+}
+
+{
+  const staleRoom = baseRoom();
+  staleRoom.economy.last100.startTick = 1000;
+  staleRoom.economy.last100.endTick = 1099;
+  staleRoom.economy.last100.ticks = 100;
+
+  const rows = [
+    event(1101, 'ROOM_HEARTBEAT', {
+      room: 'E8N1',
+      economy: staleRoom.economy,
+      economyModel: staleRoom.economyModel,
+      health: staleRoom.health,
+      efficiency: staleRoom.efficiency,
+      colonyState: staleRoom.colonyState
+    }),
+    event(1150, 'BOT_HEARTBEAT', { cpu: 3.8, bucket: 10000 })
+  ];
+
+  const r = evaluateLive({ events: rows, startTick: 1101, nodeVersion: '18.20.4' });
+  assert.equal(r.complete, false);
+  assert.equal(r.attributionWindow.matches, false);
+  assert.equal(r.attributionWindow.observedStartTick, 1000);
+  assert.equal(r.attributionWindow.observedEndTick, 1099);
+  assert.equal(r.checks.find(c => c.id === 'productive-attribution').status, 'WATCH');
+  assert.equal(r.checks.find(c => c.id === 'controller-progress').status, 'WATCH');
+  assert.equal(r.checks.find(c => c.id === 'productive-throughput').status, 'WATCH');
 }
 
 console.log('live-verification tests passed');
