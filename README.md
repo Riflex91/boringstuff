@@ -52,6 +52,26 @@ npm run verify:live
 
 Expected runtime version after deployment: `0.2.19-node18`.
 
+### Live verification result
+
+Smoke window `3683727–3683751`:
+
+- `PASS=8 / WATCH=1 / FAIL=0`
+- only WATCH: no durable jseq sample inside the short window
+
+Final 100-tick live window `3684101–3684200`:
+
+- `PASS=13 / WATCH=3 / FAIL=0`
+- productive-flow attribution complete: PASS
+- runtime/collector/CPU/mining/hard-stall/telemetry/hauler/controller/construction gates: PASS
+- consumer-supply: WATCH — self-supply fallback occurred
+- productive-throughput: WATCH — below mining capacity
+- efficiency: WATCH — `UNDERUTILIZED`
+
+The later serialization/UX hardening remained observability-only. The final 100-tick gate validates the patched attribution payload and all hard safety gates.
+
+v0.2.19 is therefore **VERIFIED / CLOSED**.
+
 ---
 
 ## Historical documentation
