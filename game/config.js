@@ -1,7 +1,7 @@
 'use strict';
 
 module.exports = {
-  VERSION: '0.3.0-shadow.2-node18',
+  VERSION: '0.3.0-shadow.3-node18',
   BOT_NAME: 'Autonomy',
 
   // Console logging. DEBUG is noisy; INFO is a good default.
