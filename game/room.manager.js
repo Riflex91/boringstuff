@@ -9,6 +9,7 @@ const economyModel = require('economy.model');
 const colonyHealth = require('colony.health');
 const colonyEfficiency = require('colony.efficiency');
 const colonyState = require('colony.state');
+const requestShadow = require('request.shadow');
 const logger = require('logger');
 const config = require('config');
 
@@ -25,6 +26,7 @@ function status(state) {
     economyModel: state.economyModel,
     health: state.health,
     efficiency: state.efficiency,
+    requests: state.requestShadow ? state.requestShadow.summary : null,
     colonyState: state.colonyState || null
   };
 }
@@ -89,6 +91,7 @@ function run(room, lowCpu) {
 
   state.health = colonyHealth.evaluate(state);
   state.efficiency = colonyEfficiency.evaluate(state);
+  state.requestShadow = requestShadow.produce(state);
   state.colonyState = colonyState.build(state, {
     tick: Game.time,
     bucket: Game.cpu.bucket
