@@ -311,6 +311,68 @@ const energy = require('../game/energy.js');
   assert.equal(energy.shouldInterruptPickupForConsumer(partial), false);
 }
 
+// Measured v0.2.20 live regression: one ready guard must not globally block
+// a useful partial hauler when another critical consumer is uncovered and a
+// third live hauler remains available for hard infrastructure.
+{
+  const worker = makeConsumer('worker-ready-plus-partial', 'worker', 0, 6, false, 2);
+  worker.memory.working = false;
+  const builder = makeConsumer('builder-ready-plus-partial', 'builder', 0, 4, true, 6);
+  builder.memory.working = false;
+
+  const ready = makeHauler('hauler-rpp-ready', {
+    [worker.id]: 1,
+    [builder.id]: 6
+  }, 200);
+  const partial = makeHauler('hauler-rpp-partial', {
+    [worker.id]: 6,
+    [builder.id]: 1
+  }, 50);
+  const reserve = makeHauler('hauler-rpp-reserve', {}, 0);
+
+  room.creeps = [worker, builder, ready, partial, reserve];
+
+  assert.equal(energy._test.selectConsumerGuardHaulers(room).length, 1);
+  assert.equal(energy._test.selectConsumerEarlyDispatchHauler(room).id, partial.id);
+  assert.equal(energy.shouldInterruptPickupForConsumer(partial), true);
+  assert.equal(energy.shouldInterruptPickupForConsumer(reserve), false);
+}
+
+// Infrastructure reserve invariant: with three live haulers and two ready
+// guards already covering the maximum liveHaulers-1 consumer slots, a partial
+// third hauler must not be pulled off pickup even if another critical consumer
+// remains uncovered.
+{
+  const worker = makeConsumer('worker-reserve-cap', 'worker', 0, 6, false, 2);
+  worker.memory.working = false;
+  const builder = makeConsumer('builder-reserve-cap', 'builder', 0, 5, true, 5);
+  builder.memory.working = false;
+  const upgrader = makeConsumer('upgrader-reserve-cap', 'upgrader', 0, 4, false, 8);
+  upgrader.memory.working = false;
+
+  const ready1 = makeHauler('hauler-rc-ready1', {
+    [worker.id]: 1,
+    [builder.id]: 5,
+    [upgrader.id]: 8
+  }, 200);
+  const ready2 = makeHauler('hauler-rc-ready2', {
+    [worker.id]: 5,
+    [builder.id]: 1,
+    [upgrader.id]: 8
+  }, 200);
+  const partial = makeHauler('hauler-rc-partial', {
+    [worker.id]: 8,
+    [builder.id]: 8,
+    [upgrader.id]: 1
+  }, 50);
+
+  room.creeps = [worker, builder, upgrader, ready1, ready2, partial];
+
+  assert.equal(energy._test.selectConsumerGuardHaulers(room).length, 2);
+  assert.equal(energy._test.selectConsumerEarlyDispatchHauler(room), null);
+  assert.equal(energy.shouldInterruptPickupForConsumer(partial), false);
+}
+
 // Single-hauler recovery remains immutable: even a critical consumer cannot
 // pull the sole partial hauler off its normal pickup/infrastructure loop.
 {
