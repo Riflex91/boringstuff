@@ -145,7 +145,10 @@ function upsert(roomName, spec, memoryRoot, game) {
     request.blocked = preserved.blocked;
     if (request.status === STATUS.SATISFIED || request.status === STATUS.EXPIRED || request.status === STATUS.CANCELLED) {
       request.status = STATUS.OPEN;
+      request.createdTick = tick;
       request.progress = { amount: 0, lastProgressTick: null };
+      request.reservations = [];
+      request.blocked = { untilTick: null, reason: null, failureCount: 0 };
     }
   }
 
