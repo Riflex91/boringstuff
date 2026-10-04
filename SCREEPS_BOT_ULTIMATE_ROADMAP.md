@@ -1507,12 +1507,17 @@ Stable implementation interfaces:
 
 `docs/VNEXT_CORE_CONTRACTS.md`
 
+Current-runtime to VNext strangler migration plan:
+
+`docs/VNEXT_MIGRATION_MAP.md`
+
 A new chat working on VNext should read:
 
 1. this roadmap;
 2. `docs/ULTIMATE_AUTONOMY_KNOWLEDGE_BASE.md` for the research and algorithms;
 3. `docs/VNEXT_CORE_CONTRACTS.md` for the authoritative cross-track interfaces;
-4. the current active PR/release evidence relevant to its assigned slice.
+4. `docs/VNEXT_MIGRATION_MAP.md` before replacing any current runtime subsystem;
+5. the current active PR/release evidence relevant to its assigned slice.
 
 Do not repeat external-repo research unless a specific concept needs deeper verification or the source projects have materially changed. Do not redesign an existing core contract casually; version and migrate it if a change is necessary.
 
