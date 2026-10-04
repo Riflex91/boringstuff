@@ -3,7 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { EXPECTED_BOT_VERSION, evaluateLive, evaluateSmoke } from './live-verification-core.mjs';
 import { filterTimestampedLogRecords } from './live-verification-log.mjs';
-import { resolveAutoStart, waitForAutoStart } from './live-verification-wait.mjs';
+import { waitForAutoStart } from './live-verification-wait.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_LOG_DIR = String.raw`C:\Users\hansi\AppData\Local\Screeps\scripts\screeps_newbieland_net___21025\chatgpt\logs`;
@@ -78,13 +78,6 @@ function dedupeEvents(events) {
   return out.sort((a, b) => (Number(a.tick) || 0) - (Number(b.tick) || 0) || (Number(a.jseq) || 0) - (Number(b.jseq) || 0));
 }
 
-function autoStart(events, version, mode, roomName) {
-  const status = resolveAutoStart(events, version, mode, roomName);
-  if (status.fatal) throw new Error(status.fatal);
-  if (!status.ready) throw new Error('No complete live verification window is available yet.');
-  return status.startTick;
-}
-
 function printHuman(result) {
   console.log(`VERIFY ${result.mode.toUpperCase()} ${result.startTick}-${result.endTick}: ${result.outcome}`);
   for (const c of result.checks) console.log(`${c.status.padEnd(5)} ${c.id.padEnd(24)} ${c.message}`);
@@ -96,7 +89,7 @@ let events = dedupeEvents(readNdjson('bot-events-'));
 if (!events.length) throw new Error(`No bot-events-*.ndjson evidence found in ${LOG_DIR}. Run the collector first.`);
 
 let startTick = args.startTick;
-if (startTick === null && args.mode === 'live') {
+if (startTick === null) {
   const waited = await waitForAutoStart({
     mode: args.mode,
     version: args.version,
@@ -106,8 +99,6 @@ if (startTick === null && args.mode === 'live') {
   });
   startTick = waited.startTick;
   events = waited.events;
-} else if (startTick === null) {
-  startTick = autoStart(events, args.version, args.mode, args.room);
 }
 
 const tickCount = args.mode === 'smoke' ? 25 : 100;
