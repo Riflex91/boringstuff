@@ -291,17 +291,29 @@ function snapshot(roomName, memoryRoot) {
   const byDomain = {};
   let reservationCount = 0;
   let blocked = 0;
+  let open = 0;
+  let terminal = 0;
   for (const request of requests) {
     byStatus[request.status] = (byStatus[request.status] || 0) + 1;
-    byDomain[request.domain] = (byDomain[request.domain] || 0) + 1;
     reservationCount += request.reservations.length;
+    const isTerminal = request.status === STATUS.SATISFIED ||
+      request.status === STATUS.EXPIRED ||
+      request.status === STATUS.CANCELLED;
+    if (isTerminal) {
+      terminal += 1;
+      continue;
+    }
+    byDomain[request.domain] = (byDomain[request.domain] || 0) + 1;
     if (request.status === STATUS.BLOCKED) blocked += 1;
+    else open += 1;
   }
   return {
     schemaVersion: SCHEMA_VERSION,
     authority: 'SHADOW',
-    total: requests.length,
-    open: (byStatus.OPEN || 0) + (byStatus.RESERVED || 0) + (byStatus.IN_PROGRESS || 0),
+    total: open + blocked,
+    stored: requests.length,
+    terminal,
+    open,
     blocked,
     reservationCount,
     byStatus,
