@@ -59,30 +59,32 @@ function produce(state, memoryRoot, game) {
     }, memoryRoot, game);
   }
 
-  if (Number.isFinite(model.harvesterWorkDeficit) && model.harvesterWorkDeficit > 0) {
+  if (Number.isFinite(model.recommendedHarvesterWorkParts) && model.recommendedHarvesterWorkParts > 0) {
+    const currentDeficit = Math.max(0, Number(model.harvesterWorkDeficit) || 0);
     upsertActive(active, room, {
       dedupeKey: 'economy:harvest-capacity',
       domain: 'economy',
       kind: 'HARVEST_CAPACITY',
       target: { roomName: room },
-      demand: { capability: 'workHarvest', amount: model.harvesterWorkDeficit, minimumUsefulAmount: 1 },
-      priority: { base: 95, urgency: Math.min(100, model.harvesterWorkDeficit * 15), strategicClass: 'CORE_ECONOMY' },
-      utility: { current: model.harvesterWorkDeficit, marginalModel: 'LINEAR' },
-      evidence: { source: 'economy.model.harvesterWorkDeficit', hypothesis: 'mirror legacy mining capacity deficit' },
+      demand: { capability: 'workHarvest', amount: model.recommendedHarvesterWorkParts, minimumUsefulAmount: 1 },
+      priority: { base: 95, urgency: Math.min(100, currentDeficit * 15), strategicClass: 'CORE_ECONOMY' },
+      utility: { current: currentDeficit, marginalModel: 'LINEAR' },
+      evidence: { source: 'economy.model.recommendedHarvesterWorkParts', hypothesis: 'publish total mining capacity requirement; E2 computes future deficit' },
       shadow: true
     }, memoryRoot, game);
   }
 
-  if (Number.isFinite(model.haulerCarryDeficit) && model.haulerCarryDeficit > 0) {
+  if (Number.isFinite(model.recommendedHaulerCarryParts) && model.recommendedHaulerCarryParts > 0) {
+    const currentDeficit = Math.max(0, Number(model.haulerCarryDeficit) || 0);
     upsertActive(active, room, {
       dedupeKey: 'logistics:haul-capacity',
       domain: 'logistics',
       kind: 'HAUL_CAPACITY',
       target: { roomName: room },
-      demand: { capability: 'carry', amount: model.haulerCarryDeficit, minimumUsefulAmount: 1 },
-      priority: { base: 90, urgency: Math.min(100, model.haulerCarryDeficit * 10), strategicClass: 'CORE_ECONOMY' },
-      utility: { current: model.haulerCarryDeficit, marginalModel: 'LINEAR' },
-      evidence: { source: 'economy.model.haulerCarryDeficit', hypothesis: 'mirror legacy transport capacity deficit' },
+      demand: { capability: 'carry', amount: model.recommendedHaulerCarryParts, minimumUsefulAmount: 1 },
+      priority: { base: 90, urgency: Math.min(100, currentDeficit * 10), strategicClass: 'CORE_ECONOMY' },
+      utility: { current: currentDeficit, marginalModel: 'LINEAR' },
+      evidence: { source: 'economy.model.recommendedHaulerCarryParts', hypothesis: 'publish total transport capacity requirement; E2 computes future deficit' },
       shadow: true
     }, memoryRoot, game);
   }
