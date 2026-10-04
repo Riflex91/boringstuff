@@ -212,6 +212,32 @@ function consumerRefillEnergyNeeded(creep) {
   return Math.max(0, consumerRefillTargetEnergy(creep) - energyAmount(creep));
 }
 
+function consumerResumeTargetEnergy(creep) {
+  const refillTarget = consumerRefillTargetEnergy(creep);
+  const carryUnit = typeof CARRY_CAPACITY !== 'undefined' ? CARRY_CAPACITY : 50;
+  return Math.min(refillTarget, carryUnit);
+}
+
+function consumerCanResumeWork(creep) {
+  if (!isConsumer(creep)) return false;
+  const resumeTarget = consumerResumeTargetEnergy(creep);
+  return resumeTarget > 0 && energyAmount(creep) >= resumeTarget;
+}
+
+function consumerUsefulDeliveryEnergyNeeded(creep) {
+  const refillNeeded = consumerRefillEnergyNeeded(creep);
+  if (refillNeeded <= 0) return 0;
+
+  const waiting = creep.memory.waitingEnergyTicks || 0;
+  const stalled = !creep.memory.working ||
+    energyAmount(creep) === 0 ||
+    waiting > 0 ||
+    !!creep.memory.logisticsFallback;
+
+  if (!stalled) return refillNeeded;
+  return Math.max(0, consumerResumeTargetEnergy(creep) - energyAmount(creep));
+}
+
 function consumerHasLowRunway(creep) {
   if (!isConsumer(creep) || !creep.memory.working || freeEnergyCapacity(creep) <= 0) return false;
   const carried = energyAmount(creep);
@@ -316,17 +342,21 @@ function selectConsumerEarlyDispatchHauler(room) {
   });
   if (!critical.length) return null;
 
-  // A partial dispatch is useful only if it can complete the refill target in
-  // one transfer. This prevents the 50-energy oscillation seen with 2-WORK
-  // builders: 50 energy lasts only 5 build ticks, shorter than the configured
-  // 12-tick logistics wait horizon.
-  const requiredRefill = critical.reduce((maxNeeded, consumer) => {
-    return Math.max(maxNeeded, consumerRefillEnergyNeeded(consumer));
-  }, 0);
+  // A stalled consumer only needs enough energy to resume a meaningful work
+  // burst. Low-runway hysteresis keeps the refill request active afterwards
+  // until the full derived refill target is reached, so resuming at one CARRY
+  // unit no longer recreates the old "deliver 50, disappear from the queue"
+  // oscillation. For already-working low-runway consumers, the useful amount
+  // remains the full outstanding refill need.
+  const usefulNeeds = critical
+    .map(consumerUsefulDeliveryEnergyNeeded)
+    .filter(need => need > 0);
+  if (!usefulNeeds.length) return null;
+  const requiredUsefulDelivery = Math.min.apply(null, usefulNeeds);
   const partial = haulers.filter(h =>
     !haulerReadyToDeliver(h) &&
     energyAmount(h) > 0 &&
-    energyAmount(h) >= requiredRefill
+    energyAmount(h) >= requiredUsefulDelivery
   );
   if (!partial.length) return null;
 
@@ -437,17 +467,21 @@ function deliverToConsumer(creep) {
     return true;
   }
   if (rc === OK) {
-    // The first v0.2.20 iteration waited for a completely full consumer; the
-    // second resumed after any positive transfer. Live evidence showed that
-    // both extremes oscillate. Resume only after the consumer reaches a refill
-    // target derived from its WORK burn and the existing logistics wait SLA.
-    const refillTarget = consumerRefillTargetEnergy(target);
-    if (refillTarget > 0 && energyAmount(target) >= refillTarget) {
+    // Resume after one meaningful logistics quantum, not only after a full
+    // refill. Unlike the rejected "any positive transfer" iteration, the
+    // low-runway request remains active below the derived refill target, so a
+    // resumed consumer stays eligible for top-up instead of disappearing from
+    // the delivery queue until it becomes empty again.
+    if (consumerCanResumeWork(target)) {
       target.memory.working = true;
       target.memory.waitingEnergyTicks = 0;
       target.memory.logisticsFallback = false;
-      clearConsumerTarget(creep);
     }
+
+    // Travel is complete after a successful transfer. Release the reservation
+    // even when the consumer still needs top-up so another hauler may finish
+    // the refill without being blocked by a stale assignment.
+    clearConsumerTarget(creep);
     return true;
   }
 
@@ -482,6 +516,7 @@ module.exports = {
   isSourceContainer,
   consumerNeedsDelivery,
   isCriticalConsumerRequest,
+  consumerCanResumeWork,
   shouldPrioritizeConsumer,
   shouldInterruptPickupForConsumer,
   clearConsumerTarget,
@@ -492,6 +527,8 @@ module.exports = {
     consumerRefillTargetEnergy,
     consumerRefillRequestThresholdEnergy,
     consumerRefillEnergyNeeded,
+    consumerResumeTargetEnergy,
+    consumerUsefulDeliveryEnergyNeeded,
     consumerHasLowRunway,
     selectConsumerTarget,
     currentConsumerTarget,
