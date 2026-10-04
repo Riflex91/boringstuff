@@ -219,6 +219,7 @@ function planRequirement(state, request, slots, planned, game) {
   }
 
   const proposals = [];
+  let lastRemaining = initialDeficit;
   let guard = 0;
   while (guard++ < MAX_PROPOSALS_PER_REQUIREMENT) {
     const slot = earliestSlot(slots);
@@ -233,7 +234,7 @@ function planRequirement(state, request, slots, planned, game) {
       if (item.sourceDeficitId === deficit.id && item.predicted.productiveStartTick <= tick + horizon) priorPlanned += item.capacityDelivered;
     }
     const remaining = Math.max(0, required - surviving - arrivingSpawning - priorPlanned);
-    if (remaining <= 0) break;
+    if (remaining <= 0) { lastRemaining = 0; break; }
 
     const index = proposals.length;
     const productiveLifetime = Math.max(0, (typeof CREEP_LIFE_TIME !== 'undefined' ? CREEP_LIFE_TIME : 1500) - travelTicks);
@@ -267,11 +268,12 @@ function planRequirement(state, request, slots, planned, game) {
     proposals.push(proposal);
     planned.push(proposal);
     deficit.proposedCapacity += proposal.capacityDelivered;
+    lastRemaining = Math.max(0, remaining - proposal.capacityDelivered);
     slot.availableIn += spawnTicks;
   }
 
   deficit.queued = 0;
-  deficit.uncoveredAfterPlan = Math.max(0, deficit.deficit - deficit.proposedCapacity);
+  deficit.uncoveredAfterPlan = lastRemaining;
   if (guard > MAX_PROPOSALS_PER_REQUIREMENT && deficit.uncoveredAfterPlan > 0) deficit.unresolvedReason = 'PROPOSAL_LIMIT';
   return { deficit, proposals };
 }
@@ -289,11 +291,13 @@ function plan(state, requests, game) {
   let proposedCapacity = 0;
   let uncovered = 0;
   let preSpawnCount = 0;
+  const proposedByRole = {};
   for (const deficit of deficits) {
     proposedCapacity += deficit.proposedCapacity || 0;
     uncovered += deficit.uncoveredAfterPlan || 0;
     if (deficit.preSpawn && deficit.proposedCapacity > 0) preSpawnCount += 1;
   }
+  for (const request of planned) proposedByRole[request.role] = (proposedByRole[request.role] || 0) + 1;
 
   return {
     schemaVersion: SCHEMA_VERSION,
@@ -310,6 +314,7 @@ function plan(state, requests, game) {
       preSpawnCount,
       proposedCapacity: Math.round(proposedCapacity * 100) / 100,
       uncoveredAfterPlan: Math.round(uncovered * 100) / 100,
+      proposedByRole,
       bodySource: 'LEGACY_BODY_ADAPTER'
     }
   };
@@ -332,6 +337,7 @@ function deferredSnapshot(reason) {
       preSpawnCount: 0,
       proposedCapacity: 0,
       uncoveredAfterPlan: 0,
+      proposedByRole: {},
       bodySource: 'LEGACY_BODY_ADAPTER'
     }
   };
