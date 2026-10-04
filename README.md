@@ -43,6 +43,8 @@ npm run verify:smoke
 npm run verify:live
 ```
 
+`verify:live` now waits automatically when the first valid post-deploy 100-tick window is not complete yet. It reloads collector evidence every 5 seconds and runs the gate as soon as a complete `STATUS_SNAPSHOT` window becomes available. Keep the collector running; press `Ctrl+C` only if you want to cancel the wait.
+
 Expected runtime version after deployment: `0.2.18-node18`.
 
 ---

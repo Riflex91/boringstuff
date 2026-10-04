@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { EXPECTED_BOT_VERSION, evaluateLive, evaluateSmoke } from './live-verification-core.mjs';
 import { filterTimestampedLogRecords } from './live-verification-log.mjs';
+import { resolveAutoStart, waitForAutoStart } from './live-verification-wait.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_LOG_DIR = String.raw`C:\Users\hansi\AppData\Local\Screeps\scripts\screeps_newbieland_net___21025\chatgpt\logs`;
@@ -10,7 +11,7 @@ const LOG_DIR = process.env.SCREEPS_LOG_DIR || DEFAULT_LOG_DIR;
 const ROOM = process.env.SCREEPS_ROOM || 'E8N1';
 
 function usage(code = 0) {
-  console.log(`\nLive Verification Harness v0.2.17\n\n  node live-verification.mjs smoke [--start-tick N] [--room E8N1] [--version 0.2.17-node18]\n  node live-verification.mjs live  [--start-tick N] [--room E8N1] [--version 0.2.17-node18]\n\nThe command is read-only. It evaluates existing collector evidence and never mutates Screeps or historical telemetry.\nIf --start-tick is omitted, the latest VERSION_CHANGE to the requested version is used.\n`);
+  console.log(`\nLive Verification Harness v0.2.18\n\n  node live-verification.mjs smoke [--start-tick N] [--room E8N1] [--version 0.2.18-node18]\n  node live-verification.mjs live  [--start-tick N] [--room E8N1] [--version 0.2.18-node18]\n\nThe command is read-only. It evaluates existing collector evidence and never mutates Screeps or historical telemetry.\nIf --start-tick is omitted, the latest VERSION_CHANGE to the requested version is used.\n`);
   process.exit(code);
 }
 
@@ -78,20 +79,10 @@ function dedupeEvents(events) {
 }
 
 function autoStart(events, version, mode, roomName) {
-  const changes = events.filter(e => e?.code === 'VERSION_CHANGE' && (e?.ctx?.to === version || e?.v === version)).sort((a, b) => Number(a.tick) - Number(b.tick));
-  if (!changes.length) throw new Error(`No VERSION_CHANGE to ${version} found. Deploy first or pass --start-tick explicitly.`);
-  const deployTick = Number(changes.at(-1).tick);
-  if (mode === 'smoke') return deployTick + 1;
-
-  const candidates = events
-    .filter(e => e?.code === 'STATUS_SNAPSHOT' && (!e?.v || e.v === version))
-    .map(e => ({ e, last100: e?.ctx?.rooms?.[roomName]?.economy?.last100 }))
-    .filter(x => Number(x.last100?.ticks) >= 100 && Number(x.last100?.startTick) > deployTick && Number(x.last100?.endTick) >= Number(x.last100?.startTick) + 99)
-    .sort((a, b) => Number(a.last100.startTick) - Number(b.last100.startTick));
-  if (!candidates.length) {
-    throw new Error(`No complete 100-tick STATUS_SNAPSHOT window exists after deployment tick ${deployTick}. Keep the collector running, then retry.`);
-  }
-  return Number(candidates[0].last100.startTick);
+  const status = resolveAutoStart(events, version, mode, roomName);
+  if (status.fatal) throw new Error(status.fatal);
+  if (!status.ready) throw new Error('No complete live verification window is available yet.');
+  return status.startTick;
 }
 
 function printHuman(result) {
@@ -101,9 +92,24 @@ function printHuman(result) {
 }
 
 const args = parseArgs(process.argv.slice(2));
-const events = dedupeEvents(readNdjson('bot-events-'));
+let events = dedupeEvents(readNdjson('bot-events-'));
 if (!events.length) throw new Error(`No bot-events-*.ndjson evidence found in ${LOG_DIR}. Run the collector first.`);
-const startTick = args.startTick ?? autoStart(events, args.version, args.mode, args.room);
+
+let startTick = args.startTick;
+if (startTick === null && args.mode === 'live') {
+  const waited = await waitForAutoStart({
+    mode: args.mode,
+    version: args.version,
+    roomName: args.room,
+    loadEvents: () => dedupeEvents(readNdjson('bot-events-')),
+    onWait: message => console.error(message + ' Press Ctrl+C to stop waiting.')
+  });
+  startTick = waited.startTick;
+  events = waited.events;
+} else if (startTick === null) {
+  startTick = autoStart(events, args.version, args.mode, args.room);
+}
+
 const tickCount = args.mode === 'smoke' ? 25 : 100;
 const endTick = startTick + tickCount - 1;
 const inWindow = events.filter(e => Number(e?.tick) >= startTick && Number(e?.tick) <= endTick);
