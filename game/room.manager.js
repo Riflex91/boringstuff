@@ -13,6 +13,7 @@ const requestShadow = require('request.shadow');
 const assignmentShadow = require('assignment.shadow');
 const assignmentEvidence = require('assignment.evidence');
 const capacitySpawnShadow = require('spawn.capacity.shadow');
+const profiler = require('profiler');
 const logger = require('logger');
 const config = require('config');
 
@@ -71,73 +72,102 @@ function maybeWarnUpgraderStall(state) {
 }
 
 function run(room, lowCpu) {
-  const state = stateBuilder.get(room);
-  state.economyMetrics = economyMetrics.observe(state);
-  state.economyModel = economyModel.analyze(state);
-
-  const roomMemory = Memory.rooms[room.name] || (Memory.rooms[room.name] = {});
-  const currentMode = state.economyModel ? state.economyModel.mode : null;
-  if (roomMemory.lastEconomyMode !== undefined && roomMemory.lastEconomyMode !== currentMode) {
-    logger.info('ECONOMY_MODE_CHANGE', 'Economy model changed operating mode', {
-      room: room.name,
-      from: roomMemory.lastEconomyMode,
-      to: currentMode,
-      rcl: state.rcl,
-      sourceContainersReady: state.economyModel ? state.economyModel.sourceContainersReady : null
-    }, { force: true, persist: true, dedupeTicks: 0 });
-  }
-  roomMemory.lastEconomyMode = currentMode;
-  if (roomMemory.lastObservedRcl !== undefined && roomMemory.lastObservedRcl !== state.rcl) {
-    logger.info('RCL_CHANGE', 'Controller level changed', {
-      room: room.name,
-      from: roomMemory.lastObservedRcl,
-      to: state.rcl
-    }, { force: true, persist: true, dedupeTicks: 0 });
-  }
-  roomMemory.lastObservedRcl = state.rcl;
-
-  state.health = colonyHealth.evaluate(state);
-  state.efficiency = colonyEfficiency.evaluate(state);
-  state.requestShadow = requestShadow.produce(state);
-  state.capacitySpawnShadow = lowCpu
-    ? capacitySpawnShadow.deferredSnapshot('LOW_CPU')
-    : capacitySpawnShadow.plan(state, state.requestShadow.requests, Game);
-  state.capacitySpawnShadow.summary.legacyDesired = spawnManager.desired(state);
-
-  state.assignmentShadow = lowCpu
-    ? {
-        assignments: [],
-        unfilled: [],
-        summary: assignmentShadow.deferredSnapshot(state.room.name, 'LOW_CPU')
-      }
-    : assignmentShadow.plan(
-        state.room.name,
-        state.requestShadow.requests,
-        state.creeps,
-        undefined,
-        Game
-      );
-  state.assignmentEvidence = assignmentEvidence.observe(state);
-  if (state.assignmentEvidence.completed) {
-    logger.info('ASSIGNMENT_EVIDENCE_WINDOW', 'Shadow request/assignment evidence window completed', {
-      room: state.room.name,
-      evidence: state.assignmentEvidence.completed
-    }, { force: true, persist: true, dedupeTicks: 0 });
-  }
-  state.colonyState = colonyState.build(state, {
-    tick: Game.time,
-    bucket: Game.cpu.bucket
+  const state = profiler.detailSection('room.state', function() {
+    return stateBuilder.get(room);
   });
 
-  towerManager.run(state);
-  maybeSafeMode(state);
-  maybeWarnUpgraderStall(state);
-  spawnManager.spawnOne(state);
+  profiler.detailSection('room.economy', function() {
+    state.economyMetrics = economyMetrics.observe(state);
+    state.economyModel = economyModel.analyze(state);
 
-  if (!lowCpu && Game.time % config.PLANNER_INTERVAL === 0) planner.plan(state);
+    const roomMemory = Memory.rooms[room.name] || (Memory.rooms[room.name] = {});
+    const currentMode = state.economyModel ? state.economyModel.mode : null;
+    if (roomMemory.lastEconomyMode !== undefined && roomMemory.lastEconomyMode !== currentMode) {
+      logger.info('ECONOMY_MODE_CHANGE', 'Economy model changed operating mode', {
+        room: room.name,
+        from: roomMemory.lastEconomyMode,
+        to: currentMode,
+        rcl: state.rcl,
+        sourceContainersReady: state.economyModel ? state.economyModel.sourceContainersReady : null
+      }, { force: true, persist: true, dedupeTicks: 0 });
+    }
+    roomMemory.lastEconomyMode = currentMode;
+    if (roomMemory.lastObservedRcl !== undefined && roomMemory.lastObservedRcl !== state.rcl) {
+      logger.info('RCL_CHANGE', 'Controller level changed', {
+        room: room.name,
+        from: roomMemory.lastObservedRcl,
+        to: state.rcl
+      }, { force: true, persist: true, dedupeTicks: 0 });
+    }
+    roomMemory.lastObservedRcl = state.rcl;
+
+    state.health = colonyHealth.evaluate(state);
+    state.efficiency = colonyEfficiency.evaluate(state);
+  });
+
+  state.requestShadow = profiler.detailSection('room.requests', function() {
+    return requestShadow.produce(state);
+  });
+
+  state.capacitySpawnShadow = profiler.detailSection('room.capacity-spawn', function() {
+    const snapshot = lowCpu
+      ? capacitySpawnShadow.deferredSnapshot('LOW_CPU')
+      : capacitySpawnShadow.plan(state, state.requestShadow.requests, Game);
+    snapshot.summary.legacyDesired = spawnManager.desired(state);
+    return snapshot;
+  });
+
+  state.assignmentShadow = profiler.detailSection('room.assignment', function() {
+    return lowCpu
+      ? {
+          assignments: [],
+          unfilled: [],
+          summary: assignmentShadow.deferredSnapshot(state.room.name, 'LOW_CPU')
+        }
+      : assignmentShadow.plan(
+          state.room.name,
+          state.requestShadow.requests,
+          state.creeps,
+          undefined,
+          Game
+        );
+  });
+
+  state.assignmentEvidence = profiler.detailSection('room.evidence', function() {
+    const evidence = assignmentEvidence.observe(state);
+    if (evidence.completed) {
+      logger.info('ASSIGNMENT_EVIDENCE_WINDOW', 'Shadow request/assignment evidence window completed', {
+        room: state.room.name,
+        evidence: evidence.completed
+      }, { force: true, persist: true, dedupeTicks: 0 });
+    }
+    return evidence;
+  });
+
+  state.colonyState = profiler.detailSection('room.colony-state', function() {
+    return colonyState.build(state, {
+      tick: Game.time,
+      bucket: Game.cpu.bucket
+    });
+  });
+
+  profiler.detailSection('room.legacy', function() {
+    towerManager.run(state);
+    maybeSafeMode(state);
+    maybeWarnUpgraderStall(state);
+    spawnManager.spawnOne(state);
+  });
+
+  if (!lowCpu && Game.time % config.PLANNER_INTERVAL === 0) {
+    profiler.detailSection('room.planner', function() {
+      planner.plan(state);
+    });
+  }
 
   if (Game.time % config.LOG_HEARTBEAT_INTERVAL === 0) {
-    logger.info('ROOM_HEARTBEAT', 'Room operational snapshot', status(state), { force: true, persist: false, dedupeTicks: 0 });
+    profiler.detailSection('room.heartbeat', function() {
+      logger.info('ROOM_HEARTBEAT', 'Room operational snapshot', status(state), { force: true, persist: false, dedupeTicks: 0 });
+    });
   }
   return state;
 }
