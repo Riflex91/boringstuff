@@ -122,6 +122,21 @@ function upgrade(creep) {
   return rc === OK || rc === ERR_NOT_IN_RANGE;
 }
 
+function liveHaulerCount(room) {
+  return room.find(FIND_MY_CREEPS, {
+    filter: c => !c.spawning && c.memory && c.memory.role === 'hauler'
+  }).length;
+}
+
+function shouldAssistInfrastructure(creep) {
+  // Productive consumers are the recovery logistics reserve, not part of the
+  // normal haul loop. Once two live haulers exist, keep consumer energy on
+  // productive work instead of donating it back to spawn/extensions and then
+  // waiting for another delivery. If logistics loses redundancy, immediately
+  // restore the historical infrastructure-first behavior.
+  return liveHaulerCount(creep.room) < 2;
+}
+
 function refill(creep) { return energy.deliver(creep); }
 
 function run(creep) {
@@ -138,7 +153,7 @@ function run(creep) {
     return;
   }
 
-  if (refill(creep)) return;
+  if (shouldAssistInfrastructure(creep) && refill(creep)) return;
 
   if (role === 'builder') {
     if (build(creep)) return;
@@ -158,4 +173,4 @@ function run(creep) {
   upgrade(creep);
 }
 
-module.exports = { run, _test: { acquireWorkEnergy, needsEnergy } };
+module.exports = { run, _test: { acquireWorkEnergy, needsEnergy, liveHaulerCount, shouldAssistInfrastructure } };

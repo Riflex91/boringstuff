@@ -4,7 +4,8 @@ Canonical repository: `Riflex91/boringstuff`
 
 ## Canonical source baseline
 
-- Source baseline: **v0.2.16-node18**
+- Seed baseline: **v0.2.16-node18**
+- Current verified `main`: **v0.2.18-node18**
 - Runtime target: **Node.js 18.20.4**
 - Runtime branch: `chatgpt`
 - Primary room: `E8N1`
@@ -104,47 +105,78 @@ Observed result:
 - Dedicated/theoretical mining `20 e/t`
 - 3 haulers / 16 CARRY / 12 required
 
+### v0.2.17 — VERIFIED / CLOSED
+
+Live Verification Harness. Tools/observability only; no colony behavior change.
+
+- `npm run verify:smoke` — 25-tick safety gate.
+- `npm run verify:live` — complete 100-tick performance gate.
+- Timestamp-aware multiline error parsing separates bot/runtime failures from collector faults.
+- Collector faults are reported independently as `collector-health`.
+- Incomplete evidence windows cannot be mistaken for completed passes.
+- Installer mirrors `game/*.js` under the installed test tree while preserving the flat Screeps runtime layout.
+
+Verified live evidence on Node.js `18.20.4`:
+
+- smoke ticks `3682644–3682668`: `PASS=8 / WATCH=1 / FAIL=0`;
+- live ticks `3682701–3682800`: `PASS=12 / WATCH=3 / FAIL=0`;
+- runtime errors, collector health, CPU/bucket, mining, hard-stall, telemetry continuity, hauler capacity, controller progress, and construction progress all passed in the full live gate;
+- remaining WATCH findings: consumer self-supply fallback, productive throughput below mining capacity, and Efficiency `INEFFICIENT`; these are optimization findings, not safety failures.
+
+### v0.2.18 — VERIFIED / CLOSED
+
+Dedicated Productive Work.
+
+- With two or more live haulers, `builder`, `worker`, and `repairer` creeps keep carried energy for productive work instead of refilling spawn/extensions.
+- With zero or one live hauler, the historical infrastructure-first recovery path remains unchanged.
+- Upgrader behavior is unchanged.
+- Mining, hauling-capacity models, spawn counts, defense, planning, and expansion are unchanged.
+- `npm run verify:live` now waits automatically for the first complete post-deploy 100-tick window, polling collector evidence every 5 seconds.
+
+Verified live window: ticks `3683401–3683500`.
+
+Observed gate result:
+
+- `PASS=13 / WATCH=2 / FAIL=0`
+- runtime errors: PASS
+- collector health: PASS
+- CPU/bucket: PASS
+- mining active: PASS
+- hard stall: PASS
+- telemetry continuity: PASS
+- hauler capacity: PASS
+- controller progress: PASS
+- construction progress: PASS
+- consumer supply: WATCH — consumers were waiting/critical, but `consumerFallbackCount` remained `0`
+- productive throughput: WATCH — throughput still trails mining capacity
+- efficiency status: `EFFICIENT`
+
+The behavior target succeeded: self-supply fallback was eliminated in the verified live window while all hard safety gates remained green.
+
 ## Next release boundary
 
-The next intended release is **v0.2.17-node18 — Live Verification Harness**.
+v0.2.18 is live-verified and closes the measured consumer-energy churn issue. Do **not** immediately increase mining or hauling capacity: both were healthy in the verification window.
 
-It is a **TOOLS-ONLY / OBSERVABILITY** release. It must not alter colony, spawn, economy, logistics, role, room-planning, or strategic decision behavior.
+The next behavior release is intentionally **not selected yet**. Fresh evidence should first explain the remaining two optimization signals:
 
-Intended commands:
+- some consumers still become waiting/critical even though fallback stays at zero;
+- productive throughput still trails available mining capacity.
 
-- `npm run verify:smoke` — 25-tick safety smoke window.
-- `npm run verify:live` — 100-tick performance window.
-
-Expected gate outcomes: `PASS`, `WATCH`, `FAIL`.
-
-Smoke checks should cover runtime version, runtime errors, CPU/bucket, mining active, no hard spawn/economy stall, and telemetry continuity.
-
-Live checks should cover hauler deficit, consumer fallback/critical/waiting, controller/construction progress, productive throughput, telemetry continuity, CPU/bucket, runtime errors, and hard stalls.
-
-Policy:
-
-- `UNDERUTILIZED` alone must not block progression.
-- Optimization findings produce `WATCH`.
-- Safety/runtime/stall failures produce `FAIL`.
-- A behavior release may follow only after smoke and the full 100-tick live gate have passed without hard failure.
-
-A previously reconstructed v0.2.17 candidate existed outside this repository, but it is **not** the canonical original source and must not silently replace this v0.2.16 baseline.
+The next change should therefore be derived from additional telemetry that distinguishes delivery latency, consumer work-capacity limits, construction mix, and controller demand before changing creep counts or body sizes.
 
 ## Current strategic interpretation
 
-`E8N1` is at RCL2 with two sources and both source containers completed. Economy mode is container logistics.
+`E8N1` remains an RCL2 two-source colony in container-logistics mode. The verified v0.2.18 window confirms:
 
-Current verified signals indicate the mining side is no longer the primary bottleneck:
+- dedicated mining is active;
+- modeled hauler capacity is sufficient;
+- consumer fallback remained at zero;
+- telemetry continuity is healthy;
+- CPU/bucket and hard-stall gates are clean;
+- controller and construction both progress;
+- Efficiency improved to `EFFICIENT`.
 
-- dedicated/theoretical mining is about `20 e/t`;
-- hauling is sufficient;
-- consumer starvation is resolved;
-- energy is often capped;
-- spawn can be idle;
-- productive throughput was measured around `14.8 e/t`;
-- Efficiency can report `UNDERUTILIZED` while Health remains `HEALTHY`.
-
-Do **not** blindly spawn more creeps from this signal. After v0.2.17 live verification, use fresh telemetry to determine whether the next behavior change should target productive consumer capacity, Builder/Upgrader sizing, dynamic demand, or RCL3/RCL4 transition behavior.
+The remaining inefficiency is narrower than before: consumers can still become waiting/critical, and aggregate productive throughput still trails mining capacity, but this no longer escalates into self-supply fallback. The next release should measure that residual latency/work-capacity gap before changing fleet size or role bodies.
 
 ## Development invariants
 

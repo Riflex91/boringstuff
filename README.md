@@ -1,3 +1,69 @@
+# Screeps Autonomous Bot v0.2.18-node18
+
+Canonical local repository:
+
+`C:\Users\hansi\AppData\Local\Screeps\scripts\screeps_newbieland_net___21025\boringstuff`
+
+Installed Screeps runtime:
+
+`C:\Users\hansi\AppData\Local\Screeps\scripts\screeps_newbieland_net___21025\chatgpt`
+
+## v0.2.18 – Dedicated Productive Work
+
+The verified v0.2.17 live window passed every hard safety gate but retained three optimization signals: consumer self-supply fallback, productive throughput below mining capacity, and `INEFFICIENT` colony efficiency. Mining and modeled hauler capacity were already healthy.
+
+The remaining churn is in productive consumers. Builders/workers/repairers currently refill spawn/extensions before doing their own work. With redundant haulers this can send a consumer's carried energy back into infrastructure, leave the consumer empty, and then require a hauler to deliver energy back to the same productive layer.
+
+### Behavior change
+
+- with two or more live haulers, builders/workers/repairers keep carried energy for productive work;
+- with zero or one live hauler, the historical infrastructure-first recovery path remains unchanged;
+- upgrader behavior is unchanged;
+- mining, hauling capacity models, spawn counts, defense, planning, and expansion are unchanged.
+
+### Verification
+
+The regression suite explicitly checks both sides of the invariant: two-hauler colonies skip consumer infrastructure assist, while one-hauler recovery still refills infrastructure first. The standard v0.2.18 acceptance path is:
+
+```powershell
+cd "C:\Users\hansi\AppData\Local\Screeps\scripts\screeps_newbieland_net___21025\boringstuff"
+powershell -ExecutionPolicy Bypass -File .\install.ps1
+cd tools
+npm install
+npm test
+npm run doctor
+npm run deploy
+npm run logs
+```
+
+Then, from a second PowerShell window in the installed runtime tools directory:
+
+```powershell
+npm run verify:smoke
+npm run verify:live
+```
+
+`verify:live` now waits automatically when the first valid post-deploy 100-tick window is not complete yet. It reloads collector evidence every 5 seconds and runs the gate as soon as a complete `STATUS_SNAPSHOT` window becomes available. Keep the collector running; press `Ctrl+C` only if you want to cancel the wait.
+
+Expected runtime version after deployment: `0.2.18-node18`.
+
+### Live verification result
+
+Verified 100-tick live window: `3683401–3683500`.
+
+- result: `PASS=13 / WATCH=2 / FAIL=0`
+- consumer fallback remained at `0`
+- hauler capacity met the modeled requirement
+- controller and construction progress passed
+- Efficiency status improved to `EFFICIENT`
+- remaining WATCH signals: consumer waiting/critical without fallback, and productive throughput below mining capacity
+
+v0.2.18 is therefore **VERIFIED / CLOSED**. The remaining WATCH findings are optimization evidence for a later release, not blockers for this one.
+
+---
+
+## Historical documentation from v0.2.16 and earlier
+
 # Screeps Autonomous Bot v0.2.16-node18
 
 Target path:

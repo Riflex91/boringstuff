@@ -11,6 +11,18 @@ const require = createRequire(import.meta.url);
 
 global.RESOURCE_ENERGY = 'energy';
 global.FIND_MY_CREEPS = 1;
+global.FIND_MY_CONSTRUCTION_SITES = 2;
+global.FIND_STRUCTURES = 3;
+global.STRUCTURE_SPAWN = 'spawn';
+global.STRUCTURE_EXTENSION = 'extension';
+global.STRUCTURE_CONTAINER = 'container';
+global.STRUCTURE_TOWER = 'tower';
+global.STRUCTURE_STORAGE = 'storage';
+global.STRUCTURE_LINK = 'link';
+global.STRUCTURE_TERMINAL = 'terminal';
+global.STRUCTURE_ROAD = 'road';
+global.STRUCTURE_RAMPART = 'rampart';
+global.STRUCTURE_WALL = 'wall';
 global.OK = 0;
 global.ERR_NOT_IN_RANGE = -9;
 global.ERR_FULL = -8;
@@ -24,11 +36,11 @@ function makeStore(capacity, energy) {
   return {
     energy,
     getFreeCapacity(resource) {
-      assert.equal(resource, RESOURCE_ENERGY);
+      if (resource !== undefined) assert.equal(resource, RESOURCE_ENERGY);
       return capacity - this.energy;
     },
     getCapacity(resource) {
-      assert.equal(resource, RESOURCE_ENERGY);
+      if (resource !== undefined) assert.equal(resource, RESOURCE_ENERGY);
       return capacity;
     }
   };
@@ -36,9 +48,14 @@ function makeStore(capacity, energy) {
 
 const room = {
   creeps: [],
+  sites: [],
+  structures: [],
   find(type, opts) {
-    assert.equal(type, FIND_MY_CREEPS);
-    const list = this.creeps.slice();
+    let list;
+    if (type === FIND_MY_CREEPS) list = this.creeps.slice();
+    else if (type === FIND_MY_CONSTRUCTION_SITES) list = this.sites.slice();
+    else if (type === FIND_STRUCTURES) list = this.structures.slice();
+    else throw new Error(`unexpected find type: ${type}`);
     return opts && opts.filter ? list.filter(opts.filter) : list;
   }
 };
@@ -49,8 +66,12 @@ function makeConsumer(id, role, energy, waiting = 0, fallback = false, range = 5
     room,
     memory: { role, waitingEnergyTicks: waiting, logisticsFallback: fallback },
     store: makeStore(100, energy),
-    pos: { range },
-    spawning: false
+    pos: {
+      range,
+      findClosestByPath(list) { return Array.isArray(list) ? (list[0] || null) : null; }
+    },
+    spawning: false,
+    moveTo() {}
   };
   objects.set(id, creep);
   return creep;
@@ -237,6 +258,43 @@ const energy = require('../game/energy.js');
   assert.deepEqual(calls, ['infrastructure', 'clear']);
 
   Object.assign(energy, original);
+}
+
+
+// v0.2.18: once logistics has two live haulers, productive consumers stop
+// donating their own work energy back into spawn/extensions. This removes a
+// measured churn loop where a builder/worker would refill infrastructure, go
+// empty, wait for the same energy to be hauled back, and sometimes enter
+// self-supply fallback. With only one hauler, the historical recovery behavior
+// remains infrastructure-first.
+{
+  const roleWorker = require('../game/role.worker.js');
+  const builder = makeConsumer('builder-dedicated-work', 'builder', 50, 0, false, 2);
+  builder.memory.working = true;
+  const hauler1 = makeHauler('hauler-dw1');
+  const hauler2 = makeHauler('hauler-dw2');
+  room.creeps = [builder, hauler1, hauler2];
+  room.sites = [{ id: 'site-dw', structureType: STRUCTURE_EXTENSION, pos: {} }];
+
+  assert.equal(roleWorker._test.liveHaulerCount(room), 2);
+  assert.equal(roleWorker._test.shouldAssistInfrastructure(builder), false);
+
+  const originalDeliver = energy.deliver;
+  const calls = [];
+  energy.deliver = () => { calls.push('infrastructure'); return true; };
+  builder.build = () => { calls.push('build'); return OK; };
+  roleWorker.run(builder);
+  assert.deepEqual(calls, ['build']);
+
+  calls.length = 0;
+  room.creeps = [builder, hauler1];
+  assert.equal(roleWorker._test.liveHaulerCount(room), 1);
+  assert.equal(roleWorker._test.shouldAssistInfrastructure(builder), true);
+  roleWorker.run(builder);
+  assert.deepEqual(calls, ['infrastructure']);
+
+  energy.deliver = originalDeliver;
+  room.sites = [];
 }
 
 console.log('consumer supply tests passed');
