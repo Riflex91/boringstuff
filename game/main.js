@@ -158,7 +158,7 @@ module.exports.loop = function() {
       minimumInterval: config.INTEL_INTERVAL,
       freshnessRequirement: config.INTEL_INTERVAL
     }, function() {
-      worldIntel.observeVisibleRooms();
+      profiler.section('world-intel', function() { worldIntel.observeVisibleRooms(); });
     }, schedulerContext);
 
     processScheduler.run({
