@@ -122,44 +122,73 @@ const energy = require('../game/energy.js');
   assert.equal(partial.memory.consumerTargetId, undefined);
 }
 
-// An empty 2-WORK construction consumer needs 100 energy to reach the refill
-// target. A 50-energy partial hauler must not break pickup early, because that
-// would recreate the 5-tick work burst seen in the rejected live iteration.
-// A 100-energy partial hauler is still below the normal 150-energy delivery
-// threshold but is sufficient for the target, so it may dispatch.
+// An empty 2-WORK construction consumer still has a 100-energy refill target,
+// but one CARRY unit is enough to resume a useful work burst. The low-runway
+// request remains active at 50 energy, so a second hauler may top the consumer
+// up instead of waiting for it to become empty again.
 {
-  const consumer = makeConsumer('worker-empty-critical', 0, 4, false, false);
-  const short = makeHauler('hauler-short', 50);
+  const consumer = makeConsumer('worker-empty-critical', 0, 4, true, false);
+  const partial = makeHauler('hauler-short', 50);
   const empty = makeHauler('hauler-empty-2', 0);
-  room.creeps = [consumer, short, empty];
+  room.creeps = [consumer, partial, empty];
 
   assert.equal(energy._test.consumerRefillTargetEnergy(consumer), 100);
+  assert.equal(energy._test.consumerResumeTargetEnergy(consumer), 50);
   assert.equal(energy._test.consumerRefillEnergyNeeded(consumer), 100);
-  assert.equal(energy._test.selectConsumerEarlyDispatchHauler(room), null);
-  assert.equal(energy.shouldInterruptPickupForConsumer(short), false);
+  assert.equal(energy._test.consumerUsefulDeliveryEnergyNeeded(consumer), 50);
+  assert.equal(energy._test.selectConsumerEarlyDispatchHauler(room).id, partial.id);
+  assert.equal(energy.shouldInterruptPickupForConsumer(partial), true);
 
-  const sufficient = makeHauler('hauler-sufficient', 100);
-  room.creeps = [consumer, sufficient, empty];
-  assert.equal(energy._test.haulerReadyToDeliver(sufficient), false);
-  assert.equal(energy._test.selectConsumerEarlyDispatchHauler(room).id, sufficient.id);
-  assert.equal(energy.shouldInterruptPickupForConsumer(sufficient), true);
+  partial.memory.consumerTargetId = consumer.id;
+  assert.equal(energy.deliverToConsumer(partial), true);
+  assert.equal(consumer.store.energy, 50);
+  assert.equal(consumer.memory.working, true);
+  assert.equal(consumer.memory.waitingEnergyTicks, 0);
+  assert.equal(consumer.memory.logisticsFallback, false);
+  assert.equal(partial.memory.consumerTargetId, undefined);
+  assert.equal(energy.consumerNeedsDelivery(consumer), true);
+  assert.equal(energy.isCriticalConsumerRequest(consumer), true);
 }
 
-// Even if an undersized transfer occurs through another path, it must not
-// prematurely clear waiting/fallback. State is released only after the derived
-// refill target is reached.
+// A transfer below one useful work burst must not clear fallback, but its
+// completed travel reservation must be released so another hauler can help.
 {
   const consumer = makeConsumer('worker-undersized-transfer', 0, 5, true, false);
-  const short = makeHauler('hauler-undersized-transfer', 50);
+  const short = makeHauler('hauler-undersized-transfer', 20);
   short.memory.consumerTargetId = consumer.id;
   room.creeps = [consumer, short];
 
   assert.equal(energy.deliverToConsumer(short), true);
-  assert.equal(consumer.store.energy, 50);
+  assert.equal(consumer.store.energy, 20);
   assert.equal(consumer.memory.working, false);
   assert.equal(consumer.memory.waitingEnergyTicks, 5);
   assert.equal(consumer.memory.logisticsFallback, true);
-  assert.equal(short.memory.consumerTargetId, consumer.id);
+  assert.equal(short.memory.consumerTargetId, undefined);
+}
+
+
+// role.worker must shorten fallback residency only when live logistics exists.
+// At one CARRY unit, work resumes and the low-runway request remains active;
+// without a hauler, historical full-carry self-supply behavior is preserved.
+{
+  const roleWorker = require('../game/role.worker.js');
+
+  const consumer = makeConsumer('worker-fallback-resume', 50, 0, true, false);
+  const hauler1 = makeHauler('hauler-fallback-resume-1', 0);
+  const hauler2 = makeHauler('hauler-fallback-resume-2', 0);
+  room.creeps = [consumer, hauler1, hauler2];
+
+  assert.equal(roleWorker._test.needsEnergy(consumer), false);
+  assert.equal(consumer.memory.working, true);
+  assert.equal(consumer.memory.logisticsFallback, false);
+  assert.equal(consumer.memory.waitingEnergyTicks, 0);
+  assert.equal(energy.consumerNeedsDelivery(consumer), true);
+
+  const solo = makeConsumer('worker-fallback-solo', 50, 0, true, false);
+  room.creeps = [solo];
+  assert.equal(roleWorker._test.needsEnergy(solo), true);
+  assert.equal(solo.memory.working, false);
+  assert.equal(solo.memory.logisticsFallback, true);
 }
 
 console.log('consumer refill hysteresis tests passed');
