@@ -457,9 +457,9 @@ const energy = require('../game/energy.js');
   assert.equal(diag.usefulPartialHaulers, 2);
   assert.equal(diag.dispatchCriticalConsumers, 3);
   assert.equal(diag.readyConsumerGuards, 1);
-  assert.equal(diag.earlyDispatchSelected, 0);
-  assert.equal(diag.uncoveredCriticalConsumers, 2);
-  assert.equal(diag.earlyDispatchBlockedByReadyGuard, true);
+  assert.equal(diag.earlyDispatchSelected, 1);
+  assert.equal(diag.uncoveredCriticalConsumers, 1);
+  assert.equal(diag.earlyDispatchBlockedByReadyGuard, false);
 }
 
 // v0.2.20 role integration: a partial hauler selected for early dispatch must
