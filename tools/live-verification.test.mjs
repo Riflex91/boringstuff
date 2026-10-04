@@ -11,19 +11,13 @@ function baseRoom(overrides = {}) {
         controllerProgress: 180,
         constructionProgress: 1300,
         productiveFlow: {
-          consumerSupply: {
-            consumerTicks: 400,
-            waitingConsumerTicks: 20,
-            criticalConsumerTicks: 20,
-            fallbackConsumerTicks: 0
-          },
-          workCapacity: {
-            averageConstructionCapacityPerTick: 15,
-            averageDedicatedControllerCapacityPerTick: 3
-          },
-          actualThroughput: {
-            totalPerTick: 14.8
-          }
+          consumerTicks: 400,
+          waitingConsumerTicks: 20,
+          criticalConsumerTicks: 20,
+          fallbackConsumerTicks: 0,
+          averageConstructionCapacityPerTick: 15,
+          averageDedicatedControllerCapacityPerTick: 3,
+          actualProductiveThroughputPerTick: 14.8
         }
       }
     },
@@ -70,6 +64,7 @@ function evidence(start = 1000) {
 {
   const r = evaluateLive({ events: evidence(), startTick: 1000, nodeVersion: '18.20.4' });
   assert.equal(r.outcome, 'WATCH');
+  assert.equal(r.checks.find(c => c.id === 'productive-attribution').status, 'PASS');
   assert.equal(r.checks.find(c => c.id === 'productive-throughput').status, 'WATCH');
   assert.equal(r.checks.find(c => c.id === 'efficiency-status').status, 'WATCH');
   assert.equal(r.counts.fail, 0);
@@ -162,7 +157,9 @@ function evidence(start = 1000) {
   delete rows.at(-1).ctx.rooms.E8N1.economy.last100.productiveFlow;
   const r = evaluateLive({ events: rows, startTick: 1000, nodeVersion: '18.20.4' });
   assert.equal(r.outcome, 'FAIL');
-  assert.equal(r.checks.find(c => c.id === 'productive-attribution').status, 'FAIL');
+  const attribution = r.checks.find(c => c.id === 'productive-attribution');
+  assert.equal(attribution.status, 'FAIL');
+  assert.match(attribution.message, /consumerTicks/);
 }
 
 console.log('live-verification tests passed');

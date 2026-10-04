@@ -140,13 +140,13 @@ export function evaluateLive(input) {
   const last100 = eco?.last100 || {};
   const attribution = last100?.productiveFlow || null;
   const attributionFields = {
-    consumerTicks: finite(attribution?.consumerSupply?.consumerTicks, null),
-    waitingConsumerTicks: finite(attribution?.consumerSupply?.waitingConsumerTicks, null),
-    criticalConsumerTicks: finite(attribution?.consumerSupply?.criticalConsumerTicks, null),
-    fallbackConsumerTicks: finite(attribution?.consumerSupply?.fallbackConsumerTicks, null),
-    averageConstructionCapacityPerTick: finite(attribution?.workCapacity?.averageConstructionCapacityPerTick, null),
-    averageDedicatedControllerCapacityPerTick: finite(attribution?.workCapacity?.averageDedicatedControllerCapacityPerTick, null),
-    actualProductiveThroughputPerTick: finite(attribution?.actualThroughput?.totalPerTick, null)
+    consumerTicks: finite(attribution?.consumerTicks, null),
+    waitingConsumerTicks: finite(attribution?.waitingConsumerTicks, null),
+    criticalConsumerTicks: finite(attribution?.criticalConsumerTicks, null),
+    fallbackConsumerTicks: finite(attribution?.fallbackConsumerTicks, null),
+    averageConstructionCapacityPerTick: finite(attribution?.averageConstructionCapacityPerTick, null),
+    averageDedicatedControllerCapacityPerTick: finite(attribution?.averageDedicatedControllerCapacityPerTick, null),
+    actualProductiveThroughputPerTick: finite(attribution?.actualProductiveThroughputPerTick, null)
   };
   const missingAttribution = Object.entries(attributionFields).filter(([, value]) => value === null).map(([key]) => key);
   if (!attribution || missingAttribution.length) {
@@ -154,9 +154,9 @@ export function evaluateLive(input) {
       'productive-attribution',
       selected.complete ? 'FAIL' : 'WATCH',
       selected.complete
-        ? 'Productive-flow attribution is missing or incomplete in the complete 100-tick window.'
+        ? `Productive-flow attribution is missing or incomplete: ${missingAttribution.join(', ') || 'payload'}.`
         : 'Productive-flow attribution is not complete yet.',
-      { missing: missingAttribution }
+      { missing: missingAttribution, attribution }
     ));
   } else {
     checks.push(check('productive-attribution', 'PASS', 'Productive-flow attribution is complete for the 100-tick window.', attributionFields));

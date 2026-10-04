@@ -102,7 +102,7 @@ if (startTick === null && args.mode === 'live') {
     version: args.version,
     roomName: args.room,
     loadEvents: () => dedupeEvents(readNdjson('bot-events-')),
-    onWait: message => console.error(message + ' Press Ctrl+C to stop waiting.')
+    onWait: message => console.error(message)
   });
   startTick = waited.startTick;
   events = waited.events;

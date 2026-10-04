@@ -201,34 +201,67 @@ function summarize(window, ticks, endingFlow, actual) {
   const controllerProgress = Math.max(0, Number(actual.controllerProgress) || 0);
   const constructionProgress = Math.max(0, Number(actual.constructionProgress) || 0);
 
+  const consumerSupply = {
+    consumerTicks,
+    waitingConsumerTicks: waitingTicks,
+    criticalConsumerTicks: Math.max(0, window.criticalConsumerTicks || 0),
+    fallbackConsumerTicks: Math.max(0, window.fallbackConsumerTicks || 0),
+    emptyConsumerTicks: Math.max(0, window.emptyConsumerTicks || 0),
+    waitingRatio: round(waitingTicks / Math.max(1, consumerTicks)),
+    criticalRatio: round((window.criticalConsumerTicks || 0) / Math.max(1, consumerTicks)),
+    fallbackRatio: round((window.fallbackConsumerTicks || 0) / Math.max(1, consumerTicks)),
+    emptyRatio: round((window.emptyConsumerTicks || 0) / Math.max(1, consumerTicks)),
+    averageWaitingAgeWhenWaiting: round((window.waitingAgeTicks || 0) / Math.max(1, waitingTicks), 2),
+    maxWaitingEnergyTicks: Math.max(0, window.maxWaitingEnergyTicks || 0)
+  };
+  const workCapacity = {
+    averageWorkPartsByRole: workPartsByRole,
+    averageProductiveWorkParts: round(CONSUMER_ROLES.reduce((sum, role) => sum + workPartsByRole[role], 0), 2),
+    averageConstructionCapacityPerTick: round((window.constructionCapacityTicks || 0) / ticks, 2),
+    averageDedicatedControllerCapacityPerTick: round((window.controllerCapacityTicks || 0) / ticks, 2),
+    constructionBacklogRatio: round((window.constructionBacklogTicks || 0) / ticks),
+    controllerDemandRatio: round((window.controllerDemandTicks || 0) / ticks)
+  };
+  const actualThroughput = {
+    constructionPerTick: round(constructionProgress / ticks, 2),
+    controllerPerTick: round(controllerProgress / ticks, 2),
+    totalPerTick: round((constructionProgress + controllerProgress) / ticks, 2)
+  };
+
+  // Keep release-gate attribution fields directly on productiveFlow. STATUS_SNAPSHOT
+  // serialization is depth-bounded; these compact mirrors remain numeric even when
+  // the richer grouped diagnostics below are too deep for a console payload.
   return {
-    consumerSupply: {
-      consumerTicks,
-      waitingConsumerTicks: waitingTicks,
-      criticalConsumerTicks: Math.max(0, window.criticalConsumerTicks || 0),
-      fallbackConsumerTicks: Math.max(0, window.fallbackConsumerTicks || 0),
-      emptyConsumerTicks: Math.max(0, window.emptyConsumerTicks || 0),
-      waitingRatio: round(waitingTicks / Math.max(1, consumerTicks)),
-      criticalRatio: round((window.criticalConsumerTicks || 0) / Math.max(1, consumerTicks)),
-      fallbackRatio: round((window.fallbackConsumerTicks || 0) / Math.max(1, consumerTicks)),
-      emptyRatio: round((window.emptyConsumerTicks || 0) / Math.max(1, consumerTicks)),
-      averageWaitingAgeWhenWaiting: round((window.waitingAgeTicks || 0) / Math.max(1, waitingTicks), 2),
-      maxWaitingEnergyTicks: Math.max(0, window.maxWaitingEnergyTicks || 0)
-    },
-    workCapacity: {
-      averageWorkPartsByRole: workPartsByRole,
-      averageProductiveWorkParts: round(CONSUMER_ROLES.reduce((sum, role) => sum + workPartsByRole[role], 0), 2),
-      averageConstructionCapacityPerTick: round((window.constructionCapacityTicks || 0) / ticks, 2),
-      averageDedicatedControllerCapacityPerTick: round((window.controllerCapacityTicks || 0) / ticks, 2),
-      constructionBacklogRatio: round((window.constructionBacklogTicks || 0) / ticks),
-      controllerDemandRatio: round((window.controllerDemandTicks || 0) / ticks)
-    },
-    actualThroughput: {
-      constructionPerTick: round(constructionProgress / ticks, 2),
-      controllerPerTick: round(controllerProgress / ticks, 2),
-      totalPerTick: round((constructionProgress + controllerProgress) / ticks, 2)
-    },
-    ending: endingFlow || null
+    consumerTicks: consumerSupply.consumerTicks,
+    waitingConsumerTicks: consumerSupply.waitingConsumerTicks,
+    criticalConsumerTicks: consumerSupply.criticalConsumerTicks,
+    fallbackConsumerTicks: consumerSupply.fallbackConsumerTicks,
+    emptyConsumerTicks: consumerSupply.emptyConsumerTicks,
+    waitingRatio: consumerSupply.waitingRatio,
+    criticalRatio: consumerSupply.criticalRatio,
+    fallbackRatio: consumerSupply.fallbackRatio,
+    emptyRatio: consumerSupply.emptyRatio,
+    averageWaitingAgeWhenWaiting: consumerSupply.averageWaitingAgeWhenWaiting,
+    maxWaitingEnergyTicks: consumerSupply.maxWaitingEnergyTicks,
+    averageBuilderWorkParts: workPartsByRole.builder,
+    averageWorkerWorkParts: workPartsByRole.worker,
+    averageRepairerWorkParts: workPartsByRole.repairer,
+    averageUpgraderWorkParts: workPartsByRole.upgrader,
+    averageProductiveWorkParts: workCapacity.averageProductiveWorkParts,
+    averageConstructionCapacityPerTick: workCapacity.averageConstructionCapacityPerTick,
+    averageDedicatedControllerCapacityPerTick: workCapacity.averageDedicatedControllerCapacityPerTick,
+    constructionBacklogRatio: workCapacity.constructionBacklogRatio,
+    controllerDemandRatio: workCapacity.controllerDemandRatio,
+    constructionPerTick: actualThroughput.constructionPerTick,
+    controllerPerTick: actualThroughput.controllerPerTick,
+    actualProductiveThroughputPerTick: actualThroughput.totalPerTick,
+    endingConstructionSiteCount: endingFlow?.construction?.siteCount ?? null,
+    endingConstructionRemainingProgress: endingFlow?.construction?.remainingProgress ?? null,
+    endingControllerRemainingProgress: endingFlow?.controller?.remainingProgress ?? null,
+    endingControllerTicksToDowngrade: endingFlow?.controller?.ticksToDowngrade ?? null,
+    consumerSupply,
+    workCapacity,
+    actualThroughput
   };
 }
 

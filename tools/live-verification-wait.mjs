@@ -10,6 +10,26 @@ function latestVersionChange(events, version) {
     .at(-1) || null;
 }
 
+function requiresProductiveAttribution(version) {
+  const m = String(version || '').match(/^0\.2\.(\d+)/);
+  return !!m && Number(m[1]) >= 19;
+}
+
+function attributionReady(last100) {
+  const p = last100?.productiveFlow;
+  if (!p || typeof p !== 'object') return false;
+  const required = [
+    p.consumerTicks,
+    p.waitingConsumerTicks,
+    p.criticalConsumerTicks,
+    p.fallbackConsumerTicks,
+    p.averageConstructionCapacityPerTick,
+    p.averageDedicatedControllerCapacityPerTick,
+    p.actualProductiveThroughputPerTick
+  ];
+  return required.every(v => Number.isFinite(Number(v)));
+}
+
 function snapshotWindows(events, version, roomName) {
   return (events || [])
     .filter(e => e?.code === 'STATUS_SNAPSHOT' && (!e?.v || e.v === version))
@@ -19,11 +39,29 @@ function snapshotWindows(events, version, roomName) {
         eventTick: finiteTick(e?.tick),
         startTick: finiteTick(last100?.startTick),
         endTick: finiteTick(last100?.endTick),
-        ticks: finiteTick(last100?.ticks)
+        ticks: finiteTick(last100?.ticks),
+        attributionReady: attributionReady(last100)
       };
     })
     .filter(x => x.startTick !== null && x.endTick !== null && x.ticks !== null)
     .sort((a, b) => a.endTick - b.endTick || a.eventTick - b.eventTick);
+}
+
+function estimateSecondsPerTick(events) {
+  const samples = (events || [])
+    .map(e => ({ tick: finiteTick(e?.tick), time: Date.parse(e?.capturedAt) }))
+    .filter(x => x.tick !== null && Number.isFinite(x.time))
+    .sort((a, b) => a.tick - b.tick || a.time - b.time);
+
+  const rates = [];
+  for (let i = 1; i < samples.length; i++) {
+    const dtick = samples[i].tick - samples[i - 1].tick;
+    const dsec = (samples[i].time - samples[i - 1].time) / 1000;
+    if (dtick > 0 && dsec > 0 && dsec / dtick < 10) rates.push(dsec / dtick);
+  }
+  if (!rates.length) return 0.2;
+  rates.sort((a, b) => a - b);
+  return rates[Math.floor(rates.length / 2)];
 }
 
 export function resolveAutoStart(events, version, mode, roomName) {
@@ -41,7 +79,13 @@ export function resolveAutoStart(events, version, mode, roomName) {
   }
 
   const windows = snapshotWindows(events, version, roomName);
-  const candidate = windows.find(x => x.ticks >= 100 && x.startTick > deployTick && x.endTick >= x.startTick + 99);
+  const requireAttribution = requiresProductiveAttribution(version);
+  const candidate = windows.find(x =>
+    x.ticks >= 100 &&
+    x.startTick > deployTick &&
+    x.endTick >= x.startTick + 99 &&
+    (!requireAttribution || x.attributionReady)
+  );
   if (candidate) {
     return {
       ready: true,
@@ -59,27 +103,43 @@ export function resolveAutoStart(events, version, mode, roomName) {
   if (latestWindow && latestWindow.ticks >= 100 && latestWindow.endTick >= latestWindow.startTick + 99) {
     expectedStartTick = latestWindow.startTick;
     expectedEndTick = latestWindow.endTick;
+    while (
+      expectedStartTick <= deployTick ||
+      (requireAttribution && !latestWindow.attributionReady && expectedEndTick <= latestEvidenceTick)
+    ) {
+      expectedStartTick = expectedEndTick + 1;
+      expectedEndTick = expectedStartTick + 99;
+    }
+  } else {
+    expectedStartTick = Math.floor(deployTick / 100) * 100 + 101;
+    expectedEndTick = expectedStartTick + 99;
     while (expectedStartTick <= deployTick) {
       expectedStartTick = expectedEndTick + 1;
       expectedEndTick = expectedStartTick + 99;
     }
   }
 
+  const secondsPerTick = estimateSecondsPerTick(events);
+  const remainingTicks = expectedEndTick === null
+    ? 0
+    : Math.max(0, expectedEndTick - Math.max(deployTick, latestEvidenceTick));
+  const remainingSeconds = Math.max(0, Math.ceil(remainingTicks * secondsPerTick));
+
   return {
     ready: false,
     deployTick,
     latestEvidenceTick,
     expectedStartTick,
-    expectedEndTick
+    expectedEndTick,
+    remainingSeconds
   };
 }
 
 export function formatWaitStatus(status) {
-  const current = status.latestEvidenceTick >= 0 ? ` latest evidence tick ${status.latestEvidenceTick}.` : '';
-  if (status.expectedStartTick !== null && status.expectedEndTick !== null) {
-    return `Waiting for complete post-deploy 100-tick window ${status.expectedStartTick}-${status.expectedEndTick};${current}`;
-  }
-  return `Waiting for the first complete post-deploy 100-tick STATUS_SNAPSHOT after deployment tick ${status.deployTick};${current}`;
+  const total = Math.max(0, Math.ceil(Number(status.remainingSeconds) || 0));
+  const minutes = String(Math.floor(total / 60)).padStart(2, '0');
+  const seconds = String(total % 60).padStart(2, '0');
+  return `Waiting for data...[${minutes} Min ${seconds} Sec remaining]`;
 }
 
 export async function waitForAutoStart({

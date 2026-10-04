@@ -48,7 +48,7 @@ npm run verify:smoke
 npm run verify:live
 ```
 
-`verify:live` waits automatically for the first complete post-deploy 100-tick window.
+`verify:live` waits automatically for the first usable post-deploy 100-tick window and prints a compact `Waiting for data...[MM Min SS Sec remaining]` countdown. Completed windows whose required attribution was truncated or otherwise unusable are skipped automatically.
 
 Expected runtime version after deployment: `0.2.19-node18`.
 

@@ -172,7 +172,7 @@ v0.2.19 adds bounded current-state and 100-tick attribution that separates:
 - controller demand: remaining controller progress, ticks-to-downgrade, and demand-active ratio;
 - actual productive throughput split into construction and controller progress per tick.
 
-The live gate must hard-fail a complete 100-tick v0.2.19 window if this attribution is missing or incomplete. Historical telemetry is not rewritten.
+The live gate must hard-fail a complete 100-tick v0.2.19 window if this attribution is missing or incomplete. Gate-critical attribution fields are mirrored at a serialization-safe depth; unusable completed windows are skipped by auto-wait in favor of the next valid window. Historical telemetry is not rewritten.
 
 ## Current strategic interpretation
 
