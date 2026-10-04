@@ -47,6 +47,19 @@ npm run verify:live
 
 Expected runtime version after deployment: `0.2.18-node18`.
 
+### Live verification result
+
+Verified 100-tick live window: `3683401–3683500`.
+
+- result: `PASS=13 / WATCH=2 / FAIL=0`
+- consumer fallback remained at `0`
+- hauler capacity met the modeled requirement
+- controller and construction progress passed
+- Efficiency status improved to `EFFICIENT`
+- remaining WATCH signals: consumer waiting/critical without fallback, and productive throughput below mining capacity
+
+v0.2.18 is therefore **VERIFIED / CLOSED**. The remaining WATCH findings are optimization evidence for a later release, not blockers for this one.
+
 ---
 
 ## Historical documentation from v0.2.16 and earlier
