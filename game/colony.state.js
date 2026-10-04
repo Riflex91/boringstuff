@@ -266,6 +266,9 @@ function build(state, context) {
       ? {
           available: true,
           authority: 'SHADOW',
+          planTick: state.assignmentShadow.summary.planTick,
+          deferred: !!state.assignmentShadow.summary.deferred,
+          deferReason: state.assignmentShadow.summary.deferReason || null,
           requestCount: state.assignmentShadow.summary.requestCount,
           executorCount: state.assignmentShadow.summary.executorCount,
           assignmentCount: state.assignmentShadow.summary.assignmentCount,
@@ -276,6 +279,9 @@ function build(state, context) {
       : {
           available: false,
           authority: 'SHADOW',
+          planTick: null,
+          deferred: false,
+          deferReason: null,
           requestCount: null,
           executorCount: null,
           assignmentCount: null,
