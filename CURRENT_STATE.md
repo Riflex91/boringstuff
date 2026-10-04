@@ -5,7 +5,7 @@ Canonical repository: `Riflex91/boringstuff`
 ## Canonical source baseline
 
 - Seed baseline: **v0.2.16-node18**
-- Current verified `main`: **v0.2.18-node18**
+- Current verified `main`: **v0.2.19-node18**
 - Runtime target: **Node.js 18.20.4**
 - Runtime branch: `chatgpt`
 - Primary room: `E8N1`
@@ -153,30 +153,49 @@ Observed gate result:
 
 The behavior target succeeded: self-supply fallback was eliminated in the verified live window while all hard safety gates remained green.
 
+### v0.2.19 — VERIFIED / CLOSED
+
+Productive Flow Attribution. Observability only; no colony control behavior change.
+
+- Added bounded current-state and 100-tick productive-flow attribution.
+- Measures consumer waiting/critical/fallback/empty creep-ticks and wait age.
+- Measures active WORK capacity by productive role.
+- Measures construction backlog/mix and controller demand.
+- Measures actual construction/controller productive throughput per tick.
+- Gate-critical attribution fields are mirrored at serialization-safe depth.
+- `verify:live` skips unusable completed windows and waits for the next valid one.
+- Wait UX is compact: `Waiting for data...[MM Min SS Sec remaining]`.
+
+Verification evidence:
+
+- smoke ticks `3683727–3683751`: `PASS=8 / WATCH=1 / FAIL=0`;
+- final live ticks `3684101–3684200`: `PASS=13 / WATCH=3 / FAIL=0`;
+- productive-flow attribution: PASS / complete;
+- runtime errors, collector health, CPU/bucket, mining, hard-stall, telemetry continuity, hauler capacity, controller progress, and construction progress: PASS;
+- remaining WATCH findings: consumer self-supply fallback occurred, productive throughput below mining capacity, Efficiency `UNDERUTILIZED`.
+
+The smoke window belongs to the initial v0.2.19 deploy. The later serialization/UX patch changed observability only; the final 100-tick live window validated the patched attribution payload and all hard safety gates with zero FAIL.
+
 ## Next release boundary
 
-v0.2.18 is live-verified and closes the measured consumer-energy churn issue. Do **not** immediately increase mining or hauling capacity: both were healthy in the verification window.
+v0.2.19 is live-verified and closes the attribution gap. The next behavior release is intentionally **not selected yet**.
 
-The next behavior release is intentionally **not selected yet**. Fresh evidence should first explain the remaining two optimization signals:
+The remaining live findings are now actionable evidence rather than generic symptoms:
 
-- some consumers still become waiting/critical even though fallback stays at zero;
-- productive throughput still trails available mining capacity.
+- consumer self-supply fallback occurred again;
+- productive throughput remains below mining capacity;
+- Efficiency returned to `UNDERUTILIZED`;
+- mining and modeled hauler capacity still passed.
 
-The next change should therefore be derived from additional telemetry that distinguishes delivery latency, consumer work-capacity limits, construction mix, and controller demand before changing creep counts or body sizes.
+The next change must be chosen from the measured v0.2.19 attribution rather than by increasing harvester/hauler counts blindly.
 
 ## Current strategic interpretation
 
-`E8N1` remains an RCL2 two-source colony in container-logistics mode. The verified v0.2.18 window confirms:
+`E8N1` remains an RCL2 two-source colony in container-logistics mode. v0.2.19 confirms the supply side is still structurally healthy: dedicated mining is active, modeled hauler capacity is sufficient, controller and construction progress continue, CPU/bucket are safe, and telemetry is contiguous.
 
-- dedicated mining is active;
-- modeled hauler capacity is sufficient;
-- consumer fallback remained at zero;
-- telemetry continuity is healthy;
-- CPU/bucket and hard-stall gates are clean;
-- controller and construction both progress;
-- Efficiency improved to `EFFICIENT`.
+The unresolved problem is now localized to productive-flow execution. Consumer fallback can still recur even with sufficient aggregate hauling, productive throughput remains below available mining capacity, and Efficiency can fall back to `UNDERUTILIZED`.
 
-The remaining inefficiency is narrower than before: consumers can still become waiting/critical, and aggregate productive throughput still trails mining capacity, but this no longer escalates into self-supply fallback. The next release should measure that residual latency/work-capacity gap before changing fleet size or role bodies.
+Use the v0.2.19 attribution to distinguish whether the next bottleneck is primarily delivery latency, insufficient productive WORK capacity, construction backlog composition, or controller allocation. Do not add mining or hauling capacity without attribution evidence supporting it.
 
 ## Development invariants
 

@@ -5,7 +5,22 @@ function baseRoom(overrides = {}) {
   return {
     rcl: 2,
     constructionSites: 3,
-    economy: { last100: { ticks: 100, controllerProgress: 180, constructionProgress: 1300 } },
+    economy: {
+      last100: {
+        ticks: 100,
+        controllerProgress: 180,
+        constructionProgress: 1300,
+        productiveFlow: {
+          consumerTicks: 400,
+          waitingConsumerTicks: 20,
+          criticalConsumerTicks: 20,
+          fallbackConsumerTicks: 0,
+          averageConstructionCapacityPerTick: 15,
+          averageDedicatedControllerCapacityPerTick: 3,
+          actualProductiveThroughputPerTick: 14.8
+        }
+      }
+    },
     economyModel: {
       theoreticalIncomePerTick: 20,
       dedicatedHarvestCapacityPerTick: 20,
@@ -25,13 +40,13 @@ function baseRoom(overrides = {}) {
 }
 
 function event(tick, code, ctx, extra = {}) {
-  return { tick, v: '0.2.18-node18', level: 'INFO', code, ctx, ...extra };
+  return { tick, v: '0.2.19-node18', level: 'INFO', code, ctx, ...extra };
 }
 
 function evidence(start = 1000) {
   const room = baseRoom();
   return [
-    event(start, 'VERSION_CHANGE', { from: '0.2.16-node18', to: '0.2.18-node18' }, { jseq: 20 }),
+    event(start, 'VERSION_CHANGE', { from: '0.2.18-node18', to: '0.2.19-node18' }, { jseq: 20 }),
     event(start, 'ROOM_HEARTBEAT', { room: 'E8N1', economyModel: room.economyModel, health: room.health }),
     event(start, 'BOT_HEARTBEAT', { cpu: 3.8, bucket: 10000 }),
     event(start + 24, 'ROOM_HEARTBEAT', { room: 'E8N1', economyModel: room.economyModel, health: room.health }),
@@ -49,6 +64,7 @@ function evidence(start = 1000) {
 {
   const r = evaluateLive({ events: evidence(), startTick: 1000, nodeVersion: '18.20.4' });
   assert.equal(r.outcome, 'WATCH');
+  assert.equal(r.checks.find(c => c.id === 'productive-attribution').status, 'PASS');
   assert.equal(r.checks.find(c => c.id === 'productive-throughput').status, 'WATCH');
   assert.equal(r.checks.find(c => c.id === 'efficiency-status').status, 'WATCH');
   assert.equal(r.counts.fail, 0);
@@ -132,6 +148,18 @@ function evidence(start = 1000) {
   assert.equal(r.checks.find(c => c.id === 'runtime-errors').status, 'PASS');
   assert.equal(r.checks.find(c => c.id === 'collector-health').status, 'WATCH');
   assert.equal(r.counts.fail, 0);
+}
+
+
+
+{
+  const rows = evidence();
+  delete rows.at(-1).ctx.rooms.E8N1.economy.last100.productiveFlow;
+  const r = evaluateLive({ events: rows, startTick: 1000, nodeVersion: '18.20.4' });
+  assert.equal(r.outcome, 'FAIL');
+  const attribution = r.checks.find(c => c.id === 'productive-attribution');
+  assert.equal(attribution.status, 'FAIL');
+  assert.match(attribution.message, /consumerTicks/);
 }
 
 console.log('live-verification tests passed');
