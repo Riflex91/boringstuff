@@ -105,12 +105,28 @@ function currentAndSpawning(state, request) {
   let spawning = 0;
   const activeCreeps = [];
   const spawningCreeps = [];
+  const spawnRemainingByName = {};
+  if (state && state.room && typeof state.room.find === 'function' && typeof FIND_MY_SPAWNS !== 'undefined') {
+    let spawns = [];
+    try { spawns = state.room.find(FIND_MY_SPAWNS) || []; } catch (err) {}
+    for (const spawn of spawns) {
+      if (spawn && spawn.spawning && spawn.spawning.name) {
+        spawnRemainingByName[spawn.spawning.name] = Number.isFinite(spawn.spawning.remainingTime)
+          ? Math.max(0, spawn.spawning.remainingTime)
+          : 0;
+      }
+    }
+  }
   for (const creep of state.creeps || []) {
     const capacity = capacityForCreep(creep, request);
     if (capacity <= 0) continue;
     if (creep.spawning) {
       spawning += capacity;
-      spawningCreeps.push({ creep, capacity });
+      spawningCreeps.push({
+        creep,
+        capacity,
+        remainingTime: Number.isFinite(spawnRemainingByName[creep.name]) ? spawnRemainingByName[creep.name] : 0
+      });
     } else {
       active += capacity;
       activeCreeps.push({ creep, capacity });
@@ -131,9 +147,7 @@ function projectedSurviving(entries, horizon) {
 function spawningAvailableBy(entries, horizon, travelTicks) {
   let total = 0;
   for (const entry of entries || []) {
-    const remaining = entry.creep && entry.creep.spawning && Number.isFinite(entry.creep.spawning.remainingTime)
-      ? Math.max(0, entry.creep.spawning.remainingTime)
-      : 0;
+    const remaining = Number.isFinite(entry.remainingTime) ? Math.max(0, entry.remainingTime) : 0;
     if (remaining + travelTicks <= horizon) total += entry.capacity;
   }
   return total;
@@ -256,7 +270,7 @@ function planRequirement(state, request, slots, planned, game) {
     slot.availableIn += spawnTicks;
   }
 
-  deficit.queued = deficit.proposedCapacity;
+  deficit.queued = 0;
   deficit.uncoveredAfterPlan = Math.max(0, deficit.deficit - deficit.proposedCapacity);
   if (guard > MAX_PROPOSALS_PER_REQUIREMENT && deficit.uncoveredAfterPlan > 0) deficit.unresolvedReason = 'PROPOSAL_LIMIT';
   return { deficit, proposals };
