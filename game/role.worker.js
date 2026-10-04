@@ -7,6 +7,22 @@ function needsEnergy(creep) {
   if (creep.memory.working && creep.store[RESOURCE_ENERGY] === 0) {
     creep.memory.working = false;
   }
+
+  // With live logistics, a consumer no longer has to remain in self-supply
+  // fallback until its carry is completely full. Resume after one meaningful
+  // work burst; energy.consumerNeedsDelivery() keeps the low-runway request
+  // active until haulers finish the derived refill target. Without a live
+  // hauler, preserve the historical full-carry self-supply behavior.
+  if (
+    !creep.memory.working &&
+    hasLiveHauler(creep.room) &&
+    energy.consumerCanResumeWork(creep)
+  ) {
+    creep.memory.working = true;
+    creep.memory.logisticsFallback = false;
+    creep.memory.waitingEnergyTicks = 0;
+  }
+
   if (!creep.memory.working && creep.store.getFreeCapacity() === 0) {
     creep.memory.working = true;
     creep.memory.logisticsFallback = false;
