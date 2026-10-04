@@ -103,6 +103,12 @@ Request {
 
 Lifecycle: `OPEN → RESERVED → IN_PROGRESS → SATISFIED`, with `BLOCKED → OPEN` retry and terminal `EXPIRED | CANCELLED`.
 
+Capacity-request semantics:
+
+- `*_CAPACITY` requests publish total required capacity for the target scope.
+- Producers may attach current-deficit evidence/urgency, but must not pre-subtract active capacity from `demand.amount`.
+- E2 is the single owner of future deficit calculation so TTL, spawn congestion, spawning bodies, authoritative queue state and external commitments are subtracted exactly once.
+
 # 6. Reservation
 
 ```text
@@ -214,7 +220,7 @@ Assignment supports continuation bias and emergency preemption.
 
 Assignment boundary rules:
 
-- `*_CAPACITY` deficits are not executor jobs. They already represent missing capacity after active capacity has been counted and therefore feed E2 spawn/support planning instead of E1 creep assignment.
+- `*_CAPACITY` requests are total-capacity requirements, not executor jobs. E2 converts them into future `CapacityDeficit` records after subtracting projected surviving, spawning, queued and externally committed capacity; E1 never assigns creeps directly to them.
 - E1 consumes executable requests such as BUILD, REPAIR, UPGRADE and ENERGY_DELIVERY.
 - While authority is `SHADOW`, E1 uses an internal per-plan remaining-need ledger and does not mutate authoritative RequestRegistry reservations.
 - Shadow assignment may be deferred under CPU pressure; telemetry must expose the last plan tick and the deferral reason.
