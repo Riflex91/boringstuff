@@ -100,7 +100,8 @@ function repairTargetHits(structure, rcl) {
   const wall = structureType('STRUCTURE_WALL', 'constructedWall');
   const rampart = structureType('STRUCTURE_RAMPART', 'rampart');
   if (structure.structureType === wall || structure.structureType === rampart) {
-    const cap = Math.max(10000, (Number(rcl) || 1) * config.REPAIR_WALL_TARGET_RCL_MULTIPLIER);
+    const multiplier = Number.isFinite(config.REPAIR_WALL_TARGET_RCL_MULTIPLIER) ? config.REPAIR_WALL_TARGET_RCL_MULTIPLIER : 10000;
+    const cap = Math.max(10000, (Number(rcl) || 1) * multiplier);
     return structure.hits < cap ? Math.min(structure.hitsMax, cap) : null;
   }
   const threshold = Math.floor(structure.hitsMax * 0.65);
