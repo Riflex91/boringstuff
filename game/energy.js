@@ -367,7 +367,12 @@ function deliverToConsumer(creep) {
     return true;
   }
   if (rc === OK) {
-    if (freeEnergyCapacity(target) <= 0) {
+    // v0.2.20 live evidence showed partial emergency deliveries eliminating
+    // fallback while leaving consumers stuck in refill/waiting state. Any
+    // successful positive delivery is enough to resume productive work; the
+    // consumer can spend that energy immediately instead of waiting to be full.
+    if (energyAmount(target) > 0) {
+      target.memory.working = true;
       target.memory.waitingEnergyTicks = 0;
       target.memory.logisticsFallback = false;
       clearConsumerTarget(creep);
