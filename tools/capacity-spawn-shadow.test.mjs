@@ -186,6 +186,48 @@ function capacityRequest(kind, capability, amount, options = {}) {
 }
 
 {
+  // Live regression: spawn.spawning can name a creep that Game.creeps exposes
+  // before room.find(FIND_MY_CREEPS) includes it in state.creeps.
+  const spawningMiner = makeCreep('har-live', 'harvester', { work: 3, carry: 2, move: 3 }, null, true);
+  const spawn = makeSpawn('Spawn1', 16, 'har-live');
+  const game = { time: 2550, creeps: { 'har-live': spawningMiner } };
+  const plan = planner.plan(state({
+    creeps: [
+      makeCreep('har-a', 'harvester', { work: 4, carry: 1, move: 2 }, 500),
+      makeCreep('har-b', 'harvester', { work: 3, carry: 1, move: 2 }, 500)
+    ],
+    spawns: [spawn],
+    energyCapacity: 550,
+    energyAvailable: 8
+  }), [
+    capacityRequest('HARVEST_CAPACITY','workHarvest',10)
+  ], game);
+  assert.equal(plan.deficits[0].active, 7);
+  assert.equal(plan.deficits[0].spawning, 3);
+  assert.equal(plan.deficits[0].deficit, 0);
+  assert.equal(plan.spawnRequests.length, 0);
+}
+
+{
+  // If in-flight capacity cannot become productive inside the evaluated
+  // horizon, it must not hide a real future deficit.
+  const lateMiner = makeCreep('har-late', 'harvester', { work: 3, carry: 2, move: 3 }, null, true);
+  const spawn = makeSpawn('Spawn1', 300, 'har-late');
+  const game = { time: 2575, creeps: { 'har-late': lateMiner } };
+  const plan = planner.plan(state({
+    creeps: [makeCreep('har-a', 'harvester', { work: 7, carry: 2, move: 4 }, 1000)],
+    spawns: [spawn],
+    energyCapacity: 550,
+    energyAvailable: 550
+  }), [
+    capacityRequest('HARVEST_CAPACITY','workHarvest',10)
+  ], game);
+  assert.equal(plan.deficits[0].spawning, 3);
+  assert.equal(plan.deficits[0].deficit, 0);
+  assert.equal(plan.spawnRequests.length, 0);
+}
+
+{
   // Recovery outranks normal economy and consumes the first spawn slot.
   const recovery = capacityRequest('RECOVERY_CAPACITY','bootstrap',1,{ strategicClass:'RECOVERY', base:100, id:'recovery' });
   const mining = capacityRequest('HARVEST_CAPACITY','workHarvest',3,{ base:95, id:'mining' });
