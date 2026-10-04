@@ -8,6 +8,7 @@ const creepManager = require('creep.manager');
 const stats = require('stats');
 const visuals = require('visuals');
 const commands = require('commands');
+const runtimeCapabilities = require('runtime.capabilities');
 
 function bootstrapMemory() {
   if (!Memory.bot) Memory.bot = { version: config.VERSION, born: Game.time };
@@ -40,6 +41,7 @@ function bootstrapMemory() {
 
 function statusSnapshot(roomStates, tickCpu) {
   const rooms = {};
+  const capabilities = runtimeCapabilities.observe();
   for (const state of roomStates) {
     const controller = state.room.controller;
     rooms[state.room.name] = {
@@ -66,6 +68,7 @@ function statusSnapshot(roomStates, tickCpu) {
     bucket: Game.cpu.bucket,
     gcl: Game.gcl ? { level: Game.gcl.level, progress: Game.gcl.progress, progressTotal: Game.gcl.progressTotal } : null,
     totalCreeps: Object.keys(Game.creeps).length,
+    capabilities,
     rooms
   }, { force: true, persist: false, dedupeTicks: 0 });
 }
