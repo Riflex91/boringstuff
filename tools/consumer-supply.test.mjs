@@ -77,13 +77,13 @@ function makeConsumer(id, role, energy, waiting = 0, fallback = false, range = 5
   return creep;
 }
 
-function makeHauler(id, rangeMap = {}) {
+function makeHauler(id, rangeMap = {}, carried = 300) {
   const creep = {
     id,
     room,
     memory: { role: 'hauler' },
     name: id,
-    store: makeStore(300, 300),
+    store: makeStore(300, carried),
     spawning: false,
     pos: {
       getRangeTo(target) { return rangeMap[target.id] ?? target.pos?.range ?? 10; }
@@ -225,6 +225,46 @@ const energy = require('../game/energy.js');
 }
 
 
+// v0.2.20 early dispatch: if redundant logistics exists, no normal guard is
+// delivery-ready, and a consumer is already critical, exactly one partial
+// hauler with carried energy may break its pickup leg early.
+{
+  const consumer = makeConsumer('worker-early-dispatch', 'worker', 0, 4, false, 4);
+  const partial = makeHauler('hauler-early-partial', { [consumer.id]: 2 }, 50);
+  const empty = makeHauler('hauler-early-empty', { [consumer.id]: 1 }, 0);
+  room.creeps = [consumer, partial, empty];
+
+  assert.equal(energy._test.haulerReadyToDeliver(partial), false);
+  assert.equal(energy._test.selectConsumerGuardHauler(room), null);
+  assert.equal(energy._test.selectConsumerEarlyDispatchHauler(room).id, partial.id);
+  assert.equal(energy.shouldInterruptPickupForConsumer(partial), true);
+  assert.equal(energy.shouldInterruptPickupForConsumer(empty), false);
+}
+
+// A partial pickup must not be interrupted when a normal delivery-ready guard
+// is already available for the critical consumer.
+{
+  const consumer = makeConsumer('worker-ready-guard-exists', 'worker', 0, 4, false, 4);
+  const ready = makeHauler('hauler-ready-existing', { [consumer.id]: 4 }, 200);
+  const partial = makeHauler('hauler-partial-existing', { [consumer.id]: 1 }, 50);
+  room.creeps = [consumer, ready, partial];
+
+  assert.equal(energy._test.selectConsumerGuardHauler(room).id, ready.id);
+  assert.equal(energy._test.selectConsumerEarlyDispatchHauler(room), null);
+  assert.equal(energy.shouldInterruptPickupForConsumer(partial), false);
+}
+
+// Single-hauler recovery remains immutable: even a critical consumer cannot
+// pull the sole partial hauler off its normal pickup/infrastructure loop.
+{
+  const consumer = makeConsumer('worker-single-early', 'worker', 0, 5, false, 3);
+  const partial = makeHauler('hauler-single-early', { [consumer.id]: 2 }, 50);
+  room.creeps = [consumer, partial];
+
+  assert.equal(energy._test.selectConsumerEarlyDispatchHauler(room), null);
+  assert.equal(energy.shouldInterruptPickupForConsumer(partial), false);
+}
+
 // Integration of the guard into role.hauler: a selected guard must attempt a
 // consumer transfer before the normal infrastructure delivery path. A normal
 // hauler keeps infrastructure first. This protects the priority ordering from
@@ -232,6 +272,7 @@ const energy = require('../game/energy.js');
 {
   const roleHauler = require('../game/role.hauler.js');
   const original = {
+    shouldInterruptPickupForConsumer: energy.shouldInterruptPickupForConsumer,
     shouldPrioritizeConsumer: energy.shouldPrioritizeConsumer,
     deliverToConsumer: energy.deliverToConsumer,
     deliver: energy.deliver,
@@ -256,6 +297,31 @@ const energy = require('../game/energy.js');
   energy.shouldPrioritizeConsumer = () => false;
   roleHauler.run(creep);
   assert.deepEqual(calls, ['infrastructure', 'clear']);
+
+  Object.assign(energy, original);
+}
+
+// v0.2.20 role integration: a partial hauler selected for early dispatch must
+// skip the acquisition leg and attempt the consumer transfer in the same tick.
+{
+  const roleHauler = require('../game/role.hauler.js');
+  const original = {
+    shouldInterruptPickupForConsumer: energy.shouldInterruptPickupForConsumer,
+    shouldPrioritizeConsumer: energy.shouldPrioritizeConsumer,
+    deliverToConsumer: energy.deliverToConsumer,
+    acquireForHauler: energy.acquireForHauler
+  };
+  const creep = makeHauler('hauler-role-early', {}, 50);
+  const calls = [];
+
+  energy.shouldInterruptPickupForConsumer = () => true;
+  energy.shouldPrioritizeConsumer = () => true;
+  energy.deliverToConsumer = () => { calls.push('consumer'); return true; };
+  energy.acquireForHauler = () => { calls.push('acquire'); return true; };
+
+  roleHauler.run(creep);
+  assert.equal(creep.memory.delivering, true);
+  assert.deepEqual(calls, ['consumer']);
 
   Object.assign(energy, original);
 }

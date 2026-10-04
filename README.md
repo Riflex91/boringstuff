@@ -1,3 +1,66 @@
+# Screeps Autonomous Bot v0.2.20-node18
+
+Canonical local repository:
+
+`C:\Users\hansi\AppData\Local\Screeps\scripts\screeps_newbieland_net___21025\boringstuff`
+
+Installed Screeps runtime:
+
+`C:\Users\hansi\AppData\Local\Screeps\scripts\screeps_newbieland_net___21025\chatgpt`
+
+## v0.2.20 – Critical Consumer Early Dispatch
+
+Behavior release derived directly from the verified v0.2.19 productive-flow attribution.
+
+The v0.2.19 window showed sufficient aggregate logistics but persistent last-mile latency: waiting ratio `0.212`, fallback ratio `0.097`, average waiting age `5.73` ticks and maximum waiting age `12` ticks. Average construction capacity was `23.2 e/t` while actual construction throughput was only `10.05 e/t`; controller throughput was already `1.96 / 2 e/t`. Mining was `20 e/t` with zero modeled hauler deficit.
+
+### Behavior change
+
+When at least two live haulers exist and a consumer is already waiting or in fallback:
+
+- if a normal delivery-ready starvation guard exists, behavior remains unchanged;
+- otherwise exactly one partial hauler that already carries energy may stop its pickup leg early and serve the critical consumer;
+- a partial-hauler reservation to a critical consumer remains sticky;
+- fresh empty consumers do not trigger early dispatch;
+- the single-hauler recovery path is unchanged.
+
+No hauler-count, mining, worker/body sizing, defense, planner, or expansion changes are included.
+
+### Live acceptance
+
+The verifier compares the full v0.2.20 window against the v0.2.19 baseline:
+
+- waiting ratio target: below `0.212`;
+- fallback ratio target: below `0.097`;
+- zero hard FAIL in all existing runtime/safety gates.
+
+### Verification workflow
+
+```powershell
+cd "C:\Users\hansi\AppData\Local\Screeps\scripts\screeps_newbieland_net___21025\boringstuff"
+powershell -ExecutionPolicy Bypass -File .\install.ps1
+cd tools
+npm install
+npm test
+npm run doctor
+npm run deploy
+npm run logs
+```
+
+Then:
+
+```powershell
+cd "C:\Users\hansi\AppData\Local\Screeps\scripts\screeps_newbieland_net___21025\chatgpt\tools"
+npm run verify:smoke
+npm run verify:live
+```
+
+Expected runtime version: `0.2.20-node18`.
+
+---
+
+## Historical documentation
+
 # Screeps Autonomous Bot v0.2.19-node18
 
 Canonical local repository:

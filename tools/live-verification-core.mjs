@@ -1,5 +1,5 @@
 export const EXPECTED_NODE_VERSION = '18.20.4';
-export const EXPECTED_BOT_VERSION = '0.2.19-node18';
+export const EXPECTED_BOT_VERSION = '0.2.20-node18';
 
 const RANK = { PASS: 0, WATCH: 1, FAIL: 2 };
 
@@ -160,6 +160,17 @@ export function evaluateLive(input) {
     ));
   } else {
     checks.push(check('productive-attribution', 'PASS', 'Productive-flow attribution is complete for the 100-tick window.', attributionFields));
+  }
+
+  const waitingRatio = finite(attribution?.waitingRatio, null);
+  const fallbackRatio = finite(attribution?.fallbackRatio, null);
+  const latencyBaseline = { waitingRatio: 0.212, fallbackRatio: 0.097 };
+  if (waitingRatio === null || fallbackRatio === null) {
+    checks.push(check('consumer-latency-window', 'WATCH', 'No complete consumer latency ratios were available.', { waitingRatio, fallbackRatio, baseline: latencyBaseline }));
+  } else if (waitingRatio < latencyBaseline.waitingRatio && fallbackRatio < latencyBaseline.fallbackRatio) {
+    checks.push(check('consumer-latency-window', 'PASS', 'Consumer latency improved versus the v0.2.19 baseline.', { waitingRatio, fallbackRatio, baseline: latencyBaseline }));
+  } else {
+    checks.push(check('consumer-latency-window', 'WATCH', 'Consumer latency has not improved on both v0.2.19 baseline ratios.', { waitingRatio, fallbackRatio, baseline: latencyBaseline }));
   }
 
   const haulerDeficit = finite(model.haulerCarryDeficit, null);

@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import { formatWaitStatus, resolveAutoStart, waitForAutoStart } from './live-verification-wait.mjs';
 
-const version = '0.2.19-node18';
+const version = '0.2.20-node18';
 const room = 'E8N1';
 
 function versionChange(tick = 1000) {
-  return { tick, v: version, code: 'VERSION_CHANGE', ctx: { from: '0.2.18-node18', to: version } };
+  return { tick, v: version, code: 'VERSION_CHANGE', ctx: { from: '0.2.19-node18', to: version } };
 }
 
 function snapshot(eventTick, startTick, endTick, attribution = true) {

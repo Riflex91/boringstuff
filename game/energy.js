@@ -236,6 +236,57 @@ function shouldPrioritizeConsumer(creep) {
   return !!guard && guard.id === creep.id;
 }
 
+
+function selectConsumerEarlyDispatchHauler(room) {
+  // v0.2.20: aggregate CARRY can be sufficient while every hauler is still on
+  // the pickup leg. A critical consumer can then wait all the way to fallback
+  // even though one hauler already carries usable energy. With redundant
+  // logistics, let exactly one partial hauler break pickup early — but only
+  // when no normal delivery-ready guard already exists.
+  if (!room || !room.find) return null;
+  const readyGuard = selectConsumerGuardHauler(room);
+  if (readyGuard) return null;
+
+  const haulers = room.find(FIND_MY_CREEPS, {
+    filter: c => !c.spawning && c.memory && c.memory.role === 'hauler'
+  });
+  if (haulers.length < 2) return null;
+
+  const critical = room.find(FIND_MY_CREEPS, {
+    filter: c => isCriticalConsumerRequest(c)
+  });
+  if (!critical.length) return null;
+
+  const partial = haulers.filter(h => !haulerReadyToDeliver(h) && energyAmount(h) > 0);
+  if (!partial.length) return null;
+
+  const criticalIds = {};
+  for (const consumer of critical) criticalIds[consumer.id] = true;
+
+  const reserved = partial.filter(h => h.memory.consumerTargetId && criticalIds[h.memory.consumerTargetId]);
+  if (reserved.length) {
+    reserved.sort((a, b) => stableCreepKey(a).localeCompare(stableCreepKey(b)));
+    return reserved[0];
+  }
+
+  partial.sort((a, b) => {
+    const rangeA = Math.min.apply(null, critical.map(c => a.pos && a.pos.getRangeTo ? a.pos.getRangeTo(c) : 999));
+    const rangeB = Math.min.apply(null, critical.map(c => b.pos && b.pos.getRangeTo ? b.pos.getRangeTo(c) : 999));
+    if (rangeA !== rangeB) return rangeA - rangeB;
+
+    const energyDelta = energyAmount(b) - energyAmount(a);
+    if (energyDelta !== 0) return energyDelta;
+    return stableCreepKey(a).localeCompare(stableCreepKey(b));
+  });
+  return partial[0] || null;
+}
+
+function shouldInterruptPickupForConsumer(creep) {
+  if (!creep || !creep.room || !creep.memory || creep.memory.delivering || energyAmount(creep) <= 0) return false;
+  const guard = selectConsumerEarlyDispatchHauler(creep.room);
+  return !!guard && guard.id === creep.id;
+}
+
 function consumerEnergyRatio(creep) {
   const carried = energyAmount(creep);
   const free = freeEnergyCapacity(creep);
@@ -356,6 +407,7 @@ module.exports = {
   consumerNeedsDelivery,
   isCriticalConsumerRequest,
   shouldPrioritizeConsumer,
+  shouldInterruptPickupForConsumer,
   clearConsumerTarget,
   _test: {
     consumerPriority,
@@ -363,6 +415,7 @@ module.exports = {
     selectConsumerTarget,
     currentConsumerTarget,
     haulerReadyToDeliver,
-    selectConsumerGuardHauler
+    selectConsumerGuardHauler,
+    selectConsumerEarlyDispatchHauler
   }
 };

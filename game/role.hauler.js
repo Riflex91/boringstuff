@@ -15,6 +15,14 @@ function run(creep) {
     if (carried >= Math.max(50, Math.floor(capacity * 0.5))) creep.memory.delivering = true;
   }
 
+  // v0.2.20: when logistics is redundant but every hauler is still on pickup,
+  // one partial hauler may break pickup early for an already-critical consumer.
+  // The selector refuses this path if a normal delivery-ready guard exists or
+  // if only one hauler is alive.
+  if (!creep.memory.delivering && energy.shouldInterruptPickupForConsumer(creep)) {
+    creep.memory.delivering = true;
+  }
+
   if (!creep.memory.delivering) {
     energy.clearConsumerTarget(creep);
     if (!energy.acquireForHauler(creep)) {

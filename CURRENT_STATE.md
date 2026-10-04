@@ -178,24 +178,38 @@ The smoke window belongs to the initial v0.2.19 deploy. The later serialization/
 
 ## Next release boundary
 
-v0.2.19 is live-verified and closes the attribution gap. The next behavior release is intentionally **not selected yet**.
+The next intended release is **v0.2.20-node18 — Critical Consumer Early Dispatch**.
 
-The remaining live findings are now actionable evidence rather than generic symptoms:
+v0.2.19 attribution identified delivery latency as the dominant residual bottleneck:
 
-- consumer self-supply fallback occurred again;
-- productive throughput remains below mining capacity;
-- Efficiency returned to `UNDERUTILIZED`;
-- mining and modeled hauler capacity still passed.
+- consumer waiting ratio: **0.212**;
+- consumer fallback ratio: **0.097**;
+- average wait age while waiting: **5.73 ticks**;
+- maximum wait age: **12 ticks**, exactly the configured handoff-to-fallback threshold;
+- average construction capacity: **23.2 e/t**, but actual construction throughput only **10.05 e/t**;
+- controller capacity **2 e/t** and actual controller throughput **1.96 e/t**;
+- mining **20 e/t** and modeled hauler deficit **0**.
 
-The next change must be chosen from the measured v0.2.19 attribution rather than by increasing harvester/hauler counts blindly.
+This rules out missing mining capacity and strongly argues against insufficient productive WORK capacity. The gap is last-mile delivery latency.
+
+v0.2.20 changes only the redundant-hauler critical-consumer path:
+
+- with fewer than two live haulers, behavior is unchanged;
+- a fresh empty consumer alone does not trigger early dispatch;
+- if a consumer is already waiting/fallbacking and no normal delivery-ready starvation guard exists, exactly one partial hauler carrying energy may end its pickup leg early;
+- an existing critical reservation remains sticky;
+- if a normal delivery-ready guard exists, partial haulers continue pickup normally;
+- mining targets, hauler count/capacity planning, productive creep counts, defense, planner/layout, and expansion policy are unchanged.
+
+Live acceptance compares the full 100-tick window against the v0.2.19 baseline. The target is to reduce **both** waiting ratio below `0.212` and fallback ratio below `0.097` while all hard safety gates remain free of FAIL.
 
 ## Current strategic interpretation
 
-`E8N1` remains an RCL2 two-source colony in container-logistics mode. v0.2.19 confirms the supply side is still structurally healthy: dedicated mining is active, modeled hauler capacity is sufficient, controller and construction progress continue, CPU/bucket are safe, and telemetry is contiguous.
+`E8N1` is still supply-positive: dedicated mining reaches 20 e/t, modeled hauler capacity is sufficient, room energy was capped for 69% of the measured v0.2.19 window, and productive backlog remained active.
 
-The unresolved problem is now localized to productive-flow execution. Consumer fallback can still recur even with sufficient aggregate hauling, productive throughput remains below available mining capacity, and Efficiency can fall back to `UNDERUTILIZED`.
+The limiting signal is temporal rather than aggregate capacity. Consumers spent 21.2% of consumer-time waiting and 9.7% in fallback, while available construction WORK capacity substantially exceeded realized construction throughput. Controller utilization was already near its dedicated capacity.
 
-Use the v0.2.19 attribution to distinguish whether the next bottleneck is primarily delivery latency, insufficient productive WORK capacity, construction backlog composition, or controller allocation. Do not add mining or hauling capacity without attribution evidence supporting it.
+v0.2.20 therefore reduces response latency inside the existing two-hauler fleet rather than adding creeps. Recovery safety remains invariant: the sole-hauler path and normal hard-infrastructure priority are unchanged.
 
 ## Development invariants
 
