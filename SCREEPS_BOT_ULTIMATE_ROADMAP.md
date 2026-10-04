@@ -287,6 +287,25 @@ The second source-level pass adds these concrete rules:
 
 These rules are mandatory when implementing U3-U11. The detailed algorithms and derived fixtures are in `docs/ULTIMATE_AUTONOMY_KNOWLEDGE_BASE.md`.
 
+## 2.7 Recovery / memory / industry rules that are now architectural requirements
+
+- **Recovery is a first-class colony mode.** A broken colony suppresses optional work, reserves spawn energy, restores minimum mining/logistics/controller capacity and can request external aid. Recovery exit requires hysteresis-confirmed stability.
+- **Cross-colony aid is generic.** Emergency workers, energy convoy, defense reinforcement, bootstrap support and boost/material aid all use the same `SupportRequest` contract with deadline, provider cost and ETA.
+- **Persistent state is lifecycle-managed.** Every durable schema has a version, migration path, freshness/permanence classification and garbage-collection rule. New code must not require manually clearing Memory.
+- **Segments are optional.** Large plans/routes/history may use RawMemory segments when available, but survival must fall back to compact Memory or recomputation.
+- **Market decisions use effective value.** Nominal credits are corrected for terminal transaction energy, internal energy shadow price, reserves and opportunity cost. Internal empire transfers compete against market trades.
+- **Resource reserves are forecast-driven.** Strategic stock is computed from survival reserve, forecast demand, committed operations, production pipeline and desired buffer instead of fixed magic thresholds.
+- **Labs are demand-driven.** Boost/compound need creates a reaction dependency DAG, reagent requests, logistics, lab assignment and eventual boost appointment.
+- **Boosts belong to operations.** Compound stock is reserved at operation commitment; body optimization compares boosted vs unboosted plans including lab/logistics/scarcity cost.
+- **Factory production is value-based.** Product output value is compared against ingredient shadow value, energy, transfer, cooldown and logistics cost.
+- **Power is subordinate to economy health.** Power processing or harvesting may not consume the core survival/growth reserve.
+- **Power-bank harvesting is an Operation.** Discovery, valuation, target reservation, damage/heal assembly, attack, JIT hauler dispatch, collection and ROI settlement are explicit phases.
+- **Empire requests use cheap-filter then expensive-validation.** Reject impossible responders by status/distance/capability before doing costly pathfinding.
+- **Remote transport tracks credit/debt.** Produced-but-unmoved, reserved pickup, expected production, transported and decayed/lost resource are separately represented.
+- **Respawn and schema migration are normal lifecycle events.** Empty-memory boot, soft migration, hard migration fallback and ownership/operation invalidation are tested.
+
+These rules apply especially to K0/K1, E3/E4, I2/I4 and M0-M4.
+
 ---
 
 # 3. Universal runtime model
