@@ -32,10 +32,8 @@ function bodyCost(body) {
 }
 
 function emergencyFallbackBody(role, energy) {
-  if (role === 'worker') return bodyBuilder.worker(energy, true);
-  if (role === 'harvester') return bodyBuilder.harvester(energy, false);
-  if (role === 'hauler') return bodyBuilder.hauler(energy);
-  return [];
+  if (role !== 'worker') return [];
+  return bodyBuilder.worker(energy, true);
 }
 
 function routeContext(state, request) {
