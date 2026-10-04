@@ -18,7 +18,7 @@ Projektziel: Ein autonomer, adaptiver, CPU-effizienter Screeps-Bot, der vom erst
 - Letzte vollständig verifizierte Runtime-Version auf `main`: `0.2.19-node18`
 - Aktueller Entwicklungs-Release: `0.2.20-node18` – **Critical Consumer Early Dispatch**
 - Aktueller Entwicklungsbranch: `feature/v0.2.20-critical-consumer-early-dispatch`
-- Aktueller PR: `#4` – Draft / Live-Verifikation läuft
+- Aktueller PR: `#4` – Draft / erste Live-Iteration ausgewertet, zweite Behavior-Iteration muss neu verifiziert werden
 - Colony Session: `E8N1-3669884`
 - Aktuell erreicht: RCL2
 - Node.js-Gate: exakt `18.20.4`
@@ -37,6 +37,12 @@ Projektziel: Ein autonomer, adaptiver, CPU-effizienter Screeps-Bot, der vom erst
   - tatsächlicher Controller-Durchsatz: `1.96 e/t`
 - Aktuelle Hypothese: Der verbleibende Engpass ist primär **Delivery-Latenz**, nicht Mining- oder WORK-Kapazität.
 - v0.2.20 testet daher Early Dispatch eines teilweise beladenen Haulers bei kritischem Consumer-Warten, ohne Hauler-Anzahl, Mining oder Single-Hauler-Recovery zu verändern.
+- Erste v0.2.20 Live-Iteration, Fenster `3684501–3684600`: `PASS=13 / WATCH=4 / FAIL=0`.
+  - `fallbackRatio = 0.008` gegenüber v0.2.19-Baseline `0.097`: stark verbessert.
+  - `waitingRatio = 0.395` gegenüber Baseline `0.212`: deutlich verschlechtert.
+  - Live-Logs bestätigen wartende/critical Consumers trotz bereits vorhandener Energie; Teil-Lieferungen beendeten Waiting bisher erst bei vollständig gefülltem Consumer.
+  - Aktuelle zweite v0.2.20-Iteration: Jede erfolgreiche positive Consumer-Lieferung setzt `working=true`, löscht Waiting/Fallback und gibt die Reservation sofort frei.
+  - Diese Behavior-Änderung ist noch **nicht live verifiziert** und erfordert erneut Offline-Test, Deploy, Smoke und 100-Tick-Live-Gate.
 - `verify:live` wartet automatisch auf ein vollständiges 100-Tick-Fenster und zeigt einen Countdown `Waiting for data...[MM Min SS Sec remaining]`.
 
 Wichtig: Der Bot läuft live. Änderungen weiterhin datengetrieben durchführen. Historische Verification Evidence ist append-only und darf nicht nachträglich umgeschrieben werden.
