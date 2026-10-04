@@ -8,6 +8,15 @@ function versionChange(tick = 1000) {
   return { tick, v: version, code: 'VERSION_CHANGE', ctx: { from: '0.2.19-node18', to: version } };
 }
 
+function deploymentMarker(tick, deploymentId) {
+  return {
+    tick,
+    v: version,
+    code: 'DEPLOYMENT_MARKER',
+    ctx: { version, deploymentId }
+  };
+}
+
 function snapshot(eventTick, startTick, endTick, attribution = true) {
   const productiveFlow = attribution ? {
     consumerTicks: 400,
@@ -80,6 +89,52 @@ function snapshot(eventTick, startTick, endTick, attribution = true) {
   const status = resolveAutoStart([versionChange(1000)], version, 'smoke', room);
   assert.equal(status.ready, true);
   assert.equal(status.startTick, 1001);
+}
+
+{
+  // Same-version redeploy: old complete windows must not be reused after the
+  // new deployment marker.
+  const rows = [
+    versionChange(1000),
+    snapshot(1100, 1001, 1100),
+    deploymentMarker(1150, 'deploy-b'),
+    snapshot(1200, 1101, 1200)
+  ];
+  const status = resolveAutoStart(rows, version, 'live', room);
+  assert.equal(status.ready, false);
+  assert.equal(status.deployTick, 1150);
+  assert.equal(status.deploymentId, 'deploy-b');
+  assert.equal(status.boundarySource, 'DEPLOYMENT_MARKER');
+  assert.equal(status.expectedStartTick, 1201);
+  assert.equal(status.expectedEndTick, 1300);
+}
+
+{
+  // Once a full window begins after the same-version deployment marker, it is
+  // selected normally.
+  const rows = [
+    versionChange(1000),
+    snapshot(1100, 1001, 1100),
+    deploymentMarker(1150, 'deploy-b'),
+    snapshot(1300, 1201, 1300)
+  ];
+  const status = resolveAutoStart(rows, version, 'live', room);
+  assert.equal(status.ready, true);
+  assert.equal(status.startTick, 1201);
+  assert.equal(status.endTick, 1300);
+  assert.equal(status.deploymentId, 'deploy-b');
+}
+
+{
+  const status = resolveAutoStart(
+    [versionChange(1000), deploymentMarker(1150, 'deploy-b')],
+    version,
+    'smoke',
+    room
+  );
+  assert.equal(status.ready, true);
+  assert.equal(status.startTick, 1150);
+  assert.equal(status.boundarySource, 'DEPLOYMENT_MARKER');
 }
 
 console.log('live verification wait tests passed');
