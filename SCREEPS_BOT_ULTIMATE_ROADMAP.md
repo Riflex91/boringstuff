@@ -1497,19 +1497,24 @@ The project reaches its target only when all statements are true:
 
 ---
 
-# 23. Canonical research file
+# 23. Canonical VNext knowledge set
 
 Deep study and algorithm notes:
 
 `docs/ULTIMATE_AUTONOMY_KNOWLEDGE_BASE.md`
 
+Stable implementation interfaces:
+
+`docs/VNEXT_CORE_CONTRACTS.md`
+
 A new chat working on VNext should read:
 
 1. this roadmap;
-2. the knowledge base;
-3. the current active PR/release evidence relevant to its assigned slice.
+2. `docs/ULTIMATE_AUTONOMY_KNOWLEDGE_BASE.md` for the research and algorithms;
+3. `docs/VNEXT_CORE_CONTRACTS.md` for the authoritative cross-track interfaces;
+4. the current active PR/release evidence relevant to its assigned slice.
 
-Do not repeat external-repo research unless a specific concept needs deeper verification or the source projects have materially changed.
+Do not repeat external-repo research unless a specific concept needs deeper verification or the source projects have materially changed. Do not redesign an existing core contract casually; version and migrate it if a change is necessary.
 
 ---
 
