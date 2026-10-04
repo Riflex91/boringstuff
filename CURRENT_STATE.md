@@ -6,7 +6,7 @@ Canonical repository: `Riflex91/boringstuff`
 
 - Seed baseline: **v0.2.16-node18**
 - Current canonical source baseline before this release prep: `29ad209af552f0a20ea50c0e7c8ad4e32a567e05`
-- Release candidate identity: **0.3.0-shadow.3-node18**
+- Release candidate identity: **0.3.0-shadow.4-node18**
 - Latest VNext live gate: **WATCH — 15 PASS / 3 WATCH / 0 FAIL**
 - Runtime target: **Node.js 18.20.4**
 - Runtime branch: `chatgpt`
@@ -284,6 +284,32 @@ The first complete shadow.2 live window `3691601–3691700` is **FAIL**, not PAS
 - the live window did not contain a spawn transition, so the E2 in-flight-spawn fix still needs a direct post-fix live replacement observation.
 
 Existing profiler maxima are lifetime maxima and cannot attribute the exact spike tick to `rooms` vs `creeps`. Per-sample section attribution has now been added to the 25-tick CPU history, including `rooms`, `creeps`, `world-intel`, `stats`, `visuals`, `attributed`, and `unattributed`. The next gate is a shadow.3 live run that captures at least one future CPU spike with this attribution. E4 remains blocked until that evidence is reviewed. Do not weaken the hard CPU threshold.
+
+## 0.3.0-shadow.3 CPU attribution follow-up
+
+The complete shadow.3 live window `3692101–3692200` finished **WATCH**, not FAIL:
+
+- `PASS=15 / WATCH=3 / FAIL=0`;
+- CPU/bucket passed inside the 100-tick verification window;
+- runtime errors, collector health, mining, hard-stall, telemetry continuity, productive attribution, modeled hauler capacity, controller progress, construction progress, VNext platform shadow, and VNext shadow authority all passed;
+- remaining WATCH findings were consumer self-supply fallback, productive throughput below mining capacity, and Efficiency `WATCH`.
+
+Post-window CPU history then captured a new recurring hard spike at tick `3692225`:
+
+- total CPU: `27.412`;
+- bucket: `10000`;
+- `rooms: 19.065` CPU (~69.6% of total);
+- `creeps: 2.357` CPU;
+- `world-intel: 0` CPU;
+- `stats: 0.046` CPU;
+- `visuals: 0.048` CPU;
+- `unattributed: 5.896` CPU.
+
+This identifies the top-level `rooms` section as the primary recurring spike domain for that sample. It is not yet sufficient to identify the exact expensive operation inside `room.manager`.
+
+PR #23 added nested, non-additive room-manager CPU detail sampling for `room.state`, `room.economy`, `room.requests`, `room.capacity-spawn`, `room.assignment`, `room.evidence`, `room.colony-state`, `room.legacy`, `room.planner`, and `room.heartbeat`. It changes observability only and preserves legacy gameplay authority and the hard CPU threshold.
+
+The next release is **0.3.0-shadow.4-node18**. Its purpose is to capture the next recurring >20 CPU sample with nested room detail attribution. E4 remains blocked until that evidence is reviewed; do not optimize or weaken thresholds on suspicion alone.
 
 ## Current strategic interpretation
 
