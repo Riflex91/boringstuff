@@ -11,6 +11,7 @@ const colonyEfficiency = require('colony.efficiency');
 const colonyState = require('colony.state');
 const requestShadow = require('request.shadow');
 const assignmentShadow = require('assignment.shadow');
+const assignmentEvidence = require('assignment.evidence');
 const logger = require('logger');
 const config = require('config');
 
@@ -29,6 +30,7 @@ function status(state) {
     efficiency: state.efficiency,
     requests: state.requestShadow ? state.requestShadow.summary : null,
     assignments: state.assignmentShadow ? state.assignmentShadow.summary : null,
+    assignmentEvidence: state.assignmentEvidence ? (state.assignmentEvidence.lastWindow || state.assignmentEvidence.current) : null,
     colonyState: state.colonyState || null
   };
 }
@@ -107,6 +109,13 @@ function run(room, lowCpu) {
         undefined,
         Game
       );
+  state.assignmentEvidence = assignmentEvidence.observe(state);
+  if (state.assignmentEvidence.completed) {
+    logger.info('ASSIGNMENT_EVIDENCE_WINDOW', 'Shadow request/assignment evidence window completed', {
+      room: state.room.name,
+      evidence: state.assignmentEvidence.completed
+    }, { force: true, persist: true, dedupeTicks: 0 });
+  }
   state.colonyState = colonyState.build(state, {
     tick: Game.time,
     bucket: Game.cpu.bucket
