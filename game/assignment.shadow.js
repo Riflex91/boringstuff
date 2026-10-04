@@ -296,6 +296,23 @@ function snapshot(roomName, memoryRoot) {
   };
 }
 
+function deferredSnapshot(roomName, reason, memoryRoot) {
+  const base = snapshot(roomName, memoryRoot);
+  return {
+    schemaVersion: base.schemaVersion,
+    authority: 'SHADOW',
+    planTick: base.planTick,
+    deferred: true,
+    deferReason: reason || 'DEFERRED',
+    requestCount: base.requestCount,
+    executorCount: base.executorCount,
+    assignmentCount: base.assignmentCount,
+    switchCount: base.switchCount,
+    unfilledCount: base.unfilledCount,
+    totalUnfilled: base.totalUnfilled
+  };
+}
+
 module.exports = {
   SCHEMA_VERSION,
   ensure,
@@ -304,5 +321,6 @@ module.exports = {
   score,
   recordFailure,
   snapshot,
+  deferredSnapshot,
   _test: { bodyParts, role, carriedEnergy, capabilityFor, localRange, deadlineUrgency, pairKey, activeFailure, requestActive, requestAssignable }
 };
