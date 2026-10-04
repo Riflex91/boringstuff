@@ -148,6 +148,29 @@ const energy = require('../game/energy.js');
   assert.equal(energy._test.selectConsumerTarget(hauler2).id, builder.id);
 }
 
+// v0.2.20 live regression: a partial emergency delivery must resume productive
+// work immediately. The consumer must not keep waiting merely because its carry
+// is not completely full.
+{
+  const target = makeConsumer('worker-partial-after', 'worker', 0, 7, true, 2);
+  target.memory.working = false;
+  const hauler = makeHauler('hauler-partial-fill', {}, 50);
+  hauler.memory.consumerTargetId = target.id;
+  hauler.transfer = (consumer) => {
+    consumer.store.energy = 50;
+    return OK;
+  };
+  room.creeps = [target, hauler];
+
+  assert.equal(energy.deliverToConsumer(hauler), true);
+  assert.equal(target.store.energy, 50);
+  assert.equal(target.memory.working, true);
+  assert.equal(target.memory.waitingEnergyTicks, 0);
+  assert.equal(target.memory.logisticsFallback, false);
+  assert.equal(hauler.memory.consumerTargetId, undefined);
+  assert.equal(energy.consumerNeedsDelivery(target), false);
+}
+
 // Once a reserved target is fully supplied, the reservation and fallback state
 // are cleared immediately so the hauler can take a different request next tick.
 {
@@ -162,6 +185,7 @@ const energy = require('../game/energy.js');
 
   assert.equal(energy.deliverToConsumer(hauler), true);
   assert.equal(hauler.memory.consumerTargetId, undefined);
+  assert.equal(target.memory.working, true);
   assert.equal(target.memory.waitingEnergyTicks, 0);
   assert.equal(target.memory.logisticsFallback, false);
 }
