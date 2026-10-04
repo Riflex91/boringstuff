@@ -41,6 +41,13 @@ RuntimeCapabilities {
 
 Invariant: no strategic module may check a server name when a normalized capability can answer the question.
 
+Claim-policy rule:
+
+- `ERR_GCL_NOT_ENOUGH` is dynamic GCL capacity evidence, not a persistent global room limit.
+- `ERR_FULL` from a claim is contextual capacity evidence unless the server explicitly documents/provides a global limit.
+- `discoveredClaimLimit` is populated only from explicit server metadata/adapters or later evidence strong enough to establish a global constraint.
+- raw claim failures remain available through `lastClaimFailure` / server-profile observations for backoff and replanning.
+
 # 3. WorldIntel
 
 ```text
