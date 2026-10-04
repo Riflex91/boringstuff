@@ -115,6 +115,21 @@ function storeSnapshot(state) {
   };
 }
 
+function structureSnapshot(state) {
+  const byType = {};
+  const ownedByType = {};
+  for (const structure of state.structures || []) {
+    const type = String(structure.structureType || 'unknown');
+    byType[type] = (byType[type] || 0) + 1;
+    if (structure.my) ownedByType[type] = (ownedByType[type] || 0) + 1;
+  }
+  return {
+    count: (state.structures || []).length,
+    byType,
+    ownedByType
+  };
+}
+
 function sourceSnapshot(state) {
   const routes = state.economyModel && Array.isArray(state.economyModel.sourceRoutes)
     ? state.economyModel.sourceRoutes
@@ -188,18 +203,20 @@ function build(state, context) {
 
   return {
     schemaVersion: SCHEMA_VERSION,
+    authority: 'SHADOW',
     tick: Number.isFinite(context.tick) ? context.tick : (typeof Game !== 'undefined' ? Game.time : null),
     roomName: state.room && state.room.name ? state.room.name : null,
     mode: deriveMode(state),
     controller: controllerSnapshot(state),
     sources: sourceSnapshot(state),
     stores: storeSnapshot(state),
+    structures: structureSnapshot(state),
     construction: constructionSnapshot(state),
     spawn,
     capacity: {
       active: active.parts,
-      projected: null,
-      queued: null,
+      projected: { available: false, reason: 'E2_NOT_IMPLEMENTED' },
+      queued: { available: false, reason: 'E2_NOT_IMPLEMENTED' },
       spawning: spawn.spawningParts,
       ttl: active.ttl
     },
@@ -236,6 +253,7 @@ module.exports = {
     activeCapacity,
     controllerSnapshot,
     constructionSnapshot,
+    structureSnapshot,
     logisticsSnapshot,
     threatSnapshot,
     deriveMode
