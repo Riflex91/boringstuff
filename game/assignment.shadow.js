@@ -136,6 +136,7 @@ function score(creep, request, roomState, now) {
   const deadline = deadlineUrgency(request, now);
   const localityBonus = range <= 3 ? 15 : range <= 10 ? 8 : 0;
   const carriedBonus = request.kind === 'ENERGY_DELIVERY' ? Math.min(30, carriedEnergy(creep) / 10) : 0;
+  const r = role(creep);
   let roleFitBonus = 0;
   if (r === 'builder' && request.kind === 'BUILD') roleFitBonus = 15;
   else if (r === 'repairer' && request.kind === 'REPAIR') roleFitBonus = 15;
