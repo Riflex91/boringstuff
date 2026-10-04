@@ -178,4 +178,25 @@ function request(id, kind, capability, amount, options = {}) {
   assert.equal(plan.assignments.length, 0);
 }
 
+{
+  const capacity = request('capacity-only', 'HAUL_CAPACITY', 'carry', 4, { base: 100 });
+  assert.equal(assignment._test.requestAssignable(capacity), false);
+  const work = request('work-only', 'BUILD', 'workBuild', 2, { base: 50 });
+  assert.equal(assignment._test.requestAssignable(work), true);
+}
+
+{
+  const memory = {};
+  const h = creep('h-defer', 'hauler', { carry: 2, move: 1 }, 10, 10, 50);
+  const r = request('defer-r', 'ENERGY_DELIVERY', null, 50, { base: 80 });
+  const plan = assignment.plan('E1N1', [r], [h], memory, { time: 190 });
+  assert.equal(plan.summary.planTick, 190);
+  assert.equal(plan.summary.deferred, false);
+  const deferred = assignment.deferredSnapshot('E1N1', 'LOW_CPU', memory);
+  assert.equal(deferred.planTick, 190);
+  assert.equal(deferred.deferred, true);
+  assert.equal(deferred.deferReason, 'LOW_CPU');
+  assert.equal(deferred.assignmentCount, plan.summary.assignmentCount);
+}
+
 console.log('assignment shadow tests passed');
