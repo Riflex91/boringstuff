@@ -6,7 +6,7 @@ Canonical repository: `Riflex91/boringstuff`
 
 - Seed baseline: **v0.2.16-node18**
 - Current canonical source baseline before this release prep: `29ad209af552f0a20ea50c0e7c8ad4e32a567e05`
-- Release candidate identity: **0.3.0-shadow.4-node18**
+- Release candidate identity: **0.3.0-shadow.5-node18**
 - Latest VNext live gate: **WATCH — 15 PASS / 3 WATCH / 0 FAIL**
 - Runtime target: **Node.js 18.20.4**
 - Runtime branch: `chatgpt`
@@ -310,6 +310,34 @@ This identifies the top-level `rooms` section as the primary recurring spike dom
 PR #23 added nested, non-additive room-manager CPU detail sampling for `room.state`, `room.economy`, `room.requests`, `room.capacity-spawn`, `room.assignment`, `room.evidence`, `room.colony-state`, `room.legacy`, `room.planner`, and `room.heartbeat`. It changes observability only and preserves legacy gameplay authority and the hard CPU threshold.
 
 The next release is **0.3.0-shadow.4-node18**. Its purpose is to capture the next recurring >20 CPU sample with nested room detail attribution. E4 remains blocked until that evidence is reviewed; do not optimize or weaken thresholds on suspicion alone.
+
+## 0.3.0-shadow.4 CPU detail follow-up
+
+The complete shadow.4 live window `3692501–3692600` finished **WATCH** with `PASS=15 / WATCH=3 / FAIL=0`:
+
+- CPU/bucket, runtime health, collector health, mining, hard-stall, telemetry continuity, productive attribution, modeled hauler capacity, controller progress, construction progress, VNext platform shadow, and VNext shadow authority all passed;
+- consumer supply remained WATCH because consumers waited/were critical, but self-supply fallback stayed at zero;
+- productive throughput remained below mining capacity;
+- Efficiency remained `UNDERUTILIZED`.
+
+The new nested room CPU detail telemetry explains the observed room cost almost completely. Captured samples show:
+
+- `room.capacity-spawn`: peak `6.534` CPU at tick `3692525`;
+- `room.assignment`: peak `4.272` CPU at tick `3692625`;
+- `room.requests`: peak `3.822` CPU at tick `3692575`;
+- `room.heartbeat`: only `0.331–1.273` CPU in the captured detail samples.
+
+No post-deploy shadow.4 sample in the captured history exceeded 20 CPU, but ticks `3692525` (`19.462`) and `3692550` (`19.643`) approached the hard threshold closely. The evidence therefore does not justify blaming heartbeat serialization; the first optimization target is repeated computation inside the E2 capacity/body-optimization path and E1 assignment scoring.
+
+PR #25 applies behavior-neutral Shadow CPU reuse only:
+
+- bounded deterministic caching in the body optimizer with mutation-isolated returns;
+- candidate cost calculation before body allocation so over-budget candidates can be skipped earlier;
+- once-per-plan executor profiles in E1 so role, WORK, CARRY and carried energy are not repeatedly recomputed for every candidate pair.
+
+No request priority, assignment score formula, spawn decision, body ranking, CPU threshold, gameplay authority, or E4 logistics behavior is changed.
+
+The next release is **0.3.0-shadow.5-node18**. Its live purpose is to verify that the observed `capacity-spawn` and `assignment` CPU costs fall without behavior regressions. E4 remains blocked until the CPU safety evidence from this release is reviewed.
 
 ## Current strategic interpretation
 
