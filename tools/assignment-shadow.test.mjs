@@ -188,6 +188,29 @@ function request(id, kind, capability, amount, options = {}) {
   assert.equal(assignment._test.requestAssignable(work), true);
 }
 
+
+{
+  // Static executor facts are computed once per plan, not once per
+  // creep/request candidate pair in the greedy assignment search.
+  const memory = {};
+  const w = creep('w-profile', 'worker', { work: 3, carry: 2, move: 2 }, 10, 10, 50);
+  let bodyPartReads = 0;
+  const originalGetActiveBodyparts = w.getActiveBodyparts;
+  w.getActiveBodyparts = function(type) {
+    bodyPartReads += 1;
+    return originalGetActiveBodyparts.call(this, type);
+  };
+  const build = request('profile-build', 'BUILD', 'workBuild', 2, {
+    base: 70, pos: { x: 11, y: 10, roomName: 'E1N1' }
+  });
+  const upgrade = request('profile-upgrade', 'UPGRADE', 'workUpgrade', 2, {
+    base: 60, pos: { x: 12, y: 10, roomName: 'E1N1' }
+  });
+  const plan = assignment.plan('E1N1', [build, upgrade], [w], memory, { time: 185 });
+  assert.equal(plan.assignments.length, 1);
+  assert.equal(bodyPartReads, 2);
+}
+
 {
   const memory = {};
   const h = creep('h-defer', 'hauler', { carry: 2, move: 1 }, 10, 10, 50);
