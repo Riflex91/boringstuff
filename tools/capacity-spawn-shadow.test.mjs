@@ -101,7 +101,8 @@ function capacityRequest(kind, capability, amount, options = {}) {
   assert.equal(plan.summary.deficitCount, 1);
   assert.equal(plan.spawnRequests.length, 2);
   assert.equal(plan.spawnRequests[0].capacityDelivered, 3);
-  assert.equal(plan.spawnRequests[1].capacityDelivered, 2);
+  assert.equal(plan.spawnRequests[1].capacityDelivered, 3);
+  assert.equal(plan.spawnRequests[1].capacityApplied, 2);
   assert.equal(plan.deficits[0].active, 0);
   assert.equal(plan.deficits[0].queued, 0);
   assert.equal(plan.deficits[0].uncoveredAfterPlan, 0);
