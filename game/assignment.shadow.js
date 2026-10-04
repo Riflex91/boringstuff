@@ -67,19 +67,19 @@ function capabilityFor(creep, request) {
   const move = bodyParts(creep, 'MOVE');
   const carryCapacity = typeof CARRY_CAPACITY !== 'undefined' ? CARRY_CAPACITY : 50;
 
+  // Capacity-deficit requests already subtract currently active capacity.
+  // They are inputs to E2/spawn planning, not executable work for existing creeps.
+  if (kind === 'HARVEST_CAPACITY' || kind === 'HAUL_CAPACITY' || kind === 'RECOVERY_CAPACITY') return 0;
+
   if (kind === 'ENERGY_DELIVERY') {
     if (r !== 'hauler' || carry <= 0) return 0;
     return carry * carryCapacity;
   }
-  if (capability === 'carry') return r === 'hauler' ? carry : 0;
-  if (capability === 'workHarvest') return r === 'harvester' ? work : 0;
-  if (capability === 'workBuild') return (r === 'worker' || r === 'builder' || r === 'repairer') ? work : 0;
-  if (capability === 'workRepair') return (r === 'worker' || r === 'builder' || r === 'repairer') ? work : 0;
-  if (capability === 'workUpgrade') return (r === 'worker' || r === 'builder' || r === 'repairer' || r === 'upgrader') ? work : 0;
-  if (capability === 'bootstrap') {
-    if (r !== 'worker' && r !== 'harvester') return 0;
-    return Math.min(work, carry, move);
-  }
+
+  const hasWorkEnergy = carriedEnergy(creep) > 0;
+  if (capability === 'workBuild') return hasWorkEnergy && (r === 'worker' || r === 'builder' || r === 'repairer') ? work : 0;
+  if (capability === 'workRepair') return hasWorkEnergy && (r === 'worker' || r === 'builder' || r === 'repairer') ? work : 0;
+  if (capability === 'workUpgrade') return hasWorkEnergy && (r === 'worker' || r === 'builder' || r === 'repairer' || r === 'upgrader') ? work : 0;
   return 0;
 }
 
@@ -136,6 +136,10 @@ function score(creep, request, roomState, now) {
   const deadline = deadlineUrgency(request, now);
   const localityBonus = range <= 3 ? 15 : range <= 10 ? 8 : 0;
   const carriedBonus = request.kind === 'ENERGY_DELIVERY' ? Math.min(30, carriedEnergy(creep) / 10) : 0;
+  let roleFitBonus = 0;
+  if (r === 'builder' && request.kind === 'BUILD') roleFitBonus = 15;
+  else if (r === 'repairer' && request.kind === 'REPAIR') roleFitBonus = 15;
+  else if (r === 'upgrader' && request.kind === 'UPGRADE') roleFitBonus = 20;
   const continuationBonus = continuing && !emergency ? 20 : continuing ? 5 : 0;
   const switchCost = previous && !continuing && !emergency ? 15 : 0;
   const travelCost = Math.min(50, range * 2);
@@ -143,14 +147,14 @@ function score(creep, request, roomState, now) {
   const opportunityCost = (role(creep) === 'upgrader' && request.kind !== 'UPGRADE') ? 8 : 0;
   const emergencyBonus = emergency ? 100 : 0;
 
-  const total = base + urgency + marginal + deadline + localityBonus + carriedBonus + continuationBonus + emergencyBonus
+  const total = base + urgency + marginal + deadline + localityBonus + carriedBonus + roleFitBonus + continuationBonus + emergencyBonus
     - travelCost - switchCost - riskCost - opportunityCost;
 
   return {
     total,
     capacity,
     components: {
-      base, urgency, marginal, deadline, localityBonus, carriedBonus, continuationBonus, emergencyBonus,
+      base, urgency, marginal, deadline, localityBonus, carriedBonus, roleFitBonus, continuationBonus, emergencyBonus,
       travelCost, switchCost, riskCost, opportunityCost, range
     }
   };
