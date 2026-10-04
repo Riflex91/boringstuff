@@ -168,7 +168,16 @@ function requestActive(request) {
 function requestAssignable(request) {
   if (!requestActive(request)) return false;
   const kind = String(request.kind || '');
-  return !/_CAPACITY$/.test(kind);
+  if (/_CAPACITY$/.test(kind)) return false;
+
+  // E3 publishes the transport graph only. Dedicated hauler matching,
+  // reservations and execution belong to E4; excluding these kinds here keeps
+  // E1 evidence comparable and prevents generic assignment from masquerading
+  // as E4 behavior.
+  if (kind === 'PICKUP' || kind === 'DELIVER' || kind === 'BALANCE' ||
+      kind === 'RESERVE' || kind === 'EMERGENCY_DELIVER') return false;
+
+  return true;
 }
 
 function plan(roomName, requests, creeps, memoryRoot, game) {
