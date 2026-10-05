@@ -302,19 +302,19 @@ function makeCandidates(creep, sets, roomState, now) {
   if (carried(creep) > 0) {
     for (const demand of sets.demand) {
       const candidate = directCandidate(creep, demand, roomState, now);
-      if (candidate) result.push(candidate);
+      if (candidate && candidate.score > 0) result.push(candidate);
     }
   }
   if (freeCapacity(creep) > 0 && carried(creep) === 0) {
     for (const supply of sets.pickup) {
       for (const demand of sets.demand) {
         const candidate = pairedCandidate(creep, supply, demand, roomState, now);
-        if (candidate) result.push(candidate);
+        if (candidate && candidate.score > 0) result.push(candidate);
       }
     }
     for (const request of sets.balance) {
       const candidate = balanceCandidate(creep, request, roomState, now);
-      if (candidate) result.push(candidate);
+      if (candidate && candidate.score > 0) result.push(candidate);
     }
   }
   return result;
