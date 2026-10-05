@@ -386,6 +386,18 @@ function plan(state, requests, memoryRoot, game) {
   for (const hauler of haulers) candidates.push(...makeCandidates(hauler, sets, roomState, now));
   candidates.sort((a, b) => better(a, b) ? -1 : (better(b, a) ? 1 : 0));
 
+  // Track whether each critical request was serviceable by at least one
+  // pre-revalidation candidate. Raw critical coverage is intentionally strict,
+  // but can be structurally capped when critical requests outnumber haulers.
+  // These counters distinguish candidate-generation gaps from finite hauler
+  // slots without changing matching authority or selection behavior.
+  const criticalCandidateIds = {};
+  for (const candidate of candidates) {
+    if (demandTier(candidate) > 0 && candidate.demand && candidate.demand.id) {
+      criticalCandidateIds[candidate.demand.id] = true;
+    }
+  }
+
   const jobs = [];
   const usedHaulers = {};
   for (const candidate of candidates) {
@@ -437,6 +449,10 @@ function plan(state, requests, memoryRoot, game) {
   const matchedCritical = {};
   for (const job of jobs) if (job.critical && job.demandRequestId) matchedCritical[job.demandRequestId] = true;
   const unmatchedCritical = initialCritical.filter(r => !matchedCritical[r.id]);
+  const criticalCandidateRequestCount = initialCritical.filter(r => !!criticalCandidateIds[r.id]).length;
+  const criticalNoCandidateCount = Math.max(0, initialCritical.length - criticalCandidateRequestCount);
+  const criticalCandidateUnmatchedCount = unmatchedCritical.filter(r => !!criticalCandidateIds[r.id]).length;
+  const criticalSlotCapacity = Math.min(initialCritical.length, haulers.length);
 
   const reservedAmountTotal = jobs.reduce((sum, job) => sum + job.amount, 0);
   const etaTotal = jobs.reduce((sum, job) => sum + (job.predicted.transportTicks || 0), 0);
@@ -456,6 +472,10 @@ function plan(state, requests, memoryRoot, game) {
     criticalRequestCount: initialCritical.length,
     criticalMatchedCount: Object.keys(matchedCritical).length,
     unmatchedCriticalCount: unmatchedCritical.length,
+    criticalCandidateRequestCount,
+    criticalNoCandidateCount,
+    criticalCandidateUnmatchedCount,
+    criticalSlotCapacity,
     reservedAmount: Math.round(reservedAmountTotal * 100) / 100,
     averageTransportTicks: jobs.length ? Math.round((etaTotal / jobs.length) * 100) / 100 : 0
   };
@@ -498,6 +518,10 @@ function deferredSnapshot(reason) {
       criticalRequestCount: 0,
       criticalMatchedCount: 0,
       unmatchedCriticalCount: 0,
+      criticalCandidateRequestCount: 0,
+      criticalNoCandidateCount: 0,
+      criticalCandidateUnmatchedCount: 0,
+      criticalSlotCapacity: 0,
       reservedAmount: 0,
       averageTransportTicks: 0
     },
