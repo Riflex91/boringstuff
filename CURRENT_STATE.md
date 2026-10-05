@@ -489,6 +489,14 @@ This proves reservation integrity is currently clean, but E4 critical-demand cov
 
 No E4 authority transition is allowed.
 
+## shadow.7 second smoke CPU follow-up
+
+After compacting `ROOM_HEARTBEAT`, smoke window `3712488–3712512` still failed only the hard CPU gate. Because `BOT_HEARTBEAT` runs every 25 ticks, the relevant sample in that window is tick `3712500`.
+
+Code-order review established an important correction: `tickCpu` is measured immediately after `profiler.finishTick()` and before `STATUS_SNAPSHOT` plus before `BOT_HEARTBEAT` serialization/logging. Therefore the measured hard CPU failure is caused by pre-telemetry bot work, not by the size of the heartbeat payload itself. The heartbeat compaction remains useful observability overhead reduction but does not explain the reported CPU number.
+
+The profiler already stores exact 25-tick section/detail attribution in `Memory.bot.cpu.history`. The next observability step is to attach that already-computed attribution to durable `BOT_HEARTBEAT` events and make the verifier print hard-fail tick/value details directly. No CPU threshold or gameplay behavior is changed.
+
 ## Current strategic interpretation
 
 `E8N1` remains structurally safe under the VNext shadow stack: dedicated mining is active, modeled hauler capacity is sufficient, controller and construction progress continue, CPU/bucket are safe, telemetry is contiguous, and no VNext subsystem gained gameplay authority.
