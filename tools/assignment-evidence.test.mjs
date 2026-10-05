@@ -183,4 +183,33 @@ function stateAt(tick, options = {}) {
   assert.equal(roomState.seenEpisodes.recent, 9990);
 }
 
+{
+  // Evidence compatibility scans must reuse one static executor profile per
+  // creep instead of re-reading body parts for every unfilled request.
+  const w = creep('w-profile-cache', 'worker', { work: 2, carry: 2, move: 2 }, 50);
+  let bodyPartReads = 0;
+  const originalGetActiveBodyparts = w.getActiveBodyparts;
+  w.getActiveBodyparts = function(type) {
+    bodyPartReads += 1;
+    return originalGetActiveBodyparts.call(this, type);
+  };
+
+  const delivery = request({
+    id: 'profile-delivery',
+    dedupeKey: 'profile-delivery',
+    kind: 'ENERGY_DELIVERY',
+    demand: { capability: null, amount: 50 }
+  });
+  const build = request({
+    id: 'profile-build',
+    dedupeKey: 'profile-build',
+    kind: 'BUILD',
+    demand: { capability: 'workBuild', amount: 2 }
+  });
+
+  const candidates = evidence._test.compatibleExecutors([delivery, build], [w]);
+  assert.equal(candidates['w-profile-cache'], true);
+  assert.equal(bodyPartReads, 2);
+}
+
 console.log('assignment evidence tests passed');
