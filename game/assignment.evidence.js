@@ -116,8 +116,9 @@ function compatibleExecutors(requests, creeps) {
   const result = {};
   for (const creep of creeps || []) {
     if (!creep || creep.spawning || !(creep.id || creep.name)) continue;
+    const profile = assignmentShadow.executorProfile(creep);
     for (const request of active) {
-      if (assignmentShadow._test.capabilityFor(creep, request) > 0) {
+      if (assignmentShadow._test.capabilityFor(creep, request, profile) > 0) {
         result[creep.id || creep.name] = true;
         break;
       }
