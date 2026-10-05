@@ -421,7 +421,8 @@ function evidence(start = 1000) {
 
   const r = evaluateLive({ events: rows, startTick: 1000, nodeVersion: '18.20.4' });
   const e4 = r.checks.find(c => c.id === 'e4-matching-evidence');
-  assert.equal(e4.status, 'PASS');
+  assert.equal(e4.status, 'WATCH');
+  assert.match(e4.message, /did not cover every critical logistics request/i);
   assert.equal(e4.data.criticalCoverageRatio, 0.9);
   assert.equal(e4.data.duplicateReservationTicks, 0);
 }
