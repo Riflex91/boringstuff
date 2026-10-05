@@ -148,6 +148,11 @@ export function evaluateLive(input) {
     last100Ticks >= 100;
   const windowLast100 = last100MatchesWindow ? last100 : null;
   const attribution = windowLast100?.productiveFlow || null;
+  const observedCompletedWindow =
+    last100StartTick !== null &&
+    last100EndTick !== null &&
+    last100Ticks !== null &&
+    last100Ticks >= 100;
   const attributionFields = {
     consumerTicks: finite(attribution?.consumerTicks, null),
     waitingConsumerTicks: finite(attribution?.waitingConsumerTicks, null),
@@ -158,7 +163,18 @@ export function evaluateLive(input) {
     actualProductiveThroughputPerTick: finite(attribution?.actualProductiveThroughputPerTick, null)
   };
   const missingAttribution = Object.entries(attributionFields).filter(([, value]) => value === null).map(([key]) => key);
-  if (!attribution || missingAttribution.length) {
+
+  if (!last100MatchesWindow && observedCompletedWindow) {
+    checks.push(check(
+      'productive-attribution',
+      'WATCH',
+      'A complete productive-flow window exists, but its fixed runtime cadence does not align exactly with the requested live-verification window.',
+      {
+        requestedWindow: { startTick: selected.startTick, endTick: selected.endTick },
+        observedLast100: { startTick: last100StartTick, endTick: last100EndTick, ticks: last100Ticks }
+      }
+    ));
+  } else if (!attribution || missingAttribution.length) {
     checks.push(check(
       'productive-attribution',
       selected.complete ? 'FAIL' : 'WATCH',
