@@ -26,6 +26,10 @@ module.exports = {
   PLANNER_INTERVAL: 50,
   INTEL_INTERVAL: 25,
   VISUALS: true,
+  // Bound individual legacy PathFinder searches so a cache miss cannot consume
+  // an entire tick's CPU budget. Same-room role movement should normally fit
+  // well inside this ceiling and will retry on later ticks if incomplete.
+  PATH_MAX_OPS: 200,
 
   // Economy tuning.
   UPGRADE_ENERGY_RESERVE: 600,

@@ -95,6 +95,7 @@ function makeHauler(id, rangeMap = {}) {
   return creep;
 }
 
+const config = require('../game/config.js');
 const energy = require('../game/energy.js');
 
 // A partially used but actively working high-priority builder must not steal a
@@ -294,6 +295,38 @@ const energy = require('../game/energy.js');
   assert.deepEqual(calls, ['infrastructure']);
 
   energy.deliver = originalDeliver;
+  room.sites = [];
+}
+
+
+{
+  // Worker target selection and movement must both carry the bounded PathFinder
+  // budget. This guards against the measured multi-CPU findClosestByPath +
+  // moveTo spike on a single worker tick.
+  const roleWorker = require('../game/role.worker.js');
+  const builder = makeConsumer('builder-path-budget', 'builder', 50, 0, false, 2);
+  builder.memory.working = true;
+  const hauler1 = makeHauler('hauler-path-budget-1');
+  const hauler2 = makeHauler('hauler-path-budget-2');
+  room.creeps = [builder, hauler1, hauler2];
+  const site = { id: 'site-path-budget', structureType: STRUCTURE_EXTENSION, pos: {} };
+  room.sites = [site];
+
+  let closestOpts = null;
+  let moveOpts = null;
+  builder.pos.findClosestByPath = (targets, opts) => {
+    closestOpts = opts;
+    return Array.isArray(targets) ? targets[0] : null;
+  };
+  builder.build = () => ERR_NOT_IN_RANGE;
+  builder.moveTo = (target, opts) => {
+    assert.equal(target, site);
+    moveOpts = opts;
+  };
+
+  roleWorker.run(builder);
+  assert.equal(closestOpts.maxOps, config.PATH_MAX_OPS);
+  assert.equal(moveOpts.maxOps, config.PATH_MAX_OPS);
   room.sites = [];
 }
 

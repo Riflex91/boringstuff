@@ -1,6 +1,7 @@
 'use strict';
 
 const energy = require('energy');
+const config = require('config');
 
 function run(creep) {
   if (creep.memory.delivering && creep.store[RESOURCE_ENERGY] === 0) {
@@ -21,13 +22,13 @@ function run(creep) {
       const sourceContainers = creep.room.find(FIND_STRUCTURES, {
         filter: s => energy.isSourceContainer(creep.room, s)
       });
-      const sourceContainer = creep.pos.findClosestByPath(sourceContainers);
+      const sourceContainer = creep.pos.findClosestByPath(sourceContainers, { maxOps: config.PATH_MAX_OPS });
       if (sourceContainer) {
-        creep.moveTo(sourceContainer, { reusePath: 10 });
+        creep.moveTo(sourceContainer, { reusePath: 10, maxOps: config.PATH_MAX_OPS });
         return;
       }
-      const harvester = creep.pos.findClosestByPath(FIND_MY_CREEPS, { filter: c => c.memory.role === 'harvester' });
-      if (harvester) creep.moveTo(harvester, { reusePath: 10 });
+      const harvester = creep.pos.findClosestByPath(FIND_MY_CREEPS, { maxOps: config.PATH_MAX_OPS, filter: c => c.memory.role === 'harvester' });
+      if (harvester) creep.moveTo(harvester, { reusePath: 10, maxOps: config.PATH_MAX_OPS });
     }
     return;
   }
@@ -51,11 +52,11 @@ function run(creep) {
   const storage = creep.room.storage;
   if (storage) {
     const rc = creep.transfer(storage, RESOURCE_ENERGY);
-    if (rc === ERR_NOT_IN_RANGE) creep.moveTo(storage, { reusePath: 10 });
+    if (rc === ERR_NOT_IN_RANGE) creep.moveTo(storage, { reusePath: 10, maxOps: config.PATH_MAX_OPS });
     return;
   }
 
-  if (creep.room.controller) creep.moveTo(creep.room.controller, { reusePath: 10, range: 3 });
+  if (creep.room.controller) creep.moveTo(creep.room.controller, { reusePath: 10, range: 3, maxOps: config.PATH_MAX_OPS });
 }
 
 module.exports = { run };

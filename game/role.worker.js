@@ -43,20 +43,20 @@ function preferredConstructionSite(creep) {
   let bestPriority = Infinity;
   for (const site of sites) bestPriority = Math.min(bestPriority, constructionPriority(site));
   const important = sites.filter(site => constructionPriority(site) === bestPriority);
-  return creep.pos.findClosestByPath(important) || important[0] || null;
+  return creep.pos.findClosestByPath(important, { maxOps: config.PATH_MAX_OPS }) || important[0] || null;
 }
 
 function waitNearWork(creep) {
   if (creep.memory.role === 'upgrader' && creep.room.controller) {
-    creep.moveTo(creep.room.controller, { reusePath: 10, range: 3 });
+    creep.moveTo(creep.room.controller, { reusePath: 10, range: 3, maxOps: config.PATH_MAX_OPS });
     return;
   }
   const site = preferredConstructionSite(creep);
   if (site) {
-    creep.moveTo(site, { reusePath: 10, range: 3 });
+    creep.moveTo(site, { reusePath: 10, range: 3, maxOps: config.PATH_MAX_OPS });
     return;
   }
-  if (creep.room.controller) creep.moveTo(creep.room.controller, { reusePath: 10, range: 3 });
+  if (creep.room.controller) creep.moveTo(creep.room.controller, { reusePath: 10, range: 3, maxOps: config.PATH_MAX_OPS });
 }
 
 function acquireWorkEnergy(creep) {
@@ -94,7 +94,7 @@ function build(creep) {
   const site = preferredConstructionSite(creep);
   if (!site) return false;
   const rc = creep.build(site);
-  if (rc === ERR_NOT_IN_RANGE) creep.moveTo(site, { reusePath: 10, visualizePathStyle: { stroke: '#00ffff' } });
+  if (rc === ERR_NOT_IN_RANGE) creep.moveTo(site, { reusePath: 10, maxOps: config.PATH_MAX_OPS, visualizePathStyle: { stroke: '#00ffff' } });
   return rc === OK || rc === ERR_NOT_IN_RANGE;
 }
 
@@ -102,6 +102,7 @@ function repair(creep) {
   const rcl = creep.room.controller ? creep.room.controller.level : 1;
   const wallCap = Math.max(10000, rcl * config.REPAIR_WALL_TARGET_RCL_MULTIPLIER);
   const target = creep.pos.findClosestByPath(FIND_STRUCTURES, {
+    maxOps: config.PATH_MAX_OPS,
     filter: s => {
       if (s.hits >= s.hitsMax) return false;
       if (s.structureType === STRUCTURE_WALL || s.structureType === STRUCTURE_RAMPART) return s.hits < wallCap;
@@ -110,7 +111,7 @@ function repair(creep) {
   });
   if (!target) return false;
   const rc = creep.repair(target);
-  if (rc === ERR_NOT_IN_RANGE) creep.moveTo(target, { reusePath: 10, visualizePathStyle: { stroke: '#00ff66' } });
+  if (rc === ERR_NOT_IN_RANGE) creep.moveTo(target, { reusePath: 10, maxOps: config.PATH_MAX_OPS, visualizePathStyle: { stroke: '#00ff66' } });
   return rc === OK || rc === ERR_NOT_IN_RANGE;
 }
 
@@ -118,7 +119,7 @@ function upgrade(creep) {
   const controller = creep.room.controller;
   if (!controller) return false;
   const rc = creep.upgradeController(controller);
-  if (rc === ERR_NOT_IN_RANGE) creep.moveTo(controller, { reusePath: 10, visualizePathStyle: { stroke: '#aa66ff' } });
+  if (rc === ERR_NOT_IN_RANGE) creep.moveTo(controller, { reusePath: 10, maxOps: config.PATH_MAX_OPS, visualizePathStyle: { stroke: '#aa66ff' } });
   return rc === OK || rc === ERR_NOT_IN_RANGE;
 }
 

@@ -19,6 +19,7 @@ global.Memory = {};
 const finds = { sources: 0, minerals: 0, structures: 0, hostiles: 0 };
 let describeExitsCalls = 0;
 let moveCalls = 0;
+let lastMoveOpts = null;
 
 const room = {
   name: 'E1N1',
@@ -69,6 +70,7 @@ global.Game = {
   }
 };
 
+const config = require('../game/config.js');
 const scout = require('../game/role.scout.js');
 
 const creep = {
@@ -80,8 +82,9 @@ const creep = {
       return { x: 25, y: 0, roomName: room.name };
     }
   },
-  moveTo() {
+  moveTo(target, opts) {
     moveCalls += 1;
+    lastMoveOpts = opts;
     return 0;
   }
 };
@@ -97,6 +100,8 @@ assert.equal(finds.minerals, 1);
 assert.equal(finds.structures, 1);
 assert.equal(describeExitsCalls, 2);
 assert.equal(moveCalls, 1);
+assert.equal(lastMoveOpts.reusePath, 50);
+assert.equal(lastMoveOpts.maxOps, config.PATH_MAX_OPS);
 assert.equal(Memory.bot.worldIntel.rooms.E1N1.observation.lastSeenTick, 100);
 assert.equal(Memory.bot.cpu.details['scout.legacy-intel'].lastTick, 100);
 assert.equal(Memory.bot.cpu.details['scout.world-intel'].lastTick, 100);
