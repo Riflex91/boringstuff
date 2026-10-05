@@ -461,6 +461,34 @@ This was diagnosed as an observability durability gap, not evidence of unsafe CP
 
 Follow-up fix: explicitly journal `BOT_HEARTBEAT` while keeping it out of `Memory.bot.logs`. This changes observability only; CPU thresholds, gameplay, E4 matching/evidence and authority are unchanged.
 
+## shadow.7 live CPU and E4 evidence follow-up
+
+The live window `3712102–3712201` completed with `PASS=11 / WATCH=7 / FAIL=1`. The sole hard failure was CPU safety:
+
+- tick `3712175`: `BOT_HEARTBEAT cpu = 23.638`, bucket `10000`;
+- tick `3712200`: `BOT_HEARTBEAT cpu = 23.595`, bucket `10000`;
+- no critical bucket samples occurred.
+
+Therefore the failure is caused by total CPU exceeding the existing hard threshold of 20, not by bucket exhaustion.
+
+Both failing ticks are 25-tick `ROOM_HEARTBEAT` ticks. The room heartbeat currently serializes the full economy metrics (including `last100`) and the full ColonyState even though the durable `STATUS_SNAPSHOT` already carries those heavy structures every 100 ticks. The immediate follow-up is to compact `ROOM_HEARTBEAT` by removing those redundant heavy payloads while preserving operational summaries required by smoke verification.
+
+The completed E4 matching-evidence window `3712093–3712192` shows:
+
+- `haulerUtilization = 1`;
+- `averageCandidatesPerTick = 34.48`;
+- `averageJobsPerTick = 2.82`;
+- `criticalRequestTicks = 745`;
+- `criticalMatchedTicks = 110`;
+- `criticalCoverageRatio = 0.148`;
+- `averagePredictedTransportTicks = 2.28`;
+- `averageConsumerFallback = 0.72`;
+- `duplicateReservationTicks = 0`.
+
+This proves reservation integrity is currently clean, but E4 critical-demand coverage is poor. At tick `3712125`, a `RESERVE` delivery scored `256.5` while an `EMERGENCY_DELIVER` scored `245.5`, so the current E4 scoring can prefer reserve demand over emergency demand. That is a separate matching-quality issue and must be addressed only after the CPU hard-fail path is stabilized.
+
+No E4 authority transition is allowed.
+
 ## Current strategic interpretation
 
 `E8N1` remains structurally safe under the VNext shadow stack: dedicated mining is active, modeled hauler capacity is sufficient, controller and construction progress continue, CPU/bucket are safe, telemetry is contiguous, and no VNext subsystem gained gameplay authority.
