@@ -28,7 +28,6 @@ function status(state) {
     creeps: state.byRole,
     sites: state.sites.length,
     hostiles: state.hostileCreeps.length,
-    economy: state.economyMetrics,
     economyModel: state.economyModel,
     health: state.health,
     efficiency: state.efficiency,
@@ -39,7 +38,7 @@ function status(state) {
     logisticsMatching: state.logisticsMatchingShadow ? state.logisticsMatchingShadow.summary : null,
     logisticsMatchingEvidence: state.logisticsMatchingEvidence ? (state.logisticsMatchingEvidence.lastWindow || state.logisticsMatchingEvidence.current) : null,
     assignmentEvidence: state.assignmentEvidence ? (state.assignmentEvidence.lastWindow || state.assignmentEvidence.current) : null,
-    colonyState: state.colonyState || null
+    colonyStateAvailable: !!state.colonyState
   };
 }
 
@@ -200,4 +199,4 @@ function run(room, lowCpu) {
   return state;
 }
 
-module.exports = { run };
+module.exports = { run, _test: { status } };
