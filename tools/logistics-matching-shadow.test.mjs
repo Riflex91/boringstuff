@@ -215,6 +215,39 @@ function add(memory, time, specs) {
 
 {
   const memory = {};
+  const balance = {
+    dedupeKey: 'balance-controller',
+    domain: 'logistics',
+    kind: 'BALANCE',
+    source: endpoint('source-buffer', 5, 5),
+    target: endpoint('controller-buffer', 20, 20),
+    demand: {
+      resourceType: 'energy',
+      capability: 'transportEnergy',
+      amount: 100,
+      minimumUsefulAmount: 50,
+      maximumUsefulAmount: 100
+    },
+    priority: { base: 45, urgency: 0, strategicClass: 'PRODUCTIVE_WORK' },
+    utility: { current: 100, marginalModel: 'SATURATING' },
+    evidence: { source: 'test' },
+    shadow: true
+  };
+  const requests = add(memory, 450, [balance]);
+  const plan = matcher.plan({
+    room: { name: 'E1N1' },
+    creeps: [hauler('balance-hauler', 6, 5, 0, 50)]
+  }, requests, memory, { time: 450 });
+
+  assert.equal(plan.jobs.length, 1);
+  assert.equal(plan.jobs[0].mode, 'BALANCE');
+  assert.equal(plan.jobs[0].amount, 50);
+  assert.equal(plan.jobs[0].supplyRequestId, plan.jobs[0].demandRequestId);
+  assert.equal(plan.jobs[0].reservationIds.length, 1);
+}
+
+{
+  const memory = {};
   const legacy = {
     dedupeKey: 'legacy-consumer',
     domain: 'logistics',
