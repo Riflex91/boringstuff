@@ -226,4 +226,27 @@ function evidence(start = 1000) {
   assert.equal(r.checks.find(c => c.id === 'productive-throughput').status, 'WATCH');
 }
 
+{
+  // Runtime economy windows have their own fixed 100-tick cadence. A complete
+  // verifier window can therefore end with a valid last100 block that does not
+  // share the verifier's exact start/end ticks. That is an evidence-alignment
+  // WATCH, not proof that productive-flow telemetry is missing.
+  const rows = evidence(1101);
+  const status = rows.at(-1);
+  status.ctx.rooms.E8N1.economy.last100.startTick = 1000;
+  status.ctx.rooms.E8N1.economy.last100.endTick = 1099;
+  status.ctx.rooms.E8N1.economy.last100.ticks = 100;
+
+  const r = evaluateLive({ events: rows, startTick: 1101, nodeVersion: '18.20.4' });
+  assert.equal(r.complete, true);
+  assert.equal(r.attributionWindow.matches, false);
+  assert.equal(r.attributionWindow.observedStartTick, 1000);
+  assert.equal(r.attributionWindow.observedEndTick, 1099);
+  assert.equal(r.checks.find(c => c.id === 'productive-attribution').status, 'WATCH');
+  assert.equal(r.checks.find(c => c.id === 'controller-progress').status, 'WATCH');
+  assert.equal(r.checks.find(c => c.id === 'construction-progress').status, 'WATCH');
+  assert.equal(r.checks.find(c => c.id === 'productive-throughput').status, 'WATCH');
+  assert.equal(r.counts.fail, 0);
+}
+
 console.log('live-verification tests passed');
