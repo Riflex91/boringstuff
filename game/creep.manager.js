@@ -6,6 +6,7 @@ const hauler = require('role.hauler');
 const worker = require('role.worker');
 const defender = require('role.defender');
 const scout = require('role.scout');
+const profiler = require('profiler');
 
 const handlers = {
   harvester,
@@ -35,7 +36,17 @@ function runCreep(creep) {
 }
 
 function runAll() {
-  for (const name in Game.creeps) runCreep(Game.creeps[name]);
+  const cpuByRole = {};
+  for (const name in Game.creeps) {
+    const creep = Game.creeps[name];
+    const role = creep && creep.memory && creep.memory.role ? creep.memory.role : 'worker';
+    const start = Game.cpu.getUsed();
+    runCreep(creep);
+    const used = Math.max(0, Game.cpu.getUsed() - start);
+    cpuByRole[role] = (cpuByRole[role] || 0) + used;
+  }
+  for (const role in cpuByRole) profiler.detailValue('creep.' + role, cpuByRole[role]);
+  return cpuByRole;
 }
 
-module.exports = { runAll };
+module.exports = { runAll, _test: { runCreep } };
