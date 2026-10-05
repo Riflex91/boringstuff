@@ -61,6 +61,29 @@ function desired(state) {
 }
 
 function countRole(room, role) {
+  if (role === 'scout') {
+    const counted = {};
+    let total = 0;
+    for (const name in Game.creeps) {
+      const creep = Game.creeps[name];
+      if (!creep || !creep.memory || creep.memory.role !== 'scout') continue;
+      const home = creep.memory.home || (creep.room && creep.room.name);
+      if (home !== room.name) continue;
+      counted[name] = true;
+      total += 1;
+    }
+
+    // Guard against runtimes where a spawning creep is not yet exposed through
+    // Game.creeps. Do not double-count when it already is.
+    const spawning = room.find(FIND_MY_SPAWNS, {
+      filter: s => s.spawning &&
+        !counted[s.spawning.name] &&
+        Memory.creeps[s.spawning.name] &&
+        Memory.creeps[s.spawning.name].role === 'scout'
+    });
+    return total + spawning.length;
+  }
+
   return room.find(FIND_MY_CREEPS, { filter: c => c.memory.role === role }).length +
     room.find(FIND_MY_SPAWNS, { filter: s => s.spawning && Memory.creeps[s.spawning.name] && Memory.creeps[s.spawning.name].role === role }).length;
 }
@@ -168,4 +191,4 @@ function spawnOne(state) {
   return false;
 }
 
-module.exports = { desired, spawnOne };
+module.exports = { desired, spawnOne, _test: { countRole } };
