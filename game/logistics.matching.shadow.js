@@ -320,6 +320,26 @@ function makeCandidates(creep, sets, roomState, now) {
   return result;
 }
 
+function revalidatedAmount(candidate) {
+  if (!candidate || !candidate.creep || !candidate.demand) return 0;
+  if (candidate.mode === 'DIRECT_CARRIED') {
+    return Math.min(carried(candidate.creep), remainingAmount(candidate.demand));
+  }
+  if (candidate.mode === 'PICKUP_DELIVER') {
+    if (!candidate.supply || carried(candidate.creep) > 0) return 0;
+    return Math.min(
+      freeCapacity(candidate.creep),
+      remainingAmount(candidate.supply),
+      remainingAmount(candidate.demand)
+    );
+  }
+  if (candidate.mode === 'BALANCE') {
+    if (carried(candidate.creep) > 0) return 0;
+    return Math.min(freeCapacity(candidate.creep), remainingAmount(candidate.demand));
+  }
+  return 0;
+}
+
 function reserveMatch(roomName, candidate, memoryRoot, game) {
   const validUntilTick = tick(game);
   const reservations = [];
@@ -355,50 +375,44 @@ function plan(state, requests, memoryRoot, game) {
   const sets = activeSets(requests);
   const initialCritical = sets.demand.filter(r => r.kind === 'EMERGENCY_DELIVER' && remainingAmount(r) > 0);
   const haulers = (state.creeps || []).filter(c => c && !c.spawning && role(c) === 'hauler' && (c.id || c.name));
-  const unused = haulers.slice();
+  const candidates = [];
+  for (const hauler of haulers) candidates.push(...makeCandidates(hauler, sets, roomState, now));
+  candidates.sort((a, b) => better(a, b) ? -1 : (better(b, a) ? 1 : 0));
+
   const jobs = [];
-  let candidateCount = 0;
+  const usedHaulers = {};
+  for (const candidate of candidates) {
+    if (usedHaulers[candidate.haulerId]) continue;
+    const amount = revalidatedAmount(candidate);
+    if (amount <= 0) continue;
+    candidate.amount = amount;
 
-  while (unused.length) {
-    let best = null;
-    let bestIndex = -1;
-    for (let i = 0; i < unused.length; i++) {
-      const candidates = makeCandidates(unused[i], sets, roomState, now);
-      candidateCount += candidates.length;
-      for (const candidate of candidates) {
-        if (better(candidate, best)) {
-          best = candidate;
-          bestIndex = i;
-        }
-      }
-    }
-    if (!best) break;
-
-    const reservations = reserveMatch(roomName, best, memoryRoot, game);
+    const reservations = reserveMatch(roomName, candidate, memoryRoot, game);
     const job = {
       schemaVersion: SCHEMA_VERSION,
       authority: 'SHADOW',
-      id: 'e4|' + roomName + '|' + best.haulerId + '|' + now,
-      haulerId: best.haulerId,
-      mode: best.mode,
-      supplyRequestId: best.supply ? best.supply.id : null,
-      demandRequestId: best.demand ? best.demand.id : null,
-      supplyDedupeKey: best.supply ? best.supply.dedupeKey : null,
-      demandDedupeKey: best.demand ? best.demand.dedupeKey : null,
-      amount: best.amount,
-      score: Math.round(best.score * 100) / 100,
-      scoreComponents: best.components,
+      id: 'e4|' + roomName + '|' + candidate.haulerId + '|' + now,
+      haulerId: candidate.haulerId,
+      mode: candidate.mode,
+      supplyRequestId: candidate.supply ? candidate.supply.id : null,
+      demandRequestId: candidate.demand ? candidate.demand.id : null,
+      supplyDedupeKey: candidate.supply ? candidate.supply.dedupeKey : null,
+      demandDedupeKey: candidate.demand ? candidate.demand.dedupeKey : null,
+      amount: candidate.amount,
+      score: Math.round(candidate.score * 100) / 100,
+      scoreComponents: candidate.components,
       predicted: {
-        pickupTick: best.supply ? now + best.pickupEta : null,
-        deliveryTick: now + best.deliveryEta,
-        transportTicks: best.deliveryEta
+        pickupTick: candidate.supply ? now + candidate.pickupEta : null,
+        deliveryTick: now + candidate.deliveryEta,
+        transportTicks: candidate.deliveryEta
       },
       reservationIds: reservations.map(r => r.id),
-      requestKind: best.demand ? best.demand.kind : null,
-      critical: !!(best.demand && best.demand.kind === 'EMERGENCY_DELIVER')
+      requestKind: candidate.demand ? candidate.demand.kind : null,
+      critical: !!(candidate.demand && candidate.demand.kind === 'EMERGENCY_DELIVER')
     };
     jobs.push(job);
-    unused.splice(bestIndex, 1);
+    usedHaulers[candidate.haulerId] = true;
+    if (jobs.length >= haulers.length) break;
   }
 
   const previousByHauler = {};
@@ -425,7 +439,7 @@ function plan(state, requests, memoryRoot, game) {
     deferred: false,
     deferReason: null,
     haulerCount: haulers.length,
-    candidateCount,
+    candidateCount: candidates.length,
     jobCount: jobs.length,
     matchedHaulerCount: jobs.length,
     haulerUtilization: haulers.length ? Math.round((jobs.length / haulers.length) * 1000) / 1000 : 0,
@@ -506,6 +520,7 @@ module.exports = {
     balanceCandidate,
     activeSets,
     makeCandidates,
+    revalidatedAmount,
     better
   }
 };
