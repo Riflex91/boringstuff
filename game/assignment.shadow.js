@@ -344,6 +344,7 @@ module.exports = {
   ensureRoom,
   plan,
   score,
+  executorProfile,
   recordFailure,
   snapshot,
   deferredSnapshot,
