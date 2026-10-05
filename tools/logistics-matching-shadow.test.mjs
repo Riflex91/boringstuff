@@ -126,6 +126,10 @@ function add(memory, time, specs) {
   assert.equal(plan.summary.criticalRequestCount, 2);
   assert.equal(plan.summary.criticalMatchedCount, 2);
   assert.equal(plan.summary.unmatchedCriticalCount, 0);
+  assert.equal(plan.summary.criticalCandidateRequestCount, 2);
+  assert.equal(plan.summary.criticalNoCandidateCount, 0);
+  assert.equal(plan.summary.criticalCandidateUnmatchedCount, 0);
+  assert.equal(plan.summary.criticalSlotCapacity, 2);
   assert.equal(plan.summary.reservedAmount, 100);
   assert.equal(new Set(plan.jobs.map(j => j.haulerId)).size, 2);
   assert.equal(new Set(plan.jobs.map(j => j.demandRequestId)).size, 2);
@@ -137,6 +141,34 @@ function add(memory, time, specs) {
   // them before a fresh matching pass.
   add(memory, 101, specs);
   assert.equal(registry.snapshot('E1N1', memory).reservationCount, 0);
+}
+
+{
+  // Raw critical coverage can be below 1 even when every available hauler slot
+  // is spent on critical work. Keep that distinction explicit in evidence.
+  const memory = {};
+  const specs = [
+    pickup('pickup-capacity', 200, 5, 5),
+    delivery('critical-1', 50, 15, 10, true, 100, 50),
+    delivery('critical-2', 50, 20, 10, true, 95, 40),
+    delivery('critical-3', 50, 25, 10, true, 90, 30)
+  ];
+  const requests = add(memory, 150, specs);
+  const plan = matcher.plan({
+    room: { name: 'E1N1' },
+    creeps: [
+      hauler('slot-1', 6, 5, 0, 50),
+      hauler('slot-2', 7, 5, 0, 50)
+    ]
+  }, requests, memory, { time: 150 });
+
+  assert.equal(plan.summary.criticalRequestCount, 3);
+  assert.equal(plan.summary.criticalCandidateRequestCount, 3);
+  assert.equal(plan.summary.criticalMatchedCount, 2);
+  assert.equal(plan.summary.unmatchedCriticalCount, 1);
+  assert.equal(plan.summary.criticalNoCandidateCount, 0);
+  assert.equal(plan.summary.criticalCandidateUnmatchedCount, 1);
+  assert.equal(plan.summary.criticalSlotCapacity, 2);
 }
 
 {
