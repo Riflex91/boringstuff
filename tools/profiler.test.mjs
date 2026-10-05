@@ -125,4 +125,16 @@ function cpuSequence(values) {
   assert.equal(profiler.currentHistorySample(), null);
 }
 
+{
+  Game.time = 150;
+  cpuSequence([17, 21]);
+  profiler.detailValue('creep.hauler', 2.5);
+  profiler.finishTick(17);
+  const sample = Memory.bot.cpu.history.at(-1);
+  assert.equal(sample.tick, 150);
+  assert.equal(sample.used, 4);
+  assert.equal(sample.details['creep.hauler'], 2.5);
+  assert.equal(sample.unattributed, 4);
+}
+
 console.log('profiler tests passed');
