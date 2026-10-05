@@ -78,4 +78,26 @@ const emittedPayload = JSON.parse(emittedLine.slice('[BOTLOG]'.length));
 assert.equal(emittedPayload.jseq, 1);
 assert.equal(Memory.bot.telemetryJournal.events[0].q, 1);
 
+// BOT_HEARTBEAT is normally INFO and would not be durable by default. The
+// runtime opts it into the journal explicitly so a collector reconnect can
+// recover the CPU/bucket sample required by the 25-tick smoke gate.
+global.Game.time = 525;
+emittedLine = null;
+console.log = line => { emittedLine = String(line); };
+try {
+  logger.info('BOT_HEARTBEAT', 'heartbeat', { cpu: 4.2, bucket: 10000 }, {
+    force: true,
+    journal: true,
+    dedupeTicks: 0
+  });
+} finally {
+  console.log = originalConsoleLog;
+}
+assert.ok(emittedLine && emittedLine.startsWith('[BOTLOG]'));
+const heartbeatPayload = JSON.parse(emittedLine.slice('[BOTLOG]'.length));
+assert.equal(heartbeatPayload.code, 'BOT_HEARTBEAT');
+assert.equal(heartbeatPayload.jseq, 2);
+assert.equal(Memory.bot.telemetryJournal.events[1].c, 'BOT_HEARTBEAT');
+assert.equal(Memory.bot.telemetryJournal.events[1].q, 2);
+
 console.log('telemetry journal tests passed');
