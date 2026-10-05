@@ -457,7 +457,14 @@ function evidence(start = 1000) {
       criticalRequestTicks: 80,
       criticalMatchedTicks: 72,
       unmatchedCriticalTicks: 8,
+      criticalCandidateRequestTicks: 80,
+      criticalNoCandidateTicks: 0,
+      criticalCandidateUnmatchedTicks: 8,
+      criticalSlotCapacityTicks: 72,
       criticalCoverageRatio: 0.9,
+      criticalCandidateRatio: 1,
+      criticalCandidateCoverageRatio: 0.9,
+      criticalSlotCoverageRatio: 1,
       averagePredictedTransportTicks: 3.25,
       averageConsumerWaiting: 0.4,
       averageConsumerFallback: 0,
@@ -472,6 +479,13 @@ function evidence(start = 1000) {
   assert.equal(e4.data.observedLastWindow.endTick, 1199);
   assert.equal(e4.data.observedMetrics.criticalCoverageRatio, 0.9);
   assert.equal(e4.data.observedMetrics.criticalMatchedTicks, 72);
+  assert.equal(e4.data.observedMetrics.criticalCandidateRequestTicks, 80);
+  assert.equal(e4.data.observedMetrics.criticalNoCandidateTicks, 0);
+  assert.equal(e4.data.observedMetrics.criticalCandidateUnmatchedTicks, 8);
+  assert.equal(e4.data.observedMetrics.criticalSlotCapacityTicks, 72);
+  assert.equal(e4.data.observedMetrics.criticalCandidateRatio, 1);
+  assert.equal(e4.data.observedMetrics.criticalCandidateCoverageRatio, 0.9);
+  assert.equal(e4.data.observedMetrics.criticalSlotCoverageRatio, 1);
   assert.equal(e4.data.observedMetrics.duplicateReservationTicks, 0);
   assert.equal(e4.data.currentTicks, 8);
 }

@@ -28,6 +28,10 @@ function newWindow(startTick) {
     criticalRequestTicks: 0,
     criticalMatchedTicks: 0,
     unmatchedCriticalTicks: 0,
+    criticalCandidateRequestTicks: 0,
+    criticalNoCandidateTicks: 0,
+    criticalCandidateUnmatchedTicks: 0,
+    criticalSlotCapacityTicks: 0,
     reservedAmountTicks: 0,
     transportTickTotal: 0,
     transportJobCount: 0,
@@ -92,6 +96,10 @@ function accumulate(window, state) {
   window.criticalRequestTicks += Math.max(0, Number(summary.criticalRequestCount) || 0);
   window.criticalMatchedTicks += Math.max(0, Number(summary.criticalMatchedCount) || 0);
   window.unmatchedCriticalTicks += Math.max(0, Number(summary.unmatchedCriticalCount) || 0);
+  window.criticalCandidateRequestTicks += Math.max(0, Number(summary.criticalCandidateRequestCount) || 0);
+  window.criticalNoCandidateTicks += Math.max(0, Number(summary.criticalNoCandidateCount) || 0);
+  window.criticalCandidateUnmatchedTicks += Math.max(0, Number(summary.criticalCandidateUnmatchedCount) || 0);
+  window.criticalSlotCapacityTicks += Math.max(0, Number(summary.criticalSlotCapacity) || 0);
   window.reservedAmountTicks += Math.max(0, Number(summary.reservedAmount) || 0);
 
   const jobCount = Math.max(0, Number(summary.jobCount) || 0);
@@ -112,6 +120,9 @@ function accumulate(window, state) {
 function summarize(window, endTick) {
   const ticks = Math.max(1, Number(window.ticks) || 0);
   const critical = Math.max(0, Number(window.criticalRequestTicks) || 0);
+  const criticalCandidates = Math.max(0, Number(window.criticalCandidateRequestTicks) || 0);
+  const criticalSlotCapacity = Math.max(0, Number(window.criticalSlotCapacityTicks) || 0);
+  const criticalMatched = Math.max(0, Number(window.criticalMatchedTicks) || 0);
   const haulers = Math.max(0, Number(window.haulerTicks) || 0);
   return {
     schemaVersion: SCHEMA_VERSION,
@@ -129,11 +140,24 @@ function summarize(window, endTick) {
     averageDirectCarriedJobsPerTick: round(window.directCarriedJobTicks / ticks, 2),
     averageBalanceJobsPerTick: round(window.balanceJobTicks / ticks, 2),
     criticalRequestTicks: critical,
-    criticalMatchedTicks: Math.max(0, Number(window.criticalMatchedTicks) || 0),
+    criticalMatchedTicks: criticalMatched,
     unmatchedCriticalTicks: Math.max(0, Number(window.unmatchedCriticalTicks) || 0),
+    criticalCandidateRequestTicks: criticalCandidates,
+    criticalNoCandidateTicks: Math.max(0, Number(window.criticalNoCandidateTicks) || 0),
+    criticalCandidateUnmatchedTicks: Math.max(0, Number(window.criticalCandidateUnmatchedTicks) || 0),
+    criticalSlotCapacityTicks: criticalSlotCapacity,
     criticalCoverageRatio: critical
-      ? round(window.criticalMatchedTicks / critical)
+      ? round(criticalMatched / critical)
       : 1,
+    criticalCandidateRatio: critical
+      ? round(criticalCandidates / critical)
+      : 1,
+    criticalCandidateCoverageRatio: criticalCandidates
+      ? round(criticalMatched / criticalCandidates)
+      : (critical ? 0 : 1),
+    criticalSlotCoverageRatio: criticalSlotCapacity
+      ? round(criticalMatched / criticalSlotCapacity)
+      : (critical ? 0 : 1),
     averageReservedAmountPerTick: round(window.reservedAmountTicks / ticks, 2),
     averagePredictedTransportTicks: window.transportJobCount
       ? round(window.transportTickTotal / window.transportJobCount, 2)
