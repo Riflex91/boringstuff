@@ -13,6 +13,7 @@ const requestShadow = require('request.shadow');
 const assignmentShadow = require('assignment.shadow');
 const assignmentEvidence = require('assignment.evidence');
 const capacitySpawnShadow = require('spawn.capacity.shadow');
+const logisticsMatchingShadow = require('logistics.matching.shadow');
 const profiler = require('profiler');
 const logger = require('logger');
 const config = require('config');
@@ -34,6 +35,7 @@ function status(state) {
     logisticsRequests: state.requestShadow ? state.requestShadow.logisticsGraph : null,
     capacitySpawn: state.capacitySpawnShadow ? state.capacitySpawnShadow.summary : null,
     assignments: state.assignmentShadow ? state.assignmentShadow.summary : null,
+    logisticsMatching: state.logisticsMatchingShadow ? state.logisticsMatchingShadow.summary : null,
     assignmentEvidence: state.assignmentEvidence ? (state.assignmentEvidence.lastWindow || state.assignmentEvidence.current) : null,
     colonyState: state.colonyState || null
   };
@@ -131,6 +133,19 @@ function run(room, lowCpu) {
           undefined,
           Game
         );
+  });
+
+  state.logisticsMatchingShadow = profiler.detailSection('room.logistics-match', function() {
+    const snapshot = lowCpu
+      ? logisticsMatchingShadow.deferredSnapshot('LOW_CPU')
+      : logisticsMatchingShadow.plan(
+          state,
+          state.requestShadow.requests,
+          undefined,
+          Game
+        );
+    if (snapshot.requestSummary) state.requestShadow.summary = snapshot.requestSummary;
+    return snapshot;
   });
 
   state.assignmentEvidence = profiler.detailSection('room.evidence', function() {
