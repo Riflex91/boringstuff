@@ -49,9 +49,6 @@ assert.equal(desired.worker, 2);
 assert.equal(desired.builder, 2);
 assert.equal(desired.upgrader, 1);
 
-console.log('spawn economy tests passed');
-
-
 {
   // Scouts roam outside the home room. They must still count against the
   // home colony's desired scout population.
@@ -79,3 +76,5 @@ console.log('spawn economy tests passed');
   };
   assert.equal(spawnManager._test.countRole(room, 'scout'), 1);
 }
+
+console.log('spawn economy tests passed');
