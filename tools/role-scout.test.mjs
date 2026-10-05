@@ -44,8 +44,16 @@ const room = {
   }
 };
 
+let cpuUsed = 0;
 global.Game = {
   time: 100,
+  cpu: {
+    bucket: 10000,
+    getUsed() {
+      cpuUsed += 1;
+      return cpuUsed;
+    }
+  },
   map: {
     describeExits() {
       describeExitsCalls += 1;
@@ -87,6 +95,10 @@ assert.equal(finds.structures, 1);
 assert.equal(describeExitsCalls, 2);
 assert.equal(moveCalls, 1);
 assert.equal(Memory.bot.worldIntel.rooms.E1N1.observation.lastSeenTick, 100);
+assert.equal(Memory.bot.cpu.details['scout.legacy-intel'].lastTick, 100);
+assert.equal(Memory.bot.cpu.details['scout.world-intel'].lastTick, 100);
+assert.equal(Memory.bot.cpu.details['scout.target'].lastTick, 100);
+assert.equal(Memory.bot.cpu.details['scout.move'].lastTick, 100);
 
 // Fresh shared world intel suppresses the duplicate full snapshot. Legacy scout
 // intel remains current and target/movement behavior is unchanged.
@@ -102,6 +114,10 @@ assert.equal(finds.minerals, 1);
 assert.equal(finds.structures, 1);
 assert.equal(describeExitsCalls - beforeTargetRefreshExits, 1);
 assert.equal(Memory.bot.worldIntel.rooms.E1N1.observation.lastSeenTick, 100);
+assert.equal(Memory.bot.cpu.details['scout.world-intel'].lastTick, 100);
+assert.equal(Memory.bot.cpu.details['scout.legacy-intel'].lastTick, 101);
+assert.equal(Memory.bot.cpu.details['scout.target'].lastTick, 101);
+assert.equal(Memory.bot.cpu.details['scout.move'].lastTick, 101);
 
 // At exactly INTEL_INTERVAL age, the scheduled global pass is due later in the
 // same tick, so the scout does not duplicate it.
@@ -117,5 +133,6 @@ scout.run(creep);
 assert.equal(finds.minerals, 2);
 assert.equal(finds.structures, 2);
 assert.equal(Memory.bot.worldIntel.rooms.E1N1.observation.lastSeenTick, 126);
+assert.equal(Memory.bot.cpu.details['scout.world-intel'].lastTick, 126);
 
 console.log('scout role tests passed');

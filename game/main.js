@@ -96,6 +96,25 @@ function statusSnapshot(roomStates, tickCpu) {
   }, { force: true, persist: false, dedupeTicks: 0 });
 }
 
+function measureMainDetail(name, fn) {
+  const start = Game.cpu.getUsed();
+  try {
+    return fn();
+  } finally {
+    profiler.detailValue(name, Math.max(0, Game.cpu.getUsed() - start));
+  }
+}
+
+function currentSectionTotal(names) {
+  let total = 0;
+  const sections = Memory.bot && Memory.bot.cpu && Memory.bot.cpu.sections || {};
+  for (const name of names) {
+    const sample = sections[name];
+    if (sample && sample.lastTick === Game.time) total += Math.max(0, Number(sample.last) || 0);
+  }
+  return total;
+}
+
 function cleanupMemory() {
   for (const name in Memory.creeps) {
     if (!Game.creeps[name]) delete Memory.creeps[name];
@@ -108,11 +127,12 @@ function cleanupMemory() {
 module.exports.loop = function() {
   const tickStart = Game.cpu.getUsed();
   try {
-    bootstrapMemory();
-    commands.install();
-    logger.prune();
-    cleanupMemory();
+    measureMainDetail('main.bootstrap', bootstrapMemory);
+    measureMainDetail('main.commands', function() { commands.install(); });
+    measureMainDetail('main.logger-prune', function() { logger.prune(); });
+    measureMainDetail('main.cleanup', cleanupMemory);
 
+    const schedulerSetupStart = Game.cpu.getUsed();
     const lowCpu = Game.cpu.bucket < config.CPU_BUCKET_LOW;
     const criticalCpu = Game.cpu.bucket < config.CPU_BUCKET_CRITICAL;
     if (criticalCpu && Game.time % 25 === 0) {
@@ -131,6 +151,9 @@ module.exports.loop = function() {
     };
 
     const roomStates = [];
+    profiler.detailValue('main.scheduler-setup', Math.max(0, Game.cpu.getUsed() - schedulerSetupStart));
+    const scheduledStart = Game.cpu.getUsed();
+
     processScheduler.run({
       id: 'rooms',
       priorityClass: processScheduler.PRIORITY.CRITICAL,
@@ -176,6 +199,10 @@ module.exports.loop = function() {
     }, function() {
       profiler.section('visuals', function() { roomStates.forEach(visuals.draw); });
     }, schedulerContext);
+
+    const scheduledTotal = Math.max(0, Game.cpu.getUsed() - scheduledStart);
+    const sectionTotal = currentSectionTotal(['rooms', 'creeps', 'world-intel', 'stats', 'visuals']);
+    profiler.detailValue('main.scheduler-overhead', Math.max(0, scheduledTotal - sectionTotal));
 
     profiler.finishTick(tickStart);
 
