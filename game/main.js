@@ -188,7 +188,7 @@ module.exports.loop = function() {
         bucket: Game.cpu.bucket,
         rooms: roomStates.length,
         creeps: Object.keys(Game.creeps).length
-      }, { force: true, dedupeTicks: 0 });
+      }, { force: true, journal: true, dedupeTicks: 0 });
     }
   } catch (err) {
     logger.error('MAIN_FATAL', 'Unhandled exception escaped main loop', err, { cpu: Game.cpu.getUsed(), bucket: Game.cpu.bucket });
