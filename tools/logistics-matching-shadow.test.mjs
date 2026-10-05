@@ -163,6 +163,50 @@ function add(memory, time, specs) {
 
 {
   const memory = {};
+  const reserve = {
+    dedupeKey: 'reserve-higher-score',
+    domain: 'logistics',
+    kind: 'RESERVE',
+    source: null,
+    target: endpoint('spawn-reserve-target', 10, 10),
+    demand: {
+      resourceType: 'energy',
+      capability: 'reserveEnergy',
+      amount: 135,
+      minimumUsefulAmount: 50,
+      maximumUsefulAmount: 135
+    },
+    priority: { base: 92, urgency: 64, strategicClass: 'CORE_ECONOMY' },
+    utility: { current: 135, marginalModel: 'SATURATING' },
+    evidence: { source: 'test' },
+    shadow: true
+  };
+  const emergency = delivery('critical-must-win', 85, 10, 10, true, 90, 50);
+  const requests = add(memory, 250, [reserve, emergency]);
+  const byKey = Object.fromEntries(requests.map(r => [r.dedupeKey, r]));
+  const creep = hauler('priority-hauler', 10, 10, 200, 200);
+  const roomState = matcher._test.ensureRoom('E1N1', memory);
+
+  const reserveCandidate = matcher._test.directCandidate(creep, byKey['reserve-higher-score'], roomState, 250);
+  const emergencyCandidate = matcher._test.directCandidate(creep, byKey['critical-must-win'], roomState, 250);
+  assert.ok(reserveCandidate.score > emergencyCandidate.score);
+  assert.equal(matcher._test.demandTier(reserveCandidate), 0);
+  assert.equal(matcher._test.demandTier(emergencyCandidate), 1);
+  assert.equal(matcher._test.better(emergencyCandidate, reserveCandidate), true);
+
+  const plan = matcher.plan({
+    room: { name: 'E1N1' },
+    creeps: [creep]
+  }, requests, memory, { time: 250 });
+
+  assert.equal(plan.jobs.length, 1);
+  assert.equal(plan.jobs[0].demandDedupeKey, 'critical-must-win');
+  assert.equal(plan.jobs[0].requestKind, 'EMERGENCY_DELIVER');
+  assert.equal(plan.jobs[0].critical, true);
+}
+
+{
+  const memory = {};
   const specs = [
     delivery('route-a', 50, 15, 10, false, 80, 0),
     delivery('route-b', 50, 15, 10, false, 80, 0)
