@@ -13,7 +13,35 @@ function worldIntelNeedsRefresh(roomName) {
   return !worldIntel.freshness(roomName, Game.time, config.INTEL_INTERVAL).fresh;
 }
 
+function scoutHome(creep) {
+  return creep && creep.memory && creep.memory.home
+    ? creep.memory.home
+    : (creep && creep.room ? creep.room.name : null);
+}
+
+function activeScoutName(homeRoom) {
+  let best = null;
+  for (const name in Game.creeps) {
+    const creep = Game.creeps[name];
+    if (!creep || !creep.memory || creep.memory.role !== 'scout') continue;
+    if (scoutHome(creep) !== homeRoom) continue;
+    const born = Number.isFinite(creep.memory.born) ? creep.memory.born : Number.MAX_SAFE_INTEGER;
+    const candidate = { name, born };
+    if (!best || candidate.born < best.born ||
+      (candidate.born === best.born && candidate.name < best.name)) {
+      best = candidate;
+    }
+  }
+  return best ? best.name : null;
+}
+
+function isActiveScout(creep) {
+  const home = scoutHome(creep);
+  return !!home && activeScoutName(home) === creep.name;
+}
+
 function run(creep) {
+  if (!isActiveScout(creep)) return;
   if (!Memory.intel) Memory.intel = {};
   const room = creep.room;
 
@@ -54,4 +82,4 @@ function run(creep) {
   });
 }
 
-module.exports = { run, _test: { adjacentRooms, worldIntelNeedsRefresh } };
+module.exports = { run, _test: { adjacentRooms, worldIntelNeedsRefresh, scoutHome, activeScoutName, isActiveScout } };
