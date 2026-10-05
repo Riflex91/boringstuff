@@ -305,7 +305,7 @@ function makeCandidates(creep, sets, roomState, now) {
       if (candidate) result.push(candidate);
     }
   }
-  if (freeCapacity(creep) > 0) {
+  if (freeCapacity(creep) > 0 && carried(creep) === 0) {
     for (const supply of sets.pickup) {
       for (const demand of sets.demand) {
         const candidate = pairedCandidate(creep, supply, demand, roomState, now);
@@ -353,6 +353,7 @@ function plan(state, requests, memoryRoot, game) {
   if (!roomName) return deferredSnapshot('NO_ROOM');
   const roomState = ensureRoom(roomName, memoryRoot);
   const sets = activeSets(requests);
+  const initialCritical = sets.demand.filter(r => r.kind === 'EMERGENCY_DELIVER' && remainingAmount(r) > 0);
   const haulers = (state.creeps || []).filter(c => c && !c.spawning && role(c) === 'hauler' && (c.id || c.name));
   const unused = haulers.slice();
   const jobs = [];
@@ -411,10 +412,9 @@ function plan(state, requests, memoryRoot, game) {
   roomState.previousByHauler = previousByHauler;
   roomState.lastPlanTick = now;
 
-  const activeCritical = sets.demand.filter(r => r.kind === 'EMERGENCY_DELIVER' && remainingAmount(r) > 0);
   const matchedCritical = {};
   for (const job of jobs) if (job.critical && job.demandRequestId) matchedCritical[job.demandRequestId] = true;
-  const unmatchedCritical = activeCritical.filter(r => !matchedCritical[r.id]);
+  const unmatchedCritical = initialCritical.filter(r => !matchedCritical[r.id]);
 
   const reservedAmountTotal = jobs.reduce((sum, job) => sum + job.amount, 0);
   const etaTotal = jobs.reduce((sum, job) => sum + (job.predicted.transportTicks || 0), 0);
@@ -431,7 +431,7 @@ function plan(state, requests, memoryRoot, game) {
     haulerUtilization: haulers.length ? Math.round((jobs.length / haulers.length) * 1000) / 1000 : 0,
     pairedJobCount: jobs.filter(j => j.mode === 'PICKUP_DELIVER' || j.mode === 'BALANCE').length,
     directCarriedJobCount: jobs.filter(j => j.mode === 'DIRECT_CARRIED').length,
-    criticalRequestCount: activeCritical.length,
+    criticalRequestCount: initialCritical.length,
     criticalMatchedCount: Object.keys(matchedCritical).length,
     unmatchedCriticalCount: unmatchedCritical.length,
     reservedAmount: Math.round(reservedAmountTotal * 100) / 100,
