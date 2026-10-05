@@ -303,6 +303,47 @@ function build(state, context) {
           byKind: {},
           amountByKind: {}
         },
+    logisticsMatching: state.logisticsMatchingShadow && state.logisticsMatchingShadow.summary
+      ? {
+          available: true,
+          authority: 'SHADOW',
+          planTick: state.logisticsMatchingShadow.summary.planTick,
+          deferred: !!state.logisticsMatchingShadow.summary.deferred,
+          deferReason: state.logisticsMatchingShadow.summary.deferReason || null,
+          haulerCount: state.logisticsMatchingShadow.summary.haulerCount,
+          candidateCount: state.logisticsMatchingShadow.summary.candidateCount,
+          jobCount: state.logisticsMatchingShadow.summary.jobCount,
+          matchedHaulerCount: state.logisticsMatchingShadow.summary.matchedHaulerCount,
+          haulerUtilization: state.logisticsMatchingShadow.summary.haulerUtilization,
+          pairedJobCount: state.logisticsMatchingShadow.summary.pairedJobCount,
+          directCarriedJobCount: state.logisticsMatchingShadow.summary.directCarriedJobCount,
+          criticalRequestCount: state.logisticsMatchingShadow.summary.criticalRequestCount,
+          criticalMatchedCount: state.logisticsMatchingShadow.summary.criticalMatchedCount,
+          unmatchedCriticalCount: state.logisticsMatchingShadow.summary.unmatchedCriticalCount,
+          reservedAmount: state.logisticsMatchingShadow.summary.reservedAmount,
+          averageTransportTicks: state.logisticsMatchingShadow.summary.averageTransportTicks,
+          jobs: state.logisticsMatchingShadow.jobs || []
+        }
+      : {
+          available: false,
+          authority: 'SHADOW',
+          planTick: null,
+          deferred: false,
+          deferReason: null,
+          haulerCount: 0,
+          candidateCount: 0,
+          jobCount: 0,
+          matchedHaulerCount: 0,
+          haulerUtilization: 0,
+          pairedJobCount: 0,
+          directCarriedJobCount: 0,
+          criticalRequestCount: 0,
+          criticalMatchedCount: 0,
+          unmatchedCriticalCount: 0,
+          reservedAmount: 0,
+          averageTransportTicks: 0,
+          jobs: []
+        },
     assignments: state.assignmentShadow && state.assignmentShadow.summary
       ? {
           available: true,
