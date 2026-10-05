@@ -127,7 +127,7 @@ function cpuSequence(values) {
 
 {
   Game.time = 150;
-  cpuSequence([17, 21]);
+  cpuSequence([21]);
   profiler.detailValue('creep.hauler', 2.5);
   profiler.finishTick(17);
   const sample = Memory.bot.cpu.history.at(-1);
