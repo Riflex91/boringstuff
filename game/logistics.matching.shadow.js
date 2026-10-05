@@ -280,8 +280,15 @@ function candidateKey(candidate) {
   ].join('|');
 }
 
+function demandTier(candidate) {
+  return candidate && candidate.demand && candidate.demand.kind === 'EMERGENCY_DELIVER' ? 1 : 0;
+}
+
 function better(a, b) {
   if (!b) return true;
+  const aTier = demandTier(a);
+  const bTier = demandTier(b);
+  if (aTier !== bTier) return aTier > bTier;
   if (a.score !== b.score) return a.score > b.score;
   if (a.deliveryEta !== b.deliveryEta) return a.deliveryEta < b.deliveryEta;
   if (a.amount !== b.amount) return a.amount > b.amount;
@@ -521,6 +528,7 @@ module.exports = {
     activeSets,
     makeCandidates,
     revalidatedAmount,
-    better
+    better,
+    demandTier
   }
 };
