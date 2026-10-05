@@ -200,7 +200,7 @@ function evidence(start = 1000) {
   assert.equal(r.outcome, 'FAIL');
   const authority = r.checks.find(c => c.id === 'vnext-shadow-authority');
   assert.equal(authority.status, 'FAIL');
-  assert.ok(authority.details.failures.includes('logisticsMatching'));
+  assert.ok(authority.data.failures.includes('logisticsMatching'));
 }
 
 {
