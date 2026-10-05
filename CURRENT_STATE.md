@@ -6,7 +6,7 @@ Canonical repository: `Riflex91/boringstuff`
 
 - Seed baseline: **v0.2.16-node18**
 - Current canonical source baseline before this release prep: `29ad209af552f0a20ea50c0e7c8ad4e32a567e05`
-- Release candidate identity: **0.3.0-shadow.6-node18**
+- Release candidate identity: **0.3.0-shadow.7-node18**
 - Latest VNext live gate: **WATCH — 15 PASS / 3 WATCH / 0 FAIL**
 - Runtime target: **Node.js 18.20.4**
 - Runtime branch: `chatgpt`
@@ -431,6 +431,22 @@ Interpretation:
 - current per-tick matching summaries are insufficient for an authority decision.
 
 The next E4 step is a dedicated 100-tick matching-evidence window tracking hauler utilization, critical-request coverage, predicted transport latency, job mix, reservation integrity and concurrent consumer waiting/fallback. No authority transition is allowed until this evidence is reviewed.
+
+## 0.3.0-shadow.7 E4 evidence live-test purpose
+
+PR #30 adds a dedicated 100-tick E4 matching-evidence window while keeping `role.hauler` authoritative and E4 strictly SHADOW.
+
+The `0.3.0-shadow.7-node18` release exists to validate that evidence layer live. Acceptance focus:
+
+- `room.logistics-evidence` CPU must remain small;
+- `logisticsMatching.authority` must remain `SHADOW`;
+- `logisticsMatching.evidence.authority` must remain `SHADOW_EVIDENCE`;
+- the 100-tick E4 window should complete with sensible hauler utilization, job rate, critical-request coverage, predicted transport latency and reservation volume;
+- `duplicateReservationTicks` must remain zero;
+- consumer waiting/critical/fallback should be observed alongside E4 matching evidence, without attributing legacy execution outcomes to E4;
+- any incomplete exact-window evidence is WATCH, duplicate reservation evidence is FAIL.
+
+No gameplay-authority transition is included or permitted by this release.
 
 ## Current strategic interpretation
 
