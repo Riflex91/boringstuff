@@ -183,11 +183,18 @@ module.exports.loop = function() {
     if (Game.time % config.STATUS_SNAPSHOT_INTERVAL === 0) statusSnapshot(roomStates, tickCpu);
 
     if (Game.time % config.LOG_HEARTBEAT_INTERVAL === 0) {
+      const profile = profiler.currentHistorySample();
       logger.info('BOT_HEARTBEAT', 'Bot tick completed', {
         cpu: Math.round(tickCpu * 1000) / 1000,
         bucket: Game.cpu.bucket,
         rooms: roomStates.length,
-        creeps: Object.keys(Game.creeps).length
+        creeps: Object.keys(Game.creeps).length,
+        profile: profile ? {
+          sections: profile.sections,
+          details: profile.details,
+          attributed: profile.attributed,
+          unattributed: profile.unattributed
+        } : null
       }, { force: true, journal: true, dedupeTicks: 0 });
     }
   } catch (err) {

@@ -108,6 +108,26 @@ function evidence(start = 1000) {
 
 {
   const rows = evidence();
+  rows[2] = event(1000, 'BOT_HEARTBEAT', {
+    cpu: 23.6,
+    bucket: 10000,
+    profile: {
+      sections: { rooms: 8.5, creeps: 4.2 },
+      details: { 'room.logistics-match': 0.3 },
+      attributed: 12.7,
+      unattributed: 10.9
+    }
+  });
+  const r = evaluateSmoke({ events: rows, startTick: 1000, nodeVersion: '18.20.4' });
+  const cpu = r.checks.find(c => c.id === 'cpu-bucket');
+  assert.equal(cpu.status, 'FAIL');
+  assert.match(cpu.message, /CPU>20: 1000=23\.6/);
+  assert.equal(cpu.data.badCpu[0].profile.sections.rooms, 8.5);
+  assert.equal(cpu.data.badCpu[0].profile.details['room.logistics-match'], 0.3);
+}
+
+{
+  const rows = evidence();
   rows[0].jseq = 20;
   rows.at(-1).jseq = 23;
   const r = evaluateLive({ events: rows, startTick: 1000, nodeVersion: '18.20.4', droppedThroughSeq: 0 });

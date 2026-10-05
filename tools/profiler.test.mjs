@@ -114,4 +114,15 @@ function cpuSequence(values) {
   assert.equal(Memory.bot.cpu.details['room.fail'].lastTick, 126);
 }
 
+{
+  Game.time = 125;
+  const current = profiler.currentHistorySample();
+  assert.ok(current);
+  assert.equal(current.tick, 125);
+  assert.equal(current.unattributed, 5);
+
+  Game.time = 126;
+  assert.equal(profiler.currentHistorySample(), null);
+}
+
 console.log('profiler tests passed');

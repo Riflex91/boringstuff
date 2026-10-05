@@ -86,12 +86,25 @@ function baseChecks({ events, startTick, endTick, evidenceMaxTick = -1, complete
     ? check('collector-health', 'PASS', 'No collector errors were observed in the window.')
     : check('collector-health', 'WATCH', 'Collector errors occurred in the window; verify telemetry completeness.', { collectorErrors: collector.slice(0, 20) }));
 
-  const cpu = events.filter(e => e?.code === 'BOT_HEARTBEAT').map(e => ({ tick: e.tick, cpu: finite(e?.ctx?.cpu, null), bucket: finite(e?.ctx?.bucket, null) }));
+  const cpu = events.filter(e => e?.code === 'BOT_HEARTBEAT').map(e => ({
+    tick: e.tick,
+    cpu: finite(e?.ctx?.cpu, null),
+    bucket: finite(e?.ctx?.bucket, null),
+    profile: e?.ctx?.profile || null
+  }));
   const badCpu = cpu.filter(x => x.cpu !== null && x.cpu > 20);
   const criticalBucket = cpu.filter(x => x.bucket !== null && x.bucket < 1000);
   const lowBucket = cpu.filter(x => x.bucket !== null && x.bucket >= 1000 && x.bucket < 3000);
   if (!cpu.length) checks.push(check('cpu-bucket', complete ? 'FAIL' : 'WATCH', complete ? 'No BOT_HEARTBEAT CPU/bucket evidence was found in the complete window.' : 'No BOT_HEARTBEAT sample has arrived yet for the incomplete window.'));
-  else if (badCpu.length || criticalBucket.length) checks.push(check('cpu-bucket', 'FAIL', 'CPU or bucket crossed a hard safety threshold.', { badCpu, criticalBucket }));
+  else if (badCpu.length || criticalBucket.length) {
+    const cpuSummary = badCpu.map(x => x.tick + '=' + x.cpu).join(', ');
+    const bucketSummary = criticalBucket.map(x => x.tick + '=' + x.bucket).join(', ');
+    const detail = [
+      cpuSummary ? 'CPU>20: ' + cpuSummary : null,
+      bucketSummary ? 'bucket<1000: ' + bucketSummary : null
+    ].filter(Boolean).join('; ');
+    checks.push(check('cpu-bucket', 'FAIL', 'CPU or bucket crossed a hard safety threshold' + (detail ? ' (' + detail + ').' : '.'), { badCpu, criticalBucket }));
+  }
   else if (lowBucket.length) checks.push(check('cpu-bucket', 'WATCH', 'CPU is acceptable but bucket entered the low range.', { lowBucket }));
   else checks.push(check('cpu-bucket', 'PASS', 'CPU and bucket remained inside safety thresholds.', { samples: cpu.length }));
 
