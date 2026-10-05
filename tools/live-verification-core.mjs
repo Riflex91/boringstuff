@@ -289,6 +289,18 @@ export function evaluateLive(input) {
     if (!e4Evidence) {
       checks.push(check('e4-matching-evidence', 'WATCH', 'E4 matching is present but its 100-tick evidence window is not available yet.'));
     } else if (!e4Last || !e4MatchesWindow) {
+      const observedMetrics = e4Last ? {
+        haulerUtilization: finite(e4Last.haulerUtilization, null),
+        averageJobsPerTick: finite(e4Last.averageJobsPerTick, null),
+        criticalRequestTicks: finite(e4Last.criticalRequestTicks, null),
+        criticalMatchedTicks: finite(e4Last.criticalMatchedTicks, null),
+        unmatchedCriticalTicks: finite(e4Last.unmatchedCriticalTicks, null),
+        criticalCoverageRatio: finite(e4Last.criticalCoverageRatio, null),
+        averagePredictedTransportTicks: finite(e4Last.averagePredictedTransportTicks, null),
+        averageConsumerWaiting: finite(e4Last.averageConsumerWaiting, null),
+        averageConsumerFallback: finite(e4Last.averageConsumerFallback, null),
+        duplicateReservationTicks: finite(e4Last.duplicateReservationTicks, null)
+      } : null;
       checks.push(check(
         'e4-matching-evidence',
         'WATCH',
@@ -296,6 +308,7 @@ export function evaluateLive(input) {
         {
           requestedWindow: { startTick: selected.startTick, endTick: selected.endTick },
           observedLastWindow: { startTick: e4StartTick, endTick: e4EndTick, ticks: e4Ticks },
+          observedMetrics,
           currentTicks: finite(e4Current?.ticks, null)
         }
       ));

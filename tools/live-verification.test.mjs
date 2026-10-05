@@ -427,4 +427,53 @@ function evidence(start = 1000) {
   assert.equal(e4.data.duplicateReservationTicks, 0);
 }
 
+
+{
+  // A valid completed E4 window may be cadence-shifted relative to the verifier
+  // window. Keep WATCH semantics, but surface the completed window's quality
+  // metrics so live diagnosis can compare coverage without another data dump.
+  const rows = evidence(1101);
+  const status = rows.at(-1);
+  status.ctx.rooms.E8N1.colonyState.logisticsMatching = {
+    available: true,
+    authority: 'SHADOW',
+    evidence: { authority: 'SHADOW_EVIDENCE' }
+  };
+  status.ctx.rooms.E8N1.logisticsMatchingEvidence = {
+    authority: 'SHADOW_EVIDENCE',
+    current: {
+      authority: 'SHADOW_EVIDENCE',
+      startTick: 1200,
+      endTick: 1207,
+      ticks: 8
+    },
+    lastWindow: {
+      authority: 'SHADOW_EVIDENCE',
+      startTick: 1100,
+      endTick: 1199,
+      ticks: 100,
+      haulerUtilization: 1,
+      averageJobsPerTick: 2.5,
+      criticalRequestTicks: 80,
+      criticalMatchedTicks: 72,
+      unmatchedCriticalTicks: 8,
+      criticalCoverageRatio: 0.9,
+      averagePredictedTransportTicks: 3.25,
+      averageConsumerWaiting: 0.4,
+      averageConsumerFallback: 0,
+      duplicateReservationTicks: 0
+    }
+  };
+
+  const r = evaluateLive({ events: rows, startTick: 1101, nodeVersion: '18.20.4' });
+  const e4 = r.checks.find(c => c.id === 'e4-matching-evidence');
+  assert.equal(e4.status, 'WATCH');
+  assert.equal(e4.data.observedLastWindow.startTick, 1100);
+  assert.equal(e4.data.observedLastWindow.endTick, 1199);
+  assert.equal(e4.data.observedMetrics.criticalCoverageRatio, 0.9);
+  assert.equal(e4.data.observedMetrics.criticalMatchedTicks, 72);
+  assert.equal(e4.data.observedMetrics.duplicateReservationTicks, 0);
+  assert.equal(e4.data.currentTicks, 8);
+}
+
 console.log('live-verification tests passed');
