@@ -145,9 +145,16 @@ function evidence(start = 1000) {
   const status = rows.at(-1);
   status.ctx.rooms.E8N1.economyModel.consumerWaitingCount = 3;
   status.ctx.rooms.E8N1.economyModel.consumerCriticalCount = 3;
+  status.ctx.rooms.E8N1.consumerSupply = {
+    criticalConsumers: [{ name: 'builder-a', role: 'builder', energy: 0, waiting: 3, fallback: false }],
+    consumerReservations: [{ hauler: 'hauler-a', targetId: 'builder-a', carried: 100, delivering: true }]
+  };
   const r = evaluateLive({ events: rows, startTick: 1000, nodeVersion: '18.20.4' });
   assert.equal(r.outcome, 'WATCH');
-  assert.equal(r.checks.find(c => c.id === 'consumer-supply').status, 'WATCH');
+  const supply = r.checks.find(c => c.id === 'consumer-supply');
+  assert.equal(supply.status, 'WATCH');
+  assert.equal(supply.data.diagnostics.criticalConsumers[0].name, 'builder-a');
+  assert.equal(supply.data.diagnostics.consumerReservations[0].hauler, 'hauler-a');
   assert.equal(r.counts.fail, 0);
 }
 
