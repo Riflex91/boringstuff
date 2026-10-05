@@ -141,7 +141,7 @@ function previousBonus(roomState, haulerId, supply, demand) {
   if (!previous) return 0;
   const supplyId = supply ? supply.id : null;
   const demandId = demand ? demand.id : null;
-  if (previous.supplyRequestId === supplyId && previous.demandRequestId === demandId) return 25;
+  if (supplyId && previous.supplyRequestId === supplyId && previous.demandRequestId === demandId) return 25;
   if (demandId && previous.demandRequestId === demandId) return 12;
   if (supplyId && previous.supplyRequestId === supplyId) return 6;
   return 0;
