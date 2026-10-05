@@ -6,7 +6,7 @@ Canonical repository: `Riflex91/boringstuff`
 
 - Seed baseline: **v0.2.16-node18**
 - Current canonical source baseline before this release prep: `29ad209af552f0a20ea50c0e7c8ad4e32a567e05`
-- Release candidate identity: **0.3.0-shadow.5-node18**
+- Release candidate identity: **0.3.0-shadow.6-node18**
 - Latest VNext live gate: **WATCH — 15 PASS / 3 WATCH / 0 FAIL**
 - Runtime target: **Node.js 18.20.4**
 - Runtime branch: `chatgpt`
@@ -373,6 +373,21 @@ E4 implementation target from the roadmap:
 - allow partial carried resource to satisfy urgent demand;
 - expose predicted transport timing and critical-demand coverage;
 - leave `role.hauler` execution unchanged until live comparison evidence supports an authority transition.
+
+## 0.3.0-shadow.6 E4 live-test purpose
+
+PR #28 introduced **E4 — Hauler Matching** in SHADOW/evidence-only mode and was merged only after the complete Node 18.20.4 regression suite passed, including the new logistics-matching regression and syntax validation across 42 game modules.
+
+The `0.3.0-shadow.6-node18` release exists only to validate E4 live telemetry. Acceptance focus:
+
+- `room.logistics-match` CPU must remain small enough that E4 does not recreate the prior room CPU problem;
+- E4 must continue to report `authority: SHADOW`;
+- matching must produce sensible `DIRECT_CARRIED`, `PICKUP_DELIVER`, and `BALANCE` job evidence;
+- critical logistics demand should show measurable match coverage without duplicate reservation inflation;
+- consumer waiting/fallback should be compared against the existing legacy hauler behavior, not assumed improved;
+- legacy `role.hauler` remains authoritative and unchanged.
+
+No E4 authority transition is allowed from this release. A future switch requires equal-or-better live evidence for safety, consumer supply, transport latency/utilization, and CPU.
 
 ## Current strategic interpretation
 
