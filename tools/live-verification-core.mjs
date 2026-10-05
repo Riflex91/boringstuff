@@ -213,10 +213,12 @@ export function evaluateLive(input) {
   const fallback = finite(model.consumerFallbackCount, null);
   const critical = finite(model.consumerCriticalCount, null);
   const waiting = finite(model.consumerWaitingCount, null);
-  if ([fallback, critical, waiting].every(v => v === null)) checks.push(check('consumer-supply', 'WATCH', 'No consumer-supply counters were available.'));
-  else if ((fallback || 0) > 0) checks.push(check('consumer-supply', 'WATCH', 'Consumer self-supply fallback occurred; optimization may still be needed.', { fallback, critical, waiting }));
-  else if ((critical || 0) > 0 || (waiting || 0) > 0) checks.push(check('consumer-supply', 'WATCH', 'Consumers were waiting/critical, but fallback remained zero.', { fallback, critical, waiting }));
-  else checks.push(check('consumer-supply', 'PASS', 'No consumer fallback/waiting/critical pressure was observed in the latest snapshot.', { fallback, critical, waiting }));
+  const consumerSupplyDiagnostics = latest?.consumerSupply || null;
+  const consumerSupplyData = { fallback, critical, waiting, diagnostics: consumerSupplyDiagnostics };
+  if ([fallback, critical, waiting].every(v => v === null)) checks.push(check('consumer-supply', 'WATCH', 'No consumer-supply counters were available.', consumerSupplyData));
+  else if ((fallback || 0) > 0) checks.push(check('consumer-supply', 'WATCH', 'Consumer self-supply fallback occurred; optimization may still be needed.', consumerSupplyData));
+  else if ((critical || 0) > 0 || (waiting || 0) > 0) checks.push(check('consumer-supply', 'WATCH', 'Consumers were waiting/critical, but fallback remained zero.', consumerSupplyData));
+  else checks.push(check('consumer-supply', 'PASS', 'No consumer fallback/waiting/critical pressure was observed in the latest snapshot.', consumerSupplyData));
 
   const controllerProgress = finite(windowLast100?.controllerProgress, null);
   const constructionProgress = finite(windowLast100?.constructionProgress, null);
