@@ -339,6 +339,41 @@ No request priority, assignment score formula, spawn decision, body ranking, CPU
 
 The next release is **0.3.0-shadow.5-node18**. Its live purpose is to verify that the observed `capacity-spawn` and `assignment` CPU costs fall without behavior regressions. E4 remains blocked until the CPU safety evidence from this release is reviewed.
 
+
+## 0.3.0-shadow.5 CPU reuse follow-up
+
+The shadow.5 CPU-reuse release was live-tested after PR #25:
+
+- runtime version: `0.3.0-shadow.5-node18`;
+- the corrected live verification window `3710702–3710801` finished **WATCH** with `PASS=12 / WATCH=6 / FAIL=0`;
+- Node runtime, bot version, window completion, runtime errors, collector health, CPU/bucket, mining, hard-stall, telemetry continuity, modeled hauler capacity, VNext platform shadow, and VNext shadow authority all passed;
+- consumer supply remained WATCH because self-supply fallback still occurred;
+- productive-attribution/controller/construction/throughput WATCH results are caused by the runtime's fixed economy-window cadence not aligning exactly with the verifier's deployment-relative 100-tick window. PR #27 corrected this from a false hard FAIL to WATCH while preserving hard FAIL for genuinely missing attribution fields.
+
+The nested CPU samples show that PR #25 materially reduced the two intended Shadow hot paths:
+
+- `room.capacity-spawn` fell from multi-CPU samples/peak `6.534` in shadow.4 to generally about `0.1–0.3` CPU in the captured shadow.5 history;
+- `room.assignment` fell from multi-CPU samples/peak `4.272` in shadow.4 to generally sub-1 CPU in the captured shadow.5 history;
+- total `rooms` cost is substantially lower than the shadow.4 sample set.
+
+Occasional total CPU samples above 20 still occurred outside the corrected live-gate window, but they were no longer driven by E2 capacity-spawn or E1 assignment. Remaining variable cost is concentrated in unattributed main-loop work, creep execution, assignment evidence, and occasional legacy `room.planner` work. The hard CPU threshold is unchanged.
+
+Decision:
+
+- the original E1/E2 CPU blocker for **starting E4 in SHADOW mode** is lifted;
+- this is **not** approval for E4 gameplay authority;
+- E4 must remain evidence-only, get its own CPU attribution, and prove match quality / consumer-supply improvement before any legacy hauler behavior is replaced;
+- consumer fallback is still a real optimization target despite modeled hauler capacity passing.
+
+E4 implementation target from the roadmap:
+
+- match only E3 `PICKUP`, `DELIVER`, `BALANCE`, `RESERVE`, and `EMERGENCY_DELIVER` requests;
+- score priority, deadline, carried-resource advantage, route reuse, travel, detour, and reservation conflict;
+- use short-lived Shadow reservations to avoid double allocation;
+- allow partial carried resource to satisfy urgent demand;
+- expose predicted transport timing and critical-demand coverage;
+- leave `role.hauler` execution unchanged until live comparison evidence supports an authority transition.
+
 ## Current strategic interpretation
 
 `E8N1` remains structurally safe under the VNext shadow stack: dedicated mining is active, modeled hauler capacity is sufficient, controller and construction progress continue, CPU/bucket are safe, telemetry is contiguous, and no VNext subsystem gained gameplay authority.
