@@ -2,6 +2,7 @@
 
 const logger = require('logger');
 const energy = require('energy');
+const config = require('config');
 
 function chooseSource(creep) {
   if (creep.memory.sourceId) {
@@ -31,7 +32,7 @@ function run(creep) {
 
   if (creep.store.getFreeCapacity() > 0) {
     const rc = creep.harvest(source);
-    if (rc === ERR_NOT_IN_RANGE) creep.moveTo(source, { reusePath: 20, visualizePathStyle: { stroke: '#ffaa00' } });
+    if (rc === ERR_NOT_IN_RANGE) creep.moveTo(source, { reusePath: 20, maxOps: config.PATH_MAX_OPS, visualizePathStyle: { stroke: '#ffaa00' } });
     else if (rc !== OK && rc !== ERR_NOT_ENOUGH_RESOURCES) logger.warn('HARVEST_RC', 'Harvester action returned error', { creep: creep.name, room: creep.room.name, rc });
     return;
   }
@@ -41,7 +42,7 @@ function run(creep) {
   })[0];
   if (nearbyContainer) {
     const rc = creep.transfer(nearbyContainer, RESOURCE_ENERGY);
-    if (rc === ERR_NOT_IN_RANGE) creep.moveTo(nearbyContainer, { reusePath: 10 });
+    if (rc === ERR_NOT_IN_RANGE) creep.moveTo(nearbyContainer, { reusePath: 10, maxOps: config.PATH_MAX_OPS });
     return;
   }
 
