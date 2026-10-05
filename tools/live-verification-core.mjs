@@ -249,6 +249,7 @@ export function evaluateLive(input) {
     if (!colony.spawnPlan?.available || colony.spawnPlan?.authority !== 'SHADOW') shadowFailures.push('spawnPlan');
     if (!colony.assignmentEvidence?.available || colony.assignmentEvidence?.authority !== 'SHADOW_EVIDENCE') shadowFailures.push('assignmentEvidence');
     if (colony.logisticsMatching?.available && colony.logisticsMatching?.authority !== 'SHADOW') shadowFailures.push('logisticsMatching');
+    if (colony.logisticsMatching?.evidence && colony.logisticsMatching.evidence.authority !== 'SHADOW_EVIDENCE') shadowFailures.push('logisticsMatching.evidence');
   }
   checks.push(shadowFailures.length
     ? check('vnext-shadow-authority', selected.complete ? 'FAIL' : 'WATCH', 'VNext shadow authority contract is incomplete or violated.', { failures: shadowFailures })
