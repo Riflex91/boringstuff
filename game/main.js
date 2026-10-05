@@ -55,6 +55,46 @@ function bootstrapMemory() {
   }
 }
 
+function consumerSupplySnapshot(state) {
+  const energyKey = typeof RESOURCE_ENERGY !== 'undefined' ? RESOURCE_ENERGY : 'energy';
+  const consumers = [];
+  const reservations = [];
+  for (const creep of state.creeps || []) {
+    if (!creep || !creep.memory) continue;
+    const role = creep.memory.role;
+    if (role === 'hauler') {
+      if (creep.memory.consumerTargetId) {
+        reservations.push({
+          hauler: creep.name || creep.id || null,
+          targetId: creep.memory.consumerTargetId,
+          carried: creep.store ? Math.max(0, Number(creep.store[energyKey]) || 0) : 0,
+          delivering: !!creep.memory.delivering
+        });
+      }
+      continue;
+    }
+    if (role !== 'builder' && role !== 'worker' && role !== 'repairer' && role !== 'upgrader') continue;
+    const waiting = Math.max(0, Number(creep.memory.waitingEnergyTicks) || 0);
+    const fallback = !!creep.memory.logisticsFallback;
+    if (!waiting && !fallback) continue;
+    consumers.push({
+      name: creep.name || null,
+      id: creep.id || null,
+      role,
+      energy: creep.store ? Math.max(0, Number(creep.store[energyKey]) || 0) : 0,
+      capacity: creep.store && creep.store.getCapacity
+        ? Math.max(0, Number(creep.store.getCapacity(energyKey)) || 0)
+        : null,
+      waiting,
+      fallback
+    });
+  }
+  return {
+    criticalConsumers: consumers.slice(0, 8),
+    consumerReservations: reservations.slice(0, 8)
+  };
+}
+
 function statusSnapshot(roomStates, tickCpu) {
   const rooms = {};
   const profile = serverProfile.snapshot();
@@ -78,6 +118,7 @@ function statusSnapshot(roomStates, tickCpu) {
       spawnRemainingTime: state.spawn && state.spawn.spawning ? state.spawn.spawning.remainingTime : 0,
       economy: state.economyMetrics || null,
       economyModel: state.economyModel || null,
+      consumerSupply: consumerSupplySnapshot(state),
       health: state.health || null,
       efficiency: state.efficiency || null,
       // Keep E4 evidence shallow enough for logger.slim(). The canonical copy
