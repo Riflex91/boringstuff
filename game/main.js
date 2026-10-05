@@ -80,6 +80,16 @@ function statusSnapshot(roomStates, tickCpu) {
       economyModel: state.economyModel || null,
       health: state.health || null,
       efficiency: state.efficiency || null,
+      // Keep E4 evidence shallow enough for logger.slim(). The canonical copy
+      // remains in colonyState, but its window fields sit one level beyond the
+      // configured serialization depth and otherwise become "[depth-limit]".
+      logisticsMatchingEvidence: state.logisticsMatchingEvidence
+        ? {
+            authority: 'SHADOW_EVIDENCE',
+            current: state.logisticsMatchingEvidence.current || null,
+            lastWindow: state.logisticsMatchingEvidence.lastWindow || null
+          }
+        : null,
       colonyState: state.colonyState || null
     };
   }
