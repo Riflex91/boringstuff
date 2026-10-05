@@ -4,6 +4,8 @@ const assignmentShadow = require('assignment.shadow');
 
 const SCHEMA_VERSION = 1;
 const WINDOW_TICKS = 100;
+const SEEN_RETENTION_TICKS = WINDOW_TICKS * 2;
+const SEEN_PRUNE_INTERVAL = WINDOW_TICKS;
 const TERMINAL = { SATISFIED: true, EXPIRED: true, CANCELLED: true };
 
 function round(value, digits) {
@@ -231,10 +233,21 @@ function summarize(window, endTick) {
   };
 }
 
-function pruneSeen(roomState, now) {
-  const cutoff = now - 5000;
+function pruneSeen(roomState, now, retentionTicks) {
+  const retention = Number.isFinite(retentionTicks)
+    ? Math.max(WINDOW_TICKS, retentionTicks)
+    : SEEN_RETENTION_TICKS;
+  const cutoff = now - retention;
   for (const key in roomState.seenEpisodes) if (roomState.seenEpisodes[key] < cutoff) delete roomState.seenEpisodes[key];
   for (const key in roomState.seenTerminals) if (roomState.seenTerminals[key] < cutoff) delete roomState.seenTerminals[key];
+}
+
+function maybePruneSeen(roomState, now) {
+  const last = Number.isFinite(roomState.lastSeenPruneTick) ? roomState.lastSeenPruneTick : null;
+  if (last !== null && now - last < SEEN_PRUNE_INTERVAL) return false;
+  pruneSeen(roomState, now);
+  roomState.lastSeenPruneTick = now;
+  return true;
 }
 
 function observe(state, memoryRoot, game) {
@@ -243,6 +256,7 @@ function observe(state, memoryRoot, game) {
   const roomName = state && state.room && state.room.name;
   if (!roomName) return { current: null, completed: null };
   const roomState = ensureRoom(roomName, memoryRoot, now);
+  maybePruneSeen(roomState, now);
 
   observeRequestLifecycle(roomState, state.requestShadow && state.requestShadow.requests || [], now);
   observeAssignment(roomState, state);
@@ -254,7 +268,6 @@ function observe(state, memoryRoot, game) {
     completed = summarize(roomState.window, now);
     roomState.lastWindow = completed;
     roomState.window = newWindow(now + 1);
-    pruneSeen(roomState, now);
   }
 
   return {
@@ -278,6 +291,7 @@ function snapshot(roomName, memoryRoot) {
 module.exports = {
   SCHEMA_VERSION,
   WINDOW_TICKS,
+  SEEN_RETENTION_TICKS,
   ensure,
   observe,
   snapshot,
@@ -291,6 +305,7 @@ module.exports = {
     compatibleExecutors,
     observeAssignment,
     observeUsefulWork,
-    pruneSeen
+    pruneSeen,
+    maybePruneSeen
   }
 };
