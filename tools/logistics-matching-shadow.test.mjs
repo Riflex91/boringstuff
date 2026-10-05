@@ -203,6 +203,7 @@ function add(memory, time, specs) {
   assert.equal(plan.jobs[0].demandDedupeKey, 'critical-must-win');
   assert.equal(plan.jobs[0].requestKind, 'EMERGENCY_DELIVER');
   assert.equal(plan.jobs[0].critical, true);
+  assert.equal(plan.jobs[0].scoreComponents.demandTier, 1);
 }
 
 {
