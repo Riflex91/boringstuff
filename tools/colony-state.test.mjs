@@ -300,6 +300,17 @@ function creep(name, parts, ttl) {
     economyModel: null,
     health: null,
     efficiency: null,
+    logisticsMatchingEvidence: {
+      current: {
+        authority: 'SHADOW_EVIDENCE',
+        ticks: 42,
+        haulerUtilization: 0.5,
+        criticalCoverageRatio: 1,
+        averagePredictedTransportTicks: 12,
+        duplicateReservationTicks: 0
+      },
+      lastWindow: null
+    },
     logisticsMatchingShadow: {
       jobs: [{
         id: 'e4|E5N5|h1|7000',
@@ -336,6 +347,9 @@ function creep(name, parts, ttl) {
   assert.equal(snapshot.logisticsMatching.haulerUtilization, 0.5);
   assert.equal(snapshot.logisticsMatching.criticalMatchedCount, 1);
   assert.equal(snapshot.logisticsMatching.jobs[0].mode, 'PICKUP_DELIVER');
+  assert.equal(snapshot.logisticsMatching.evidence.authority, 'SHADOW_EVIDENCE');
+  assert.equal(snapshot.logisticsMatching.evidence.current.haulerUtilization, 0.5);
+  assert.equal(snapshot.logisticsMatching.evidence.current.criticalCoverageRatio, 1);
 }
 
 console.log('colony state tests passed');

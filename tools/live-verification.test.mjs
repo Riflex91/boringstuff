@@ -205,6 +205,101 @@ function evidence(start = 1000) {
 
 {
   const rows = evidence();
+  rows.at(-1).ctx.rooms.E8N1.colonyState.logisticsMatching = {
+    available: true,
+    authority: 'SHADOW',
+    evidence: {
+      authority: 'AUTHORITATIVE'
+    }
+  };
+  const r = evaluateLive({ events: rows, startTick: 1000, nodeVersion: '18.20.4' });
+  assert.equal(r.outcome, 'FAIL');
+  const authority = r.checks.find(c => c.id === 'vnext-shadow-authority');
+  assert.equal(authority.status, 'FAIL');
+  assert.ok(authority.data.failures.includes('logisticsMatching.evidence'));
+}
+
+{
+  const rows = evidence();
+  rows.at(-1).ctx.rooms.E8N1.colonyState.logisticsMatching = {
+    available: true,
+    authority: 'SHADOW',
+    evidence: {
+      authority: 'SHADOW_EVIDENCE',
+      current: null,
+      lastWindow: {
+        authority: 'SHADOW_EVIDENCE',
+        startTick: 1000,
+        endTick: 1099,
+        ticks: 100,
+        haulerUtilization: 0.5,
+        averageJobsPerTick: 1,
+        criticalRequestTicks: 40,
+        criticalCoverageRatio: 1,
+        averagePredictedTransportTicks: 9.5,
+        averageConsumerWaiting: 0.2,
+        averageConsumerFallback: 0,
+        duplicateReservationTicks: 0
+      }
+    }
+  };
+  const r = evaluateLive({ events: rows, startTick: 1000, nodeVersion: '18.20.4' });
+  const e4 = r.checks.find(c => c.id === 'e4-matching-evidence');
+  assert.equal(e4.status, 'PASS');
+  assert.equal(e4.data.duplicateReservationTicks, 0);
+}
+
+{
+  const rows = evidence();
+  rows.at(-1).ctx.rooms.E8N1.colonyState.logisticsMatching = {
+    available: true,
+    authority: 'SHADOW',
+    evidence: {
+      authority: 'SHADOW_EVIDENCE',
+      current: null,
+      lastWindow: {
+        authority: 'SHADOW_EVIDENCE',
+        startTick: 1000,
+        endTick: 1099,
+        ticks: 100,
+        haulerUtilization: 0.5,
+        averageJobsPerTick: 1,
+        criticalRequestTicks: 40,
+        criticalCoverageRatio: 1,
+        averagePredictedTransportTicks: 9.5,
+        averageConsumerWaiting: 0.2,
+        averageConsumerFallback: 0,
+        duplicateReservationTicks: 1
+      }
+    }
+  };
+  const r = evaluateLive({ events: rows, startTick: 1000, nodeVersion: '18.20.4' });
+  assert.equal(r.outcome, 'FAIL');
+  assert.equal(r.checks.find(c => c.id === 'e4-matching-evidence').status, 'FAIL');
+}
+
+{
+  const rows = evidence();
+  rows.at(-1).ctx.rooms.E8N1.colonyState.logisticsMatching = {
+    available: true,
+    authority: 'SHADOW',
+    evidence: {
+      authority: 'SHADOW_EVIDENCE',
+      current: {
+        authority: 'SHADOW_EVIDENCE',
+        startTick: 1080,
+        endTick: 1099,
+        ticks: 20
+      },
+      lastWindow: null
+    }
+  };
+  const r = evaluateLive({ events: rows, startTick: 1000, nodeVersion: '18.20.4' });
+  assert.equal(r.checks.find(c => c.id === 'e4-matching-evidence').status, 'WATCH');
+}
+
+{
+  const rows = evidence();
   delete rows.at(-1).ctx.scheduler;
   const r = evaluateLive({ events: rows, startTick: 1000, nodeVersion: '18.20.4' });
   assert.equal(r.outcome, 'FAIL');

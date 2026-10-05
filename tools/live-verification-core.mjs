@@ -249,10 +249,61 @@ export function evaluateLive(input) {
     if (!colony.spawnPlan?.available || colony.spawnPlan?.authority !== 'SHADOW') shadowFailures.push('spawnPlan');
     if (!colony.assignmentEvidence?.available || colony.assignmentEvidence?.authority !== 'SHADOW_EVIDENCE') shadowFailures.push('assignmentEvidence');
     if (colony.logisticsMatching?.available && colony.logisticsMatching?.authority !== 'SHADOW') shadowFailures.push('logisticsMatching');
+    if (colony.logisticsMatching?.evidence && colony.logisticsMatching.evidence.authority !== 'SHADOW_EVIDENCE') shadowFailures.push('logisticsMatching.evidence');
   }
   checks.push(shadowFailures.length
     ? check('vnext-shadow-authority', selected.complete ? 'FAIL' : 'WATCH', 'VNext shadow authority contract is incomplete or violated.', { failures: shadowFailures })
     : check('vnext-shadow-authority', 'PASS', 'VNext authority remains shadow/evidence-only in live telemetry.'));
+
+  if (colony?.logisticsMatching?.available) {
+    const e4Evidence = colony.logisticsMatching.evidence || null;
+    const e4Last = e4Evidence?.lastWindow || null;
+    const e4Current = e4Evidence?.current || null;
+    const e4StartTick = finite(e4Last?.startTick, null);
+    const e4EndTick = finite(e4Last?.endTick, null);
+    const e4Ticks = finite(e4Last?.ticks, null);
+    const e4MatchesWindow =
+      e4StartTick === selected.startTick &&
+      e4EndTick === selected.endTick &&
+      e4Ticks !== null &&
+      e4Ticks >= 100;
+
+    if (!e4Evidence) {
+      checks.push(check('e4-matching-evidence', 'WATCH', 'E4 matching is present but its 100-tick evidence window is not available yet.'));
+    } else if (!e4Last || !e4MatchesWindow) {
+      checks.push(check(
+        'e4-matching-evidence',
+        'WATCH',
+        'E4 matching evidence is not complete for the exact verification window yet.',
+        {
+          requestedWindow: { startTick: selected.startTick, endTick: selected.endTick },
+          observedLastWindow: { startTick: e4StartTick, endTick: e4EndTick, ticks: e4Ticks },
+          currentTicks: finite(e4Current?.ticks, null)
+        }
+      ));
+    } else {
+      const duplicates = finite(e4Last.duplicateReservationTicks, 0);
+      const criticalRequests = finite(e4Last.criticalRequestTicks, 0);
+      const criticalCoverage = finite(e4Last.criticalCoverageRatio, criticalRequests > 0 ? 0 : 1);
+      const data = {
+        haulerUtilization: finite(e4Last.haulerUtilization, null),
+        averageJobsPerTick: finite(e4Last.averageJobsPerTick, null),
+        criticalRequestTicks: criticalRequests,
+        criticalCoverageRatio: criticalCoverage,
+        averagePredictedTransportTicks: finite(e4Last.averagePredictedTransportTicks, null),
+        averageConsumerWaiting: finite(e4Last.averageConsumerWaiting, null),
+        averageConsumerFallback: finite(e4Last.averageConsumerFallback, null),
+        duplicateReservationTicks: duplicates
+      };
+      if (duplicates > 0) {
+        checks.push(check('e4-matching-evidence', 'FAIL', 'E4 produced duplicate reservation IDs inside the verification window.', data));
+      } else if (criticalRequests > 0 && criticalCoverage < 1) {
+        checks.push(check('e4-matching-evidence', 'WATCH', 'E4 did not cover every critical logistics request in the verification window.', data));
+      } else {
+        checks.push(check('e4-matching-evidence', 'PASS', 'E4 matching evidence is complete with no duplicate reservations.', data));
+      }
+    }
+  }
 
   return {
     mode: 'live',
