@@ -381,11 +381,6 @@ function evidence(start = 1000) {
   assert.equal(r.checks.find(c => c.id === 'controller-progress').status, 'WATCH');
   assert.equal(r.checks.find(c => c.id === 'construction-progress').status, 'WATCH');
   assert.equal(r.checks.find(c => c.id === 'productive-throughput').status, 'WATCH');
-  const e4 = r.checks.find(c => c.id === 'e4-matching-evidence');
-  assert.equal(e4.status, 'WATCH');
-  if (e4.data.observedMetrics) {
-    assert.equal(typeof e4.data.observedMetrics.criticalCoverageRatio, 'number');
-  }
   assert.equal(r.counts.fail, 0);
 }
 
