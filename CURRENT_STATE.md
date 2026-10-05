@@ -448,6 +448,19 @@ The `0.3.0-shadow.7-node18` release exists to validate that evidence layer live.
 
 No gameplay-authority transition is included or permitted by this release.
 
+## shadow.7 smoke heartbeat durability follow-up
+
+The first shadow.7 smoke window `3711793–3711817` completed with `PASS=8 / FAIL=1`. The only failure was `cpu-bucket`: no `BOT_HEARTBEAT` CPU/bucket event was present in the captured 25-tick window. Runtime errors, collector health, mining, hard-stall safety and telemetry continuity all passed.
+
+This was diagnosed as an observability durability gap, not evidence of unsafe CPU:
+
+- `BOT_HEARTBEAT` runs every 25 ticks and the smoke window included tick `3711800`, so a runtime heartbeat should have existed;
+- the event was INFO-only and was not opted into the durable telemetry journal;
+- a WebSocket/collector gap can therefore lose the sole heartbeat required by a 25-tick smoke window even when all other durable telemetry is healthy;
+- `STATUS_SNAPSHOT` is durable but runs only every 100 ticks, so it cannot reliably cover a 25-tick smoke gate.
+
+Follow-up fix: explicitly journal `BOT_HEARTBEAT` while keeping it out of `Memory.bot.logs`. This changes observability only; CPU thresholds, gameplay, E4 matching/evidence and authority are unchanged.
+
 ## Current strategic interpretation
 
 `E8N1` remains structurally safe under the VNext shadow stack: dedicated mining is active, modeled hauler capacity is sufficient, controller and construction progress continue, CPU/bucket are safe, telemetry is contiguous, and no VNext subsystem gained gameplay authority.
