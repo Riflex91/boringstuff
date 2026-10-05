@@ -14,6 +14,7 @@ const assignmentShadow = require('assignment.shadow');
 const assignmentEvidence = require('assignment.evidence');
 const capacitySpawnShadow = require('spawn.capacity.shadow');
 const logisticsMatchingShadow = require('logistics.matching.shadow');
+const logisticsMatchingEvidence = require('logistics.matching.evidence');
 const profiler = require('profiler');
 const logger = require('logger');
 const config = require('config');
@@ -36,6 +37,7 @@ function status(state) {
     capacitySpawn: state.capacitySpawnShadow ? state.capacitySpawnShadow.summary : null,
     assignments: state.assignmentShadow ? state.assignmentShadow.summary : null,
     logisticsMatching: state.logisticsMatchingShadow ? state.logisticsMatchingShadow.summary : null,
+    logisticsMatchingEvidence: state.logisticsMatchingEvidence ? (state.logisticsMatchingEvidence.lastWindow || state.logisticsMatchingEvidence.current) : null,
     assignmentEvidence: state.assignmentEvidence ? (state.assignmentEvidence.lastWindow || state.assignmentEvidence.current) : null,
     colonyState: state.colonyState || null
   };
@@ -146,6 +148,17 @@ function run(room, lowCpu) {
         );
     if (snapshot.requestSummary) state.requestShadow.summary = snapshot.requestSummary;
     return snapshot;
+  });
+
+  state.logisticsMatchingEvidence = profiler.detailSection('room.logistics-evidence', function() {
+    const evidence = logisticsMatchingEvidence.observe(state);
+    if (evidence.completed) {
+      logger.info('LOGISTICS_MATCHING_EVIDENCE_WINDOW', 'E4 shadow matching evidence window completed', {
+        room: state.room.name,
+        evidence: evidence.completed
+      }, { force: true, persist: true, dedupeTicks: 0 });
+    }
+    return evidence;
   });
 
   state.assignmentEvidence = profiler.detailSection('room.evidence', function() {
