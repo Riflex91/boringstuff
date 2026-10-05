@@ -195,13 +195,17 @@ export function resolveAutoStart(events, version, mode, roomName, expectedDeploy
     latestEvidenceTick,
     expectedStartTick,
     expectedEndTick,
-    remainingSeconds
+    remainingSeconds,
+    waitingForSnapshot: remainingSeconds === 0 && expectedEndTick !== null && latestEvidenceTick >= expectedEndTick
   };
 }
 
 export function formatWaitStatus(status) {
   if (status.waitingForDeploymentMarker) {
     return `Waiting for deployment marker ${status.expectedDeploymentId}...`;
+  }
+  if (status.waitingForSnapshot) {
+    return `Window ${status.expectedStartTick}-${status.expectedEndTick} has enough tick data; waiting for complete STATUS_SNAPSHOT (latest evidence tick ${status.latestEvidenceTick})...`;
   }
   const total = Math.max(0, Math.ceil(Number(status.remainingSeconds) || 0));
   const minutes = String(Math.floor(total / 60)).padStart(2, '0');

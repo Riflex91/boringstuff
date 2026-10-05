@@ -225,4 +225,24 @@ function snapshot(eventTick, startTick, endTick, attribution = true) {
   assert.equal(status.deploymentId, 'deploy-new');
 }
 
+
+{
+  // Once tick evidence reaches the predicted end but the matching STATUS_SNAPSHOT
+  // has not arrived yet, report that state explicitly instead of appearing stuck
+  // at 00:00.
+  const rows = [
+    versionChange(1000),
+    snapshot(1000, 901, 1000),
+    evidenceTick(1100)
+  ];
+  const status = resolveAutoStart(rows, version, 'live', room);
+  assert.equal(status.ready, false);
+  assert.equal(status.expectedStartTick, 1001);
+  assert.equal(status.expectedEndTick, 1100);
+  assert.equal(status.remainingSeconds, 0);
+  assert.equal(status.waitingForSnapshot, true);
+  assert.match(formatWaitStatus(status), /waiting for complete STATUS_SNAPSHOT/i);
+  assert.match(formatWaitStatus(status), /latest evidence tick 1100/i);
+}
+
 console.log('live verification wait tests passed');
