@@ -322,7 +322,14 @@ function build(state, context) {
           unmatchedCriticalCount: state.logisticsMatchingShadow.summary.unmatchedCriticalCount,
           reservedAmount: state.logisticsMatchingShadow.summary.reservedAmount,
           averageTransportTicks: state.logisticsMatchingShadow.summary.averageTransportTicks,
-          jobs: (state.logisticsMatchingShadow.jobs || []).slice(0, 12)
+          jobs: (state.logisticsMatchingShadow.jobs || []).slice(0, 12),
+          evidence: state.logisticsMatchingEvidence
+            ? {
+                authority: 'SHADOW_EVIDENCE',
+                current: state.logisticsMatchingEvidence.current || null,
+                lastWindow: state.logisticsMatchingEvidence.lastWindow || null
+              }
+            : null
         }
       : {
           available: false,
@@ -342,7 +349,8 @@ function build(state, context) {
           unmatchedCriticalCount: 0,
           reservedAmount: 0,
           averageTransportTicks: 0,
-          jobs: []
+          jobs: [],
+          evidence: null
         },
     assignments: state.assignmentShadow && state.assignmentShadow.summary
       ? {
