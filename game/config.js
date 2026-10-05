@@ -17,7 +17,7 @@ module.exports = {
   // A byte ceiling prevents observability from consuming unbounded Memory.
   TELEMETRY_JOURNAL_MAX_SNAPSHOTS: 512,
   TELEMETRY_JOURNAL_MAX_EVENTS: 1500,
-  TELEMETRY_JOURNAL_MAX_BYTES: 700000,
+  TELEMETRY_JOURNAL_MAX_BYTES: 300000,
 
   // Scheduler / CPU protection.
   CPU_BUCKET_CRITICAL: 1000,
