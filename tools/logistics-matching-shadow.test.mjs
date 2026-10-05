@@ -263,6 +263,48 @@ function add(memory, time, specs) {
 }
 
 {
+  // Emergency delivery is a hard demand tier above RESERVE. Numeric score
+  // remains the tiebreaker within the same tier, but cannot let reserve work
+  // starve an already-waiting productive consumer.
+  const memory = {};
+  const emergency = delivery('critical-consumer', 50, 20, 20, true, 65, 0);
+  const reserve = {
+    dedupeKey: 'reserve-spawn-floor',
+    domain: 'logistics',
+    kind: 'RESERVE',
+    source: null,
+    target: endpoint('spawn', 11, 10),
+    demand: {
+      resourceType: 'energy',
+      capability: 'reserveEnergy',
+      amount: 50,
+      minimumUsefulAmount: 50,
+      maximumUsefulAmount: 50
+    },
+    priority: { base: 100, urgency: 100, strategicClass: 'RECOVERY' },
+    utility: { current: 50, marginalModel: 'SATURATING' },
+    evidence: { source: 'test' },
+    shadow: true
+  };
+  const requests = add(memory, 500, [emergency, reserve]);
+  const plan = matcher.plan({
+    room: { name: 'E1N1' },
+    creeps: [hauler('tier-hauler', 10, 10, 50, 50)]
+  }, requests, memory, { time: 500 });
+
+  assert.equal(plan.jobs.length, 1);
+  assert.equal(plan.jobs[0].requestKind, 'EMERGENCY_DELIVER');
+  assert.equal(plan.jobs[0].demandDedupeKey, 'critical-consumer');
+  assert.equal(plan.jobs[0].demandTier, 1);
+
+  const emergencyCandidate = { demand: { kind: 'EMERGENCY_DELIVER' }, score: 1, deliveryEta: 50, amount: 1, haulerId: 'a', mode: 'DIRECT_CARRIED' };
+  const reserveCandidate = { demand: { kind: 'RESERVE' }, score: 999, deliveryEta: 1, amount: 50, haulerId: 'a', mode: 'DIRECT_CARRIED' };
+  assert.equal(matcher._test.demandTier(emergencyCandidate), 1);
+  assert.equal(matcher._test.demandTier(reserveCandidate), 0);
+  assert.equal(matcher._test.better(emergencyCandidate, reserveCandidate), true);
+}
+
+{
   const deferred = matcher.deferredSnapshot('LOW_CPU');
   assert.equal(deferred.authority, 'SHADOW');
   assert.equal(deferred.summary.deferred, true);
