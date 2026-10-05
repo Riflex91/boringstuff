@@ -47,6 +47,7 @@ const room = {
 let cpuUsed = 0;
 global.Game = {
   time: 100,
+  creeps: {},
   cpu: {
     bucket: 10000,
     getUsed() {
@@ -71,8 +72,9 @@ global.Game = {
 const scout = require('../game/role.scout.js');
 
 const creep = {
+  name: 'primary-scout',
   room,
-  memory: {},
+  memory: { role: 'scout', home: 'E1N1', born: 1 },
   pos: {
     findClosestByRange() {
       return { x: 25, y: 0, roomName: room.name };
@@ -83,6 +85,7 @@ const creep = {
     return 0;
   }
 };
+Game.creeps[creep.name] = creep;
 
 // First observation is stale/unknown, so the scout still creates full I0 intel.
 scout.run(creep);
@@ -134,5 +137,28 @@ assert.equal(finds.minerals, 2);
 assert.equal(finds.structures, 2);
 assert.equal(Memory.bot.worldIntel.rooms.E1N1.observation.lastSeenTick, 126);
 assert.equal(Memory.bot.cpu.details['scout.world-intel'].lastTick, 126);
+
+{
+  // Extra scouts from the same home colony remain passive. The oldest scout
+  // stays active, matching the single-scout spawn policy.
+  const extra = {
+    name: 'extra-scout',
+    room,
+    memory: { role: 'scout', home: 'E1N1', born: 2 },
+    pos: creep.pos,
+    moveTo() {
+      moveCalls += 1;
+      return 0;
+    }
+  };
+  Game.creeps[extra.name] = extra;
+  const beforeFinds = { ...finds };
+  const beforeMoves = moveCalls;
+  scout.run(extra);
+  assert.equal(scout._test.isActiveScout(creep), true);
+  assert.equal(scout._test.isActiveScout(extra), false);
+  assert.deepEqual(finds, beforeFinds);
+  assert.equal(moveCalls, beforeMoves);
+}
 
 console.log('scout role tests passed');
