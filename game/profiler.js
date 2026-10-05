@@ -77,4 +77,12 @@ function finishTick() {
   }
 }
 
-module.exports = { section, detailSection, finishTick };
+function currentHistorySample() {
+  ensure();
+  const history = Memory.bot.cpu.history;
+  if (!history.length) return null;
+  const sample = history[history.length - 1];
+  return sample && sample.tick === Game.time ? sample : null;
+}
+
+module.exports = { section, detailSection, finishTick, currentHistorySample };
