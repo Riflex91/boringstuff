@@ -184,6 +184,27 @@ function stateAt(tick, options = {}) {
 }
 
 {
+  // Existing pre-compaction evidence state is pruned immediately on first
+  // observation, then pruning is rate-limited to one pass per evidence window.
+  const roomState = {
+    seenEpisodes: { ancient: 9000, recent: 9990 },
+    seenTerminals: { ancient: 9001, recent: 9991 },
+    lastSeenPruneTick: null
+  };
+  assert.equal(evidence._test.maybePruneSeen(roomState, 10000), true);
+  assert.equal(roomState.seenEpisodes.ancient, undefined);
+  assert.equal(roomState.seenTerminals.ancient, undefined);
+  assert.equal(roomState.seenEpisodes.recent, 9990);
+  assert.equal(roomState.lastSeenPruneTick, 10000);
+
+  roomState.seenEpisodes.intermediate = 9801;
+  assert.equal(evidence._test.maybePruneSeen(roomState, 10050), false);
+  assert.equal(roomState.seenEpisodes.intermediate, 9801);
+  assert.equal(evidence._test.maybePruneSeen(roomState, 10100), true);
+  assert.equal(roomState.seenEpisodes.intermediate, undefined);
+}
+
+{
   // Evidence compatibility scans must reuse one static executor profile per
   // creep instead of re-reading body parts for every unfilled request.
   const w = creep('w-profile-cache', 'worker', { work: 2, carry: 2, move: 2 }, 50);
