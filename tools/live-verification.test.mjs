@@ -145,9 +145,16 @@ function evidence(start = 1000) {
   const status = rows.at(-1);
   status.ctx.rooms.E8N1.economyModel.consumerWaitingCount = 3;
   status.ctx.rooms.E8N1.economyModel.consumerCriticalCount = 3;
+  status.ctx.rooms.E8N1.consumerSupply = {
+    criticalConsumers: [{ name: 'builder-a', role: 'builder', energy: 0, waiting: 3, fallback: false }],
+    consumerReservations: [{ hauler: 'hauler-a', targetId: 'builder-a', carried: 100, delivering: true }]
+  };
   const r = evaluateLive({ events: rows, startTick: 1000, nodeVersion: '18.20.4' });
   assert.equal(r.outcome, 'WATCH');
-  assert.equal(r.checks.find(c => c.id === 'consumer-supply').status, 'WATCH');
+  const supply = r.checks.find(c => c.id === 'consumer-supply');
+  assert.equal(supply.status, 'WATCH');
+  assert.equal(supply.data.diagnostics.criticalConsumers[0].name, 'builder-a');
+  assert.equal(supply.data.diagnostics.consumerReservations[0].hauler, 'hauler-a');
   assert.equal(r.counts.fail, 0);
 }
 
@@ -375,6 +382,49 @@ function evidence(start = 1000) {
   assert.equal(r.checks.find(c => c.id === 'construction-progress').status, 'WATCH');
   assert.equal(r.checks.find(c => c.id === 'productive-throughput').status, 'WATCH');
   assert.equal(r.counts.fail, 0);
+}
+
+
+{
+  // STATUS_SNAPSHOT logger depth can preserve the nested E4 evidence object
+  // while truncating its window fields. The shallow room-level mirror must be
+  // preferred so the verifier sees the real 100-tick evidence values.
+  const rows = evidence();
+  const status = rows.at(-1);
+  status.ctx.rooms.E8N1.colonyState.logisticsMatching = {
+    available: true,
+    authority: 'SHADOW',
+    evidence: {
+      authority: 'SHADOW_EVIDENCE',
+      current: '[depth-limit]',
+      lastWindow: '[depth-limit]'
+    }
+  };
+  status.ctx.rooms.E8N1.logisticsMatchingEvidence = {
+    authority: 'SHADOW_EVIDENCE',
+    current: null,
+    lastWindow: {
+      authority: 'SHADOW_EVIDENCE',
+      startTick: 1000,
+      endTick: 1099,
+      ticks: 100,
+      haulerUtilization: 0.75,
+      averageJobsPerTick: 1.5,
+      criticalRequestTicks: 40,
+      criticalCoverageRatio: 0.9,
+      averagePredictedTransportTicks: 7.5,
+      averageConsumerWaiting: 0.1,
+      averageConsumerFallback: 0,
+      duplicateReservationTicks: 0
+    }
+  };
+
+  const r = evaluateLive({ events: rows, startTick: 1000, nodeVersion: '18.20.4' });
+  const e4 = r.checks.find(c => c.id === 'e4-matching-evidence');
+  assert.equal(e4.status, 'WATCH');
+  assert.match(e4.message, /did not cover every critical logistics request/i);
+  assert.equal(e4.data.criticalCoverageRatio, 0.9);
+  assert.equal(e4.data.duplicateReservationTicks, 0);
 }
 
 console.log('live-verification tests passed');
