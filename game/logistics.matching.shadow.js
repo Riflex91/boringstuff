@@ -271,6 +271,10 @@ function balanceCandidate(creep, request, roomState, now) {
   };
 }
 
+function demandTier(candidate) {
+  return candidate && candidate.demand && candidate.demand.kind === 'EMERGENCY_DELIVER' ? 1 : 0;
+}
+
 function candidateKey(candidate) {
   return [
     candidate.haulerId,
@@ -282,6 +286,9 @@ function candidateKey(candidate) {
 
 function better(a, b) {
   if (!b) return true;
+  const aTier = demandTier(a);
+  const bTier = demandTier(b);
+  if (aTier !== bTier) return aTier > bTier;
   if (a.score !== b.score) return a.score > b.score;
   if (a.deliveryEta !== b.deliveryEta) return a.deliveryEta < b.deliveryEta;
   if (a.amount !== b.amount) return a.amount > b.amount;
@@ -399,6 +406,7 @@ function plan(state, requests, memoryRoot, game) {
       supplyDedupeKey: candidate.supply ? candidate.supply.dedupeKey : null,
       demandDedupeKey: candidate.demand ? candidate.demand.dedupeKey : null,
       amount: candidate.amount,
+      demandTier: demandTier(candidate),
       score: Math.round(candidate.score * 100) / 100,
       scoreComponents: candidate.components,
       predicted: {
@@ -512,6 +520,8 @@ module.exports = {
     reservedAmount,
     remainingAmount,
     priorityScore,
+    demandTier,
+    better,
     deadlineScore,
     previousBonus,
     conflictPenalty,
