@@ -389,6 +389,49 @@ The `0.3.0-shadow.6-node18` release exists only to validate E4 live telemetry. A
 
 No E4 authority transition is allowed from this release. A future switch requires equal-or-better live evidence for safety, consumer supply, transport latency/utilization, and CPU.
 
+## 0.3.0-shadow.6 E4 live follow-up
+
+The first E4 SHADOW live verification window `3711402–3711501` finished **WATCH** with `PASS=12 / WATCH=6 / FAIL=0`.
+
+Passed:
+
+- Node runtime and bot release identity;
+- complete evidence window;
+- runtime and collector health;
+- CPU/bucket safety;
+- dedicated mining;
+- hard-stall safety;
+- durable telemetry continuity;
+- modeled hauler capacity;
+- VNext platform shadow;
+- VNext shadow-authority contract.
+
+WATCH findings:
+
+- productive-flow attribution used a valid fixed runtime 100-tick economy window that did not align exactly with the deployment-relative verifier window;
+- consumer supply had waiting/critical consumers, but **fallback remained zero** in this window;
+- controller progress, construction progress and productive throughput were not available for the exact requested window because of the same cadence mismatch;
+- efficiency remained an optimization WATCH.
+
+E4 CPU evidence from the first post-deploy profiler samples:
+
+- tick `3711400`: `room.logistics-match = 0.235` CPU;
+- tick `3711425`: `0.226`;
+- tick `3711450`: `0.168`;
+- tick `3711475`: `0.138`;
+- mean across those four captured samples: approximately `0.192` CPU.
+
+The same four samples kept CPU bucket at `10000`; total CPU was approximately `13.6–17.8`. E4 therefore did **not** recreate the previous E1/E2 room CPU hotspot in this initial live sample.
+
+Interpretation:
+
+- E4 is safe to continue in SHADOW/evidence-only mode;
+- the release does **not** prove that E4 improves consumer supply, because legacy `role.hauler` remains authoritative;
+- the zero-fallback window is encouraging but cannot be causally attributed to E4;
+- current per-tick matching summaries are insufficient for an authority decision.
+
+The next E4 step is a dedicated 100-tick matching-evidence window tracking hauler utilization, critical-request coverage, predicted transport latency, job mix, reservation integrity and concurrent consumer waiting/fallback. No authority transition is allowed until this evidence is reviewed.
+
 ## Current strategic interpretation
 
 `E8N1` remains structurally safe under the VNext shadow stack: dedicated mining is active, modeled hauler capacity is sufficient, controller and construction progress continue, CPU/bucket are safe, telemetry is contiguous, and no VNext subsystem gained gameplay authority.
