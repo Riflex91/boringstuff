@@ -322,7 +322,7 @@ function build(state, context) {
           unmatchedCriticalCount: state.logisticsMatchingShadow.summary.unmatchedCriticalCount,
           reservedAmount: state.logisticsMatchingShadow.summary.reservedAmount,
           averageTransportTicks: state.logisticsMatchingShadow.summary.averageTransportTicks,
-          jobs: state.logisticsMatchingShadow.jobs || []
+          jobs: (state.logisticsMatchingShadow.jobs || []).slice(0, 12)
         }
       : {
           available: false,
