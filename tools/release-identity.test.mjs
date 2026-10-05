@@ -13,9 +13,9 @@ const pkg = JSON.parse(fs.readFileSync(path.join(here, 'package.json'), 'utf8'))
 
 const match = configSource.match(/VERSION\s*:\s*['"]([^'"]+)['"]/);
 assert.ok(match, 'config VERSION must exist');
-assert.equal(match[1], '0.3.0-shadow.6-node18');
+assert.equal(match[1], '0.3.0-shadow.7-node18');
 assert.equal(EXPECTED_BOT_VERSION, match[1]);
-assert.equal(pkg.version, '0.3.0-shadow.6');
+assert.equal(pkg.version, '0.3.0-shadow.7');
 assert.match(mainSource, /DEPLOYMENT_MARKER/);
 assert.match(mainSource, /config\.DEPLOYMENT_ID/);
 assert.match(deploySource, /writeDeploymentReceipt/);
