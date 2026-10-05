@@ -269,7 +269,10 @@ export function evaluateLive(input) {
     : check('vnext-shadow-authority', 'PASS', 'VNext authority remains shadow/evidence-only in live telemetry.'));
 
   if (colony?.logisticsMatching?.available) {
-    const e4Evidence = colony.logisticsMatching.evidence || null;
+    // Prefer the shallow STATUS_SNAPSHOT mirror because logger serialization
+    // depth can truncate the deeper colonyState.logisticsMatching.evidence
+    // window fields to "[depth-limit]".
+    const e4Evidence = latest?.logisticsMatchingEvidence || colony.logisticsMatching.evidence || null;
     const e4Last = e4Evidence?.lastWindow || null;
     const e4Current = e4Evidence?.current || null;
     const e4StartTick = finite(e4Last?.startTick, null);
