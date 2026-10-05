@@ -1,5 +1,7 @@
 'use strict';
 
+const config = require('config');
+
 const CONSUMER_ROLES = {
   builder: true,
   worker: true,
@@ -29,21 +31,22 @@ function isSourceContainer(room, structure) {
 function findWithdrawTarget(creep) {
   const room = creep.room;
   const dropped = creep.pos.findClosestByPath(FIND_DROPPED_RESOURCES, {
+    maxOps: config.PATH_MAX_OPS,
     filter: r => r.resourceType === RESOURCE_ENERGY && r.amount >= Math.min(100, creep.store.getFreeCapacity())
   });
   if (dropped) return { type: 'pickup', target: dropped };
 
-  const tomb = creep.pos.findClosestByPath(FIND_TOMBSTONES, { filter: t => (t.store[RESOURCE_ENERGY] || 0) > 0 });
+  const tomb = creep.pos.findClosestByPath(FIND_TOMBSTONES, { maxOps: config.PATH_MAX_OPS, filter: t => (t.store[RESOURCE_ENERGY] || 0) > 0 });
   if (tomb) return { type: 'withdraw', target: tomb };
 
-  const ruin = creep.pos.findClosestByPath(FIND_RUINS, { filter: r => (r.store[RESOURCE_ENERGY] || 0) > 0 });
+  const ruin = creep.pos.findClosestByPath(FIND_RUINS, { maxOps: config.PATH_MAX_OPS, filter: r => (r.store[RESOURCE_ENERGY] || 0) > 0 });
   if (ruin) return { type: 'withdraw', target: ruin };
 
   const stores = room.find(FIND_STRUCTURES, {
     filter: s => (s.structureType === STRUCTURE_CONTAINER || s.structureType === STRUCTURE_STORAGE) && energyAmount(s) > 50
   });
   if (stores.length) {
-    const target = creep.pos.findClosestByPath(stores);
+    const target = creep.pos.findClosestByPath(stores, { maxOps: config.PATH_MAX_OPS });
     if (target) return { type: 'withdraw', target };
   }
   return null;
@@ -53,15 +56,16 @@ function acquire(creep, allowHarvest) {
   const source = findWithdrawTarget(creep);
   if (source) {
     const rc = source.type === 'pickup' ? creep.pickup(source.target) : creep.withdraw(source.target, RESOURCE_ENERGY);
-    if (rc === ERR_NOT_IN_RANGE) creep.moveTo(source.target, { reusePath: 10, visualizePathStyle: { stroke: '#ffaa00' } });
+    if (rc === ERR_NOT_IN_RANGE) creep.moveTo(source.target, { reusePath: 10, maxOps: config.PATH_MAX_OPS, visualizePathStyle: { stroke: '#ffaa00' } });
     return true;
   }
 
   if (allowHarvest !== false && creep.getActiveBodyparts(WORK) > 0) {
-    const target = creep.pos.findClosestByPath(FIND_SOURCES_ACTIVE) || creep.pos.findClosestByPath(FIND_SOURCES);
+    const target = creep.pos.findClosestByPath(FIND_SOURCES_ACTIVE, { maxOps: config.PATH_MAX_OPS }) ||
+      creep.pos.findClosestByPath(FIND_SOURCES, { maxOps: config.PATH_MAX_OPS });
     if (target) {
       const rc = creep.harvest(target);
-      if (rc === ERR_NOT_IN_RANGE) creep.moveTo(target, { reusePath: 10, visualizePathStyle: { stroke: '#ffaa00' } });
+      if (rc === ERR_NOT_IN_RANGE) creep.moveTo(target, { reusePath: 10, maxOps: config.PATH_MAX_OPS, visualizePathStyle: { stroke: '#ffaa00' } });
       return true;
     }
   }
@@ -70,28 +74,29 @@ function acquire(creep, allowHarvest) {
 
 function acquireForHauler(creep) {
   const dropped = creep.pos.findClosestByPath(FIND_DROPPED_RESOURCES, {
+    maxOps: config.PATH_MAX_OPS,
     filter: r => r.resourceType === RESOURCE_ENERGY && r.amount > 0
   });
   if (dropped) {
     const rc = creep.pickup(dropped);
-    if (rc === ERR_NOT_IN_RANGE) creep.moveTo(dropped, { reusePath: 8, visualizePathStyle: { stroke: '#ffaa00' } });
+    if (rc === ERR_NOT_IN_RANGE) creep.moveTo(dropped, { reusePath: 8, maxOps: config.PATH_MAX_OPS, visualizePathStyle: { stroke: '#ffaa00' } });
     return true;
   }
 
   const containers = creep.room.find(FIND_STRUCTURES, {
     filter: s => isSourceContainer(creep.room, s) && energyAmount(s) > 0
   });
-  const container = creep.pos.findClosestByPath(containers);
+  const container = creep.pos.findClosestByPath(containers, { maxOps: config.PATH_MAX_OPS });
   if (container) {
     const rc = creep.withdraw(container, RESOURCE_ENERGY);
-    if (rc === ERR_NOT_IN_RANGE) creep.moveTo(container, { reusePath: 8, visualizePathStyle: { stroke: '#ffaa00' } });
+    if (rc === ERR_NOT_IN_RANGE) creep.moveTo(container, { reusePath: 8, maxOps: config.PATH_MAX_OPS, visualizePathStyle: { stroke: '#ffaa00' } });
     return true;
   }
 
-  const tomb = creep.pos.findClosestByPath(FIND_TOMBSTONES, { filter: t => (t.store[RESOURCE_ENERGY] || 0) > 0 });
+  const tomb = creep.pos.findClosestByPath(FIND_TOMBSTONES, { maxOps: config.PATH_MAX_OPS, filter: t => (t.store[RESOURCE_ENERGY] || 0) > 0 });
   if (tomb) {
     const rc = creep.withdraw(tomb, RESOURCE_ENERGY);
-    if (rc === ERR_NOT_IN_RANGE) creep.moveTo(tomb, { reusePath: 8 });
+    if (rc === ERR_NOT_IN_RANGE) creep.moveTo(tomb, { reusePath: 8, maxOps: config.PATH_MAX_OPS });
     return true;
   }
   return false;
@@ -105,13 +110,13 @@ function acquireForConsumer(creep) {
   })[0];
   if (localDrop) {
     const rc = creep.pickup(localDrop);
-    if (rc === ERR_NOT_IN_RANGE) creep.moveTo(localDrop, { reusePath: 5 });
+    if (rc === ERR_NOT_IN_RANGE) creep.moveTo(localDrop, { reusePath: 5, maxOps: config.PATH_MAX_OPS });
     return true;
   }
 
   if (creep.room.storage && energyAmount(creep.room.storage) > 0) {
     const rc = creep.withdraw(creep.room.storage, RESOURCE_ENERGY);
-    if (rc === ERR_NOT_IN_RANGE) creep.moveTo(creep.room.storage, { reusePath: 8 });
+    if (rc === ERR_NOT_IN_RANGE) creep.moveTo(creep.room.storage, { reusePath: 8, maxOps: config.PATH_MAX_OPS });
     return true;
   }
 
@@ -119,10 +124,10 @@ function acquireForConsumer(creep) {
     const controllerContainers = creep.room.controller.pos.findInRange(FIND_STRUCTURES, 1, {
       filter: s => s.structureType === STRUCTURE_CONTAINER && energyAmount(s) > 0
     });
-    const target = creep.pos.findClosestByPath(controllerContainers);
+    const target = creep.pos.findClosestByPath(controllerContainers, { maxOps: config.PATH_MAX_OPS });
     if (target) {
       const rc = creep.withdraw(target, RESOURCE_ENERGY);
-      if (rc === ERR_NOT_IN_RANGE) creep.moveTo(target, { reusePath: 8 });
+      if (rc === ERR_NOT_IN_RANGE) creep.moveTo(target, { reusePath: 8, maxOps: config.PATH_MAX_OPS });
       return true;
     }
   }
@@ -146,7 +151,7 @@ function deliver(creep) {
   const target = targets[0];
   if (!target) return false;
   const rc = creep.transfer(target, RESOURCE_ENERGY);
-  if (rc === ERR_NOT_IN_RANGE) creep.moveTo(target, { reusePath: 10, visualizePathStyle: { stroke: '#ffffff' } });
+  if (rc === ERR_NOT_IN_RANGE) creep.moveTo(target, { reusePath: 10, maxOps: config.PATH_MAX_OPS, visualizePathStyle: { stroke: '#ffffff' } });
   return true;
 }
 
@@ -312,7 +317,7 @@ function deliverToConsumer(creep) {
 
   const rc = creep.transfer(target, RESOURCE_ENERGY);
   if (rc === ERR_NOT_IN_RANGE) {
-    creep.moveTo(target, { reusePath: 5, visualizePathStyle: { stroke: '#ffffff' } });
+    creep.moveTo(target, { reusePath: 5, maxOps: config.PATH_MAX_OPS, visualizePathStyle: { stroke: '#ffffff' } });
     return true;
   }
   if (rc === OK) {
@@ -338,7 +343,7 @@ function deliverToControllerBuffer(creep) {
   })[0];
   if (!target) return false;
   const rc = creep.transfer(target, RESOURCE_ENERGY);
-  if (rc === ERR_NOT_IN_RANGE) creep.moveTo(target, { reusePath: 8, visualizePathStyle: { stroke: '#ffffff' } });
+  if (rc === ERR_NOT_IN_RANGE) creep.moveTo(target, { reusePath: 8, maxOps: config.PATH_MAX_OPS, visualizePathStyle: { stroke: '#ffffff' } });
   return rc === OK || rc === ERR_NOT_IN_RANGE;
 }
 
