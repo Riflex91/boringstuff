@@ -35,6 +35,10 @@ function state(overrides = {}) {
         criticalRequestCount: 1,
         criticalMatchedCount: 1,
         unmatchedCriticalCount: 0,
+        criticalCandidateRequestCount: 1,
+        criticalNoCandidateCount: 0,
+        criticalCandidateUnmatchedCount: 0,
+        criticalSlotCapacity: 1,
         reservedAmount: 50,
         averageTransportTicks: 10
       }
@@ -67,7 +71,14 @@ function state(overrides = {}) {
   assert.equal(result.completed.criticalRequestTicks, 100);
   assert.equal(result.completed.criticalMatchedTicks, 100);
   assert.equal(result.completed.unmatchedCriticalTicks, 0);
+  assert.equal(result.completed.criticalCandidateRequestTicks, 100);
+  assert.equal(result.completed.criticalNoCandidateTicks, 0);
+  assert.equal(result.completed.criticalCandidateUnmatchedTicks, 0);
+  assert.equal(result.completed.criticalSlotCapacityTicks, 100);
   assert.equal(result.completed.criticalCoverageRatio, 1);
+  assert.equal(result.completed.criticalCandidateRatio, 1);
+  assert.equal(result.completed.criticalCandidateCoverageRatio, 1);
+  assert.equal(result.completed.criticalSlotCoverageRatio, 1);
   assert.equal(result.completed.averageReservedAmountPerTick, 50);
   assert.equal(result.completed.averagePredictedTransportTicks, 10);
   assert.equal(result.completed.averageConsumerWaiting, 1);
@@ -101,6 +112,10 @@ function state(overrides = {}) {
         criticalRequestCount: 0,
         criticalMatchedCount: 0,
         unmatchedCriticalCount: 0,
+        criticalCandidateRequestCount: 0,
+        criticalNoCandidateCount: 0,
+        criticalCandidateUnmatchedCount: 0,
+        criticalSlotCapacity: 0,
         reservedAmount: 0,
         averageTransportTicks: 0
       }
@@ -138,6 +153,10 @@ function state(overrides = {}) {
         criticalRequestCount: 0,
         criticalMatchedCount: 0,
         unmatchedCriticalCount: 0,
+        criticalCandidateRequestCount: 0,
+        criticalNoCandidateCount: 0,
+        criticalCandidateUnmatchedCount: 0,
+        criticalSlotCapacity: 0,
         reservedAmount: 80,
         averageTransportTicks: 7.5
       }
@@ -148,6 +167,44 @@ function state(overrides = {}) {
   assert.equal(summary.averageDirectCarriedJobsPerTick, 1);
   assert.equal(summary.averageBalanceJobsPerTick, 1);
   assert.equal(summary.averagePredictedTransportTicks, 7.5);
+}
+
+
+{
+  const window = evidence._test.newWindow(4000);
+  evidence._test.accumulate(window, state({
+    logisticsMatchingShadow: {
+      jobs: [
+        { mode: 'PICKUP_DELIVER', reservationIds: ['c1'] },
+        { mode: 'PICKUP_DELIVER', reservationIds: ['c2'] }
+      ],
+      summary: {
+        deferred: false,
+        haulerCount: 2,
+        matchedHaulerCount: 2,
+        candidateCount: 8,
+        jobCount: 2,
+        pairedJobCount: 2,
+        directCarriedJobCount: 0,
+        criticalRequestCount: 3,
+        criticalMatchedCount: 2,
+        unmatchedCriticalCount: 1,
+        criticalCandidateRequestCount: 3,
+        criticalNoCandidateCount: 0,
+        criticalCandidateUnmatchedCount: 1,
+        criticalSlotCapacity: 2,
+        reservedAmount: 100,
+        averageTransportTicks: 4
+      }
+    }
+  }));
+  const summary = evidence.summarize(window, 4000);
+  assert.equal(summary.criticalCoverageRatio, 0.667);
+  assert.equal(summary.criticalCandidateRatio, 1);
+  assert.equal(summary.criticalCandidateCoverageRatio, 0.667);
+  assert.equal(summary.criticalSlotCoverageRatio, 1);
+  assert.equal(summary.criticalNoCandidateTicks, 0);
+  assert.equal(summary.criticalCandidateUnmatchedTicks, 1);
 }
 
 console.log('logistics matching evidence tests passed');
