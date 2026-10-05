@@ -76,7 +76,7 @@ function run(creep) {
       const exitDir = Game.map.findExit(room.name, creep.memory.targetRoom);
       if (exitDir >= 0) {
         const exit = creep.pos.findClosestByRange(exitDir);
-        if (exit) creep.moveTo(exit, { reusePath: 20 });
+        if (exit) creep.moveTo(exit, { reusePath: 50, maxOps: config.PATH_MAX_OPS });
       }
     }
   });
