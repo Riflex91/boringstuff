@@ -192,6 +192,19 @@ function evidence(start = 1000) {
 
 {
   const rows = evidence();
+  rows.at(-1).ctx.rooms.E8N1.colonyState.logisticsMatching = {
+    available: true,
+    authority: 'AUTHORITATIVE'
+  };
+  const r = evaluateLive({ events: rows, startTick: 1000, nodeVersion: '18.20.4' });
+  assert.equal(r.outcome, 'FAIL');
+  const authority = r.checks.find(c => c.id === 'vnext-shadow-authority');
+  assert.equal(authority.status, 'FAIL');
+  assert.ok(authority.data.failures.includes('logisticsMatching'));
+}
+
+{
+  const rows = evidence();
   delete rows.at(-1).ctx.scheduler;
   const r = evaluateLive({ events: rows, startTick: 1000, nodeVersion: '18.20.4' });
   assert.equal(r.outcome, 'FAIL');

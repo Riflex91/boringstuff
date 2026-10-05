@@ -279,4 +279,63 @@ function creep(name, parts, ttl) {
   assert.equal(snapshot.spawnPlan.requests[0].role, 'harvester');
 }
 
+
+{
+  const base = {
+    room: {
+      name: 'E5N5',
+      controller: { my: true, level: 3 },
+      find() { return []; }
+    },
+    rcl: 3,
+    creeps: [],
+    hostileCreeps: [],
+    sites: [],
+    structures: [],
+    sources: [],
+    energyStored: 0,
+    energyAvailable: 300,
+    energyCapacityAvailable: 550,
+    emergency: false,
+    economyModel: null,
+    health: null,
+    efficiency: null,
+    logisticsMatchingShadow: {
+      jobs: [{
+        id: 'e4|E5N5|h1|7000',
+        authority: 'SHADOW',
+        haulerId: 'h1',
+        mode: 'PICKUP_DELIVER',
+        amount: 50,
+        demandRequestId: 'req|demand'
+      }],
+      summary: {
+        planTick: 7000,
+        deferred: false,
+        deferReason: null,
+        haulerCount: 2,
+        candidateCount: 4,
+        jobCount: 1,
+        matchedHaulerCount: 1,
+        haulerUtilization: 0.5,
+        pairedJobCount: 1,
+        directCarriedJobCount: 0,
+        criticalRequestCount: 1,
+        criticalMatchedCount: 1,
+        unmatchedCriticalCount: 0,
+        reservedAmount: 50,
+        averageTransportTicks: 12
+      }
+    }
+  };
+
+  const snapshot = colonyState.build(base, { tick: 7000, bucket: 9500 });
+  assert.equal(snapshot.logisticsMatching.available, true);
+  assert.equal(snapshot.logisticsMatching.authority, 'SHADOW');
+  assert.equal(snapshot.logisticsMatching.jobCount, 1);
+  assert.equal(snapshot.logisticsMatching.haulerUtilization, 0.5);
+  assert.equal(snapshot.logisticsMatching.criticalMatchedCount, 1);
+  assert.equal(snapshot.logisticsMatching.jobs[0].mode, 'PICKUP_DELIVER');
+}
+
 console.log('colony state tests passed');

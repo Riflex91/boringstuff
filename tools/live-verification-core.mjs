@@ -248,10 +248,11 @@ export function evaluateLive(input) {
     if (!colony.capacity?.projected?.available || colony.capacity?.projected?.authority !== 'SHADOW') shadowFailures.push('capacity.projected');
     if (!colony.spawnPlan?.available || colony.spawnPlan?.authority !== 'SHADOW') shadowFailures.push('spawnPlan');
     if (!colony.assignmentEvidence?.available || colony.assignmentEvidence?.authority !== 'SHADOW_EVIDENCE') shadowFailures.push('assignmentEvidence');
+    if (colony.logisticsMatching?.available && colony.logisticsMatching?.authority !== 'SHADOW') shadowFailures.push('logisticsMatching');
   }
   checks.push(shadowFailures.length
     ? check('vnext-shadow-authority', selected.complete ? 'FAIL' : 'WATCH', 'VNext shadow authority contract is incomplete or violated.', { failures: shadowFailures })
-    : check('vnext-shadow-authority', 'PASS', 'O1/E0/E1/E2/O2 remain shadow/evidence-only in live telemetry.'));
+    : check('vnext-shadow-authority', 'PASS', 'VNext authority remains shadow/evidence-only in live telemetry.'));
 
   return {
     mode: 'live',
