@@ -497,6 +497,35 @@ Code-order review established an important correction: `tickCpu` is measured imm
 
 The profiler already stores exact 25-tick section/detail attribution in `Memory.bot.cpu.history`. The next observability step is to attach that already-computed attribution to durable `BOT_HEARTBEAT` events and make the verifier print hard-fail tick/value details directly. No CPU threshold or gameplay behavior is changed.
 
+## tick 3712500 CPU attribution
+
+The preserved profiler sample for tick `3712500` shows:
+
+- absolute profiler `used = 40.617`;
+- bucket `10000`;
+- `rooms = 8.356`;
+- `creeps = 21.483`;
+- `stats = 0.032`;
+- `visuals = 0.047`;
+- `world-intel = 0`;
+- top-level attributed `29.918`;
+- profiler unattributed `10.699`.
+
+Room detail on the same tick:
+
+- `room.requests = 2.961`;
+- `room.capacity-spawn = 1.45`;
+- `room.assignment = 1.043`;
+- `room.planner = 0.626`;
+- `room.evidence = 0.544`;
+- `room.logistics-match = 0.444`;
+- `room.economy = 0.472`;
+- `room.logistics-evidence = 0.028`.
+
+Interpretation: the dominant measured hotspot is the global creep execution section, not E4 matching. The profiler's historical `used` value is currently absolute `Game.cpu.getUsed()`, while `BOT_HEARTBEAT.cpu` is loop-relative from `tickStart`; those bases must be aligned before using `unattributed` quantitatively.
+
+Next diagnostic step: record loop-relative profiler `used` and aggregate creep CPU by role without changing creep execution order. No gameplay behavior or CPU threshold changes are included.
+
 ## Current strategic interpretation
 
 `E8N1` remains structurally safe under the VNext shadow stack: dedicated mining is active, modeled hauler capacity is sufficient, controller and construction progress continue, CPU/bucket are safe, telemetry is contiguous, and no VNext subsystem gained gameplay authority.

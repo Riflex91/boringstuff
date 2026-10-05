@@ -177,7 +177,7 @@ module.exports.loop = function() {
       profiler.section('visuals', function() { roomStates.forEach(visuals.draw); });
     }, schedulerContext);
 
-    profiler.finishTick();
+    profiler.finishTick(tickStart);
 
     const tickCpu = Game.cpu.getUsed() - tickStart;
     if (Game.time % config.STATUS_SNAPSHOT_INTERVAL === 0) statusSnapshot(roomStates, tickCpu);

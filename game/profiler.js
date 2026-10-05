@@ -54,9 +54,15 @@ function currentSamples(store) {
   return samples;
 }
 
-function finishTick() {
+function detailValue(name, used) {
   ensure();
-  const used = Math.round(Game.cpu.getUsed() * 1000) / 1000;
+  record(Memory.bot.cpu.details, name, Math.max(0, Number(used) || 0));
+}
+
+function finishTick(startCpu) {
+  ensure();
+  const absolute = Game.cpu.getUsed();
+  const used = Math.round((Number.isFinite(startCpu) ? Math.max(0, absolute - startCpu) : absolute) * 1000) / 1000;
   Memory.bot.cpu.last = used;
   Memory.bot.cpu.bucket = Game.cpu.bucket;
   if (Game.time % 25 === 0) {
@@ -85,4 +91,4 @@ function currentHistorySample() {
   return sample && sample.tick === Game.time ? sample : null;
 }
 
-module.exports = { section, detailSection, finishTick, currentHistorySample };
+module.exports = { section, detailSection, detailValue, finishTick, currentHistorySample };
