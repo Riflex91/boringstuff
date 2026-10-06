@@ -593,7 +593,7 @@ Never commit real Screeps credentials, tokens, local collector state, telemetry 
 
 ## 2026-10-06 — post-#55 / #56 / #57 / #58 live follow-up
 
-The canonical main after PR #58 is `1a932cc14e840488d57c3f518d071a9c0d5c11b6`.
+The current lineage includes the post-#58 verifier integrity fixes and the post-#60 historical-attribution recovery; avoid hard-coding the moving merge SHA here.
 
 Evidence-integrity follow-up:
 
@@ -650,4 +650,9 @@ Current stop rule:
 - Do not change CPU thresholds.
 - Do not promote E4 authority; it remains evidence-only.
 - Do not tune productive-role counts from the stale Efficiency snapshot alone. The exact assignment window shows substantial improvement, while the richer exact productive-flow attribution still needs its own aligned snapshot before another gameplay change is justified.
-- PR #60 extends the merged verifier so a later retained STATUS_SNAPSHOT may serve only as the carrier for an exact historical `economy.last100` block. Safety/current-state checks remain restricted to the requested verification window. The next useful live check should use the merged PR #60 verifier against the historical `3738802–3738901` window to recover the richer exact productive-flow attribution if that later carrier is retained.
+- PR #60 extends the merged verifier so a later retained STATUS_SNAPSHOT may serve only as the carrier for an exact historical `economy.last100` block. Safety/current-state checks remain restricted to the requested verification window.
+- Live validation after PR #60 recovered the exact `3738802–3738901` productive-flow attribution from carrier tick `3739000`; `productive-attribution` is PASS.
+- Exact productive-flow counts for that window are `consumerTicks = 500`, `waitingConsumerTicks = 137`, `criticalConsumerTicks = 161`, and `fallbackConsumerTicks = 24`, yielding waiting/critical/fallback ratios of about `27.4% / 32.2% / 4.8%`.
+- Relative to the prior exact window (`12.8% / 35.6% / 22.8%`), fallback exposure fell by about 79% while critical exposure improved modestly; waiting exposure increased, consistent with more consumers waiting briefly instead of entering fallback. This is an optimization signal, not evidence for another hauler increase.
+- The verifier now reports `15 PASS / 4 WATCH / 0 FAIL` for the historical window. Remaining WATCH findings are consumer waiting/critical pressure without fallback, productive throughput below mining capacity, stale/current efficiency optimization state, and E4 cadence mismatch.
+- The next useful live gate is the subsequent exact productive window `3738902–3739001`. Use it to test whether the post-#57 throughput/fallback improvement persists before any further gameplay change.
