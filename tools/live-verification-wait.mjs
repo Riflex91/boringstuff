@@ -32,47 +32,6 @@ function latestDeploymentBoundary(events, version, expectedDeploymentId = null) 
   };
 }
 
-function requiresProductiveAttribution(version) {
-  const m = String(version || '').match(/^(\d+)\.(\d+)\.(\d+)/);
-  if (!m) return false;
-  const major = Number(m[1]);
-  const minor = Number(m[2]);
-  const patch = Number(m[3]);
-  return major > 0 || minor > 2 || (minor === 2 && patch >= 19);
-}
-
-function attributionReady(last100) {
-  const p = last100?.productiveFlow;
-  if (!p || typeof p !== 'object') return false;
-  const required = [
-    p.consumerTicks,
-    p.waitingConsumerTicks,
-    p.criticalConsumerTicks,
-    p.fallbackConsumerTicks,
-    p.averageConstructionCapacityPerTick,
-    p.averageDedicatedControllerCapacityPerTick,
-    p.actualProductiveThroughputPerTick
-  ];
-  return required.every(v => Number.isFinite(Number(v)));
-}
-
-function snapshotWindows(events, version, roomName) {
-  return (events || [])
-    .filter(e => e?.code === 'STATUS_SNAPSHOT' && (!e?.v || e.v === version))
-    .map(e => {
-      const last100 = e?.ctx?.rooms?.[roomName]?.economy?.last100;
-      return {
-        eventTick: finiteTick(e?.tick),
-        startTick: finiteTick(last100?.startTick),
-        endTick: finiteTick(last100?.endTick),
-        ticks: finiteTick(last100?.ticks),
-        attributionReady: attributionReady(last100)
-      };
-    })
-    .filter(x => x.startTick !== null && x.endTick !== null && x.ticks !== null)
-    .sort((a, b) => a.endTick - b.endTick || a.eventTick - b.eventTick);
-}
-
 function estimateSecondsPerTick(events) {
   const samples = (events || [])
     .map(e => ({ tick: finiteTick(e?.tick), time: Date.parse(e?.capturedAt) }))
@@ -139,63 +98,46 @@ export function resolveAutoStart(events, version, mode, roomName, expectedDeploy
     };
   }
 
-  const windows = snapshotWindows(events, version, roomName);
-  const requireAttribution = requiresProductiveAttribution(version);
-  const candidate = windows.find(x =>
-    x.ticks >= 100 &&
-    x.startTick >= minimumStartTick &&
-    x.endTick >= x.startTick + 99 &&
-    (!requireAttribution || x.attributionReady)
-  );
+  const minimumSnapshotTick = minimumStartTick + 99;
+  const snapshots = (events || [])
+    .filter(e =>
+      e?.code === 'STATUS_SNAPSHOT' &&
+      (!e?.v || e.v === version) &&
+      finiteTick(e?.tick) !== null &&
+      finiteTick(e?.tick) >= minimumSnapshotTick &&
+      e?.ctx?.rooms?.[roomName]
+    )
+    .sort((a, b) => Number(a.tick) - Number(b.tick));
+
+  const candidate = snapshots[0] || null;
   if (candidate) {
+    const endTick = Number(candidate.tick);
     return {
       ready: true,
-      startTick: candidate.startTick,
-      endTick: candidate.endTick,
+      startTick: endTick - 99,
+      endTick,
       deployTick,
       deploymentId: boundary.event?.ctx?.deploymentId || null,
-      boundarySource: boundary.source
+      boundarySource: boundary.source,
+      snapshotTick: endTick
     };
   }
 
-  const latestWindow = windows.at(-1) || null;
-  let expectedStartTick = null;
-  let expectedEndTick = null;
-
-  if (latestWindow && latestWindow.ticks >= 100 && latestWindow.endTick >= latestWindow.startTick + 99) {
-    expectedStartTick = latestWindow.startTick;
-    expectedEndTick = latestWindow.endTick;
-    while (
-      expectedStartTick < minimumStartTick ||
-      (requireAttribution && !latestWindow.attributionReady && expectedEndTick <= latestEvidenceTick)
-    ) {
-      expectedStartTick = expectedEndTick + 1;
-      expectedEndTick = expectedStartTick + 99;
-    }
-  } else {
-    expectedStartTick = Math.floor(deployTick / 100) * 100 + 101;
-    expectedEndTick = expectedStartTick + 99;
-    while (expectedStartTick < minimumStartTick) {
-      expectedStartTick = expectedEndTick + 1;
-      expectedEndTick = expectedStartTick + 99;
-    }
-  }
-
+  // STATUS_SNAPSHOT is emitted on the bot's fixed 100-tick cadence. Choose the
+  // first such boundary that can contain a full post-deploy 100-tick window.
+  const expectedEndTick = Math.ceil(minimumSnapshotTick / 100) * 100;
+  const expectedStartTick = expectedEndTick - 99;
   const secondsPerTick = estimateSecondsPerTick(events);
-  const remainingTicks = expectedEndTick === null
-    ? 0
-    : Math.max(0, expectedEndTick - Math.max(deployTick, latestEvidenceTick));
+  const remainingTicks = Math.max(0, expectedEndTick - Math.max(deployTick, latestEvidenceTick));
   const remainingSeconds = Math.max(0, Math.ceil(remainingTicks * secondsPerTick));
-  const snapshotOverdue =
-    expectedEndTick !== null &&
-    latestEvidenceTick >= expectedEndTick + 200;
+  const snapshotOverdue = latestEvidenceTick >= expectedEndTick + 200;
 
   if (snapshotOverdue) {
     return {
       ready: false,
       fatal:
-        `No complete STATUS_SNAPSHOT was observed for the expected live window ${expectedStartTick}-${expectedEndTick}, ` +
-        `even though evidence advanced to tick ${latestEvidenceTick}. Check collector jseq continuity / out-of-order delivery.`,
+        `No STATUS_SNAPSHOT was observed at or after the expected live boundary ${expectedEndTick}, ` +
+        `even though evidence advanced to tick ${latestEvidenceTick}. Check collector continuity and snapshot emission.`,
       deployTick,
       deploymentId: boundary.event?.ctx?.deploymentId || null,
       boundarySource: boundary.source,
