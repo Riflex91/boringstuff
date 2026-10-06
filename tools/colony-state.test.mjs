@@ -352,4 +352,61 @@ function creep(name, parts, ttl) {
   assert.equal(snapshot.logisticsMatching.evidence.current.criticalCoverageRatio, 1);
 }
 
+
+{
+  const full = {
+    schemaVersion: 1,
+    authority: 'SHADOW',
+    controller: { level: 5, progress: 12345 },
+    requests: { available: true, authority: 'SHADOW', open: 7, byStatus: { OPEN: 7 } },
+    assignments: { available: true, authority: 'SHADOW', assignmentCount: 12 },
+    capacity: {
+      projected: {
+        available: true,
+        authority: 'SHADOW',
+        deficits: [{ id: 'large-deficit', nested: { payload: 'omit-me' } }]
+      },
+      ttl: { count: 20, average: 900 }
+    },
+    spawnPlan: {
+      available: true,
+      authority: 'SHADOW',
+      requests: [{ id: 'large-spawn-request', body: Array(20).fill('move') }]
+    },
+    assignmentEvidence: {
+      available: true,
+      authority: 'SHADOW_EVIDENCE',
+      current: { ticks: 42, large: { payload: 'omit-me' } }
+    },
+    logisticsMatching: {
+      available: true,
+      authority: 'SHADOW',
+      jobs: [{ id: 'large-job', payload: { nested: 'omit-me' } }],
+      evidence: {
+        authority: 'SHADOW_EVIDENCE',
+        current: { ticks: 42, criticalCoverageRatio: 0.9 }
+      }
+    }
+  };
+
+  const compact = colonyState.telemetrySummary(full);
+  assert.equal(compact.schemaVersion, 1);
+  assert.equal(compact.authority, 'SHADOW');
+  assert.deepEqual(compact.requests, { available: true, authority: 'SHADOW' });
+  assert.deepEqual(compact.assignments, { available: true, authority: 'SHADOW' });
+  assert.deepEqual(compact.capacity.projected, { available: true, authority: 'SHADOW' });
+  assert.deepEqual(compact.spawnPlan, { available: true, authority: 'SHADOW' });
+  assert.deepEqual(compact.assignmentEvidence, { available: true, authority: 'SHADOW_EVIDENCE' });
+  assert.deepEqual(compact.logisticsMatching, {
+    available: true,
+    authority: 'SHADOW',
+    evidence: { authority: 'SHADOW_EVIDENCE' }
+  });
+  const json = JSON.stringify(compact);
+  assert.equal(json.includes('large-job'), false);
+  assert.equal(json.includes('large-spawn-request'), false);
+  assert.equal(json.includes('large-deficit'), false);
+  assert.equal(Object.hasOwn(compact, 'controller'), false);
+}
+
 console.log('colony state tests passed');

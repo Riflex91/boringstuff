@@ -131,7 +131,7 @@ function statusSnapshot(roomStates, tickCpu) {
             lastWindow: state.logisticsMatchingEvidence.lastWindow || null
           }
         : null,
-      colonyState: state.colonyState || null
+      colonyState: colonyState.telemetrySummary(state.colonyState)
     };
   }
   logger.info('STATUS_SNAPSHOT', 'Structured bot status snapshot', {

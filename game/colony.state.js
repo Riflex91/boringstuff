@@ -196,6 +196,49 @@ function deriveMode(state) {
   return 'STABLE';
 }
 
+function telemetrySummary(snapshot) {
+  if (!snapshot) return null;
+  const logisticsMatching = snapshot.logisticsMatching || null;
+  return {
+    schemaVersion: snapshot.schemaVersion,
+    authority: snapshot.authority || null,
+    requests: snapshot.requests
+      ? { available: !!snapshot.requests.available, authority: snapshot.requests.authority || null }
+      : null,
+    assignments: snapshot.assignments
+      ? { available: !!snapshot.assignments.available, authority: snapshot.assignments.authority || null }
+      : null,
+    capacity: snapshot.capacity
+      ? {
+          projected: snapshot.capacity.projected
+            ? {
+                available: !!snapshot.capacity.projected.available,
+                authority: snapshot.capacity.projected.authority || null
+              }
+            : null
+        }
+      : null,
+    spawnPlan: snapshot.spawnPlan
+      ? { available: !!snapshot.spawnPlan.available, authority: snapshot.spawnPlan.authority || null }
+      : null,
+    assignmentEvidence: snapshot.assignmentEvidence
+      ? {
+          available: !!snapshot.assignmentEvidence.available,
+          authority: snapshot.assignmentEvidence.authority || null
+        }
+      : null,
+    logisticsMatching: logisticsMatching
+      ? {
+          available: !!logisticsMatching.available,
+          authority: logisticsMatching.authority || null,
+          evidence: logisticsMatching.evidence
+            ? { authority: logisticsMatching.evidence.authority || null }
+            : null
+        }
+      : null
+  };
+}
+
 function build(state, context) {
   context = context || {};
   const active = activeCapacity(state.creeps || []);
@@ -398,6 +441,7 @@ function build(state, context) {
 module.exports = {
   SCHEMA_VERSION,
   build,
+  telemetrySummary,
   _test: {
     emptyParts,
     activeCapacity,
