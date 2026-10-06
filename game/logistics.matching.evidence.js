@@ -138,7 +138,6 @@ function summarize(window, endTick) {
     averageJobsPerTick: round(window.jobTicks / ticks, 2),
     averagePairedJobsPerTick: round(window.pairedJobTicks / ticks, 2),
     averageDirectCarriedJobsPerTick: round(window.directCarriedJobTicks / ticks, 2),
-    averageBalanceJobsPerTick: round(window.balanceJobTicks / ticks, 2),
     criticalRequestTicks: critical,
     criticalMatchedTicks: criticalMatched,
     unmatchedCriticalTicks: Math.max(0, Number(window.unmatchedCriticalTicks) || 0),
@@ -165,7 +164,11 @@ function summarize(window, endTick) {
     averageConsumerWaiting: round(window.consumerWaitingTicks / ticks, 2),
     averageConsumerCritical: round(window.consumerCriticalTicks / ticks, 2),
     averageConsumerFallback: round(window.consumerFallbackTicks / ticks, 2),
-    duplicateReservationTicks: Math.max(0, Number(window.duplicateReservationTicks) || 0)
+    // logger.slim() preserves only the first 30 object keys. Keep duplicate
+    // reservation evidence inside that durable telemetry budget; the balance
+    // job average is diagnostic-only and may be the truncated trailing field.
+    duplicateReservationTicks: Math.max(0, Number(window.duplicateReservationTicks) || 0),
+    averageBalanceJobsPerTick: round(window.balanceJobTicks / ticks, 2)
   };
 }
 
