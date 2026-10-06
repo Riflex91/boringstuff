@@ -2,7 +2,7 @@ import { ScreepsHttpClient, ScreepsSocketClient } from './screeps-client.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseBotLogLine } from './console-utils.mjs';
-import { decodeMemoryResponse, planJournalCatchUp } from './telemetry-journal-utils.mjs';
+import { createContiguousSequenceCursor, decodeMemoryResponse, planJournalCatchUp } from './telemetry-journal-utils.mjs';
 
 const DEFAULT_LOG_DIR = String.raw`C:\Users\hansi\AppData\Local\Screeps\scripts\screeps_newbieland_net___21025\chatgpt\logs`;
 const LOG_DIR = process.env.SCREEPS_LOG_DIR || DEFAULT_LOG_DIR;
@@ -70,13 +70,16 @@ function loadCursor() {
   } catch { return 0; }
 }
 
-let lastSeq = loadCursor();
-function saveCursor(seq) {
-  const next = Math.max(lastSeq, Number(seq) || 0);
-  if (next === lastSeq && fs.existsSync(CURSOR_PATH)) return;
-  lastSeq = next;
+const initialCursor = loadCursor();
+const sequenceCursor = createContiguousSequenceCursor(initialCursor);
+let persistedCursor = initialCursor;
+
+function saveCursor() {
+  const next = sequenceCursor.value;
+  if (next === persistedCursor && fs.existsSync(CURSOR_PATH)) return;
+  persistedCursor = next;
   const tmp = CURSOR_PATH + '.tmp-' + process.pid;
-  fs.writeFileSync(tmp, JSON.stringify({ server: SERVER, lastSeq, updatedAt: stamp() }, null, 2) + '\n', 'utf8');
+  fs.writeFileSync(tmp, JSON.stringify({ server: SERVER, lastSeq: next, updatedAt: stamp() }, null, 2) + '\n', 'utf8');
   fs.renameSync(tmp, CURSOR_PATH);
 }
 
@@ -92,7 +95,7 @@ function writeLatestStatus(event) {
 function persistBotPayload(payload, shard, meta = {}) {
   if (!payload) return false;
   const jseq = Number(payload.jseq) || 0;
-  if (jseq && jseq <= lastSeq) return false;
+  if (jseq && !sequenceCursor.canObserve(jseq)) return false;
 
   const event = { capturedAt: stamp(), shard: shard || null, ...meta, ...payload };
   appendJson('bot-events', event);
@@ -101,7 +104,11 @@ function persistBotPayload(payload, shard, meta = {}) {
     writeLatestStatus(event);
   }
   if (payload.level === 'ERROR' || payload.level === 'FATAL' || payload.level === 'WARN') appendJson('bot-problems', event);
-  if (jseq) saveCursor(jseq);
+
+  if (jseq) {
+    const observed = sequenceCursor.observe(jseq);
+    if (observed.advanced) saveCursor();
+  }
   return true;
 }
 
@@ -154,16 +161,20 @@ async function catchUp(api) {
     try {
       const journal = await fetchJournal(api);
       if (!journal) {
-        append('collector', `${started} catchup=no-journal cursor=${lastSeq}`);
+        append('collector', `${started} catchup=no-journal cursor=${sequenceCursor.value}`);
         return;
       }
-      const plan = planJournalCatchUp(journal, lastSeq);
-      if (plan.gap) emitRetentionGap(plan.gap);
+      const plan = planJournalCatchUp(journal, sequenceCursor.value);
+      if (plan.gap) {
+        emitRetentionGap(plan.gap);
+        const skipped = sequenceCursor.skipThrough(plan.gap.droppedThroughSeq);
+        if (skipped.advanced) saveCursor();
+      }
       let replayed = 0;
       for (const payload of plan.records) {
         if (persistBotPayload(payload, null, { source: 'journal-replay', recovered: true })) replayed++;
       }
-      append('collector', `${stamp()} catchup=ok replayed=${replayed} cursor=${lastSeq} latest=${plan.latestSeq}`);
+      append('collector', `${stamp()} catchup=ok replayed=${replayed} cursor=${sequenceCursor.value} latest=${plan.latestSeq}`);
     } catch (err) {
       append('collector-errors', `${stamp()} journal catch-up failed: ${err?.stack || err}`);
       console.error('Journal catch-up failed:', err?.message || err);
@@ -185,7 +196,7 @@ process.on('SIGTERM', () => { releaseLock(); process.exit(143); });
 
 console.log(`Screeps log collector starting. Server config: ${SERVER}`);
 console.log(`Writing to: ${LOG_DIR}`);
-console.log(`Durable telemetry cursor: ${lastSeq}`);
+console.log(`Durable telemetry cursor: ${sequenceCursor.value}`);
 
 const api = await ScreepsHttpClient.fromConfig(SERVER);
 
