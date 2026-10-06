@@ -1,10 +1,10 @@
 {
   "name": "screeps-chatgpt-tools",
-  "version": "0.3.0-shadow.7",
+  "version": "0.3.0-shadow.8",
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=18.20.0"
+    "node": "24.21.0"
   },
   "scripts": {
     "logs": "node console-capture.mjs",
