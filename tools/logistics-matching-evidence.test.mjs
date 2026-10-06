@@ -85,6 +85,10 @@ function state(overrides = {}) {
   assert.equal(result.completed.averageConsumerCritical, 1);
   assert.equal(result.completed.averageConsumerFallback, 0);
   assert.equal(result.completed.duplicateReservationTicks, 0);
+  // logger.slim() truncates object keys after the first 30. Keep the duplicate
+  // metric inside that visible budget so live verification never has to infer it.
+  assert.ok(Object.keys(result.completed).slice(0, 30).includes('duplicateReservationTicks'));
+  assert.equal(Object.keys(result.completed).at(-1), 'averageBalanceJobsPerTick');
   assert.deepEqual(result.lastWindow, result.completed);
 
   const snap = evidence.snapshot('E1N1', memory);

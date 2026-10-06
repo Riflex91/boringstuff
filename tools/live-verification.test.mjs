@@ -259,12 +259,17 @@ function evidence(start = 1000) {
         startTick: 1000,
         endTick: 1099,
         ticks: 100,
-        haulerUtilization: 0.5,
+        averageHaulers: 2,
+        averageMatchedHaulers: 1.5,
+        haulerUtilization: 0.75,
+        averageCandidatesPerTick: 4,
         averageJobsPerTick: 1,
         criticalRequestTicks: 40,
         criticalCoverageRatio: 1,
+        averageReservedAmountPerTick: 125,
         averagePredictedTransportTicks: 9.5,
         averageConsumerWaiting: 0.2,
+        averageConsumerCritical: 0.3,
         averageConsumerFallback: 0,
         duplicateReservationTicks: 0
       }
@@ -273,7 +278,46 @@ function evidence(start = 1000) {
   const r = evaluateLive({ events: rows, startTick: 1000, nodeVersion: '24.21.0' });
   const e4 = r.checks.find(c => c.id === 'e4-matching-evidence');
   assert.equal(e4.status, 'PASS');
+  assert.equal(e4.data.averageHaulers, 2);
+  assert.equal(e4.data.averageMatchedHaulers, 1.5);
+  assert.equal(e4.data.averageCandidatesPerTick, 4);
+  assert.equal(e4.data.averageReservedAmountPerTick, 125);
+  assert.equal(e4.data.averageConsumerCritical, 0.3);
   assert.equal(e4.data.duplicateReservationTicks, 0);
+}
+
+{
+  // Missing duplicate-reservation evidence must remain unknown. In particular,
+  // an exact 100-tick E4 window must not coerce a truncated/missing field to 0
+  // and claim a duplicate-free PASS.
+  const rows = evidence();
+  rows.at(-1).ctx.rooms.E8N1.colonyState.logisticsMatching = {
+    available: true,
+    authority: 'SHADOW',
+    evidence: {
+      authority: 'SHADOW_EVIDENCE',
+      current: null,
+      lastWindow: {
+        authority: 'SHADOW_EVIDENCE',
+        startTick: 1000,
+        endTick: 1099,
+        ticks: 100,
+        haulerUtilization: 1,
+        averageJobsPerTick: 2,
+        criticalRequestTicks: 40,
+        criticalCoverageRatio: 1,
+        averagePredictedTransportTicks: 4,
+        averageConsumerWaiting: 0,
+        averageConsumerFallback: 0
+      }
+    }
+  };
+  const r = evaluateLive({ events: rows, startTick: 1000, nodeVersion: '24.21.0' });
+  const e4 = r.checks.find(c => c.id === 'e4-matching-evidence');
+  assert.equal(e4.status, 'WATCH');
+  assert.equal(e4.data.duplicateReservationTicks, null);
+  assert.match(e4.message, /duplicate-reservation evidence is unavailable/i);
+  assert.equal(r.counts.fail, 0);
 }
 
 {
@@ -452,7 +496,10 @@ function evidence(start = 1000) {
       startTick: 1100,
       endTick: 1199,
       ticks: 100,
+      averageHaulers: 2,
+      averageMatchedHaulers: 2,
       haulerUtilization: 1,
+      averageCandidatesPerTick: 26.23,
       averageJobsPerTick: 2.5,
       criticalRequestTicks: 80,
       criticalMatchedTicks: 72,
@@ -465,8 +512,10 @@ function evidence(start = 1000) {
       criticalCandidateRatio: 1,
       criticalCandidateCoverageRatio: 0.9,
       criticalSlotCoverageRatio: 1,
+      averageReservedAmountPerTick: 149.13,
       averagePredictedTransportTicks: 3.25,
       averageConsumerWaiting: 0.4,
+      averageConsumerCritical: 1.6,
       averageConsumerFallback: 0,
       duplicateReservationTicks: 0
     }
@@ -477,6 +526,9 @@ function evidence(start = 1000) {
   assert.equal(e4.status, 'WATCH');
   assert.equal(e4.data.observedLastWindow.startTick, 1100);
   assert.equal(e4.data.observedLastWindow.endTick, 1199);
+  assert.equal(e4.data.observedMetrics.averageHaulers, 2);
+  assert.equal(e4.data.observedMetrics.averageMatchedHaulers, 2);
+  assert.equal(e4.data.observedMetrics.averageCandidatesPerTick, 26.23);
   assert.equal(e4.data.observedMetrics.criticalCoverageRatio, 0.9);
   assert.equal(e4.data.observedMetrics.criticalMatchedTicks, 72);
   assert.equal(e4.data.observedMetrics.criticalCandidateRequestTicks, 80);
@@ -486,6 +538,8 @@ function evidence(start = 1000) {
   assert.equal(e4.data.observedMetrics.criticalCandidateRatio, 1);
   assert.equal(e4.data.observedMetrics.criticalCandidateCoverageRatio, 0.9);
   assert.equal(e4.data.observedMetrics.criticalSlotCoverageRatio, 1);
+  assert.equal(e4.data.observedMetrics.averageReservedAmountPerTick, 149.13);
+  assert.equal(e4.data.observedMetrics.averageConsumerCritical, 1.6);
   assert.equal(e4.data.observedMetrics.duplicateReservationTicks, 0);
   assert.equal(e4.data.currentTicks, 8);
 }

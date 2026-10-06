@@ -290,7 +290,10 @@ export function evaluateLive(input) {
       checks.push(check('e4-matching-evidence', 'WATCH', 'E4 matching is present but its 100-tick evidence window is not available yet.'));
     } else if (!e4Last || !e4MatchesWindow) {
       const observedMetrics = e4Last ? {
+        averageHaulers: finite(e4Last.averageHaulers, null),
+        averageMatchedHaulers: finite(e4Last.averageMatchedHaulers, null),
         haulerUtilization: finite(e4Last.haulerUtilization, null),
+        averageCandidatesPerTick: finite(e4Last.averageCandidatesPerTick, null),
         averageJobsPerTick: finite(e4Last.averageJobsPerTick, null),
         criticalRequestTicks: finite(e4Last.criticalRequestTicks, null),
         criticalMatchedTicks: finite(e4Last.criticalMatchedTicks, null),
@@ -303,8 +306,10 @@ export function evaluateLive(input) {
         criticalCandidateRatio: finite(e4Last.criticalCandidateRatio, null),
         criticalCandidateCoverageRatio: finite(e4Last.criticalCandidateCoverageRatio, null),
         criticalSlotCoverageRatio: finite(e4Last.criticalSlotCoverageRatio, null),
+        averageReservedAmountPerTick: finite(e4Last.averageReservedAmountPerTick, null),
         averagePredictedTransportTicks: finite(e4Last.averagePredictedTransportTicks, null),
         averageConsumerWaiting: finite(e4Last.averageConsumerWaiting, null),
+        averageConsumerCritical: finite(e4Last.averageConsumerCritical, null),
         averageConsumerFallback: finite(e4Last.averageConsumerFallback, null),
         duplicateReservationTicks: finite(e4Last.duplicateReservationTicks, null)
       } : null;
@@ -320,11 +325,14 @@ export function evaluateLive(input) {
         }
       ));
     } else {
-      const duplicates = finite(e4Last.duplicateReservationTicks, 0);
+      const duplicates = finite(e4Last.duplicateReservationTicks, null);
       const criticalRequests = finite(e4Last.criticalRequestTicks, 0);
       const criticalCoverage = finite(e4Last.criticalCoverageRatio, criticalRequests > 0 ? 0 : 1);
       const data = {
+        averageHaulers: finite(e4Last.averageHaulers, null),
+        averageMatchedHaulers: finite(e4Last.averageMatchedHaulers, null),
         haulerUtilization: finite(e4Last.haulerUtilization, null),
+        averageCandidatesPerTick: finite(e4Last.averageCandidatesPerTick, null),
         averageJobsPerTick: finite(e4Last.averageJobsPerTick, null),
         criticalRequestTicks: criticalRequests,
         criticalMatchedTicks: finite(e4Last.criticalMatchedTicks, null),
@@ -337,13 +345,17 @@ export function evaluateLive(input) {
         criticalCandidateRatio: finite(e4Last.criticalCandidateRatio, null),
         criticalCandidateCoverageRatio: finite(e4Last.criticalCandidateCoverageRatio, null),
         criticalSlotCoverageRatio: finite(e4Last.criticalSlotCoverageRatio, null),
+        averageReservedAmountPerTick: finite(e4Last.averageReservedAmountPerTick, null),
         averagePredictedTransportTicks: finite(e4Last.averagePredictedTransportTicks, null),
         averageConsumerWaiting: finite(e4Last.averageConsumerWaiting, null),
+        averageConsumerCritical: finite(e4Last.averageConsumerCritical, null),
         averageConsumerFallback: finite(e4Last.averageConsumerFallback, null),
         duplicateReservationTicks: duplicates
       };
-      if (duplicates > 0) {
+      if (duplicates !== null && duplicates > 0) {
         checks.push(check('e4-matching-evidence', 'FAIL', 'E4 produced duplicate reservation IDs inside the verification window.', data));
+      } else if (duplicates === null) {
+        checks.push(check('e4-matching-evidence', 'WATCH', 'E4 duplicate-reservation evidence is unavailable; no duplicate PASS is inferred.', data));
       } else if (criticalRequests > 0 && criticalCoverage < 1) {
         checks.push(check('e4-matching-evidence', 'WATCH', 'E4 did not cover every critical logistics request in the verification window.', data));
       } else {
