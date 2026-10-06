@@ -170,9 +170,11 @@ function analyze(state) {
   // real consumer pressure, keep a narrow two-hauler service floor. This uses
   // legacy runtime pressure only; E4 remains shadow/evidence-only.
   const consumerServiceHaulerFloor =
-    allSourceContainersReady && consumers.length > 0 && consumerCriticalCount > 0
-      ? 2
-      : 0;
+    allSourceContainersReady && consumers.length > 0 && consumerFallbackCount > 0 && consumerCriticalCount >= 2
+      ? 3
+      : allSourceContainersReady && consumers.length > 0 && consumerCriticalCount > 0
+        ? 2
+        : 0;
   const recommendedHaulerCount = Math.max(carryDrivenHaulerCount, consumerServiceHaulerFloor);
   let mode = 'bootstrap-mobile-harvest';
   if (haulers.length && !allSourceContainersReady) mode = 'bootstrap-hauler';
