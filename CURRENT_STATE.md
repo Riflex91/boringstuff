@@ -589,3 +589,48 @@ bot.telemetryStatus()
 ## Secrets and local-only files
 
 Never commit real Screeps credentials, tokens, local collector state, telemetry captures, generated logs, or other private runtime material. `tools/screeps.json.example` is safe to commit; a real `tools/screeps.json` is not.
+
+
+## 2026-10-06 — post-#55 / #56 / #57 live follow-up
+
+The current canonical main after PR #57 is `1e4d472891d9ab7f5156376aa1286875576dd6f0`.
+
+Evidence-integrity follow-up:
+
+- PR #56 preserved `duplicateReservationTicks` inside the durable E4 telemetry key budget and stopped the verifier from coercing missing duplicate evidence to zero.
+- The subsequent live windows report `duplicateReservationTicks = 0` numerically, so duplicate-free evidence is now explicit rather than inferred.
+
+Legacy hauling follow-up:
+
+- PR #55 introduced the narrow two-hauler service floor under real consumer pressure.
+- Repeated completed post-#55 windows showed two haulers fully utilized with candidate availability intact while consumer fallback remained non-zero.
+- PR #57 therefore added a bounded severe-pressure reserve: only when two haulers are already live, at least one consumer is in fallback, and at least two consumers are critical may the legacy service floor rise to three.
+- With three live haulers, at most two starvation guards may prioritize consumers; at least one live hauler remains outside the guard set for spawn/extensions/tower service.
+- E4 remains strictly `SHADOW` / `SHADOW_EVIDENCE`; no E4 metric controls legacy runtime behavior.
+
+First complete three-hauler E4 evidence window: `3738793–3738892`.
+
+Observed:
+
+- `averageHaulers = 3`;
+- `averageMatchedHaulers = 3`;
+- `haulerUtilization = 1`;
+- `averageJobsPerTick = 3`;
+- `criticalCandidateRatio = 1`;
+- `criticalNoCandidateTicks = 0`;
+- `criticalSlotCoverageRatio = 1`;
+- `averageConsumerFallback = 0.35`;
+- `averageConsumerCritical = 1.64`;
+- `averageConsumerWaiting = 1.29`;
+- `duplicateReservationTicks = 0`.
+
+Relative to the prior clean two-hauler window `3738493–3738592`, average consumer fallback fell from `1.03` to `0.35` (about 66%). The final snapshot at tick `3738900` had three live haulers, `consumerFallbackCount = 0`, Health `100 / HEALTHY`, full `20 e/t` dedicated mining, and no modeled hauler CARRY deficit.
+
+The live verifier window `3738801–3738900` finished `WATCH` with `12 PASS / 7 WATCH / 0 FAIL`. Remaining WATCH results are optimization/cadence findings, not hard failures.
+
+Important stop rule:
+
+- Do not add more hauling capacity from this result. The room already reports surplus/underutilization pressure and the three-hauler reserve is intentionally bounded by `MAX_BOOTSTRAP_HAULERS = 3`.
+- Do not tune productive roles from the reported `6.08/tick` productive throughput yet. Its fixed 100-tick productive-flow window is `3738702–3738801`, so it is mostly pre-/transition evidence relative to the full three-hauler regime.
+- The next required gate is a later complete live verification whose productive-flow window substantially covers the stable three-hauler period. Compare productive throughput, construction/controller progress, consumer fallback/waiting, CPU/bucket, and E4 matching evidence before any further gameplay change.
+- No E4 gameplay-authority promotion is justified by this evidence.
