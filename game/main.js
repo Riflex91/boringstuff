@@ -12,6 +12,7 @@ const runtimeCapabilities = require('runtime.capabilities');
 const serverProfile = require('server.profile');
 const processScheduler = require('process.scheduler');
 const worldIntel = require('world.intel');
+const colonyState = require('colony.state');
 
 function bootstrapMemory() {
   if (!Memory.bot) Memory.bot = { version: config.VERSION, born: Game.time };
