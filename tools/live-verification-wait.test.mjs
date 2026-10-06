@@ -84,15 +84,32 @@ function snapshot(eventTick, startTick, endTick, attribution = true) {
 }
 
 {
+  // Auto-start must not block on productive-attribution completeness. The
+  // evaluator owns PASS/WATCH/FAIL semantics once the 100-tick snapshot
+  // boundary exists.
   const rows = [
     versionChange(1000),
     snapshot(1000, 901, 1000),
     snapshot(1100, 1001, 1100, false)
   ];
   const status = resolveAutoStart(rows, version, 'live', room);
-  assert.equal(status.ready, false);
-  assert.equal(status.expectedStartTick, 1101);
-  assert.equal(status.expectedEndTick, 1200);
+  assert.equal(status.ready, true);
+  assert.equal(status.startTick, 1001);
+  assert.equal(status.endTick, 1100);
+}
+
+{
+  // Runtime economy windows may be on a different fixed cadence. A snapshot at
+  // the verification boundary still makes the live window ready; evaluateLive
+  // will report the cadence mismatch as WATCH.
+  const rows = [
+    versionChange(1000),
+    snapshot(1100, 993, 1092, true)
+  ];
+  const status = resolveAutoStart(rows, version, 'live', room);
+  assert.equal(status.ready, true);
+  assert.equal(status.startTick, 1001);
+  assert.equal(status.endTick, 1100);
 }
 
 {
