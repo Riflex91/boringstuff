@@ -163,16 +163,20 @@ function analyze(state) {
 
   const allSourceContainersReady = state.sources.length > 0 && containersReady === state.sources.length;
 
-  // The legacy execution policy deliberately reserves consumer-first hauling
-  // only when at least two live haulers exist. Aggregate source-route CARRY can
-  // therefore be sufficient while productive consumers still wait/fallback
-  // under a single-hauler fleet. When stable container logistics has observed
-  // real consumer pressure, keep a narrow two-hauler service floor. This uses
-  // legacy runtime pressure only; E4 remains shadow/evidence-only.
+  // The legacy execution policy keeps at least one hauler available for hard
+  // infrastructure while redundant haulers may serve waiting consumers.
+  // Aggregate source-route CARRY can therefore be sufficient while productive
+  // consumers still wait/fallback. Keep the normal two-hauler service floor for
+  // any real pressure; escalate to three only after two haulers are already live
+  // and fallback coexists with multiple critical consumers. This uses legacy
+  // runtime pressure only; E4 remains shadow/evidence-only.
   const consumerServiceHaulerFloor =
-    allSourceContainersReady && consumers.length > 0 && consumerCriticalCount > 0
-      ? 2
-      : 0;
+    allSourceContainersReady && consumers.length > 0 && haulers.length >= 2 &&
+      consumerFallbackCount > 0 && consumerCriticalCount >= 2
+      ? 3
+      : allSourceContainersReady && consumers.length > 0 && consumerCriticalCount > 0
+        ? 2
+        : 0;
   const recommendedHaulerCount = Math.max(carryDrivenHaulerCount, consumerServiceHaulerFloor);
   let mode = 'bootstrap-mobile-harvest';
   if (haulers.length && !allSourceContainersReady) mode = 'bootstrap-hauler';

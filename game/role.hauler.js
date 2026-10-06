@@ -33,11 +33,11 @@ function run(creep) {
     return;
   }
 
-  // Hard infrastructure remains the default first priority. v0.2.16 adds a
-  // starvation guard: when at least two haulers exist and a productive creep
-  // is already waiting/fallbacking, exactly one delivery-ready hauler serves
-  // consumers before spawn/extensions. The rest of the fleet continues the
-  // infrastructure refill, preserving recovery safety.
+  // Hard infrastructure remains the default first priority. With redundant
+  // hauling, selected starvation guards may serve waiting/fallbacking consumers
+  // before spawn/extensions. Guard selection always leaves at least one live
+  // hauler outside the guard set for hard infrastructure, preserving recovery
+  // safety while a third hauler can service a second critical consumer.
   const consumerGuard = energy.shouldPrioritizeConsumer(creep);
   if (consumerGuard && energy.deliverToConsumer(creep)) return;
 
