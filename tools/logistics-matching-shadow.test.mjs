@@ -344,4 +344,33 @@ function add(memory, time, specs) {
   assert.equal(deferred.jobs.length, 0);
 }
 
+// Large urgent requests must not consume every hauler while another critical
+// consumer is serviceable. Extra haulers may still fill the remaining demand.
+for (const loaded of [false, true]) {
+  for (const count of [2, 3]) {
+    const memory = {};
+    const requests = add(memory, 600, [
+      pickup('shared-energy', 120, 5, 5),
+      delivery('large-critical', 100, 10, 10, true, 150, 80),
+      delivery('other-critical', 50, 15, 15, true, 80, 10),
+      delivery('ordinary', 100, 6, 6, false, 200, 100)
+    ]);
+    const creeps = Array.from({ length: count }, (_, i) =>
+      hauler('coverage-' + i, 6 + i, 5, loaded ? 50 : 0, 50));
+    const before = JSON.stringify(creeps);
+    const plan = matcher.plan({ room: { name: 'E1N1' }, creeps }, requests, memory, { time: 600 });
+    assert.equal(plan.summary.criticalMatchedCount, 2, 'cover distinct critical consumers first');
+    assert.equal(plan.summary.unmatchedCriticalCount, 0);
+    assert.equal(plan.jobs.length, count, 'remaining hauler can fill residual emergency demand');
+    assert.ok(plan.jobs.every(job => job.critical));
+    assert.equal(new Set(plan.jobs.map(job => job.haulerId)).size, count);
+    assert.equal(plan.summary.reservedAmount, loaded ? count * 50 : Math.min(count * 50, 120));
+    assert.equal(JSON.stringify(creeps), before, 'shadow matching must not mutate creeps');
+    for (const request of requests) {
+      const reserved = request.reservations.reduce((sum, item) => sum + item.amount, 0);
+      assert.ok(reserved <= request.demand.amount, 'never over-reserve supply or demand');
+    }
+  }
+}
+
 console.log('logistics matching shadow tests passed');

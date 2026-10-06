@@ -400,38 +400,47 @@ function plan(state, requests, memoryRoot, game) {
 
   const jobs = [];
   const usedHaulers = {};
-  for (const candidate of candidates) {
-    if (usedHaulers[candidate.haulerId]) continue;
-    const amount = revalidatedAmount(candidate);
-    if (amount <= 0) continue;
-    candidate.amount = amount;
+  const coveredCritical = {};
+  // First distribute available slots across distinct critical requests, then
+  // reuse the existing ordering for residual emergency and ordinary demand.
+  for (const distinctCritical of [true, false]) {
+    for (const candidate of candidates) {
+      const critical = demandTier(candidate) > 0;
+      if (distinctCritical && (!critical || coveredCritical[candidate.demand.id])) continue;
+      if (usedHaulers[candidate.haulerId]) continue;
+      const amount = revalidatedAmount(candidate);
+      if (amount <= 0) continue;
+      candidate.amount = amount;
 
-    const reservations = reserveMatch(roomName, candidate, memoryRoot, game);
-    const job = {
-      schemaVersion: SCHEMA_VERSION,
-      authority: 'SHADOW',
-      id: 'e4|' + roomName + '|' + candidate.haulerId + '|' + now,
-      haulerId: candidate.haulerId,
-      mode: candidate.mode,
-      supplyRequestId: candidate.supply ? candidate.supply.id : null,
-      demandRequestId: candidate.demand ? candidate.demand.id : null,
-      supplyDedupeKey: candidate.supply ? candidate.supply.dedupeKey : null,
-      demandDedupeKey: candidate.demand ? candidate.demand.dedupeKey : null,
-      amount: candidate.amount,
-      demandTier: demandTier(candidate),
-      score: Math.round(candidate.score * 100) / 100,
-      scoreComponents: candidate.components,
-      predicted: {
-        pickupTick: candidate.supply ? now + candidate.pickupEta : null,
-        deliveryTick: now + candidate.deliveryEta,
-        transportTicks: candidate.deliveryEta
-      },
-      reservationIds: reservations.map(r => r.id),
-      requestKind: candidate.demand ? candidate.demand.kind : null,
-      critical: !!(candidate.demand && candidate.demand.kind === 'EMERGENCY_DELIVER')
-    };
-    jobs.push(job);
-    usedHaulers[candidate.haulerId] = true;
+      const reservations = reserveMatch(roomName, candidate, memoryRoot, game);
+      const job = {
+        schemaVersion: SCHEMA_VERSION,
+        authority: 'SHADOW',
+        id: 'e4|' + roomName + '|' + candidate.haulerId + '|' + now,
+        haulerId: candidate.haulerId,
+        mode: candidate.mode,
+        supplyRequestId: candidate.supply ? candidate.supply.id : null,
+        demandRequestId: candidate.demand ? candidate.demand.id : null,
+        supplyDedupeKey: candidate.supply ? candidate.supply.dedupeKey : null,
+        demandDedupeKey: candidate.demand ? candidate.demand.dedupeKey : null,
+        amount: candidate.amount,
+        demandTier: demandTier(candidate),
+        score: Math.round(candidate.score * 100) / 100,
+        scoreComponents: candidate.components,
+        predicted: {
+          pickupTick: candidate.supply ? now + candidate.pickupEta : null,
+          deliveryTick: now + candidate.deliveryEta,
+          transportTicks: candidate.deliveryEta
+        },
+        reservationIds: reservations.map(r => r.id),
+        requestKind: candidate.demand ? candidate.demand.kind : null,
+        critical: !!(candidate.demand && candidate.demand.kind === 'EMERGENCY_DELIVER')
+      };
+      jobs.push(job);
+      if (critical) coveredCritical[candidate.demand.id] = true;
+      usedHaulers[candidate.haulerId] = true;
+      if (jobs.length >= haulers.length) break;
+    }
     if (jobs.length >= haulers.length) break;
   }
 
