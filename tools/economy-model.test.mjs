@@ -178,4 +178,27 @@ assert.equal(withConsumerPressure.consumerServiceHaulerFloor, 2);
 assert.equal(withConsumerPressure.haulerCarryDeficit, 0);
 assert.equal(withConsumerPressure.recommendedHaulerCount, 2);
 
+// Post-#55 live evidence: two haulers can remain fully utilized while fallback
+// persists across completed windows. Escalate only after the two-hauler reserve
+// is actually live and severe pressure is concrete: at least one fallback and
+// at least two critical consumers. The bootstrap cap still bounds this at 3.
+const pressureSecondHauler = countedCreep('hauler', { [CARRY]: 10 });
+pressureBuilder.memory.waitingEnergyTicks = 3;
+pressureBase.creeps.push(pressureSecondHauler);
+const severeConsumerPressure = require('../game/economy.model.js').analyze(pressureBase);
+assert.equal(severeConsumerPressure.haulerCarryDeficit, 0);
+assert.equal(severeConsumerPressure.consumerFallbackCount, 1);
+assert.equal(severeConsumerPressure.consumerCriticalCount, 2);
+assert.equal(severeConsumerPressure.consumerServiceHaulerFloor, 3);
+assert.equal(severeConsumerPressure.recommendedHaulerCount, 3);
+
+// The same consumer pressure must not jump a one-hauler recovery fleet directly
+// to three. Removing the redundant hauler falls back to the existing floor 2.
+pressureBase.creeps.pop();
+const singleHaulerSeverePressure = require('../game/economy.model.js').analyze(pressureBase);
+assert.equal(singleHaulerSeverePressure.consumerFallbackCount, 1);
+assert.equal(singleHaulerSeverePressure.consumerCriticalCount, 2);
+assert.equal(singleHaulerSeverePressure.consumerServiceHaulerFloor, 2);
+assert.equal(singleHaulerSeverePressure.recommendedHaulerCount, 2);
+
 console.log('economy model tests passed');
