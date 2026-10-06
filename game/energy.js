@@ -338,7 +338,13 @@ function deliverToConsumer(creep) {
     if (freeEnergyCapacity(target) <= 0) {
       target.memory.waitingEnergyTicks = 0;
       target.memory.logisticsFallback = false;
+      delete target.memory.lastHaulerDeliveryTick;
       clearConsumerTarget(creep);
+    } else if (target.memory && typeof Game !== 'undefined' && Number.isFinite(Game.time)) {
+      // Partial delivery is still useful productive energy. Mark it explicitly
+      // so role.worker can resume work on the next consumer turn without
+      // mistaking self-harvest/fallback energy for a logistics delivery.
+      target.memory.lastHaulerDeliveryTick = Game.time;
     }
     return true;
   }

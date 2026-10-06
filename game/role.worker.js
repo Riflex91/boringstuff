@@ -11,6 +11,22 @@ function needsEnergy(creep) {
     creep.memory.working = true;
     creep.memory.logisticsFallback = false;
     creep.memory.waitingEnergyTicks = 0;
+    delete creep.memory.lastHaulerDeliveryTick;
+  }
+
+  // Under hauler logistics, a confirmed partial delivery should be consumed
+  // immediately instead of forcing the worker to wait until CARRY is 100% full.
+  // The explicit marker is important: partial energy from self-harvest fallback
+  // must retain the historical fill-before-work behavior or the old one-tick
+  // fallback/wait loop returns.
+  if (!creep.memory.working && (creep.store[RESOURCE_ENERGY] || 0) > 0) {
+    const deliveredTick = Number(creep.memory.lastHaulerDeliveryTick);
+    const now = typeof Game !== 'undefined' && Number.isFinite(Game.time) ? Game.time : null;
+    if (Number.isFinite(deliveredTick) && now !== null && now - deliveredTick >= 0 && now - deliveredTick <= 1) {
+      creep.memory.working = true;
+      creep.memory.waitingEnergyTicks = 0;
+      delete creep.memory.lastHaulerDeliveryTick;
+    }
   }
   return !creep.memory.working;
 }
