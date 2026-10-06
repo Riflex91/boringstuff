@@ -545,3 +545,87 @@ function evidence(start = 1000) {
 }
 
 console.log('live-verification tests passed');
+
+
+{
+  // A completed ASSIGNMENT_EVIDENCE_WINDOW can exactly cover the requested
+  // verifier window even when the latest STATUS_SNAPSHOT still carries the
+  // previous fixed economy last100 block. Use the exact event for progress and
+  // useful-work checks without pretending the richer productiveFlow payload is
+  // available for the same window.
+  const rows = evidence(1101);
+  const status = rows.at(-1);
+  status.ctx.rooms.E8N1.economy.last100.startTick = 1000;
+  status.ctx.rooms.E8N1.economy.last100.endTick = 1099;
+  status.ctx.rooms.E8N1.economy.last100.ticks = 100;
+  rows.push(event(1200, 'ASSIGNMENT_EVIDENCE_WINDOW', {
+    room: 'E8N1',
+    evidence: {
+      authority: 'SHADOW_EVIDENCE',
+      startTick: 1101,
+      endTick: 1200,
+      ticks: 100,
+      controllerProgress: 260,
+      constructionProgress: 949,
+      usefulWorkPerTick: 12.09
+    }
+  }, { jseq: 22 }));
+
+  const r = evaluateLive({ events: rows, startTick: 1101, nodeVersion: '24.21.0' });
+  assert.equal(r.checks.find(c => c.id === 'productive-attribution').status, 'WATCH');
+  assert.equal(r.checks.find(c => c.id === 'controller-progress').status, 'PASS');
+  assert.equal(r.checks.find(c => c.id === 'controller-progress').data.controllerProgress, 260);
+  assert.equal(r.checks.find(c => c.id === 'construction-progress').status, 'PASS');
+  assert.equal(r.checks.find(c => c.id === 'construction-progress').data.constructionProgress, 949);
+  assert.equal(r.checks.find(c => c.id === 'productive-throughput').status, 'WATCH');
+  assert.equal(r.checks.find(c => c.id === 'productive-throughput').data.throughput, 12.09);
+  assert.deepEqual(r.assignmentEvidenceWindow, {
+    startTick: 1101,
+    endTick: 1200,
+    ticks: 100,
+    controllerProgress: 260,
+    constructionProgress: 949,
+    usefulWorkPerTick: 12.09
+  });
+  assert.equal(r.counts.fail, 0);
+}
+
+{
+  // Explicit null is unknown evidence, not numeric zero.
+  const rows = evidence();
+  const status = rows.at(-1);
+  status.ctx.rooms.E8N1.colonyState.logisticsMatching = {
+    available: true,
+    authority: 'SHADOW',
+    evidence: { authority: 'SHADOW_EVIDENCE' }
+  };
+  status.ctx.rooms.E8N1.logisticsMatchingEvidence = {
+    authority: 'SHADOW_EVIDENCE',
+    current: null,
+    lastWindow: {
+      authority: 'SHADOW_EVIDENCE',
+      startTick: 1000,
+      endTick: 1099,
+      ticks: 100,
+      averageHaulers: 2,
+      averageMatchedHaulers: 2,
+      haulerUtilization: 1,
+      averageCandidatesPerTick: 4,
+      averageJobsPerTick: 2,
+      criticalRequestTicks: 0,
+      criticalCoverageRatio: 1,
+      averageReservedAmountPerTick: 100,
+      averagePredictedTransportTicks: 2,
+      averageConsumerWaiting: 0,
+      averageConsumerCritical: 0,
+      averageConsumerFallback: 0,
+      duplicateReservationTicks: null
+    }
+  };
+
+  const r = evaluateLive({ events: rows, startTick: 1000, nodeVersion: '24.21.0' });
+  const e4 = r.checks.find(c => c.id === 'e4-matching-evidence');
+  assert.equal(e4.status, 'WATCH');
+  assert.equal(e4.data.duplicateReservationTicks, null);
+  assert.match(e4.message, /unavailable/i);
+}

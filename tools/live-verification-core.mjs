@@ -4,6 +4,7 @@ export const EXPECTED_BOT_VERSION = '0.3.0-shadow.8-node24';
 const RANK = { PASS: 0, WATCH: 1, FAIL: 2 };
 
 function finite(value, fallback = null) {
+  if (value === null || value === undefined || value === '') return fallback;
   const n = Number(value);
   return Number.isFinite(n) ? n : fallback;
 }
@@ -160,6 +161,20 @@ export function evaluateLive(input) {
     last100Ticks !== null &&
     last100Ticks >= 100;
   const windowLast100 = last100MatchesWindow ? last100 : null;
+  const assignmentWindow = selected.events
+    .filter(e =>
+      e?.code === 'ASSIGNMENT_EVIDENCE_WINDOW' &&
+      String(e?.ctx?.room || '').toUpperCase() === roomName.toUpperCase()
+    )
+    .map(e => e?.ctx?.evidence)
+    .filter(evidence =>
+      evidence &&
+      finite(evidence.startTick, null) === selected.startTick &&
+      finite(evidence.endTick, null) === selected.endTick &&
+      finite(evidence.ticks, null) !== null &&
+      finite(evidence.ticks, null) >= 100
+    )
+    .at(-1) || null;
   const attribution = windowLast100?.productiveFlow || null;
   const observedCompletedWindow =
     last100StartTick !== null &&
@@ -220,8 +235,14 @@ export function evaluateLive(input) {
   else if ((critical || 0) > 0 || (waiting || 0) > 0) checks.push(check('consumer-supply', 'WATCH', 'Consumers were waiting/critical, but fallback remained zero.', consumerSupplyData));
   else checks.push(check('consumer-supply', 'PASS', 'No consumer fallback/waiting/critical pressure was observed in the latest snapshot.', consumerSupplyData));
 
-  const controllerProgress = finite(windowLast100?.controllerProgress, null);
-  const constructionProgress = finite(windowLast100?.constructionProgress, null);
+  const controllerProgress = finite(
+    windowLast100?.controllerProgress,
+    finite(assignmentWindow?.controllerProgress, null)
+  );
+  const constructionProgress = finite(
+    windowLast100?.constructionProgress,
+    finite(assignmentWindow?.constructionProgress, null)
+  );
   const sites = finite(latest?.constructionSites, 0);
   if (controllerProgress === null) checks.push(check('controller-progress', 'WATCH', 'No 100-tick controller progress metric was available.'));
   else if (controllerProgress <= 0) checks.push(check('controller-progress', 'FAIL', 'Controller made no progress during the 100-tick window.', { controllerProgress }));
@@ -231,7 +252,9 @@ export function evaluateLive(input) {
   else if (constructionProgress !== null) checks.push(check('construction-progress', 'PASS', 'Construction progress is acceptable for the current workload.', { sites, constructionProgress }));
   else checks.push(check('construction-progress', 'WATCH', 'No 100-tick construction progress metric was available.'));
 
-  const throughput = last100MatchesWindow ? finite(eff?.metrics?.productiveThroughputPerTick, null) : null;
+  const throughput = last100MatchesWindow
+    ? finite(eff?.metrics?.productiveThroughputPerTick, null)
+    : finite(assignmentWindow?.usefulWorkPerTick, null);
   const mining = finite(eff?.metrics?.dedicatedHarvestCapacityPerTick, finite(model.dedicatedHarvestCapacityPerTick, null));
   if (throughput === null) checks.push(check('productive-throughput', 'WATCH', 'No productive throughput metric was available.'));
   else if (throughput <= 0) checks.push(check('productive-throughput', 'FAIL', 'Productive throughput is zero.', { throughput, mining }));
@@ -375,6 +398,14 @@ export function evaluateLive(input) {
       observedEndTick: last100EndTick,
       observedTicks: last100Ticks
     },
+    assignmentEvidenceWindow: assignmentWindow ? {
+      startTick: finite(assignmentWindow.startTick, null),
+      endTick: finite(assignmentWindow.endTick, null),
+      ticks: finite(assignmentWindow.ticks, null),
+      controllerProgress: finite(assignmentWindow.controllerProgress, null),
+      constructionProgress: finite(assignmentWindow.constructionProgress, null),
+      usefulWorkPerTick: finite(assignmentWindow.usefulWorkPerTick, null)
+    } : null,
     ...summarize(checks)
   };
 }
