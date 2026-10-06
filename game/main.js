@@ -12,6 +12,7 @@ const runtimeCapabilities = require('runtime.capabilities');
 const serverProfile = require('server.profile');
 const processScheduler = require('process.scheduler');
 const worldIntel = require('world.intel');
+const pathShadow = require('path.shadow');
 
 function bootstrapMemory() {
   if (!Memory.bot) Memory.bot = { version: config.VERSION, born: Game.time };
@@ -143,6 +144,7 @@ function statusSnapshot(roomStates, tickCpu) {
     serverProfile: profile,
     scheduler: schedulerState,
     worldIntel: worldIntelState,
+    pathing: pathShadow.snapshot(Memory),
     rooms
   }, { force: true, persist: false, dedupeTicks: 0 });
 }
@@ -251,8 +253,22 @@ module.exports.loop = function() {
       profiler.section('visuals', function() { roomStates.forEach(visuals.draw); });
     }, schedulerContext);
 
+    processScheduler.run({
+      id: 'path-shadow',
+      priorityClass: processScheduler.PRIORITY.OVERFLOW,
+      minimumInterval: config.PATH_SHADOW_INTERVAL
+    }, function() {
+      profiler.section('path-shadow', function() {
+        pathShadow.run(roomStates, {
+          game: Game, memory: Memory, lowCpu,
+          maxOps: config.PATH_MAX_OPS,
+          cpuCeiling: Math.min(Game.cpu.limit, Game.cpu.tickLimit || Game.cpu.limit) * config.PATH_SHADOW_CPU_FRACTION
+        });
+      });
+    }, schedulerContext);
+
     const scheduledTotal = Math.max(0, Game.cpu.getUsed() - scheduledStart);
-    const sectionTotal = currentSectionTotal(['rooms', 'creeps', 'world-intel', 'stats', 'visuals']);
+    const sectionTotal = currentSectionTotal(['rooms', 'creeps', 'world-intel', 'stats', 'visuals', 'path-shadow']);
     profiler.detailValue('main.scheduler-overhead', Math.max(0, scheduledTotal - sectionTotal));
 
     profiler.finishTick(tickStart);

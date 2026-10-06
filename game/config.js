@@ -30,6 +30,9 @@ module.exports = {
   // an entire tick's CPU budget. Same-room role movement should normally fit
   // well inside this ceiling and will retry on later ticks if incomplete.
   PATH_MAX_OPS: 200,
+  // P0/P1 evaluation only. Legacy movement remains authoritative.
+  PATH_SHADOW_INTERVAL: 25,
+  PATH_SHADOW_CPU_FRACTION: 0.7,
 
   // Economy tuning.
   UPGRADE_ENERGY_RESERVE: 600,

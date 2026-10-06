@@ -589,3 +589,27 @@ bot.telemetryStatus()
 ## Secrets and local-only files
 
 Never commit real Screeps credentials, tokens, local collector state, telemetry captures, generated logs, or other private runtime material. `tools/screeps.json.example` is safe to commit; a real `tools/screeps.json` is not.
+
+
+## P0/P1 shared pathing — offline candidate (2026-10-06)
+
+The next independent foundation adds `path.costs`, `path.routes` and
+`path.shadow`. It does not include or supersede the distinct-critical E4 fix in
+PR #48. Shared cost fields cover obstacles, roads, planned geometry, work tiles,
+congestion and threat zones. Room routes and compact tile paths are versioned,
+TTL/size bounded, invalidated by changed geometry/threat and stuck feedback,
+and reject incomplete paths. Unknown/stale intel remains explicit.
+
+One optional OVERFLOW sample runs after legacy room/creep actions, with a
+configured operation cap and CPU-headroom guard. `STATUS_SNAPSHOT.pathing`
+exposes compact counters and the latest sample. No movement intent is issued.
+
+All offline tests pass under Node 24.19.0, including the new weighted-grid,
+cache-restart/invalidation, hazard, budget and shadow fixtures and syntax checks
+for 46 game modules. Real PathFinder performance, Node 18 target execution,
+exact-head smoke/live/lifecycle evidence and movement authority remain open.
+No deployment or live acceptance is claimed.
+
+The full slice-by-slice inventory is in `docs/ROADMAP_STATUS.md`; the ultimate
+roadmap remains incomplete. Missing large subsystems are explicitly listed so
+later work cannot mistake infrastructure or SHADOW evidence for completion.
