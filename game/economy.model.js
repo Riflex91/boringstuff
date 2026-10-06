@@ -170,7 +170,8 @@ function analyze(state) {
   // real consumer pressure, keep a narrow two-hauler service floor. This uses
   // legacy runtime pressure only; E4 remains shadow/evidence-only.
   const consumerServiceHaulerFloor =
-    allSourceContainersReady && consumers.length > 0 && consumerFallbackCount > 0 && consumerCriticalCount >= 2
+    allSourceContainersReady && consumers.length > 0 && haulers.length >= 2 &&
+      consumerFallbackCount > 0 && consumerCriticalCount >= 2
       ? 3
       : allSourceContainersReady && consumers.length > 0 && consumerCriticalCount > 0
         ? 2
