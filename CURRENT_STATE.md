@@ -589,3 +589,65 @@ bot.telemetryStatus()
 ## Secrets and local-only files
 
 Never commit real Screeps credentials, tokens, local collector state, telemetry captures, generated logs, or other private runtime material. `tools/screeps.json.example` is safe to commit; a real `tools/screeps.json` is not.
+
+
+## 2026-10-06 — post-#55 / #56 / #57 / #58 live follow-up
+
+The canonical main after PR #58 is `1a932cc14e840488d57c3f518d071a9c0d5c11b6`.
+
+Evidence-integrity follow-up:
+
+- PR #56 preserved `duplicateReservationTicks` inside the durable E4 telemetry key budget and stopped missing duplicate evidence from being defaulted to zero.
+- Live E4 windows now report `duplicateReservationTicks = 0` explicitly.
+- PR #58 additionally prevents explicit `null` numeric evidence from being coerced to zero and lets the verifier consume an exact `ASSIGNMENT_EVIDENCE_WINDOW` for controller progress, construction progress and useful-work throughput when the latest `STATUS_SNAPSHOT.economy.last100` still reflects the previous cadence window.
+- PR #58 does not promote incomplete productive-flow attribution: the richer `productiveFlow` check remains WATCH unless that exact payload is available.
+
+Legacy hauling follow-up:
+
+- PR #55 introduced the narrow two-hauler service floor under real consumer pressure.
+- Repeated completed post-#55 windows showed two haulers fully utilized with candidate availability intact while consumer fallback remained non-zero.
+- PR #57 added a bounded severe-pressure reserve: only when two haulers are already live, at least one consumer is in fallback and at least two consumers are critical may the legacy service floor rise to three.
+- With three live haulers, at most two starvation guards may prioritize consumers; at least one live hauler remains outside the guard set for spawn/extensions/tower service.
+- E4 remains strictly `SHADOW` / `SHADOW_EVIDENCE`; no E4 metric controls legacy runtime behavior.
+
+First complete three-hauler E4 evidence window: `3738793–3738892`.
+
+Observed:
+
+- `averageHaulers = 3`;
+- `averageMatchedHaulers = 3`;
+- `haulerUtilization = 1`;
+- `averageJobsPerTick = 3`;
+- `criticalCandidateRatio = 1`;
+- `criticalNoCandidateTicks = 0`;
+- `criticalSlotCoverageRatio = 1`;
+- `averageConsumerFallback = 0.35`;
+- `averageConsumerCritical = 1.64`;
+- `averageConsumerWaiting = 1.29`;
+- `duplicateReservationTicks = 0`.
+
+Relative to the prior clean two-hauler window, average consumer fallback fell from `1.03` to `0.35` (about 66%). The final snapshot at tick `3738900` had three live haulers, `consumerFallbackCount = 0`, Health `100 / HEALTHY`, full `20 e/t` dedicated mining and no modeled hauler CARRY deficit.
+
+Exact post-#57 assignment-evidence window: `3738802–3738901`.
+
+Observed:
+
+- `controllerProgress = 260`;
+- `constructionProgress = 949`;
+- `usefulWorkPerTick = 12.09`;
+- `averageRequestLatency = 13.64` ticks;
+- `maxRequestLatency = 40` ticks;
+- `assignmentsPerTick = 5.79`;
+- `switchesPerTick = 0.02`;
+- `averageUnfilledRequests = 3.02`;
+- `idleCompatibleExecutorRatio = 0`.
+
+Compared with the previous assignment-evidence window (`6.08 usefulWorkPerTick`, controller `202`, construction `406`), useful work rose by about 99%, controller progress by about 29% and construction progress by about 134%. This supports the conclusion that PR #57 materially improved productive energy delivery; it does not justify further hauling expansion.
+
+Current stop rule:
+
+- Do not add more hauling capacity. The severe-pressure reserve is intentionally bounded at three haulers, the room is healthy, and fallback improved materially.
+- Do not change CPU thresholds.
+- Do not promote E4 authority; it remains evidence-only.
+- Do not tune productive-role counts from the stale Efficiency snapshot alone. The exact assignment window shows substantial improvement, while the richer exact productive-flow attribution still needs its own aligned snapshot before another gameplay change is justified.
+- The next useful live check should use the merged PR #58 verifier so exact assignment evidence is surfaced automatically instead of being discarded as cadence mismatch.
