@@ -676,3 +676,30 @@ console.log('live-verification tests passed');
   assert.equal(r.checks.find(c => c.id === 'runtime-errors').status, 'PASS');
   assert.equal(r.checks.find(c => c.id === 'cpu-bucket').status, 'PASS');
 }
+
+
+{
+  // Productive progress and mining income are different units. A window that
+  // would look healthy against a small mining number must still be compared
+  // against same-unit modeled productive WORK capacity.
+  const rows = evidence();
+  const status = rows.at(-1);
+  const room = status.ctx.rooms.E8N1;
+  room.economy.last100.productiveFlow.averageBuilderWorkParts = 4;
+  room.economy.last100.productiveFlow.averageWorkerWorkParts = 1;
+  room.economy.last100.productiveFlow.averageUpgraderWorkParts = 4;
+  room.economy.last100.productiveFlow.actualProductiveThroughputPerTick = 14.8;
+  room.economyModel.productiveDemandPerTick = 29;
+  room.economyModel.dedicatedHarvestCapacityPerTick = 10;
+  room.efficiency.metrics.dedicatedHarvestCapacityPerTick = 10;
+  room.efficiency.metrics.productiveThroughputPerTick = 14.8;
+
+  const r = evaluateLive({ events: rows, startTick: 1000, nodeVersion: '24.21.0' });
+  const throughput = r.checks.find(c => c.id === 'productive-throughput');
+  assert.equal(throughput.status, 'WATCH');
+  assert.equal(throughput.data.throughput, 14.8);
+  assert.equal(throughput.data.productiveCapacity, 29);
+  assert.equal(throughput.data.mining, 10);
+  assert.ok(Math.abs(throughput.data.utilization - (14.8 / 29)) < 1e-12);
+  assert.match(throughput.message, /productive work capacity/i);
+}
