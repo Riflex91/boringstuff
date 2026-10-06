@@ -589,3 +589,24 @@ bot.telemetryStatus()
 ## Secrets and local-only files
 
 Never commit real Screeps credentials, tokens, local collector state, telemetry captures, generated logs, or other private runtime material. `tools/screeps.json.example` is safe to commit; a real `tools/screeps.json` is not.
+
+
+## E4 distinct critical coverage — offline candidate (2026-10-06)
+
+The matcher could assign multiple haulers to one large emergency request while
+another serviceable critical consumer remained unmatched. A regression reproduced
+one covered request out of two with two available haulers.
+
+Matching now makes two bounded passes over the existing sorted candidates:
+first one assignment per distinct critical request, then residual demand in the
+existing emergency-first score order. Every assignment still revalidates shared
+supply and demand reservations. This is a greedy coverage improvement, not a
+maximum-cardinality matching guarantee.
+
+Regression coverage includes empty and loaded haulers, two and three slots,
+shared supply exhaustion, residual emergency demand, and unchanged creep state.
+The complete offline suite passed under Node 24.19.0, including syntax checks for
+43 game modules. Node 18 target-runtime and live validation remain outstanding.
+E4 remains SHADOW-only; legacy gameplay authority is unchanged. No deployment or
+live result is claimed. Before rollout, complete the pending exact-main smoke
+and 100-tick evidence gate from PR #47, then measure this candidate separately.
