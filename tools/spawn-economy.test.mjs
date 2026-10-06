@@ -145,7 +145,7 @@ function spawnState(workerTtl) {
 }
 
 {
-  global.Game = { time: 5000, creeps: {} };
+  global.Game = { time: 5000, creeps: { scout: { name:'scout', memory:{ role:'scout', home:'E8N1' }, room:{ name:'E8N1' } } } };
   const s = spawnState(20);
   assert.equal(spawnManager._test.productivePrespawnHorizon('worker', s.state), 39);
   assert.equal(spawnManager._test.countRoleAvailable(s.state, 'worker'), 0);
@@ -154,14 +154,14 @@ function spawnState(workerTtl) {
 }
 
 {
-  global.Game = { time: 5100, creeps: {} };
+  global.Game = { time: 5100, creeps: { scout: { name:'scout', memory:{ role:'scout', home:'E8N1' }, room:{ name:'E8N1' } } } };
   const s = spawnState(40);
   assert.equal(spawnManager._test.countRoleAvailable(s.state, 'worker'), 1);
   assert.equal(spawnManager.spawnOne(s.state), false);
 }
 
 {
-  global.Game = { time: 5200, creeps: {} };
+  global.Game = { time: 5200, creeps: { scout: { name:'scout', memory:{ role:'scout', home:'E8N1' }, room:{ name:'E8N1' } } } };
   const s = spawnState(20);
   const spawningName = 'wor-E8N1-existing';
   s.state.spawn.spawning = { name: spawningName, remainingTime: 12 };
