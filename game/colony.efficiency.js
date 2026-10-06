@@ -21,6 +21,12 @@ function pct(numerator, denominator) {
   return clamp(Math.round((numerator / denominator) * 100), 0, 100);
 }
 
+function finiteNumber(value) {
+  if (value === null || value === undefined || value === '') return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
 function ownedControllerBelowRcl8(state) {
   const controller = state.room && state.room.controller;
   return !!(controller && controller.my && state.rcl < 8);
@@ -41,13 +47,26 @@ function productiveThroughput(last) {
   return progress / last.ticks;
 }
 
+function productiveCapacity(state, last) {
+  const flow = last && last.productiveFlow;
+  const builder = finiteNumber(flow && flow.averageBuilderWorkParts);
+  const worker = finiteNumber(flow && flow.averageWorkerWorkParts);
+  const upgrader = finiteNumber(flow && flow.averageUpgraderWorkParts);
+  if (builder !== null && worker !== null && upgrader !== null) {
+    const buildPower = typeof BUILD_POWER !== 'undefined' ? BUILD_POWER : 5;
+    const upgradePower = typeof UPGRADE_CONTROLLER_POWER !== 'undefined' ? UPGRADE_CONTROLLER_POWER : 1;
+    return Math.max(0, (builder + worker) * buildPower + upgrader * upgradePower);
+  }
+  return Math.max(0, finiteNumber(state.economyModel && state.economyModel.productiveDemandPerTick) || 0);
+}
+
 function productiveUseScore(state, last, reasons) {
   if (!last) return 50;
   if (!hasProductiveBacklog(state)) return 100;
 
-  const harvest = Math.max(0, state.economyModel && state.economyModel.dedicatedHarvestCapacityPerTick || 0);
+  const capacity = productiveCapacity(state, last);
   const throughput = productiveThroughput(last);
-  const score = harvest > 0 ? pct(throughput, harvest) : (throughput > 0 ? 100 : 0);
+  const score = capacity > 0 ? pct(throughput, capacity) : (throughput > 0 ? 100 : 0);
   if (score < 60) reasons.push('PRODUCTIVE_THROUGHPUT_LOW');
   return score;
 }
@@ -122,7 +141,7 @@ function pressure(state, last, throughput, reasons) {
   if (surplus > demand + 10) pressureState = 'SURPLUS';
   else if (demand > surplus + 10) pressureState = 'DEMAND';
 
-  const modeledDemand = Math.max(0, model.productiveDemandPerTick || 0);
+  const modeledDemand = productiveCapacity(state, last);
   if (pressureState === 'SURPLUS' && modeledDemand > 0 && throughput * 1.5 < modeledDemand) {
     reasons.push('MODELED_DEMAND_NOT_REALIZED');
   }
@@ -161,13 +180,14 @@ function evaluate(state) {
   const pressureState = pressure(state, last, throughput, reasons);
 
   return {
-    modelVersion: 1,
+    modelVersion: 2,
     overallScore,
     status: statusFor(overallScore, pressureState.state, !!last),
     components,
     pressure: pressureState,
     metrics: {
       productiveThroughputPerTick: Math.round(throughput * 100) / 100,
+      productiveCapacityPerTick: Math.round(productiveCapacity(state, last) * 100) / 100,
       dedicatedHarvestCapacityPerTick: Math.max(0, state.economyModel && state.economyModel.dedicatedHarvestCapacityPerTick || 0),
       energyCappedRatio: last ? clamp(Number(last.energyCappedRatio) || 0, 0, 1) : null,
       spawnUtilization: last ? clamp(Number(last.spawnUtilization) || 0, 0, 1) : null,
@@ -177,4 +197,4 @@ function evaluate(state) {
   };
 }
 
-module.exports = { evaluate, statusFor, WEIGHTS, productiveThroughput, hasProductiveBacklog };
+module.exports = { evaluate, statusFor, WEIGHTS, productiveThroughput, productiveCapacity, hasProductiveBacklog };

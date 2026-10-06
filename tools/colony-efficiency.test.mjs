@@ -42,11 +42,11 @@ function liveState() {
 
 const live = efficiency.evaluate(liveState());
 assert.equal(live.metrics.productiveThroughputPerTick, 6.77);
-assert.equal(live.components.productiveUse, 38);
+assert.equal(live.components.productiveUse, 32);
 assert.equal(live.components.energyUse, 3);
 assert.equal(live.components.spawnUse, 0);
 assert.equal(live.components.flow, 85);
-assert.equal(live.overallScore, 31);
+assert.equal(live.overallScore, 28);
 assert.equal(live.status, 'UNDERUTILIZED');
 assert.equal(live.pressure.state, 'SURPLUS');
 assert.ok(live.pressure.score >= 90);
@@ -67,12 +67,38 @@ efficient.economyMetrics.last100 = {
 };
 efficient.economyModel.consumerFallbackCount = 0;
 const good = efficiency.evaluate(efficient);
-assert.equal(good.components.productiveUse, 90);
+assert.equal(good.components.productiveUse, 77);
 assert.equal(good.components.energyUse, 95);
 assert.equal(good.components.spawnUse, 100);
 assert.equal(good.components.flow, 100);
 assert.equal(good.status, 'EFFICIENT');
 assert.equal(good.pressure.state, 'BALANCED');
+
+// Prefer exact-window productive WORK capacity over harvest energy or a stale
+// current economy model. Builder/worker construction capacity and upgrader
+// capacity share the same progress-per-tick unit as productiveThroughput.
+const exact = liveState();
+exact.economyMetrics.last100 = {
+  ticks: 100,
+  spawnUtilization: 0.13,
+  energyCappedRatio: 0,
+  controllerProgress: 202,
+  constructionProgress: 805,
+  sitesCompleted: 0,
+  productiveFlow: {
+    averageBuilderWorkParts: 4,
+    averageWorkerWorkParts: 1,
+    averageUpgraderWorkParts: 4
+  }
+};
+exact.economyModel.productiveDemandPerTick = 999;
+exact.economyModel.consumerFallbackCount = 0;
+const exactResult = efficiency.evaluate(exact);
+assert.equal(exactResult.modelVersion, 2);
+assert.equal(exactResult.metrics.productiveThroughputPerTick, 10.07);
+assert.equal(exactResult.metrics.productiveCapacityPerTick, 29);
+assert.equal(exactResult.components.productiveUse, 35);
+assert.equal(efficiency.productiveCapacity(exact, exact.economyMetrics.last100), 29);
 
 const demand = liveState();
 demand.economyMetrics.last100 = {
