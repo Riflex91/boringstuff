@@ -271,8 +271,8 @@ function snapshot(eventTick, startTick, endTick, attribution = true) {
   ];
   const status = resolveAutoStart(rows, version, 'live', room);
   assert.equal(status.ready, false);
-  assert.match(status.fatal, /No complete STATUS_SNAPSHOT/);
-  assert.match(status.fatal, /collector jseq continuity/i);
+  assert.match(status.fatal, /No STATUS_SNAPSHOT was observed/);
+  assert.match(status.fatal, /collector continuity and snapshot emission/i);
 }
 
 console.log('live verification wait tests passed');
