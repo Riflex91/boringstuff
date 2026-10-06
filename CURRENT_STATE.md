@@ -660,3 +660,48 @@ Current stop rule:
 - PR #63 corrects a diagnostic unit error: productive progress per tick must not be divided by mining energy per tick. Efficiency model v2 and the live verifier now compare actual productive progress against same-unit modeled productive WORK capacity derived from the exact window's builder/worker/upgrader WORK parts, falling back to `productiveDemandPerTick` only when exact-window capacity evidence is unavailable.
 - PR #63 is diagnostic only. It changes no spawn, role-count, hauling, CPU, request-authority, or E4-authority behavior.
 - After deploying PR #63, re-run a fresh smoke/live gate to validate Efficiency v2 telemetry. Do not make another gameplay change before that diagnostic baseline is observed.
+
+
+## 2026-10-06 — post-#63 / #65 productive-delivery follow-up
+
+PR #63 is live and Efficiency model v2 is visible in telemetry. The corrected diagnostic reports productive progress against same-unit productive WORK capacity rather than mining energy.
+
+The first post-#63 live window `3739601–3739700` completed with no hard failures: `12 PASS / 7 WATCH / 0 FAIL`. Its requested verifier cadence was shifted relative to the completed productive-flow block, so progress/throughput checks remained WATCH for that exact verifier window. The latest snapshot nevertheless confirms model v2 is active with `productiveThroughputPerTick = 10.23`, `productiveCapacityPerTick = 28`, and `dedicatedHarvestCapacityPerTick = 18`.
+
+The retained exact productive-flow block `3739502–3739601` reports:
+
+- `consumerTicks = 500`;
+- `waitingConsumerTicks = 81`;
+- `criticalConsumerTicks = 157`;
+- `fallbackConsumerTicks = 76`;
+- `emptyConsumerTicks = 101`;
+- `waitingRatio = 0.162`;
+- `criticalRatio = 0.314`;
+- `fallbackRatio = 0.152`;
+- `energyCappedRatio = 0.52`;
+- `controllerProgress = 294`;
+- `constructionProgress = 729`;
+- `usefulWorkPerTick = 10.23`.
+
+At tick `3739700`, room energy was `719/800` with three live haulers while three productive consumers were waiting. The structured consumer diagnostics showed the repairer empty after 6 waiting ticks and the builder empty after 5 waiting ticks. A live hauler already held a reservation to the repairer while carrying only 39 energy.
+
+This exposed a narrow legacy execution bug: a consumer in acquisition mode returned to productive work only after its entire CARRY store became full. A successful partial hauler transfer could therefore deliver usable energy while the consumer continued waiting.
+
+PR #65 fixes that behavior without changing hauling policy:
+
+- successful partial hauler-to-consumer transfers receive an explicit delivery-tick marker;
+- a consumer with positive energy from a confirmed current/previous-tick hauler delivery resumes productive work immediately;
+- the marker is consumed after resuming;
+- full-store behavior is unchanged;
+- self-harvest fallback remains fill-before-work, so the historical one-tick fallback/wait loop is not reintroduced;
+- no role counts, hauler counts, CPU thresholds, E4 authority, or request/assignment authority change.
+
+Exact branch regression coverage passed for `consumer-supply.test.mjs` and `logistics-fallback.test.mjs` before merge.
+
+Current stop rule after PR #65:
+
+- deploy PR #65 before interpreting another productive-utilization window;
+- do not add more haulers or productive roles yet;
+- after deployment, compare consumer waiting/fallback exposure and productive throughput against the retained `3739502–3739601` baseline;
+- specifically look for fewer empty/waiting consumer ticks after partial deliveries while preserving CPU/bucket safety and duplicate-free E4 evidence;
+- E4 remains strictly `SHADOW` / `SHADOW_EVIDENCE`.
