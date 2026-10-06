@@ -71,6 +71,11 @@ export function createContiguousSequenceCursor(initialSeq = 0) {
       return cursor;
     },
 
+    canObserve(seq) {
+      const value = Math.max(0, Number(seq) || 0);
+      return !!value && value > cursor && !pending.has(value);
+    },
+
     observe(seq) {
       const value = Math.max(0, Number(seq) || 0);
       if (!value || value <= cursor || pending.has(value)) {
