@@ -185,6 +185,33 @@ const energy = require('../game/energy.js');
   assert.equal(energy.shouldPrioritizeConsumer(hauler3), false);
 }
 
+// With three live haulers and multiple critical consumers, two guards may
+// serve consumers concurrently while one hauler remains outside the guard set
+// for hard infrastructure. This is the bounded severe-pressure behavior.
+{
+  const consumer1 = makeConsumer('worker-guard-severe-1', 'worker', 0, 5, false, 4);
+  const consumer2 = makeConsumer('upgrader-guard-severe-2', 'upgrader', 0, 7, true, 6);
+  const hauler1 = makeHauler('hauler-gs1', {
+    [consumer1.id]: 1,
+    [consumer2.id]: 9
+  });
+  const hauler2 = makeHauler('hauler-gs2', {
+    [consumer1.id]: 8,
+    [consumer2.id]: 2
+  });
+  const hauler3 = makeHauler('hauler-gs3', {
+    [consumer1.id]: 5,
+    [consumer2.id]: 5
+  });
+  room.creeps = [consumer1, consumer2, hauler1, hauler2, hauler3];
+
+  const guards = energy._test.selectConsumerGuardHaulers(room);
+  assert.deepEqual(guards.map(c => c.id), [hauler1.id, hauler2.id]);
+  assert.equal(energy.shouldPrioritizeConsumer(hauler1), true);
+  assert.equal(energy.shouldPrioritizeConsumer(hauler2), true);
+  assert.equal(energy.shouldPrioritizeConsumer(hauler3), false);
+}
+
 // An existing reservation to a critical consumer stays sticky even if another
 // ready hauler is geometrically closer. This prevents guard oscillation while
 // the reserved hauler is already travelling to the consumer.
