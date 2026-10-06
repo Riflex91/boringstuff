@@ -186,6 +186,24 @@ export function resolveAutoStart(events, version, mode, roomName, expectedDeploy
     ? 0
     : Math.max(0, expectedEndTick - Math.max(deployTick, latestEvidenceTick));
   const remainingSeconds = Math.max(0, Math.ceil(remainingTicks * secondsPerTick));
+  const snapshotOverdue =
+    expectedEndTick !== null &&
+    latestEvidenceTick >= expectedEndTick + 200;
+
+  if (snapshotOverdue) {
+    return {
+      ready: false,
+      fatal:
+        `No complete STATUS_SNAPSHOT was observed for the expected live window ${expectedStartTick}-${expectedEndTick}, ` +
+        `even though evidence advanced to tick ${latestEvidenceTick}. Check collector jseq continuity / out-of-order delivery.`,
+      deployTick,
+      deploymentId: boundary.event?.ctx?.deploymentId || null,
+      boundarySource: boundary.source,
+      latestEvidenceTick,
+      expectedStartTick,
+      expectedEndTick
+    };
+  }
 
   return {
     ready: false,
