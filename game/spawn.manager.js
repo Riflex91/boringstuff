@@ -99,6 +99,37 @@ function bodyFor(role, energy, state) {
   }
 }
 
+function productivePrespawnHorizon(role, state) {
+  if (role !== 'worker' && role !== 'builder' && role !== 'upgrader') return 0;
+  const budget = Math.max(0, Number(state.energyCapacityAvailable) || Number(state.energyAvailable) || 0);
+  const replacementBody = bodyFor(role, budget, state);
+  const spawnTimePerPart = typeof CREEP_SPAWN_TIME !== 'undefined' && Number.isFinite(CREEP_SPAWN_TIME)
+    ? CREEP_SPAWN_TIME
+    : 3;
+  const spawnTicks = replacementBody.length * spawnTimePerPart;
+  return spawnTicks + 3;
+}
+
+function countRoleAvailable(state, role) {
+  const horizon = productivePrespawnHorizon(role, state);
+  if (horizon <= 0) return countRole(state.room, role);
+
+  const active = state.room.find(FIND_MY_CREEPS, {
+    filter: c =>
+      c.memory.role === role &&
+      (!Number.isFinite(c.ticksToLive) || c.ticksToLive > horizon)
+  }).length;
+
+  const spawning = state.room.find(FIND_MY_SPAWNS, {
+    filter: s =>
+      s.spawning &&
+      Memory.creeps[s.spawning.name] &&
+      Memory.creeps[s.spawning.name].role === role
+  }).length;
+
+  return active + spawning;
+}
+
 function spawnOne(state) {
   const spawn = state.spawn;
   if (!spawn || spawn.spawning) return false;
@@ -110,7 +141,7 @@ function spawnOne(state) {
 
   if (!role && state.rcl <= 1) {
     const harvesters = countRole(state.room, 'harvester');
-    const workers = countRole(state.room, 'worker');
+    const workers = countRoleAvailable(state, 'worker');
     if (harvesters < 1 && harvesters < want.harvester) role = 'harvester';
     else if (workers < 1 && workers < want.worker) role = 'worker';
     else if (harvesters < want.harvester) role = 'harvester';
@@ -121,8 +152,8 @@ function spawnOne(state) {
     const baseHarvesters = Math.max(1, state.sources.length);
     const harvesters = countRole(state.room, 'harvester');
     const workers = countRole(state.room, 'worker');
-    const builders = countRole(state.room, 'builder');
-    const upgraders = countRole(state.room, 'upgrader');
+    const builders = countRoleAvailable(state, 'builder');
+    const upgraders = countRoleAvailable(state, 'upgrader');
     const haulers = countRole(state.room, 'hauler');
 
     // Preserve essential colony functions before scaling throughput.
@@ -148,7 +179,10 @@ function spawnOne(state) {
 
   if (!role) {
     for (const r of priority) {
-      if (countRole(state.room, r) < want[r]) { role = r; break; }
+      const count = (r === 'worker' || r === 'builder' || r === 'upgrader')
+        ? countRoleAvailable(state, r)
+        : countRole(state.room, r);
+      if (count < want[r]) { role = r; break; }
     }
   }
 
@@ -191,4 +225,4 @@ function spawnOne(state) {
   return false;
 }
 
-module.exports = { desired, spawnOne, _test: { countRole } };
+module.exports = { desired, spawnOne, _test: { countRole, productivePrespawnHorizon, countRoleAvailable } };
