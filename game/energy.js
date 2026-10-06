@@ -191,39 +191,46 @@ function stableCreepKey(creep) {
   return creep.name || creep.id || '';
 }
 
-function selectConsumerGuardHauler(room) {
-  // A spawn/extension refill burst can otherwise monopolize every hauler long
-  // enough for productive creeps to cross the self-supply threshold. Keep the
-  // survival rule when only one hauler exists, but with redundant logistics
-  // reserve exactly one delivery-ready hauler for a consumer that is already
-  // waiting or has entered fallback. The other haulers keep hard
-  // infrastructure at highest priority.
-  if (!room || !room.find) return null;
+function selectConsumerGuardHaulers(room) {
+  // Preserve at least one live hauler for hard infrastructure. With two
+  // haulers this remains the historical single starvation guard. A third
+  // hauler may unlock a second guard only when multiple critical consumers
+  // exist, so severe consumer pressure can be served concurrently without
+  // abandoning spawn/extensions/tower refill.
+  if (!room || !room.find) return [];
   const haulers = room.find(FIND_MY_CREEPS, {
     filter: c => !c.spawning && c.memory && c.memory.role === 'hauler'
   });
-  if (haulers.length < 2) return null;
+  if (haulers.length < 2) return [];
 
   const critical = room.find(FIND_MY_CREEPS, {
     filter: c => isCriticalConsumerRequest(c)
   });
-  if (!critical.length) return null;
+  if (!critical.length) return [];
 
   const ready = haulers.filter(haulerReadyToDeliver);
-  if (!ready.length) return null;
+  if (!ready.length) return [];
 
+  const maxGuards = Math.min(
+    critical.length,
+    ready.length,
+    Math.max(1, haulers.length - 1)
+  );
   const criticalIds = {};
   for (const consumer of critical) criticalIds[consumer.id] = true;
 
-  // Preserve an existing useful reservation so the guard assignment does not
-  // oscillate while a hauler is already travelling to a starved consumer.
+  const selected = [];
+  const selectedIds = {};
   const reserved = ready.filter(h => h.memory.consumerTargetId && criticalIds[h.memory.consumerTargetId]);
-  if (reserved.length) {
-    reserved.sort((a, b) => stableCreepKey(a).localeCompare(stableCreepKey(b)));
-    return reserved[0];
+  reserved.sort((a, b) => stableCreepKey(a).localeCompare(stableCreepKey(b)));
+  for (const hauler of reserved) {
+    if (selected.length >= maxGuards) break;
+    selected.push(hauler);
+    selectedIds[hauler.id] = true;
   }
 
-  ready.sort((a, b) => {
+  const remaining = ready.filter(h => !selectedIds[h.id]);
+  remaining.sort((a, b) => {
     const rangeA = Math.min.apply(null, critical.map(c => a.pos && a.pos.getRangeTo ? a.pos.getRangeTo(c) : 999));
     const rangeB = Math.min.apply(null, critical.map(c => b.pos && b.pos.getRangeTo ? b.pos.getRangeTo(c) : 999));
     if (rangeA !== rangeB) return rangeA - rangeB;
@@ -232,13 +239,20 @@ function selectConsumerGuardHauler(room) {
     if (energyDelta !== 0) return energyDelta;
     return stableCreepKey(a).localeCompare(stableCreepKey(b));
   });
-  return ready[0] || null;
+  for (const hauler of remaining) {
+    if (selected.length >= maxGuards) break;
+    selected.push(hauler);
+  }
+  return selected;
 }
 
+function selectConsumerGuardHauler(room) {
+  return selectConsumerGuardHaulers(room)[0] || null;
+}
 function shouldPrioritizeConsumer(creep) {
   if (!creep || !creep.room) return false;
-  const guard = selectConsumerGuardHauler(creep.room);
-  return !!guard && guard.id === creep.id;
+  const guards = selectConsumerGuardHaulers(creep.room);
+  return guards.some(guard => guard.id === creep.id);
 }
 
 function consumerEnergyRatio(creep) {
@@ -368,6 +382,7 @@ module.exports = {
     selectConsumerTarget,
     currentConsumerTarget,
     haulerReadyToDeliver,
-    selectConsumerGuardHauler
+    selectConsumerGuardHauler,
+    selectConsumerGuardHaulers
   }
 };
