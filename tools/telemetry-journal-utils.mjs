@@ -53,3 +53,54 @@ export function planJournalCatchUp(journal, lastSeq = 0) {
 
   return { records, gap, latestSeq, droppedThroughSeq };
 }
+
+
+export function createContiguousSequenceCursor(initialSeq = 0) {
+  let cursor = Math.max(0, Number(initialSeq) || 0);
+  const pending = new Set();
+
+  function consumeContiguous() {
+    while (pending.has(cursor + 1)) {
+      pending.delete(cursor + 1);
+      cursor += 1;
+    }
+  }
+
+  return {
+    get value() {
+      return cursor;
+    },
+
+    canObserve(seq) {
+      const value = Math.max(0, Number(seq) || 0);
+      return !!value && value > cursor && !pending.has(value);
+    },
+
+    observe(seq) {
+      const value = Math.max(0, Number(seq) || 0);
+      if (!value || value <= cursor || pending.has(value)) {
+        return { accepted: false, cursor, advanced: false };
+      }
+
+      const before = cursor;
+      pending.add(value);
+      consumeContiguous();
+      return { accepted: true, cursor, advanced: cursor > before };
+    },
+
+    skipThrough(seq) {
+      const value = Math.max(cursor, Number(seq) || 0);
+      for (const pendingSeq of pending) {
+        if (pendingSeq <= value) pending.delete(pendingSeq);
+      }
+      const before = cursor;
+      cursor = value;
+      consumeContiguous();
+      return { cursor, advanced: cursor > before };
+    },
+
+    pending() {
+      return [...pending].sort((a, b) => a - b);
+    }
+  };
+}

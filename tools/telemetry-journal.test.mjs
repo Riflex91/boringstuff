@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import Module from 'node:module';
 import zlib from 'node:zlib';
-import { decodeMemoryResponse, planJournalCatchUp } from './telemetry-journal-utils.mjs';
+import { createContiguousSequenceCursor, decodeMemoryResponse, planJournalCatchUp } from './telemetry-journal-utils.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 process.env.NODE_PATH = path.resolve(here, '../game');
@@ -100,5 +100,34 @@ assert.equal(heartbeatPayload.code, 'BOT_HEARTBEAT');
 assert.equal(heartbeatPayload.jseq, 2);
 assert.equal(Memory.bot.telemetryJournal.events[1].c, 'BOT_HEARTBEAT');
 assert.equal(Memory.bot.telemetryJournal.events[1].q, 2);
+
+
+{
+  const cursor = createContiguousSequenceCursor(100);
+  const high = cursor.observe(102);
+  assert.equal(high.accepted, true);
+  assert.equal(high.advanced, false);
+  assert.equal(cursor.value, 100);
+  assert.deepEqual(cursor.pending(), [102]);
+
+  const low = cursor.observe(101);
+  assert.equal(low.accepted, true);
+  assert.equal(low.advanced, true);
+  assert.equal(cursor.value, 102);
+  assert.deepEqual(cursor.pending(), []);
+
+  const duplicate = cursor.observe(102);
+  assert.equal(duplicate.accepted, false);
+  assert.equal(cursor.value, 102);
+}
+
+{
+  const cursor = createContiguousSequenceCursor(200);
+  cursor.observe(203);
+  assert.equal(cursor.value, 200);
+  cursor.skipThrough(202);
+  assert.equal(cursor.value, 203);
+  assert.deepEqual(cursor.pending(), []);
+}
 
 console.log('telemetry journal tests passed');
