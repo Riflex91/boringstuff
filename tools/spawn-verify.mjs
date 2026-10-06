@@ -1,13 +1,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ScreepsHttpClient } from './screeps-client-node18.mjs';
+import { ScreepsHttpClient } from './screeps-client.mjs';
 import { verifyInitialSpawnTarget } from './spawn-safety.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const LOG_DIR = process.env.SCREEPS_LOG_DIR || path.resolve(__dirname, '..', 'logs');
 const DEFAULT_SERVER = process.env.SCREEPS_SERVER || 'newbieland';
-const TOOL_VERSION = '0.2.6-node18';
+const TOOL_VERSION = '0.2.6-node24';
 
 function usage(exitCode = 0) {
   console.log(`

@@ -6,9 +6,9 @@ Canonical repository: `Riflex91/boringstuff`
 
 - Seed baseline: **v0.2.16-node18**
 - Current canonical source baseline before this release prep: `29ad209af552f0a20ea50c0e7c8ad4e32a567e05`
-- Release candidate identity: **0.3.0-shadow.7-node18**
+- Release candidate identity: **0.3.0-shadow.8-node24**
 - Latest VNext live gate: **WATCH — 15 PASS / 3 WATCH / 0 FAIL**
-- Runtime target: **Node.js 18.20.4**
+- Local toolchain target: **Node.js 24.21.0**
 - Runtime branch: `chatgpt`
 - Primary room: `E8N1`
 - Primary spawn: `Spawn1`

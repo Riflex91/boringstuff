@@ -1,11 +1,11 @@
-import { ScreepsHttpClient } from './screeps-client-node18.mjs';
+import { ScreepsHttpClient } from './screeps-client.mjs';
 
 const SERVER = process.env.SCREEPS_SERVER || 'newbieland';
-const [major, minor] = process.versions.node.split('.').map(Number);
+const EXPECTED_NODE_VERSION = '24.21.0';
 
 console.log(`Node: ${process.version}`);
-if (major < 18 || (major === 18 && minor < 20)) {
-  console.error('FAIL: Node 18.20.0 or newer is required for these local tools.');
+if (process.versions.node !== EXPECTED_NODE_VERSION) {
+  console.error(`FAIL: Node ${EXPECTED_NODE_VERSION} is required for these local tools; actual=${process.versions.node}.`);
   process.exit(2);
 }
 console.log('Node compatibility: OK');

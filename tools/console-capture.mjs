@@ -1,4 +1,4 @@
-import { ScreepsHttpClient, ScreepsSocketClient } from './screeps-client-node18.mjs';
+import { ScreepsHttpClient, ScreepsSocketClient } from './screeps-client.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseBotLogLine } from './console-utils.mjs';
