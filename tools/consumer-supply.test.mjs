@@ -29,6 +29,7 @@ global.ERR_FULL = -8;
 
 const objects = new Map();
 global.Game = {
+  time: 1000,
   getObjectById(id) { return objects.get(id) || null; }
 };
 
@@ -167,6 +168,45 @@ const energy = require('../game/energy.js');
   assert.equal(target.memory.logisticsFallback, false);
 }
 
+
+// A partial hauler transfer is usable energy. The consumer should resume work
+// on its next turn instead of waiting until the entire CARRY store is full.
+{
+  const roleWorker = require('../game/role.worker.js');
+  const target = makeConsumer('builder-partial-hauler', 'builder', 0, 6, false, 2);
+  target.memory.working = false;
+  const hauler = makeHauler('hauler-partial');
+  hauler.transfer = (consumer) => {
+    consumer.store.energy = 30;
+    return OK;
+  };
+  room.creeps = [target, hauler];
+
+  Game.time = 1000;
+  assert.equal(energy.deliverToConsumer(hauler), true);
+  assert.equal(target.store.energy, 30);
+  assert.equal(target.memory.lastHaulerDeliveryTick, 1000);
+
+  Game.time = 1001;
+  assert.equal(roleWorker._test.needsEnergy(target), false);
+  assert.equal(target.memory.working, true);
+  assert.equal(target.memory.waitingEnergyTicks, 0);
+  assert.equal(target.memory.lastHaulerDeliveryTick, undefined);
+}
+
+// Partial energy without an explicit hauler-delivery marker must not resume
+// work. This preserves the fill-before-work behavior of self-harvest fallback.
+{
+  const roleWorker = require('../game/role.worker.js');
+  const target = makeConsumer('builder-partial-self', 'builder', 30, 0, true, 2);
+  target.memory.working = false;
+  room.creeps = [target];
+
+  Game.time = 1002;
+  assert.equal(roleWorker._test.needsEnergy(target), true);
+  assert.equal(target.memory.working, false);
+  assert.equal(target.memory.logisticsFallback, true);
+}
 
 // Starvation guard: with redundant hauling and a consumer already waiting,
 // exactly one delivery-ready hauler is diverted from infrastructure refill.
