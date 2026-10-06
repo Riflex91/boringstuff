@@ -1,4 +1,4 @@
-import { ScreepsHttpClient } from './screeps-client-node18.mjs';
+import { ScreepsHttpClient } from './screeps-client.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -24,7 +24,7 @@ const DEFAULT_LOG_DIR = path.resolve(__dirname, '..', 'logs');
 const LOG_DIR = process.env.SCREEPS_LOG_DIR || DEFAULT_LOG_DIR;
 const DEFAULT_SERVER = process.env.SCREEPS_SERVER || 'newbieland';
 const CACHE_VERSION = 4;
-const TOOL_VERSION = '0.2.6-node18';
+const TOOL_VERSION = '0.2.6-node24';
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 function usage(exitCode = 0) {
