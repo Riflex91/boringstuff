@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ScreepsHttpClient } from './screeps-client-node18.mjs';
+import { ScreepsHttpClient } from './screeps-client.mjs';
 import { DEFAULT_VERIFICATION_LOG_DIR, writeDeploymentReceipt } from './deployment-receipt.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
