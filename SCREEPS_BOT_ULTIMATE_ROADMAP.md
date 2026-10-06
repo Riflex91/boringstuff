@@ -4,6 +4,8 @@ Stand: 2026-10-04
 Roadmap generation: VNext / Ultimate Autonomy  
 Repository: `Riflex91/boringstuff`
 
+Current implementation/acceptance ledger (2026-10-06): [docs/ROADMAP_STATUS.md](docs/ROADMAP_STATUS.md). This roadmap is not fully implemented or live-accepted.
+
 > **New-chat boot instruction:** Read this file first. It is intentionally self-contained. For the deeper research behind the architecture, then read `docs/ULTIMATE_AUTONOMY_KNOWLEDGE_BASE.md`. Do not assume an old release snapshot in this document is current; PR/live evidence is authoritative for active releases.
 
 ---
