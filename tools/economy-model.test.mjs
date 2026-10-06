@@ -127,4 +127,55 @@ assert.equal(capacitySufficient.haulerCarryParts, 16);
 assert.equal(capacitySufficient.haulerCarryDeficit, 0);
 assert.equal(capacitySufficient.recommendedHaulerCount, 2);
 
+
+
+// shadow.8 live regression: aggregate source-route carrying capacity can be
+// exactly sufficient with one 800-energy hauler (10 CARRY) while consumer
+// service still starves. The legacy hauler policy only reserves consumer-first
+// delivery when at least two haulers exist, so real waiting/fallback pressure
+// must temporarily raise the service floor to two without changing E4 authority.
+Memory.rooms = {};
+const pressureSources = [
+  { id: 'ps1', pos: pos(20, true) },
+  { id: 'ps2', pos: pos(9, true) }
+];
+const pressureHarvesterA = countedCreep('harvester', { [WORK]: 4, [CARRY]: 2 }, 'ps1');
+const pressureHarvesterB = countedCreep('harvester', { [WORK]: 5, [CARRY]: 2 }, 'ps2');
+const pressureHauler = countedCreep('hauler', { [CARRY]: 10 });
+const pressureBuilder = countedCreep('builder', { [WORK]: 2, [CARRY]: 1 });
+const pressureUpgrader = countedCreep('upgrader', { [WORK]: 4, [CARRY]: 2 });
+const pressureBase = {
+  room: {
+    name: 'E8N1-pressure',
+    findPath(from) { return Array.from({ length: from === pressureSources[0].pos ? 20 : 9 }, () => ({})); }
+  },
+  spawn: { id: 'spawn-pressure', pos: { x: 20, y: 29 } },
+  sources: pressureSources,
+  creeps: [
+    pressureHarvesterA,
+    pressureHarvesterB,
+    pressureHauler,
+    pressureBuilder,
+    pressureUpgrader
+  ],
+  sites: [{ id: 'site-pressure' }],
+  energyCapacityAvailable: 800
+};
+
+const noConsumerPressure = require('../game/economy.model.js').analyze(pressureBase);
+assert.equal(noConsumerPressure.dedicatedHarvestCapacityPerTick, 18);
+assert.equal(noConsumerPressure.recommendedHaulerCarryParts, 10);
+assert.equal(noConsumerPressure.haulerCarryParts, 10);
+assert.equal(noConsumerPressure.haulerCarryDeficit, 0);
+assert.equal(noConsumerPressure.consumerCriticalCount, 0);
+assert.equal(noConsumerPressure.consumerServiceHaulerFloor, 0);
+assert.equal(noConsumerPressure.recommendedHaulerCount, 1);
+
+pressureUpgrader.memory.logisticsFallback = true;
+const withConsumerPressure = require('../game/economy.model.js').analyze(pressureBase);
+assert.equal(withConsumerPressure.consumerCriticalCount, 1);
+assert.equal(withConsumerPressure.consumerServiceHaulerFloor, 2);
+assert.equal(withConsumerPressure.haulerCarryDeficit, 0);
+assert.equal(withConsumerPressure.recommendedHaulerCount, 2);
+
 console.log('economy model tests passed');

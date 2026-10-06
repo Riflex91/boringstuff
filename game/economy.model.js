@@ -157,11 +157,23 @@ function analyze(state) {
   const idealHaulerCount = recommendedHaulerCarryParts > 0
     ? Math.max(1, Math.ceil(recommendedHaulerCarryParts / Math.max(1, nextHaulerCarryParts)))
     : 0;
-  const recommendedHaulerCount = haulerCarryDeficit > 0
+  const carryDrivenHaulerCount = haulerCarryDeficit > 0
     ? Math.max(idealHaulerCount, haulers.length + Math.ceil(haulerCarryDeficit / Math.max(1, nextHaulerCarryParts)))
     : idealHaulerCount;
 
   const allSourceContainersReady = state.sources.length > 0 && containersReady === state.sources.length;
+
+  // The legacy execution policy deliberately reserves consumer-first hauling
+  // only when at least two live haulers exist. Aggregate source-route CARRY can
+  // therefore be sufficient while productive consumers still wait/fallback
+  // under a single-hauler fleet. When stable container logistics has observed
+  // real consumer pressure, keep a narrow two-hauler service floor. This uses
+  // legacy runtime pressure only; E4 remains shadow/evidence-only.
+  const consumerServiceHaulerFloor =
+    allSourceContainersReady && consumers.length > 0 && consumerCriticalCount > 0
+      ? 2
+      : 0;
+  const recommendedHaulerCount = Math.max(carryDrivenHaulerCount, consumerServiceHaulerFloor);
   let mode = 'bootstrap-mobile-harvest';
   if (haulers.length && !allSourceContainersReady) mode = 'bootstrap-hauler';
   if (allSourceContainersReady) mode = 'container-logistics';
@@ -187,6 +199,7 @@ function analyze(state) {
     recommendedHaulerCarryParts,
     nextHaulerCarryParts,
     haulerCarryDeficit,
+    consumerServiceHaulerFloor,
     recommendedHaulerCount,
     sourceContainersReady: containersReady,
     sourceRoutes
