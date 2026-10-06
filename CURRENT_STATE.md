@@ -650,4 +650,4 @@ Current stop rule:
 - Do not change CPU thresholds.
 - Do not promote E4 authority; it remains evidence-only.
 - Do not tune productive-role counts from the stale Efficiency snapshot alone. The exact assignment window shows substantial improvement, while the richer exact productive-flow attribution still needs its own aligned snapshot before another gameplay change is justified.
-- The next useful live check should use the merged PR #58 verifier so exact assignment evidence is surfaced automatically instead of being discarded as cadence mismatch.
+- PR #60 extends the merged verifier so a later retained STATUS_SNAPSHOT may serve only as the carrier for an exact historical `economy.last100` block. Safety/current-state checks remain restricted to the requested verification window. The next useful live check should use the merged PR #60 verifier against the historical `3738802–3738901` window to recover the richer exact productive-flow attribution if that later carrier is retained.
