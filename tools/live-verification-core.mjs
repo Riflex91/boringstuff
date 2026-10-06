@@ -149,8 +149,34 @@ export function evaluateLive(input) {
   const snapshots = roomEvents.filter(x => x.e.code === 'STATUS_SNAPSHOT');
   const latest = snapshots.at(-1)?.room || roomEvents.at(-1)?.room || null;
   const model = latest?.economyModel || {};
-  const eco = latest?.economy || {};
   const eff = latest?.efficiency || {};
+  const requestedBotVersion = input.botVersion || EXPECTED_BOT_VERSION;
+
+  // A fixed runtime last100 window can complete at the verifier end tick but
+  // only become visible in a later STATUS_SNAPSHOT. For historical verification
+  // it is safe to consume that later snapshot solely as a carrier of the exact
+  // immutable last100 block. Safety/current-state checks continue to use only
+  // events inside the requested verification window.
+  const exactAttributionCarrier = (input.events || [])
+    .filter(e => !e?.v || e.v === requestedBotVersion)
+    .map(e => ({ e, room: roomFromEvent(e, roomName) }))
+    .filter(x => {
+      const candidate = x.room?.economy?.last100;
+      return candidate &&
+        finite(candidate.startTick, null) === selected.startTick &&
+        finite(candidate.endTick, null) === selected.endTick &&
+        finite(candidate.ticks, null) !== null &&
+        finite(candidate.ticks, null) >= 100;
+    })
+    .sort((a, b) =>
+      (finite(a.e?.tick, -1) - finite(b.e?.tick, -1)) ||
+      (finite(a.e?.jseq, -1) - finite(b.e?.jseq, -1))
+    )
+    .at(-1) || null;
+
+  const attributionRoom = exactAttributionCarrier?.room || latest;
+  const eco = attributionRoom?.economy || {};
+  const attributionEff = attributionRoom?.efficiency || eff;
   const last100 = eco?.last100 || {};
   const last100StartTick = finite(last100?.startTick, null);
   const last100EndTick = finite(last100?.endTick, null);
@@ -253,7 +279,7 @@ export function evaluateLive(input) {
   else checks.push(check('construction-progress', 'WATCH', 'No 100-tick construction progress metric was available.'));
 
   const throughput = last100MatchesWindow
-    ? finite(eff?.metrics?.productiveThroughputPerTick, null)
+    ? finite(attributionEff?.metrics?.productiveThroughputPerTick, null)
     : finite(assignmentWindow?.usefulWorkPerTick, null);
   const mining = finite(eff?.metrics?.dedicatedHarvestCapacityPerTick, finite(model.dedicatedHarvestCapacityPerTick, null));
   if (throughput === null) checks.push(check('productive-throughput', 'WATCH', 'No productive throughput metric was available.'));
@@ -396,7 +422,11 @@ export function evaluateLive(input) {
       requestedEndTick: selected.endTick,
       observedStartTick: last100StartTick,
       observedEndTick: last100EndTick,
-      observedTicks: last100Ticks
+      observedTicks: last100Ticks,
+      carrierTick: finite(exactAttributionCarrier?.e?.tick, null),
+      carrierAfterWindow: exactAttributionCarrier
+        ? finite(exactAttributionCarrier.e?.tick, selected.endTick) > selected.endTick
+        : false
     },
     assignmentEvidenceWindow: assignmentWindow ? {
       startTick: finite(assignmentWindow.startTick, null),

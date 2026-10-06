@@ -629,3 +629,50 @@ console.log('live-verification tests passed');
   assert.equal(e4.data.duplicateReservationTicks, null);
   assert.match(e4.message, /unavailable/i);
 }
+
+
+{
+  // A runtime last100 window may only be serialized after the verifier window
+  // has ended. Recover the exact immutable block from a later STATUS_SNAPSHOT,
+  // but do not let that later snapshot affect safety/current-state checks.
+  const rows = evidence(1101);
+  const selectedStatus = rows.at(-1);
+  selectedStatus.ctx.rooms.E8N1.economy.last100.startTick = 1000;
+  selectedStatus.ctx.rooms.E8N1.economy.last100.endTick = 1099;
+  selectedStatus.ctx.rooms.E8N1.economy.last100.ticks = 100;
+
+  const carrierRoom = baseRoom();
+  carrierRoom.economy.last100.startTick = 1101;
+  carrierRoom.economy.last100.endTick = 1200;
+  carrierRoom.economy.last100.ticks = 100;
+  carrierRoom.economy.last100.controllerProgress = 260;
+  carrierRoom.economy.last100.constructionProgress = 949;
+  carrierRoom.economy.last100.productiveFlow.actualProductiveThroughputPerTick = 12.09;
+  carrierRoom.efficiency.metrics.productiveThroughputPerTick = 12.09;
+
+  rows.push(event(1225, 'STATUS_SNAPSHOT', {
+    rooms: { E8N1: carrierRoom },
+    cpu: 99,
+    bucket: 0,
+    capabilities: { schemaVersion: 1 },
+    serverProfile: { schemaVersion: 1 },
+    scheduler: { schemaVersion: 1 },
+    worldIntel: { schemaVersion: 1 }
+  }, { jseq: 22 }));
+  rows.push(event(1226, 'UNCAUGHT_RUNTIME', { error: 'future-only' }, { level: 'ERROR', jseq: 23 }));
+
+  const r = evaluateLive({ events: rows, startTick: 1101, nodeVersion: '24.21.0' });
+  assert.equal(r.attributionWindow.matches, true);
+  assert.equal(r.attributionWindow.observedStartTick, 1101);
+  assert.equal(r.attributionWindow.observedEndTick, 1200);
+  assert.equal(r.attributionWindow.carrierTick, 1225);
+  assert.equal(r.attributionWindow.carrierAfterWindow, true);
+  assert.equal(r.checks.find(c => c.id === 'productive-attribution').status, 'PASS');
+  assert.equal(r.checks.find(c => c.id === 'controller-progress').status, 'PASS');
+  assert.equal(r.checks.find(c => c.id === 'controller-progress').data.controllerProgress, 260);
+  assert.equal(r.checks.find(c => c.id === 'construction-progress').status, 'PASS');
+  assert.equal(r.checks.find(c => c.id === 'construction-progress').data.constructionProgress, 949);
+  assert.equal(r.checks.find(c => c.id === 'productive-throughput').data.throughput, 12.09);
+  assert.equal(r.checks.find(c => c.id === 'runtime-errors').status, 'PASS');
+  assert.equal(r.checks.find(c => c.id === 'cpu-bucket').status, 'PASS');
+}
