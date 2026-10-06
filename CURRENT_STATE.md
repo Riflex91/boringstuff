@@ -705,3 +705,44 @@ Current stop rule after PR #65:
 - after deployment, compare consumer waiting/fallback exposure and productive throughput against the retained `3739502–3739601` baseline;
 - specifically look for fewer empty/waiting consumer ticks after partial deliveries while preserving CPU/bucket safety and duplicate-free E4 evidence;
 - E4 remains strictly `SHADOW` / `SHADOW_EVIDENCE`.
+
+
+## 2026-10-06 — post-#65 / #67 lifecycle follow-up
+
+The exact verification window `3739902–3740001` completed with `14 PASS / 5 WATCH / 0 FAIL`. Its exact assignment evidence reports `controllerProgress = 72`, `constructionProgress = 689`, `usefulWorkPerTick = 7.61`, `averageRequestLatency = 14.58`, and `maxRequestLatency = 60`.
+
+The adjacent completed E4 window `3739893–3739992` remains healthy on evidence integrity and improves materially versus the earlier saturated state:
+
+- `averageHaulers = 3`;
+- `averageMatchedHaulers = 2.13`;
+- `haulerUtilization = 0.71`;
+- `criticalCoverageRatio = 0.947`;
+- `criticalCandidateRatio = 1`;
+- `criticalNoCandidateTicks = 0`;
+- `criticalSlotCoverageRatio = 0.958`;
+- `averageConsumerFallback = 0.92`;
+- `duplicateReservationTicks = 0`.
+
+The exact productive window is not a clean measure of PR #65 alone because it overlaps a productive-creep lifecycle turnover. Live snapshots show the active productive population falling from worker + builder + two upgraders + repairer at tick `3739925`, to worker + builder + upgrader by `3739950`, and then the worker itself disappearing before a replacement begins spawning at tick `3739999`. The replacement worker costs 800 energy and has a 12-part body, so its spawn time is 36 ticks.
+
+This exposed a separate legacy lifecycle gap: `spawn.manager.js` counted every living productive creep as fully available until death. The shadow capacity planner already models TTL against spawn/arrival horizon, but that shadow planner is not gameplay authority.
+
+PR #67 ports only the lifecycle principle into legacy execution:
+
+- `worker`, `builder`, and `upgrader` use a prespawn horizon based on their actual replacement-body spawn time plus a 3-tick safety margin;
+- for the current 800-energy 12-part worker body the horizon is 39 ticks;
+- a productive creep with TTL at or below that horizon no longer counts as safely available for desired-count decisions;
+- an already spawning replacement counts as available, preventing duplicate replacement spawns;
+- harvester and hauler counting is unchanged;
+- desired role counts are unchanged;
+- capacity-shadow, request/assignment, and E4 authority remain SHADOW / SHADOW_EVIDENCE.
+
+Exact branch regression coverage passed for `spawn-economy.test.mjs` before merge, including dying-worker prespawn, healthy-worker no-duplicate behavior, and already-spawning replacement accounting.
+
+Current stop rule after PR #67:
+
+- deploy PR #67 before interpreting another productive-throughput window;
+- do not add more haulers or raise productive role targets yet;
+- after deployment, verify that worker/builder/upgrader replacement starts before active capacity disappears and compare `usefulWorkPerTick`, request latency, consumer fallback, and E4 coverage against `3739902–3740001`;
+- preserve CPU/bucket safety and duplicate-free E4 evidence;
+- E4 remains strictly `SHADOW` / `SHADOW_EVIDENCE`.
