@@ -9,6 +9,16 @@ function finite(value, fallback = null) {
   return Number.isFinite(n) ? n : fallback;
 }
 
+function modeledProductiveCapacity(flow, fallback = null) {
+  const builder = finite(flow?.averageBuilderWorkParts, null);
+  const worker = finite(flow?.averageWorkerWorkParts, null);
+  const upgrader = finite(flow?.averageUpgraderWorkParts, null);
+  if (builder !== null && worker !== null && upgrader !== null) {
+    return Math.max(0, (builder + worker) * 5 + upgrader);
+  }
+  return finite(fallback, null);
+}
+
 function roomFromEvent(event, roomName = 'E8N1') {
   if (!event || typeof event !== 'object') return null;
   if (event.code === 'ROOM_HEARTBEAT') {
@@ -279,13 +289,23 @@ export function evaluateLive(input) {
   else checks.push(check('construction-progress', 'WATCH', 'No 100-tick construction progress metric was available.'));
 
   const throughput = last100MatchesWindow
-    ? finite(attributionEff?.metrics?.productiveThroughputPerTick, null)
+    ? finite(attribution?.actualProductiveThroughputPerTick, finite(attributionEff?.metrics?.productiveThroughputPerTick, null))
     : finite(assignmentWindow?.usefulWorkPerTick, null);
   const mining = finite(eff?.metrics?.dedicatedHarvestCapacityPerTick, finite(model.dedicatedHarvestCapacityPerTick, null));
-  if (throughput === null) checks.push(check('productive-throughput', 'WATCH', 'No productive throughput metric was available.'));
-  else if (throughput <= 0) checks.push(check('productive-throughput', 'FAIL', 'Productive throughput is zero.', { throughput, mining }));
-  else if (mining !== null && throughput < mining * 0.85) checks.push(check('productive-throughput', 'WATCH', 'Productive throughput trails mining capacity; this is an optimization signal, not a safety failure.', { throughput, mining, utilization: throughput / mining }));
-  else checks.push(check('productive-throughput', 'PASS', 'Productive throughput is healthy relative to mining capacity.', { throughput, mining }));
+  const productiveCapacity = modeledProductiveCapacity(attribution, finite(model.productiveDemandPerTick, null));
+  const productiveData = {
+    throughput,
+    productiveCapacity,
+    mining,
+    utilization: throughput !== null && productiveCapacity !== null && productiveCapacity > 0
+      ? throughput / productiveCapacity
+      : null
+  };
+  if (throughput === null) checks.push(check('productive-throughput', 'WATCH', 'No productive throughput metric was available.', productiveData));
+  else if (throughput <= 0) checks.push(check('productive-throughput', 'FAIL', 'Productive throughput is zero.', productiveData));
+  else if (productiveCapacity === null || productiveCapacity <= 0) checks.push(check('productive-throughput', 'WATCH', 'Productive throughput is positive, but no comparable productive work-capacity metric was available.', productiveData));
+  else if (throughput < productiveCapacity * 0.6) checks.push(check('productive-throughput', 'WATCH', 'Productive throughput trails modeled productive work capacity; this is an optimization signal, not a safety failure.', productiveData));
+  else checks.push(check('productive-throughput', 'PASS', 'Productive throughput is healthy relative to modeled productive work capacity.', productiveData));
 
   const effStatus = String(eff?.status || '').toUpperCase();
   if (effStatus === 'UNDERUTILIZED' || effStatus === 'INEFFICIENT' || effStatus === 'WATCH') checks.push(check('efficiency-status', 'WATCH', `Efficiency is ${effStatus}; optimization finding only.`, { reasons: eff?.reasons || [] }));
