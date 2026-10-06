@@ -245,4 +245,17 @@ function snapshot(eventTick, startTick, endTick, attribution = true) {
   assert.match(formatWaitStatus(status), /latest evidence tick 1100/i);
 }
 
+
+{
+  const rows = [
+    versionChange(1000),
+    snapshot(1000, 901, 1000),
+    evidenceTick(1300)
+  ];
+  const status = resolveAutoStart(rows, version, 'live', room);
+  assert.equal(status.ready, false);
+  assert.match(status.fatal, /No complete STATUS_SNAPSHOT/);
+  assert.match(status.fatal, /collector jseq continuity/i);
+}
+
 console.log('live verification wait tests passed');
