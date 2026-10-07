@@ -156,4 +156,51 @@ function makeCreep(id, role, carried, capacity, wait, fallback, roomName = 'E1N1
   assert.ok(shadow._test.consumerPriority(fallback).urgency > shadow._test.consumerPriority(waiting).urgency);
 }
 
+{
+  // I1 registry integration belongs here as well as in the dedicated scout
+  // suite: request.shadow must publish the scouting domain and expose the
+  // compact frontier summary without disturbing the existing E0/E3 contracts.
+  const memory = {
+    bot: {
+      worldIntel: {
+        schemaVersion: 1,
+        rooms: {
+          E6N6: {
+            schemaVersion: 1,
+            roomName: 'E6N6',
+            observation: { lastSeenTick: 600, confidence: 1, source: 'test' },
+            topology: { exits: [{ direction: 1, roomName: 'E6N7' }] }
+          }
+        }
+      }
+    }
+  };
+  const result = shadow.produce({
+    room: { name: 'E6N6' },
+    emergency: false,
+    creeps: [],
+    structures: [],
+    economyModel: {
+      recommendedHarvesterWorkParts: 0,
+      harvesterWorkDeficit: 0,
+      recommendedHaulerCarryParts: 0,
+      haulerCarryDeficit: 0
+    }
+  }, memory, { time: 600, map: {} });
+
+  assert.equal(result.summary.total, 1);
+  assert.equal(result.summary.byDomain.scouting, 1);
+  assert.equal(result.scoutingFrontier.authority, 'SHADOW');
+  assert.equal(result.scoutingFrontier.homeRoom, 'E6N6');
+  assert.equal(result.scoutingFrontier.requestCount, 1);
+
+  const requests = registry.list('E6N6', memory);
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].kind, 'SCOUT_INTEL');
+  assert.equal(requests[0].domain, 'scouting');
+  assert.equal(requests[0].source.roomName, 'E6N6');
+  assert.equal(requests[0].target.roomName, 'E6N7');
+  assert.equal(requests[0].shadow, true);
+}
+
 console.log('request shadow tests passed');

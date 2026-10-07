@@ -194,6 +194,22 @@ function request(id, kind, capability, amount, options = {}) {
 
 
 {
+  // SCOUT_INTEL must not change E1 request or unfilled evidence. A real
+  // assignable request remains visible while the I1 shadow request is ignored.
+  const memory = {};
+  const scout = request('i1-plan-isolation', 'SCOUT_INTEL', 'vision', 1, { domain: 'scouting' });
+  const build = request('build-plan-isolation', 'BUILD', 'workBuild', 2, { base: 50 });
+  const plan = assignment.plan('E1N1', [scout, build], [], memory, { time: 181 });
+
+  assert.equal(plan.summary.requestCount, 1);
+  assert.equal(plan.summary.unfilledCount, 1);
+  assert.equal(plan.unfilled.length, 1);
+  assert.equal(plan.unfilled[0].requestId, 'build-plan-isolation');
+  assert.equal(plan.unfilled.some(item => item.requestId === 'i1-plan-isolation'), false);
+}
+
+
+{
   // Static executor facts are computed once per plan, not once per
   // creep/request candidate pair in the greedy assignment search.
   const memory = {};

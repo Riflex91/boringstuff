@@ -201,4 +201,110 @@ function memoryWith(records) {
   assert.equal(names.includes('W9N9'), false);
 }
 
+{
+  // Explicit stale-only coverage also verifies the E0 request contract fields
+  // expected from I1.
+  const memory = memoryWith([
+    record('W2N2', 5000, ['W2N3'], { my: true }),
+    record('W2N3', 3000, ['W2N2'], { sourceCount: 1 })
+  ]);
+  const result = scoutShadow.evaluate(
+    { room: { name: 'W2N2' }, structures: [] },
+    memory,
+    { time: 5000, map: {} },
+    { maxDepth: 1, refreshAge: 1000, threatRefreshAge: 250 }
+  );
+
+  assert.equal(result.specs.length, 1);
+  const candidate = result.candidates.find(item => item.roomName === 'W2N3');
+  assert.equal(candidate.known, true);
+  assert.equal(candidate.stale, true);
+  assert.equal(candidate.threatDue, false);
+
+  const spec = result.specs[0];
+  assert.equal(spec.source.roomName, 'W2N2');
+  assert.equal(spec.target.roomName, 'W2N3');
+  assert.equal(spec.domain, 'scouting');
+  assert.equal(spec.kind, 'SCOUT_INTEL');
+  assert.equal(spec.demand.capability, 'vision');
+  assert.equal(spec.shadow, true);
+}
+
+{
+  // Threat uncertainty must materially increase both priority and urgency for
+  // otherwise identical stale frontier intel.
+  const baseRecords = [
+    record('W3N3', 6000, ['W3N4'], { my: true }),
+    record('W3N4', 5000, ['W3N3'])
+  ];
+  const threatRecords = [
+    record('W3N3', 6000, ['W3N4'], { my: true }),
+    record('W3N4', 5000, ['W3N3'], { lastHostileTick: 5900 })
+  ];
+  const options = { maxDepth: 1, refreshAge: 500, threatRefreshAge: 250 };
+  const calm = scoutShadow.evaluate(
+    { room: { name: 'W3N3' }, structures: [] },
+    memoryWith(baseRecords),
+    { time: 6000, map: {} },
+    options
+  );
+  const uncertain = scoutShadow.evaluate(
+    { room: { name: 'W3N3' }, structures: [] },
+    memoryWith(threatRecords),
+    { time: 6000, map: {} },
+    options
+  );
+
+  assert.equal(calm.specs.length, 1);
+  assert.equal(uncertain.specs.length, 1);
+  assert.ok(uncertain.specs[0].priority.base > calm.specs[0].priority.base);
+  assert.ok(uncertain.specs[0].priority.urgency > calm.specs[0].priority.urgency);
+  assert.equal(uncertain.summary.topRequests[0].threatDue, true);
+}
+
+{
+  // maxDepth is a hard frontier bound even when deeper I0 topology is known.
+  const memory = memoryWith([
+    record('W4N4', 7000, ['W4N5'], { my: true }),
+    record('W4N5', 7000, ['W4N4', 'W4N6'])
+  ]);
+  const shallow = scoutShadow.discoverFrontier(
+    { room: { name: 'W4N4' } },
+    memory,
+    { time: 7000, map: {} },
+    { maxDepth: 1 }
+  );
+  const deep = scoutShadow.discoverFrontier(
+    { room: { name: 'W4N4' } },
+    memory,
+    { time: 7000, map: {} },
+    { maxDepth: 2 }
+  );
+
+  assert.deepEqual(shallow.map(item => item.roomName), ['W4N5']);
+  assert.deepEqual(deep.map(item => item.roomName), ['W4N5', 'W4N6']);
+  assert.equal(deep.find(item => item.roomName === 'W4N6').depth, 2);
+}
+
+{
+  // Equal-score requests are deterministic by room name, and maxRequests is a
+  // hard output bound rather than a scoring hint.
+  const memory = memoryWith([
+    record('W5N5', 8000, ['W6N5', 'W5N6', 'W4N5'], { my: true })
+  ]);
+  const state = { room: { name: 'W5N5' }, structures: [] };
+  const game = { time: 8000, map: {} };
+  const options = { maxDepth: 1, maxRequests: 2 };
+
+  const first = scoutShadow.evaluate(state, memory, game, options);
+  const second = scoutShadow.evaluate(state, memory, game, options);
+  const targets = first.specs.map(spec => spec.target.roomName);
+
+  assert.equal(first.summary.frontierCount, 3);
+  assert.equal(first.summary.requestCount, 2);
+  assert.equal(first.specs.length, 2);
+  assert.deepEqual(targets, ['W4N5', 'W5N6']);
+  assert.deepEqual(second.specs.map(spec => spec.target.roomName), targets);
+}
+
 console.log('scout frontier shadow tests passed');

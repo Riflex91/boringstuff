@@ -1,0 +1,31 @@
+name: npm test
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: tools
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node 24.21.0
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.21.0
+      - name: Install tool dependencies
+        run: npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+      - name: Run canonical test suite
+        run: npm test
