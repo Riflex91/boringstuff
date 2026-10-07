@@ -49,13 +49,24 @@ function productiveThroughput(last) {
 
 function productiveCapacity(state, last) {
   const flow = last && last.productiveFlow;
+
+  const construction = finiteNumber(flow && flow.averageConstructionCapacityPerTick);
+  const controller = finiteNumber(flow && flow.averageDedicatedControllerCapacityPerTick);
+  if (construction !== null && controller !== null) {
+    return Math.max(0, construction + controller);
+  }
+
   const builder = finiteNumber(flow && flow.averageBuilderWorkParts);
   const worker = finiteNumber(flow && flow.averageWorkerWorkParts);
   const upgrader = finiteNumber(flow && flow.averageUpgraderWorkParts);
   if (builder !== null && worker !== null && upgrader !== null) {
     const buildPower = typeof BUILD_POWER !== 'undefined' ? BUILD_POWER : 5;
     const upgradePower = typeof UPGRADE_CONTROLLER_POWER !== 'undefined' ? UPGRADE_CONTROLLER_POWER : 1;
-    return Math.max(0, (builder + worker) * buildPower + upgrader * upgradePower);
+    const constructionRatio = finiteNumber(flow && flow.constructionBacklogRatio);
+    const controllerRatio = finiteNumber(flow && flow.controllerDemandRatio);
+    const constructionCapacity = (builder + worker) * buildPower * (constructionRatio === null ? 1 : constructionRatio);
+    const controllerCapacity = upgrader * upgradePower * (controllerRatio === null ? 1 : controllerRatio);
+    return Math.max(0, constructionCapacity + controllerCapacity);
   }
   return Math.max(0, finiteNumber(state.economyModel && state.economyModel.productiveDemandPerTick) || 0);
 }
@@ -180,7 +191,7 @@ function evaluate(state) {
   const pressureState = pressure(state, last, throughput, reasons);
 
   return {
-    modelVersion: 2,
+    modelVersion: 3,
     overallScore,
     status: statusFor(overallScore, pressureState.state, !!last),
     components,

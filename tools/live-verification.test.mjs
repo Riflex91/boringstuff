@@ -83,7 +83,7 @@ function evidence(start = 1000) {
   const r = evaluateLive({ events: evidence(), startTick: 1000, nodeVersion: '24.21.0' });
   assert.equal(r.outcome, 'WATCH');
   assert.equal(r.checks.find(c => c.id === 'productive-attribution').status, 'PASS');
-  assert.equal(r.checks.find(c => c.id === 'productive-throughput').status, 'WATCH');
+  assert.equal(r.checks.find(c => c.id === 'productive-throughput').status, 'PASS');
   assert.equal(r.checks.find(c => c.id === 'efficiency-status').status, 'WATCH');
   assert.equal(r.checks.find(c => c.id === 'vnext-platform-shadow').status, 'PASS');
   assert.equal(r.checks.find(c => c.id === 'vnext-shadow-authority').status, 'PASS');
@@ -688,6 +688,10 @@ console.log('live-verification tests passed');
   room.economy.last100.productiveFlow.averageBuilderWorkParts = 4;
   room.economy.last100.productiveFlow.averageWorkerWorkParts = 1;
   room.economy.last100.productiveFlow.averageUpgraderWorkParts = 4;
+  room.economy.last100.productiveFlow.averageConstructionCapacityPerTick = 25;
+  room.economy.last100.productiveFlow.averageDedicatedControllerCapacityPerTick = 4;
+  room.economy.last100.productiveFlow.constructionBacklogRatio = 1;
+  room.economy.last100.productiveFlow.controllerDemandRatio = 1;
   room.economy.last100.productiveFlow.actualProductiveThroughputPerTick = 14.8;
   room.economyModel.productiveDemandPerTick = 29;
   room.economyModel.dedicatedHarvestCapacityPerTick = 10;
@@ -702,4 +706,32 @@ console.log('live-verification tests passed');
   assert.equal(throughput.data.mining, 10);
   assert.ok(Math.abs(throughput.data.utilization - (14.8 / 29)) < 1e-12);
   assert.match(throughput.message, /productive work capacity/i);
+}
+
+
+{
+  // Controller-only windows must use controller capacity, not construction WORK
+  // that has no active construction backlog.
+  const rows = evidence();
+  const room = rows.at(-1).ctx.rooms.E8N1;
+  room.constructionSites = 0;
+  room.economy.last100.controllerProgress = 376;
+  room.economy.last100.constructionProgress = 0;
+  room.economy.last100.productiveFlow.averageBuilderWorkParts = 0;
+  room.economy.last100.productiveFlow.averageWorkerWorkParts = 4;
+  room.economy.last100.productiveFlow.averageUpgraderWorkParts = 6;
+  room.economy.last100.productiveFlow.averageConstructionCapacityPerTick = 0;
+  room.economy.last100.productiveFlow.averageDedicatedControllerCapacityPerTick = 6;
+  room.economy.last100.productiveFlow.constructionBacklogRatio = 0;
+  room.economy.last100.productiveFlow.controllerDemandRatio = 1;
+  room.economy.last100.productiveFlow.actualProductiveThroughputPerTick = 3.76;
+  room.economyModel.productiveDemandPerTick = 6;
+  room.efficiency.metrics.productiveThroughputPerTick = 3.76;
+
+  const r = evaluateLive({ events: rows, startTick: 1000, nodeVersion: '24.21.0' });
+  const throughput = r.checks.find(c => c.id === 'productive-throughput');
+  assert.equal(throughput.status, 'PASS');
+  assert.equal(throughput.data.throughput, 3.76);
+  assert.equal(throughput.data.productiveCapacity, 6);
+  assert.ok(Math.abs(throughput.data.utilization - (3.76 / 6)) < 1e-12);
 }
