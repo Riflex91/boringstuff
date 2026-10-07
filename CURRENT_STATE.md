@@ -1136,3 +1136,75 @@ Current stop rule after PR #84:
 - allow the current five-harvester recovery fleet to age out naturally; do not add despawn behavior;
 - do not change hauler or upgrader caps from this transition window;
 - keep E4 strictly `SHADOW` / `SHADOW_EVIDENCE`.
+
+
+## 2026-10-07 — optimization freeze exit / roadmap resumed through I1
+
+The final stability window before resuming the roadmap is `3760101–3760200`. It completed with `14 PASS / 5 WATCH / 0 FAIL`. Safety and steady-state exit criteria are met:
+
+- no runtime or collector errors;
+- CPU/bucket safe;
+- dedicated mining `20/20 e/t`;
+- `recommendedHarvesterCount = 2` with zero HARVEST WORK deficit;
+- latest consumer fallback/waiting/critical pressure `0 / 0 / 0`;
+- Health `100 / HEALTHY`;
+- Efficiency `EFFICIENT`;
+- latest completed E4 window `3760093–3760192` has critical/candidate/slot coverage all `1` and `duplicateReservationTicks = 0`.
+
+This satisfies the agreed exit rule for the long economy/logistics optimization phase. Future tuning should be driven by concrete regressions exposed by roadmap work rather than by eliminating every WATCH or chasing marginal steady-state gains.
+
+Roadmap work resumed immediately:
+
+### PR #86 — P0 Shared Cost Field
+
+- added normalized movement profiles;
+- shared Room CostMatrix construction;
+- road preference, hard blockers, planned-road/structure overlays;
+- stationary work-tile, congestion, creep, hostile and keeper penalties;
+- no current movement authority changed;
+- dedicated P0 regression suite passed.
+
+### PR #87 — P1 Hierarchical Route Cache
+
+- added versioned world/room-graph route caching;
+- added profile-aware in-room PathFinder cache using P0 cost fields;
+- compact local path serialization;
+- TTL/bounded pruning;
+- room/hostile invalidation;
+- stuck feedback invalidation;
+- route confidence from intel confidence;
+- current legacy movement remains authoritative;
+- P0 and P1 suites are now included in canonical `npm test`.
+
+### PR #88 — I1 Autonomous Scout Frontier SHADOW
+
+- added a bounded frontier derived from owned-room + known I0 topology;
+- unknown rooms are not recursively expanded until actual intel exists;
+- Value-of-Information scoring covers unknown/stale state, threat uncertainty, depth, source value, route connectivity, existing remote/expansion scores and observer availability;
+- publishes bounded `SCOUT_INTEL` requests into the E0 registry with authority `SHADOW`;
+- fresh I0 intel automatically reconciles those requests to `SATISFIED`;
+- `SCOUT_INTEL` is explicitly excluded from E1 generic assignment so deliberate shadow scouting demand does not pollute assignment evidence;
+- room heartbeat now exposes a compact `scoutingFrontier` summary;
+- legacy `role.scout` target selection and movement remain authoritative.
+
+Exact branch regression coverage passed before merge for I1 frontier scoring, request lifecycle, existing request-shadow behavior, assignment isolation and room-heartbeat telemetry.
+
+Current roadmap position:
+
+- K0 capability discovery: present;
+- K1 CPU scheduler: present;
+- O1 colony/universal state foundation: present;
+- I0 world intel: present;
+- E0/E1/E2/E3/E4: present in SHADOW / SHADOW_EVIDENCE as documented;
+- P0: merged;
+- P1: merged;
+- I1: merged in SHADOW, awaiting first live telemetry validation.
+
+Current stop rule after PR #88:
+
+- deploy current `main` before starting the next runtime slice;
+- require normal smoke/safety checks to remain green;
+- verify `scoutingFrontier.authority = SHADOW`, bounded request count, sensible top frontier rooms and automatic request closure when intel becomes fresh;
+- verify E1 assignment/request evidence is not inflated by `SCOUT_INTEL`;
+- legacy scout behavior must remain unchanged;
+- after I1 live validation, continue the roadmap with P2/P3 planner + defense-perimeter foundations rather than returning to general economy tuning.
