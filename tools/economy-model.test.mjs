@@ -202,3 +202,65 @@ assert.equal(singleHaulerSeverePressure.consumerServiceHaulerFloor, 2);
 assert.equal(singleHaulerSeverePressure.recommendedHaulerCount, 2);
 
 console.log('economy model tests passed');
+
+
+// Post-#80 live regression: once both source containers are online, a
+// degraded harvester body must not make reduced mining self-confirming.
+// Live evidence had 2 WORK on the long source and 5 WORK on the short source:
+// 7 total WORK / 14 e/t was reported as zero deficit despite 20 e/t source
+// capacity. Containerized rooms should recover back to full source throughput.
+Memory.rooms = {};
+const recoverySources = [
+  { id: 'rs1', pos: pos(20, true) },
+  { id: 'rs2', pos: pos(9, true) }
+];
+const degradedMiningState = {
+  room: {
+    name: 'E8N1-mining-recovery',
+    findPath(from) { return Array.from({ length: from === recoverySources[0].pos ? 20 : 9 }, () => ({})); }
+  },
+  spawn: { id: 'spawn-mining-recovery', pos: { x: 20, y: 29 } },
+  sources: recoverySources,
+  creeps: [
+    countedCreep('harvester', { [WORK]: 2, [CARRY]: 1 }, 'rs1'),
+    countedCreep('harvester', { [WORK]: 5, [CARRY]: 1 }, 'rs2'),
+    countedCreep('worker', { [WORK]: 4, [CARRY]: 2 }),
+    countedCreep('upgrader', { [WORK]: 4, [CARRY]: 2 }),
+    countedCreep('upgrader', { [WORK]: 4, [CARRY]: 2 }),
+    countedCreep('hauler', { [CARRY]: 8 }),
+    countedCreep('hauler', { [CARRY]: 8 }),
+    countedCreep('hauler', { [CARRY]: 8 })
+  ],
+  sites: [],
+  energyCapacityAvailable: 800
+};
+const degradedMining = require('../game/economy.model.js').analyze(degradedMiningState);
+assert.equal(degradedMining.theoreticalIncomePerTick, 20);
+assert.equal(degradedMining.dedicatedHarvestCapacityPerTick, 14);
+assert.equal(degradedMining.productiveDemandPerTick, 8);
+assert.equal(degradedMining.harvesterWorkParts, 7);
+assert.equal(degradedMining.recommendedHarvesterWorkParts, 10);
+assert.equal(degradedMining.nextHarvesterWorkParts, 5);
+assert.equal(degradedMining.harvesterWorkDeficit, 3);
+assert.equal(degradedMining.recommendedHarvesterCount, 3);
+
+Memory.rooms = {};
+const restoredMiningState = Object.assign({}, degradedMiningState, {
+  room: Object.assign({}, degradedMiningState.room, { name: 'E8N1-mining-restored' }),
+  spawn: { id: 'spawn-mining-restored', pos: { x: 20, y: 29 } },
+  creeps: [
+    countedCreep('harvester', { [WORK]: 5, [CARRY]: 1 }, 'rs1'),
+    countedCreep('harvester', { [WORK]: 5, [CARRY]: 1 }, 'rs2'),
+    countedCreep('worker', { [WORK]: 4, [CARRY]: 2 }),
+    countedCreep('upgrader', { [WORK]: 4, [CARRY]: 2 }),
+    countedCreep('upgrader', { [WORK]: 4, [CARRY]: 2 }),
+    countedCreep('hauler', { [CARRY]: 8 }),
+    countedCreep('hauler', { [CARRY]: 8 }),
+    countedCreep('hauler', { [CARRY]: 8 })
+  ]
+});
+const restoredMining = require('../game/economy.model.js').analyze(restoredMiningState);
+assert.equal(restoredMining.dedicatedHarvestCapacityPerTick, 20);
+assert.equal(restoredMining.recommendedHarvesterWorkParts, 10);
+assert.equal(restoredMining.harvesterWorkDeficit, 0);
+assert.equal(restoredMining.recommendedHarvesterCount, 2);

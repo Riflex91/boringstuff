@@ -114,9 +114,20 @@ function analyze(state) {
 
   const theoreticalIncomePerTick = Math.round(state.sources.length * incomePerSource * 100) / 100;
   const productiveDemandPerTick = Math.round((constructionWorkParts * buildPower + upgraderWorkParts * upgradePower) * 100) / 100;
+  const allSourceContainersReady = state.sources.length > 0 && containersReady === state.sources.length;
+
+  // Once source-container logistics is fully online, treat full source
+  // throughput as the mining floor. Productive WORK demand does not include
+  // spawn/extension refill, creep replacement, or reserve recovery, so using
+  // only current mining vs. productive demand can make a degraded harvester
+  // body self-confirming. Live post-#80 evidence showed 7 WORK / 14 e/t being
+  // accepted as "no deficit" in a room whose two sources can sustain 20 e/t.
+  // Before all source containers exist, keep the existing bootstrap behavior.
+  const targetHarvestPerTick = allSourceContainersReady
+    ? theoreticalIncomePerTick
+    : Math.min(theoreticalIncomePerTick, Math.max(dedicatedHarvestCapacityPerTick, productiveDemandPerTick));
   const recommendedHarvesterWorkParts = Math.ceil(
-    Math.min(theoreticalIncomePerTick, Math.max(dedicatedHarvestCapacityPerTick, productiveDemandPerTick)) /
-    Math.max(1, harvestPower)
+    targetHarvestPerTick / Math.max(1, harvestPower)
   );
 
   const nextHarvesterWorkParts = plannedHarvesterWorkParts(state.energyCapacityAvailable);
@@ -160,8 +171,6 @@ function analyze(state) {
   const carryDrivenHaulerCount = haulerCarryDeficit > 0
     ? Math.max(idealHaulerCount, haulers.length + Math.ceil(haulerCarryDeficit / Math.max(1, nextHaulerCarryParts)))
     : idealHaulerCount;
-
-  const allSourceContainersReady = state.sources.length > 0 && containersReady === state.sources.length;
 
   // The legacy execution policy keeps at least one hauler available for hard
   // infrastructure while redundant haulers may serve waiting consumers.
