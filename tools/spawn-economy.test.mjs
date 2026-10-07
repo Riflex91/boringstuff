@@ -168,3 +168,52 @@ function spawnState(workerTtl) {
   Memory.creeps[spawningName] = { role: 'worker', home: 'E8N1' };
   assert.equal(spawnManager._test.countRoleAvailable(s.state, 'worker'), 1);
 }
+
+
+{
+  // A productive prespawn shortfall may use the immediately-affordable
+  // 200-energy replacement body instead of waiting for the normal 300-energy
+  // degraded-body threshold and losing the remaining TTL window.
+  global.Game = { time: 5300, creeps: { scout: { name:'scout', memory:{ role:'scout', home:'E8N1' }, room:{ name:'E8N1' } } } };
+  const s = spawnState(500);
+  const creeps = s.state.room.find(FIND_MY_CREEPS);
+  const builder = creeps.find(c => c.memory.role === 'builder');
+  builder.ticksToLive = 13;
+  s.state.energyAvailable = 294;
+
+  assert.equal(spawnManager._test.productivePrespawnShortfall(s.state, 'builder', 1), true);
+  assert.equal(spawnManager.spawnOne(s.state), true);
+  assert.equal(s.spawned().opts.memory.role, 'builder');
+  assert.deepEqual(s.spawned().body, [WORK, CARRY, MOVE]);
+}
+
+{
+  // The low-energy exception is prespawn-only. A role that is already absent
+  // must retain the normal 300-energy non-emergency floor.
+  global.Game = { time: 5400, creeps: { scout: { name:'scout', memory:{ role:'scout', home:'E8N1' }, room:{ name:'E8N1' } } } };
+  const s = spawnState(500);
+  const creeps = s.state.room.find(FIND_MY_CREEPS);
+  const builderIndex = creeps.findIndex(c => c.memory.role === 'builder');
+  creeps.splice(builderIndex, 1);
+  s.state.byRole.builder = 0;
+  s.state.energyAvailable = 294;
+
+  assert.equal(spawnManager._test.productivePrespawnShortfall(s.state, 'builder', 1), false);
+  assert.equal(spawnManager.spawnOne(s.state), false);
+}
+
+{
+  // RCL2+ essential ordering must use prespawn-aware worker availability too;
+  // otherwise an expiring sole worker can be delayed behind economy scaling.
+  global.Game = { time: 5500, creeps: { scout: { name:'scout', memory:{ role:'scout', home:'E8N1' }, room:{ name:'E8N1' } } } };
+  const s = spawnState(20);
+  s.state.energyAvailable = 294;
+  s.state.economyModel.recommendedHarvesterCount = 3;
+  s.state.economyModel.recommendedHarvesterWorkParts = 6;
+  s.state.economyModel.harvesterWorkParts = 4;
+
+  assert.equal(spawnManager._test.productivePrespawnShortfall(s.state, 'worker', 1), true);
+  assert.equal(spawnManager.spawnOne(s.state), true);
+  assert.equal(s.spawned().opts.memory.role, 'worker');
+  assert.deepEqual(s.spawned().body, [WORK, CARRY, MOVE]);
+}
