@@ -1391,3 +1391,80 @@ Decision:
 - P3 must consume economic topology first, generate versioned defensive artifacts, evaluate rampart count/repair burden/tower coverage/breach routes/exit exposure/traffic crossings, and remain non-authoritative;
 - E4 remains strictly `SHADOW / SHADOW_EVIDENCE`.
 
+## 2026-10-07 — P3 Min-Cut SHADOW pending live
+
+P2 passed its initial live SHADOW gate before P3 work began:
+
+- P2 verifier window `3761879–3761978`: `7 PASS / 0 WATCH / 0 FAIL`;
+- general live window: `13 PASS / 6 WATCH / 0 FAIL`;
+- P2 remained `SHADOW`, legacy planner authority remained `UNCHANGED`;
+- selected P2 plan was `CORE_BALANCED` at `E8N1 (20,29)`, score `83.58`;
+- exact P1 route evidence was present;
+- observed first P2 scheduler cost was `17.485 CPU`, retained as an optimization target with no threshold relaxation.
+
+PR #99 implements P3 Min-Cut Defense Perimeter in strict SHADOW mode.
+
+P3 now:
+
+- consumes the READY P2 economic/core topology;
+- retains exact P1 route geometry inside internal P2 artifacts for traffic-crossing evaluation;
+- builds a bounded 8-neighbor tile graph with node splitting;
+- computes an s-t Min-Cut between protected P2 assets and the outside defense boundary;
+- uses weighted cut capacity to prefer existing ramparts and avoid traffic crossings;
+- independently flood-checks the resulting cut for residual breach routes;
+- groups rampart candidates;
+- evaluates rampart count, repair burden, tower coverage, breach resistance, exit exposure and traffic crossings;
+- stores versioned SHADOW artifacts and compact telemetry;
+- records phase evidence for protected-topology build, Min-Cut, and defense scoring.
+
+P3 safety invariants:
+
+- `authority = SHADOW`;
+- `constructionAuthority = NONE`;
+- legacy `game/room.planner.js` remains authoritative and unchanged;
+- P3 never calls `createConstructionSite()`;
+- P3 executes only as a K1 `OVERFLOW` process;
+- P3 is prohibited from running in the same tick as a freshly computed P2 plan;
+- defense graph area is bounded to 900 tiles;
+- Min-Cut augmentation count is bounded;
+- no CPU thresholds, economy/logistics behavior, movement/scouting authority, or E4 authority changed.
+
+Exact offline validation for PR #99:
+
+- tested head `1ca4887820659f62eb62dc0b67411341790a81bc`;
+- canonical `npm test`: success;
+- Check-Run: success;
+- Classic Statuses: none;
+- review threads: none;
+- `CHANGES_REQUESTED`: none;
+- merge method: `merge`;
+- merge SHA `69aefe2cfbb7f6d4189337f1f65c1fb4fbc22397`;
+- post-merge `main` canonical test: success.
+
+PR #100 adds the read-only P3 live verifier:
+
+- `npm run verify:p3 -- --start-tick <tick>`;
+- validates SHADOW/construction/legacy authority;
+- requires a READY defensive cut;
+- validates graph/cut/breach/scoring contracts;
+- validates P2→P3 dependency ordering;
+- validates independent scheduler evidence;
+- isolated P3 scheduler CPU: PASS at or below 10, WATCH above 10, FAIL above 20;
+- validates artifact freshness;
+- tooling only, with no runtime/game authority change;
+- merge SHA `24c563122200355aeeba9dd5faab3e3fbe925076`;
+- post-merge `main` canonical test: success.
+
+Current stop rule:
+
+- deploy current `main`;
+- require the normal 25-tick smoke gate to remain green;
+- collect a complete 100-tick general live window;
+- run `verify:p2` and `verify:p3` over the same deployment window;
+- require P2 to remain SHADOW and READY;
+- require P3 to remain SHADOW with `constructionAuthority = NONE`, legacy planner `UNCHANGED`, graph complete, `breachRouteCount = 0`, valid scoring, and correct P2→P3 ordering;
+- P3 isolated CPU above 10 is an optimization WATCH and above 20 is a hard FAIL;
+- do not promote P2/P3 construction authority from this release;
+- do not start the next roadmap slice until P3 live evidence is reviewed;
+- E4 remains strictly `SHADOW / SHADOW_EVIDENCE`.
+
