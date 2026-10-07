@@ -184,6 +184,10 @@ function request(id, kind, capability, amount, options = {}) {
   for (const kind of ['PICKUP', 'DELIVER', 'BALANCE', 'RESERVE', 'EMERGENCY_DELIVER']) {
     assert.equal(assignment._test.requestAssignable(request('e3-' + kind, kind, 'transportEnergy', 50)), false);
   }
+  assert.equal(
+    assignment._test.requestAssignable(request('i1-scout', 'SCOUT_INTEL', 'vision', 1, { domain: 'scouting' })),
+    false
+  );
   const work = request('work-only', 'BUILD', 'workBuild', 2, { base: 50 });
   assert.equal(assignment._test.requestAssignable(work), true);
 }
