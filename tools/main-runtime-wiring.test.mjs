@@ -17,4 +17,21 @@ assert.match(
   'STATUS_SNAPSHOT must use the compact colonyState telemetry summary'
 );
 
+
+assert.match(
+  mainSource,
+  /const\s+plannerVNextShadow\s*=\s*require\(['"]planner\.vnext\.shadow['"]\);/,
+  'main.js must import planner.vnext.shadow for P2 SHADOW'
+);
+assert.match(
+  mainSource,
+  /id:\s*['"]planner-vnext-shadow['"][\s\S]*?priorityClass:\s*processScheduler\.PRIORITY\.OVERFLOW/,
+  'P2 planner must run only on the OVERFLOW scheduler budget'
+);
+assert.match(
+  mainSource,
+  /plannerVNext:\s*plannerVNextShadow\.telemetrySummary\(state\.plannerVNextShadow\)/,
+  'STATUS_SNAPSHOT must expose compact P2 SHADOW telemetry'
+);
+
 console.log('main runtime wiring tests passed');
