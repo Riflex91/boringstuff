@@ -970,3 +970,63 @@ Current stop rule after PR #76:
 - verify that partial hauler deliveries clear stale fallback/critical state and that the severe floor relaxes naturally when pressure clears;
 - compare an exact post-#76 productive window against `3757602–3757701`, especially fallback ratio (`35%` baseline), controller throughput (`4.48/tick`), and E4 duplicate-free critical coverage;
 - E4 remains strictly `SHADOW` / `SHADOW_EVIDENCE`.
+
+
+## 2026-10-07 — post-#76 live validation / #78 surplus upgrader
+
+The first complete productive window after PR #76 is `3758002–3758101`. It confirms the sticky-fallback fix materially changed the live state:
+
+- `consumerTicks = 300`;
+- `waitingConsumerTicks = 20` (`6.7%`);
+- `criticalConsumerTicks = 22` (`7.3%`);
+- `fallbackConsumerTicks = 2` (`0.7%`), down from the pre-fix `105 / 300 = 35%` baseline;
+- `averageRequestLatency = 15.33`, down from `63.18`;
+- `maxRequestLatency = 54`, down from `145`;
+- `controllerProgress = 448` and `usefulWorkPerTick = 4.48`;
+- `averageDedicatedControllerCapacityPerTick = 5` for this lifecycle window.
+
+The adjacent E4 window `3757993–3758092` is also healthy on consumer service:
+
+- `averageHaulers = 3`;
+- `haulerUtilization = 0.803`;
+- `criticalRequestTicks = 22`;
+- `criticalMatchedTicks = 22`;
+- `criticalCoverageRatio = 1`;
+- `criticalCandidateRatio = 1`;
+- `criticalSlotCoverageRatio = 1`;
+- `averageConsumerFallback = 0.02`;
+- `duplicateReservationTicks = 0`.
+
+This confirms PR #76 solved the sticky fallback/critical-state problem. The next persistent live signal is instead unconsumed surplus in the no-construction/controller-only phase. During the `3758101–3758200` verification window the room repeatedly reached full spawn energy while the controller still had backlog. At tick `3758125`, Efficiency v3 reported:
+
+- `productiveThroughputPerTick = 4.48`;
+- `productiveCapacityPerTick = 5`;
+- `energyCappedRatio = 0.58`;
+- `spawnUtilization = 0`;
+- status `UNDERUTILIZED` with reasons `ENERGY_SURPLUS_UNCONSUMED` and `SPAWN_IDLE_WITH_SURPLUS`;
+- stored energy remained about `5800`;
+- mining and hauling deficits were zero;
+- consumer fallback/critical pressure was zero at the clean surplus snapshots.
+
+PR #78 adds one deliberately bounded mature-surplus control loop to legacy spawn planning:
+
+- only RCL2–RCL7;
+- only with zero construction sites;
+- only after at least 25 ticks of both capped room energy and idle spawn;
+- only above 5000 stored energy;
+- only when harvester and hauler deficits are zero;
+- only when consumer critical/fallback pressure is zero;
+- only when all source containers are ready;
+- desired upgraders may rise from the existing value to at most `3` (still bounded by `MAX_UPGRADERS`).
+
+At current 800-energy capacity a full upgrader body costs 700 energy and carries 4 WORK. With current dedicated productive demand around 5/tick and dedicated mining at 20 e/t, the additional upgrader raises controller demand to roughly 9/tick while remaining well below measured income. If surplus conditions disappear, desired count falls back to the previous policy automatically; existing extra creeps simply age out naturally.
+
+Exact branch `spawn-economy.test.mjs` regression coverage passed before merge, including healthy-surplus scaling, pressure/construction suppression, and actual `spawnOne()` selection of the third 4-WORK upgrader.
+
+Current stop rule after PR #78:
+
+- deploy PR #78 before judging controller-only underutilization further;
+- verify that sustained surplus spawns at most one extra upgrader and that controller throughput rises without creating consumer fallback, mining deficit, hauling deficit, or CPU pressure;
+- do not increase the steady two-hauler recommendation or change the severe three-hauler cap;
+- keep E4 strictly `SHADOW` / `SHADOW_EVIDENCE`;
+- compare the next exact post-#78 productive window against `3758002–3758101` (fallback `0.7%`, throughput `4.48/tick`, latency `15.33`).
