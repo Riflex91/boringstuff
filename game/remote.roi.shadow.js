@@ -253,7 +253,7 @@ function estimateCosts(candidate, route, state, game, options) {
   const intelConfidence = candidate.eligibility && candidate.eligibility.fresh
     ? clamp(Number(candidate.eligibility.fresh.confidence) || 0, 0, 1)
     : 0;
-  const confidence = Math.min(routeConfidence, intelConfidence || routeConfidence);
+  const confidence = Math.min(routeConfidence, intelConfidence);
   const confidenceAdjustedNet = netEnergyPerTick * confidence;
 
   return {
