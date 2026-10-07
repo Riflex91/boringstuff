@@ -788,3 +788,33 @@ Current stop rule after PR #69:
 - after deployment, verify that productive replacements actually begin while the predecessor is still alive even when room energy is between 200 and 299;
 - compare productive throughput and consumer fallback against `3740402–3740501` while preserving CPU/bucket safety and duplicate-free E4 evidence;
 - E4 remains strictly `SHADOW` / `SHADOW_EVIDENCE`.
+
+
+## 2026-10-07 — post-#69 / #71 zero-construction logistics follow-up
+
+The live window `3757001–3757100` completed with `12 PASS / 7 WATCH / 0 FAIL`, no runtime/collector errors, safe CPU/bucket, full `20 e/t` dedicated mining, and no current consumer waiting/critical/fallback pressure.
+
+The room had transitioned to `constructionSites = 0`, but source-container logistics was still active. Live economy evidence showed:
+
+- `recommendedHaulerCarryParts = 12`;
+- `haulerCarryParts = 0`;
+- `haulerCarryDeficit = 12`;
+- `recommendedHaulerCount = 2`;
+- all source containers ready;
+- Health `WATCH` with reason `HAULING_DEFICIT`.
+
+At the same time, legacy spawn telemetry reported `desired.hauler = 0` solely because `spawn.manager.js` gated modeled hauler demand on `state.sites.length > 0`. All existing haulers were therefore allowed to age out after construction completed even though spawn/extensions and productive consumers still depended on source-route transport.
+
+PR #71 removes only that construction-site gate:
+
+- at RCL2+, when an economy model exists, legacy hauler demand follows `economyModel.recommendedHaulerCount` regardless of whether construction sites exist;
+- `MAX_BOOTSTRAP_HAULERS` remains the upper bound;
+- economy-model calculations, consumer service floors, CPU thresholds, and E4/VNext authority are unchanged;
+- exact branch `spawn-economy.test.mjs` regression coverage passed for both desired-count and actual `spawnOne()` selection with zero construction sites.
+
+Current stop rule after PR #71:
+
+- deploy PR #71 before interpreting the zero-construction logistics phase further;
+- verify that haulers respawn toward the model recommendation and `HAULING_DEFICIT` clears;
+- do not alter E4 authority or hauler caps from the pre-deploy zero-hauler window;
+- once hauler service is restored, reassess productive throughput in the no-construction / controller-only workload separately from prior construction-heavy baselines.
