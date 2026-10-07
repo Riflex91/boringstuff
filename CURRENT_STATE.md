@@ -818,3 +818,54 @@ Current stop rule after PR #71:
 - verify that haulers respawn toward the model recommendation and `HAULING_DEFICIT` clears;
 - do not alter E4 authority or hauler caps from the pre-deploy zero-hauler window;
 - once hauler service is restored, reassess productive throughput in the no-construction / controller-only workload separately from prior construction-heavy baselines.
+
+
+## 2026-10-07 — post-#71 / #73 controller-only follow-up
+
+The live window `3757301–3757400` confirms PR #71 restored legacy logistics after construction completed:
+
+- two live haulers are present;
+- `haulerCarryParts = 16` versus `recommendedHaulerCarryParts = 12`;
+- `haulerCarryDeficit = 0`;
+- `recommendedHaulerCount = 2`;
+- Health is `100 / HEALTHY` with no reasons;
+- current consumer fallback/waiting/critical pressure is zero.
+
+The adjacent completed E4 window `3757293–3757392` is healthy and evidence-safe:
+
+- `averageHaulers = 2`;
+- `haulerUtilization = 0.7`;
+- `criticalRequestTicks = 35`;
+- `criticalMatchedTicks = 35`;
+- `criticalCoverageRatio = 1`;
+- `criticalCandidateRatio = 1`;
+- `criticalNoCandidateTicks = 0`;
+- `duplicateReservationTicks = 0`.
+
+The exact retained productive window `3757202–3757301` is controller-only (`constructionProgress = 0`) and reports:
+
+- `controllerProgress = 376`;
+- `actualProductiveThroughputPerTick = 3.76`;
+- `averageConstructionCapacityPerTick = 0`;
+- `averageDedicatedControllerCapacityPerTick = 6`;
+- `waitingRatio = 0.04`;
+- `criticalRatio = 0.11`;
+- `fallbackRatio = 0.07`.
+
+Efficiency model v2 incorrectly reconstructed productive capacity as 26 progress/tick by counting worker construction WORK even though no construction backlog existed. That made the controller-only utilization appear to be about 14% instead of the workload-relevant `3.76 / 6 ≈ 62.7%`.
+
+PR #73 corrects this diagnostic-only issue:
+
+- efficiency and the live verifier prefer exact-window `averageConstructionCapacityPerTick + averageDedicatedControllerCapacityPerTick`;
+- older windows fall back to WORK-part reconstruction with construction/controller demand ratios when available;
+- Efficiency diagnostic `modelVersion` is now 3;
+- no role behavior, spawn policy, hauler policy, economy model, CPU threshold, or Shadow/VNext authority changes.
+
+Exact branch regression coverage passed for `colony-efficiency.test.mjs` and the complete `live-verification.test.mjs` before merge.
+
+Current stop rule after PR #73:
+
+- deploy PR #73 before interpreting Efficiency status in the controller-only phase;
+- do not increase hauler count: current two-hauler logistics meets modeled capacity and E4 critical coverage is complete;
+- after deployment, verify Efficiency v3 reports controller-only productive capacity near 6 rather than 26 and that CPU/bucket/Health remain safe;
+- E4 remains strictly `SHADOW` / `SHADOW_EVIDENCE`.
