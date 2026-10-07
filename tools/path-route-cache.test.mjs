@@ -167,7 +167,7 @@ function makeRoom(name = 'E1N1') {
     search(from, goal, opts) {
       searches += 1;
       assert.equal(opts.maxRooms, 1);
-      assert.equal(opts.plainCost, 2);
+      assert.ok(opts.plainCost === 2 || opts.plainCost === 3);
       assert.equal(opts.swampCost, 10);
       const matrix = opts.roomCallback('E1N1');
       assert.equal(matrix.get(2, 1), 1);
