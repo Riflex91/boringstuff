@@ -1739,3 +1739,20 @@ Current stop rule:
 - E4 remains strictly `SHADOW / SHADOW_EVIDENCE`;
 - P2/P3 remain non-authoritative for construction.
 
+## 2026-10-07 — I2 evidence reviewed; D0.1 prepared
+
+Source baseline: `796fb1d` (PR #110). Read-only server comparison confirmed all
+49 deployed runtime modules matched this baseline, apart from the injected
+deployment ID. Existing deployment: `20261007213851193-15588`.
+
+- Smoke `3763951–3763975`: 9 PASS / 0 WATCH / 0 FAIL.
+- General live `3764001–3764100`: 12 PASS / 7 WATCH / 0 FAIL.
+- P2/P3/I2 were also evaluated on `3764001–3764100`: zero FAIL.
+- I2 produced a viable E9N1 candidate and remained SHADOW/NONE with mining disabled.
+- Existing general WATCH findings do not authorize changes to economic thresholds.
+
+D0.1 candidate `0.3.0-shadow.9-node24` adds bounded threat observations and a
+read-only D0 verifier. Full offline regression passes on Node 24.21.0. See
+`docs/D0_THREAT_MODEL_SHADOW.md` for implemented behavior and explicit limitations.
+This is not completion of D0, D1, or the overall autonomy roadmap.
+
