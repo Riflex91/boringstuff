@@ -15,6 +15,7 @@ const worldIntel = require('world.intel');
 const colonyState = require('colony.state');
 const plannerVNextShadow = require('planner.vnext.shadow');
 const defenseMinCutShadow = require('defense.mincut.shadow');
+const remoteRoiShadow = require('remote.roi.shadow');
 
 function bootstrapMemory() {
   if (!Memory.bot) Memory.bot = { version: config.VERSION, born: Game.time };
@@ -136,7 +137,8 @@ function statusSnapshot(roomStates, tickCpu) {
         : null,
       colonyState: colonyState.telemetrySummary(state.colonyState),
       plannerVNext: plannerVNextShadow.telemetrySummary(state.plannerVNextShadow),
-      defenseMinCut: defenseMinCutShadow.telemetrySummary(state.defenseMinCutShadow)
+      defenseMinCut: defenseMinCutShadow.telemetrySummary(state.defenseMinCutShadow),
+      remoteRoi: remoteRoiShadow.telemetrySummary(state.remoteRoiShadow)
     };
   }
   logger.info('STATUS_SNAPSHOT', 'Structured bot status snapshot', {
@@ -306,6 +308,33 @@ module.exports.loop = function() {
         defenseMinCutShadow.snapshot(state.room.name, undefined, Game);
     }
 
+    let remoteRoiRun = { ran: false, result: null };
+    const i2CanRun = !plannerVNextRun.ran && !defenseMinCutRun.ran;
+    if (i2CanRun) {
+      remoteRoiRun = processScheduler.run({
+        id: 'remote-roi-shadow',
+        priorityClass: processScheduler.PRIORITY.OVERFLOW,
+        minimumInterval: Math.max(1, config.PLANNER_INTERVAL * 5),
+        freshnessRequirement: Math.max(1, config.PLANNER_INTERVAL * 20)
+      }, function() {
+        return profiler.section('remote-roi-shadow', function() {
+          const byRoom = {};
+          for (const state of roomStates) {
+            byRoom[state.room.name] = remoteRoiShadow.evaluate(state, undefined, Game);
+          }
+          return byRoom;
+        });
+      }, schedulerContext);
+    }
+
+    const currentRemoteRoi = remoteRoiRun.ran && remoteRoiRun.result
+      ? remoteRoiRun.result
+      : {};
+    for (const state of roomStates) {
+      state.remoteRoiShadow = currentRemoteRoi[state.room.name] ||
+        remoteRoiShadow.snapshot(state.room.name, undefined, Game);
+    }
+
     processScheduler.run({
       id: 'stats',
       priorityClass: processScheduler.PRIORITY.STANDARD,
@@ -323,7 +352,7 @@ module.exports.loop = function() {
     }, schedulerContext);
 
     const scheduledTotal = Math.max(0, Game.cpu.getUsed() - scheduledStart);
-    const sectionTotal = currentSectionTotal(['rooms', 'creeps', 'world-intel', 'planner-vnext-shadow', 'defense-mincut-shadow', 'stats', 'visuals']);
+    const sectionTotal = currentSectionTotal(['rooms', 'creeps', 'world-intel', 'planner-vnext-shadow', 'defense-mincut-shadow', 'remote-roi-shadow', 'stats', 'visuals']);
     profiler.detailValue('main.scheduler-overhead', Math.max(0, scheduledTotal - sectionTotal));
 
     profiler.finishTick(tickStart);
