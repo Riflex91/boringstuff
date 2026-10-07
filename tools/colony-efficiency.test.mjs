@@ -88,17 +88,49 @@ exact.economyMetrics.last100 = {
   productiveFlow: {
     averageBuilderWorkParts: 4,
     averageWorkerWorkParts: 1,
-    averageUpgraderWorkParts: 4
+    averageUpgraderWorkParts: 4,
+    averageConstructionCapacityPerTick: 25,
+    averageDedicatedControllerCapacityPerTick: 4,
+    constructionBacklogRatio: 1,
+    controllerDemandRatio: 1
   }
 };
 exact.economyModel.productiveDemandPerTick = 999;
 exact.economyModel.consumerFallbackCount = 0;
 const exactResult = efficiency.evaluate(exact);
-assert.equal(exactResult.modelVersion, 2);
+assert.equal(exactResult.modelVersion, 3);
 assert.equal(exactResult.metrics.productiveThroughputPerTick, 10.07);
 assert.equal(exactResult.metrics.productiveCapacityPerTick, 29);
 assert.equal(exactResult.components.productiveUse, 35);
 assert.equal(efficiency.productiveCapacity(exact, exact.economyMetrics.last100), 29);
+
+// Controller-only workload: construction-capable WORK must not inflate the
+// achievable capacity once the construction backlog is gone.
+const controllerOnly = liveState();
+controllerOnly.sites = [];
+controllerOnly.economyMetrics.last100 = {
+  ticks: 100,
+  spawnUtilization: 0.7,
+  energyCappedRatio: 0.2,
+  controllerProgress: 376,
+  constructionProgress: 0,
+  productiveFlow: {
+    averageBuilderWorkParts: 0,
+    averageWorkerWorkParts: 4,
+    averageUpgraderWorkParts: 6,
+    averageConstructionCapacityPerTick: 0,
+    averageDedicatedControllerCapacityPerTick: 6,
+    constructionBacklogRatio: 0,
+    controllerDemandRatio: 1
+  }
+};
+controllerOnly.economyModel.productiveDemandPerTick = 6;
+controllerOnly.economyModel.consumerFallbackCount = 0;
+const controllerOnlyResult = efficiency.evaluate(controllerOnly);
+assert.equal(controllerOnlyResult.metrics.productiveThroughputPerTick, 3.76);
+assert.equal(controllerOnlyResult.metrics.productiveCapacityPerTick, 6);
+assert.equal(controllerOnlyResult.components.productiveUse, 63);
+assert.equal(controllerOnlyResult.reasons.includes('PRODUCTIVE_THROUGHPUT_LOW'), false);
 
 const demand = liveState();
 demand.economyMetrics.last100 = {

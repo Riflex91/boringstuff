@@ -10,11 +10,21 @@ function finite(value, fallback = null) {
 }
 
 function modeledProductiveCapacity(flow, fallback = null) {
+  const construction = finite(flow?.averageConstructionCapacityPerTick, null);
+  const controller = finite(flow?.averageDedicatedControllerCapacityPerTick, null);
+  if (construction !== null && controller !== null) {
+    return Math.max(0, construction + controller);
+  }
+
   const builder = finite(flow?.averageBuilderWorkParts, null);
   const worker = finite(flow?.averageWorkerWorkParts, null);
   const upgrader = finite(flow?.averageUpgraderWorkParts, null);
   if (builder !== null && worker !== null && upgrader !== null) {
-    return Math.max(0, (builder + worker) * 5 + upgrader);
+    const constructionRatio = finite(flow?.constructionBacklogRatio, null);
+    const controllerRatio = finite(flow?.controllerDemandRatio, null);
+    const constructionCapacity = (builder + worker) * 5 * (constructionRatio === null ? 1 : constructionRatio);
+    const controllerCapacity = upgrader * (controllerRatio === null ? 1 : controllerRatio);
+    return Math.max(0, constructionCapacity + controllerCapacity);
   }
   return finite(fallback, null);
 }
