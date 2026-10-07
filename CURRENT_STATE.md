@@ -1468,3 +1468,90 @@ Current stop rule:
 - do not start the next roadmap slice until P3 live evidence is reviewed;
 - E4 remains strictly `SHADOW / SHADOW_EVIDENCE`.
 
+## 2026-10-07 — P3 first live attempt / CPU headroom mitigation
+
+Deployment smoke window `3762415–3762439` passed with `9 PASS / 0 WATCH / 0 FAIL`.
+
+The first P3 deployment window then produced useful partial evidence before the requested 100-tick window was complete:
+
+- general live verification reported no runtime or collector failures, mining active, no hard stall, contiguous durable telemetry and adequate hauler capacity;
+- the general live gate hit one hard CPU safety failure at tick `3762500`: total measured tick CPU `21.362` with bucket still `10000`;
+- P2 completed `7 PASS / 0 WATCH / 0 FAIL`;
+- P3 completed `7 PASS / 1 WATCH / 0 FAIL`.
+
+Observed P2 evidence:
+
+- `authority = SHADOW`;
+- legacy planner authority remained `UNCHANGED`;
+- selected plan remained `CORE_BALANCED` at `E8N1 (20,29)`, score `83.58`;
+- exact P1-backed routes were present;
+- latest observed P2 plan tick was `3762479`;
+- latest isolated P2 scheduler cost was `19.297 CPU`, EMA `12.849`;
+- P2 remains an OVERFLOW-only optimization target and no verifier/scheduler threshold was relaxed.
+
+Observed P3 evidence:
+
+- `authority = SHADOW`;
+- `constructionAuthority = NONE`;
+- legacy planner authority remained `UNCHANGED`;
+- P3 status was `READY`;
+- plan tick `3762415`, source P2 tick `3762379`;
+- graph area `361`, `252` walkable tiles, `29` augmentations, complete Min-Cut;
+- `28` rampart candidates in `4` groups;
+- `breachRouteCount = 0`, `exposedAssetCount = 0`;
+- planned tower count `4`, minimum and average coverage score `100`;
+- defense score `74.8`;
+- isolated P3 scheduler cost `9.846 CPU`;
+- phase costs: protected topology `1.554`, Min-Cut `6.755`, defense scoring `1.093`;
+- the single P3 WATCH was dependency freshness only: P3 had consumed an older valid P2 plan while the newer P2 snapshot was already visible.
+
+CPU profile for failing tick `3762500`:
+
+- total CPU `21.362`;
+- attributed scheduler sections `15.565`;
+- unattributed `5.758`;
+- `rooms = 11.773`;
+- `creeps = 3.736`;
+- `main.bootstrap = 5.613`;
+- `room.capacity-spawn = 2.392`;
+- `room.assignment = 2.540`;
+- `room.colony-state = 1.654`;
+- `room.planner = 1.553`;
+- `room.requests = 0.992`;
+- `room.logistics-match = 0.969`;
+- P2 and P3 did not run on the failing tick.
+
+Interpretation:
+
+- the live failure is not a P3 Min-Cut failure;
+- the failing tick combined high first-Memory/bootstrap cost with normal per-room SHADOW planning and authoritative room/creep work;
+- the legacy room planner contributed `1.553 CPU` but was not the dominant cause;
+- threshold relaxation or moving work merely off heartbeat ticks is explicitly rejected.
+
+PR #102 adds a behavior-neutral SHADOW CPU-headroom guard:
+
+- exact tested PR head `4231cd5a213636ca9b66f58bd1aa200e17e516bd`;
+- canonical PR `npm test`: success;
+- merge method: `merge`;
+- merge SHA `e907778744b78c3a7fb3f515dd68e13f27f9e989`;
+- post-merge `main` canonical test: success;
+- configured `SHADOW_CPU_RESERVE = 8`;
+- E2 capacity-spawn, E1 assignment and E4 logistics matching use existing profiler avg/last CPU observations plus a 15% estimate margin;
+- once projected SHADOW work would consume reserved current-tick headroom, the remaining optional SHADOW stages return their existing `deferredSnapshot` with reason `CPU_HEADROOM`;
+- deferral is cascading for the current room/tick;
+- request production, colony state, legacy spawn/planner, creep execution, economy/logistics authority, P2/P3 authority and all live verifier thresholds remain unchanged;
+- E4 remains strictly `SHADOW / SHADOW_EVIDENCE`.
+
+Revalidation stop rule:
+
+- deploy `main` at or after `e907778744b78c3a7fb3f515dd68e13f27f9e989`;
+- require a new 25-tick smoke gate with no FAIL;
+- collect a fresh complete 100-tick live window;
+- run general live, P2 and P3 verifiers over the exact same deployment window;
+- require no hard general CPU/bucket failure;
+- CPU-headroom deferrals are acceptable only as explicit SHADOW evidence and must not suppress authoritative gameplay;
+- require P2 to remain SHADOW/READY with legacy planner unchanged;
+- require P3 to remain SHADOW/READY with construction authority NONE, graph complete and zero breach routes;
+- review P3 dependency freshness again after the new P2 artifact is visible;
+- do not begin the next roadmap slice or promote P2/P3 authority until this revalidation is complete.
+
