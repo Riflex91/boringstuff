@@ -12,7 +12,7 @@ Module._initPaths();
 const require = createRequire(import.meta.url);
 
 const config = require('../game/config.js');
-assert.equal(config.TELEMETRY_JOURNAL_MAX_BYTES, 450000);
+assert.equal(config.TELEMETRY_JOURNAL_MAX_BYTES, 250000);
 config.TELEMETRY_JOURNAL_MAX_SNAPSHOTS = 2;
 config.TELEMETRY_JOURNAL_MAX_EVENTS = 2;
 config.TELEMETRY_JOURNAL_MAX_BYTES = 100000;

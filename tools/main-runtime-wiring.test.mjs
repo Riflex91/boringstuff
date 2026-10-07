@@ -78,4 +78,21 @@ assert.match(
   'STATUS_SNAPSHOT must expose compact I2 SHADOW telemetry'
 );
 
+
+assert.match(
+  mainSource,
+  /memoryFootprint:\s*memoryFootprintSnapshot\(\)/,
+  'STATUS_SNAPSHOT must expose compact persistent-memory footprint telemetry'
+);
+assert.match(
+  mainSource,
+  /RawMemory\.get\(\)/,
+  'memory-footprint telemetry must measure the serialized RawMemory payload'
+);
+assert.match(
+  mainSource,
+  /journalApproxBytes:/,
+  'memory-footprint telemetry must expose the journal byte estimate without sorting the journal'
+);
+
 console.log('main runtime wiring tests passed');
