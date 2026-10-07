@@ -325,3 +325,70 @@ function spawnState(workerTtl) {
   assert.equal(s.spawned().opts.memory.role, 'upgrader');
   assert.equal(s.spawned().body.filter(p => p === WORK).length, 4);
 }
+
+
+{
+  // The third RCL2+ surplus upgrader is optional throughput. If only that
+  // optional creep enters its prespawn horizon while the two base upgraders
+  // remain healthy, do not create an overlapping replacement and drain room
+  // energy. Let it expire, then recreate it only if surplus still exists.
+  global.Game = { time: 5800, creeps: { scout: { name:'scout', memory:{ role:'scout', home:'E8N1' }, room:{ name:'E8N1' } } } };
+  const s = spawnState(500);
+  const creeps = s.state.room.find(FIND_MY_CREEPS);
+  const first = creeps.find(c => c.memory.role === 'upgrader');
+  first.ticksToLive = 500;
+  creeps.push({ name:'upgrader-second', ticksToLive:500, memory:{role:'upgrader'} });
+  creeps.push({ name:'upgrader-surplus-old', ticksToLive:20, memory:{role:'upgrader'} });
+  s.state.byRole.upgrader = 3;
+  s.state.sites = [];
+  s.state.energyStored = 5800;
+  s.state.economyMetrics.energyCappedStreak = 75;
+  s.state.economyMetrics.spawnIdleStreak = 178;
+  Object.assign(s.state.economyModel, {
+    harvesterWorkDeficit: 0,
+    haulerCarryDeficit: 0,
+    consumerCriticalCount: 0,
+    consumerFallbackCount: 0,
+    sourceContainersReady: 2
+  });
+
+  const want = spawnManager.desired(s.state);
+  assert.equal(want.upgrader, 3);
+  assert.equal(spawnManager._test.baseUpgraderTarget(s.state), 2);
+  assert.equal(spawnManager._test.countRoleAvailable(s.state, 'upgrader'), 2);
+  assert.equal(spawnManager._test.countRoleForDesired(s.state, 'upgrader', want.upgrader), 3);
+  assert.equal(spawnManager._test.productivePrespawnShortfall(s.state, 'upgrader', want.upgrader), false);
+  assert.equal(spawnManager.spawnOne(s.state), false);
+}
+
+{
+  // Base upgrader continuity is still protected. With only the two required
+  // upgraders present, one entering the prespawn horizon must still trigger a
+  // replacement even when the surplus third upgrader is not required.
+  global.Game = { time: 5900, creeps: { scout: { name:'scout', memory:{ role:'scout', home:'E8N1' }, room:{ name:'E8N1' } } } };
+  const s = spawnState(500);
+  const creeps = s.state.room.find(FIND_MY_CREEPS);
+  const first = creeps.find(c => c.memory.role === 'upgrader');
+  first.ticksToLive = 20;
+  creeps.push({ name:'upgrader-second', ticksToLive:500, memory:{role:'upgrader'} });
+  s.state.byRole.upgrader = 2;
+  s.state.sites = [];
+  s.state.energyStored = 5800;
+  s.state.economyMetrics.energyCappedStreak = 0;
+  s.state.economyMetrics.spawnIdleStreak = 0;
+  Object.assign(s.state.economyModel, {
+    harvesterWorkDeficit: 0,
+    haulerCarryDeficit: 0,
+    consumerCriticalCount: 0,
+    consumerFallbackCount: 0,
+    sourceContainersReady: 2
+  });
+
+  const want = spawnManager.desired(s.state);
+  assert.equal(want.upgrader, 2);
+  assert.equal(spawnManager._test.baseUpgraderTarget(s.state), 2);
+  assert.equal(spawnManager._test.countRoleForDesired(s.state, 'upgrader', want.upgrader), 1);
+  assert.equal(spawnManager._test.productivePrespawnShortfall(s.state, 'upgrader', want.upgrader), true);
+  assert.equal(spawnManager.spawnOne(s.state), true);
+  assert.equal(s.spawned().opts.memory.role, 'upgrader');
+}
