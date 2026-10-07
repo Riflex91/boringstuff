@@ -194,6 +194,35 @@ const energy = require('../game/energy.js');
   assert.equal(target.memory.lastHaulerDeliveryTick, undefined);
 }
 
+// A successful partial hauler delivery must end self-supply fallback
+// immediately. Otherwise a nearly-full consumer stays falsely critical and
+// self-harvests again after spending the delivered energy.
+{
+  const roleWorker = require('../game/role.worker.js');
+  const target = makeConsumer('upgrader-partial-fallback-clear', 'upgrader', 0, 0, true, 2);
+  target.memory.working = false;
+  const hauler = makeHauler('hauler-partial-fallback-clear');
+  hauler.transfer = (consumer) => {
+    consumer.store.energy = 95;
+    return OK;
+  };
+  room.creeps = [target, hauler];
+
+  Game.time = 1002;
+  assert.equal(energy.isCriticalConsumerRequest(target), true);
+  assert.equal(energy.deliverToConsumer(hauler), true);
+  assert.equal(target.store.energy, 95);
+  assert.equal(target.memory.logisticsFallback, false);
+  assert.equal(target.memory.waitingEnergyTicks, 0);
+  assert.equal(target.memory.lastHaulerDeliveryTick, 1002);
+  assert.equal(energy.consumerNeedsDelivery(target), false);
+  assert.equal(energy.isCriticalConsumerRequest(target), false);
+
+  Game.time = 1003;
+  assert.equal(roleWorker._test.needsEnergy(target), false);
+  assert.equal(target.memory.working, true);
+}
+
 // Partial energy without an explicit hauler-delivery marker must not resume
 // work. This preserves the fill-before-work behavior of self-harvest fallback.
 {
