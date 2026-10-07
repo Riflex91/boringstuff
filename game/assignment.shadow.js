@@ -187,6 +187,11 @@ function requestAssignable(request) {
   if (kind === 'PICKUP' || kind === 'DELIVER' || kind === 'BALANCE' ||
       kind === 'RESERVE' || kind === 'EMERGENCY_DELIVER') return false;
 
+  // I1 publishes frontier intel demand into the shared registry, but scout
+  // execution is not part of E1. Exclude it so assignment evidence is not
+  // polluted by deliberately unassigned shadow scouting requests.
+  if (kind === 'SCOUT_INTEL') return false;
+
   return true;
 }
 

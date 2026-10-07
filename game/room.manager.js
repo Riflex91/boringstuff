@@ -33,6 +33,7 @@ function status(state) {
     efficiency: state.efficiency,
     requests: state.requestShadow ? state.requestShadow.summary : null,
     logisticsRequests: state.requestShadow ? state.requestShadow.logisticsGraph : null,
+    scoutingFrontier: state.requestShadow ? state.requestShadow.scoutingFrontier : null,
     capacitySpawn: state.capacitySpawnShadow ? state.capacitySpawnShadow.summary : null,
     assignments: state.assignmentShadow ? state.assignmentShadow.summary : null,
     logisticsMatching: state.logisticsMatchingShadow ? state.logisticsMatchingShadow.summary : null,
