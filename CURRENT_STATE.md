@@ -1108,3 +1108,31 @@ Current stop rule after PR #82:
 - do not add a fourth hauler or fourth upgrader from the pre-recovery pressure window;
 - keep E4 strictly `SHADOW` / `SHADOW_EVIDENCE`;
 - after mining recovery, reassess exact productive and E4 windows before any additional scaling change.
+
+
+## 2026-10-07 — post-#82 live validation / #84 harvester recovery decay
+
+The first live window after PR #82 is `3759801–3759900`. It confirms the containerized mining floor recovered dedicated mining to the full `20/20 e/t` source capacity. By tick `3759825`, the room has `11 HARVEST WORK`, full source throughput, and no mining deficit.
+
+The recovery also exposed a follow-up count bug: five harvesters were live, `recommendedHarvesterWorkParts = 10`, `nextHarvesterWorkParts = 5`, and `harvesterWorkDeficit = 0`, but `recommendedHarvesterCount` remained `5`. The count formula was still anchored to the current live fleet even after the WORK deficit closed, so the temporary recovery fleet could never decay back to the minimal two-body steady state.
+
+PR #84 fixes only that decay behavior:
+
+- derive an ideal harvester count from recommended HARVEST WORK and the current-sized harvester body;
+- while a real WORK deficit exists, temporary recovery may still grow relative to the live fleet;
+- once the WORK deficit reaches zero, the recommendation returns to the ideal count;
+- in the current 800-energy room, `10 WORK / 5 WORK per new harvester = 2` steady-state harvesters;
+- the existing extra recovery harvesters are not despawned and simply age out naturally;
+- the full `20 e/t` containerized mining floor from PR #82 remains unchanged.
+
+Post-#82 live state at tick `3759900` remains safe: dedicated mining `20/20 e/t`, bucket `10000`, Health `100 / HEALTHY`, consumer fallback `0`, and no runtime errors. E4 remains SHADOW / SHADOW_EVIDENCE.
+
+Exact branch regression coverage passed before merge for both `economy-model.test.mjs` and `spawn-economy.test.mjs`, including a live-shaped `5 harvesters / 11 WORK / 20 e/t` case that now returns `recommendedHarvesterCount = 2`.
+
+Current stop rule after PR #84:
+
+- deploy PR #84 before interpreting harvester-count steady state;
+- verify that full `20/20 e/t` mining is retained while `recommendedHarvesterCount` falls to 2;
+- allow the current five-harvester recovery fleet to age out naturally; do not add despawn behavior;
+- do not change hauler or upgrader caps from this transition window;
+- keep E4 strictly `SHADOW` / `SHADOW_EVIDENCE`.
