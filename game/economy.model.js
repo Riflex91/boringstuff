@@ -132,9 +132,15 @@ function analyze(state) {
 
   const nextHarvesterWorkParts = plannedHarvesterWorkParts(state.energyCapacityAvailable);
   const harvesterWorkDeficit = Math.max(0, recommendedHarvesterWorkParts - harvesterWorkParts);
-  const recommendedHarvesterCount = harvesters.length + Math.ceil(
-    harvesterWorkDeficit / Math.max(1, nextHarvesterWorkParts)
-  );
+  const idealHarvesterCount = recommendedHarvesterWorkParts > 0
+    ? Math.max(1, Math.ceil(recommendedHarvesterWorkParts / Math.max(1, nextHarvesterWorkParts)))
+    : 0;
+  const recommendedHarvesterCount = harvesterWorkDeficit > 0
+    ? Math.max(
+      idealHarvesterCount,
+      harvesters.length + Math.ceil(harvesterWorkDeficit / Math.max(1, nextHarvesterWorkParts))
+    )
+    : idealHarvesterCount;
   const consumers = state.creeps.filter(c =>
     c.memory.role === 'builder' || c.memory.role === 'worker' ||
     c.memory.role === 'repairer' || c.memory.role === 'upgrader'
