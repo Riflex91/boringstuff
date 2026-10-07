@@ -1,6 +1,7 @@
 'use strict';
 
 const logger = require('logger');
+const config = require('config');
 
 function ensure() {
   if (!Memory.bot) Memory.bot = {};
@@ -79,7 +80,12 @@ function finishTick(startCpu) {
       attributed: Math.round(attributed * 1000) / 1000,
       unattributed: Math.round(Math.max(0, used - attributed) * 1000) / 1000
     });
-    if (Memory.bot.cpu.history.length > 40) Memory.bot.cpu.history.shift();
+    const historyLimit = Number.isFinite(config.CPU_PROFILE_HISTORY_LIMIT)
+      ? Math.max(1, Math.round(config.CPU_PROFILE_HISTORY_LIMIT))
+      : 12;
+    if (Memory.bot.cpu.history.length > historyLimit) {
+      Memory.bot.cpu.history.splice(0, Memory.bot.cpu.history.length - historyLimit);
+    }
   }
 }
 
