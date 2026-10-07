@@ -1283,3 +1283,54 @@ Decision:
 - no CPU thresholds or economy/logistics tuning changes are justified;
 - roadmap may proceed to P2 Planner VNext in SHADOW mode.
 
+## 2026-10-07 — P2 Planner VNext SHADOW foundation
+
+PR #94 implements the first P2 Planner VNext slice without changing construction authority.
+
+P2 now provides:
+
+- deterministic candidate anchors derived from spawn/controller/source/mineral geometry;
+- two core-layout variants (`CORE_COMPACT`, `CORE_BALANCED`);
+- future-structure slots tagged with `earliestCapability`;
+- extension and whole-plan feasibility scoring;
+- openness, source logistics, upgrade logistics, legacy-spawn continuity, tower coverage and traffic objectives;
+- P1-backed in-room route costs;
+- a hard path-search budget with deterministic geometric fallback;
+- bounded planner persistence and compact `STATUS_SNAPSHOT.plannerVNext` telemetry;
+- K1 execution as an `OVERFLOW` process so P2 yields under CPU pressure.
+
+Safety invariants:
+
+- `plannerVNext.authority = SHADOW`;
+- legacy `game/room.planner.js` remains authoritative and unchanged;
+- P2 never calls `createConstructionSite()`;
+- no movement, scouting, spawn, economy/logistics, CPU-threshold or E4 authority changes;
+- P3 Min-Cut remains explicitly unimplemented.
+
+Exact offline validation for PR #94:
+
+- tested head `0595e39c1d7143618cf5daf855c6dd30ca692199`;
+- canonical `npm test`: success;
+- PR merged with merge method `merge`;
+- merge SHA `2ab422dfcfcc803da88ec231193dba74b6a8de7b`;
+- post-merge `main` canonical test: success.
+
+PR #95 adds a read-only P2 live verifier:
+
+- `npm run verify:p2 -- --start-tick <tick>`;
+- checks SHADOW/legacy authority, READY plan status, candidate/path-budget/feasibility contracts, P1 exact-route evidence, independent scheduler telemetry and plan freshness;
+- tooling only; no runtime/game authority change;
+- merge SHA `ac602bd0189c91d7adbb79be1e26bec55cda9d75`;
+- post-merge `main` canonical test: success.
+
+Current stop rule:
+
+- deploy current `main`;
+- require the normal 25-tick smoke gate to remain green;
+- collect a complete 100-tick general live window;
+- run the dedicated P2 live verifier on the same deployment window;
+- require P2 to remain `SHADOW`, legacy planner authority `UNCHANGED`, a valid `READY` selected plan, bounded path/candidate counts and sane feasibility scores;
+- prefer exact P1 route evidence; geometric-only fallback is WATCH, not automatic promotion evidence;
+- do not start P3 Min-Cut or promote P2 authority until the P2 live gate is reviewed;
+- E4 remains strictly `SHADOW / SHADOW_EVIDENCE`.
+
