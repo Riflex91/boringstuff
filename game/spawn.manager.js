@@ -33,7 +33,10 @@ function desired(state) {
   // provision the number of haulers calculated from current mining throughput
   // and route length. Mining counts themselves stay conservative for now.
   let desiredHaulers = 0;
-  if (state.rcl >= 2 && state.economyModel && state.sites.length > 0) {
+  if (state.rcl >= 2 && state.economyModel) {
+    // Container/source logistics remains necessary even when there are no
+    // construction sites. Spawn/extensions and productive consumers still
+    // depend on modeled source-route transport capacity.
     desiredHaulers = Math.min(config.MAX_BOOTSTRAP_HAULERS, state.economyModel.recommendedHaulerCount || 0);
   }
 

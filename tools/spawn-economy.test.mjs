@@ -217,3 +217,44 @@ function spawnState(workerTtl) {
   assert.equal(s.spawned().opts.memory.role, 'worker');
   assert.deepEqual(s.spawned().body, [WORK, CARRY, MOVE]);
 }
+
+
+{
+  // Live post-#69 regression: source-container logistics does not stop merely
+  // because construction sites reached zero. The economy model can still
+  // require haulers for source-route transport, spawn/extensions, and upgraders.
+  const noSites = {
+    rcl: 3,
+    sites: [],
+    structures: [],
+    hostileCreeps: [],
+    sources: [{ id:'a' }, { id:'b' }],
+    energyStored: 6241,
+    energyAvailable: 800,
+    energyCapacityAvailable: 800,
+    byRole: { harvester:2, worker:1, builder:0, upgrader:2, hauler:0 },
+    economyMetrics: { energyCappedStreak: 28, spawnIdleStreak: 54 },
+    economyModel: {
+      recommendedHarvesterCount: 2,
+      recommendedHarvesterWorkParts: 10,
+      harvesterWorkParts: 10,
+      recommendedHaulerCount: 2,
+      sourceContainersReady: 2
+    },
+    emergency: false
+  };
+  const want = spawnManager.desired(noSites);
+  assert.equal(want.builder, 0);
+  assert.equal(want.hauler, 2);
+}
+
+
+{
+  global.Game = { time: 5600, creeps: { scout: { name:'scout', memory:{ role:'scout', home:'E8N1' }, room:{ name:'E8N1' } } } };
+  const s = spawnState(500);
+  s.state.sites = [];
+  s.state.economyModel.recommendedHaulerCount = 2;
+  s.state.energyStored = 1000;
+  assert.equal(spawnManager.spawnOne(s.state), true);
+  assert.equal(s.spawned().opts.memory.role, 'hauler');
+}
