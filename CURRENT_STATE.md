@@ -746,3 +746,45 @@ Current stop rule after PR #67:
 - after deployment, verify that worker/builder/upgrader replacement starts before active capacity disappears and compare `usefulWorkPerTick`, request latency, consumer fallback, and E4 coverage against `3739902–3740001`;
 - preserve CPU/bucket safety and duplicate-free E4 evidence;
 - E4 remains strictly `SHADOW` / `SHADOW_EVIDENCE`.
+
+
+## 2026-10-07 — post-#67 / #69 low-energy prespawn follow-up
+
+Historical verification for `3740402–3740501` is now fully attributable because retained telemetry includes a later exact carrier snapshot at tick `3740600`. The verifier reports `15 PASS / 4 WATCH / 0 FAIL`.
+
+Exact assignment/productive evidence for `3740402–3740501`:
+
+- `controllerProgress = 76`;
+- `constructionProgress = 964`;
+- `usefulWorkPerTick = 10.4`;
+- `averageRequestLatency = 17.42`;
+- `maxRequestLatency = 69`;
+- `consumerTicks = 300`;
+- `waitingConsumerTicks = 67`;
+- `criticalConsumerTicks = 167`;
+- `fallbackConsumerTicks = 100`;
+- waiting / critical / fallback exposure is therefore about `22.3% / 55.7% / 33.3%`;
+- productive capacity is `41 progress/tick`, so observed productive utilization is about `25.4%`.
+
+The adjacent completed E4 window `3740393–3740492` remains evidence-safe (`duplicateReservationTicks = 0`, `criticalCandidateRatio = 1`) but is saturated at three matched haulers and reflects heavy infrastructure-plus-consumer emergency demand. No E4 authority change is justified.
+
+PR #67 correctly introduced prespawn-aware availability, but live evidence exposed one remaining timing failure. At tick `3740500` the legacy builder `bui-E8N1-3739013` was already deep inside its prespawn horizon while room energy was only `294/800`. The normal non-emergency spawn path refused any degraded replacement below 300 energy, even though a 3-part `[WORK,CARRY,MOVE]` body costs 200 energy and needs only 9 spawn ticks. Waiting for the room to refill could therefore consume the remaining TTL and recreate the productive-capacity gap that prespawn was designed to prevent.
+
+PR #69 closes that narrow gap:
+
+- RCL2+ worker availability now uses the same prespawn-aware count as builder/upgrader;
+- a productive prespawn shortfall is explicitly distinguished from a role that is already absent;
+- only a confirmed `worker` / `builder` / `upgrader` prespawn shortfall may bypass the normal 300-energy non-emergency degraded-body floor;
+- the replacement still must be immediately affordable, so 294 energy can spawn a 200-energy 3-part productive body, while 165 energy still cannot;
+- a role that is already absent does not receive this bypass;
+- desired role counts, harvester/hauler policy, CPU thresholds, and all Shadow/VNext authority remain unchanged.
+
+Exact branch regression coverage passed for `spawn-economy.test.mjs`, including the 294-energy builder prespawn, no bypass for an already-missing builder, and RCL2+ worker prespawn ordering ahead of economy scaling.
+
+Current stop rule after PR #69:
+
+- deploy PR #69 before interpreting another lifecycle/productive window;
+- do not add more haulers or productive-role targets yet;
+- after deployment, verify that productive replacements actually begin while the predecessor is still alive even when room energy is between 200 and 299;
+- compare productive throughput and consumer fallback against `3740402–3740501` while preserving CPU/bucket safety and duplicate-free E4 evidence;
+- E4 remains strictly `SHADOW` / `SHADOW_EVIDENCE`.
