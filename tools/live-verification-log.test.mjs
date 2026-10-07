@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { filterTimestampedLogRecords, parseTimestampedLogRecords } from './live-verification-log.mjs';
+import { evidenceTimeBounds, filterTimestampedLogRecords, parseTimestampedLogRecords } from './live-verification-log.mjs';
 
 const sample = [
   'orphan stack line before any timestamp',
@@ -23,5 +23,20 @@ assert.equal(current.length, 1);
 assert.match(current[0], /websocket current failure/);
 assert.doesNotMatch(current[0], /old failure/);
 assert.doesNotMatch(current[0], /JSON\.parse/);
+
+
+assert.equal(evidenceTimeBounds([]), null);
+assert.equal(evidenceTimeBounds([{ capturedAt: 'not-a-time' }]), null);
+assert.deepEqual(
+  evidenceTimeBounds([
+    { capturedAt: '2026-10-04T10:21:30.000Z' },
+    { capturedAt: '2026-10-04T10:20:00.000Z' },
+    { capturedAt: 'invalid' }
+  ]),
+  {
+    startAt: Date.parse('2026-10-04T10:20:00.000Z'),
+    endAt: Date.parse('2026-10-04T10:21:30.000Z')
+  }
+);
 
 console.log('live verification log tests passed');

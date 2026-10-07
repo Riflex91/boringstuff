@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { EXPECTED_BOT_VERSION, evaluateLive, evaluateSmoke } from './live-verification-core.mjs';
-import { filterTimestampedLogRecords } from './live-verification-log.mjs';
+import { evidenceTimeBounds, filterTimestampedLogRecords } from './live-verification-log.mjs';
 import { waitForAutoStart } from './live-verification-wait.mjs';
 import { DEFAULT_VERIFICATION_LOG_DIR, readDeploymentReceipt } from './deployment-receipt.mjs';
 
@@ -115,8 +115,10 @@ if (startTick === null) {
 const tickCount = args.mode === 'smoke' ? 25 : 100;
 const endTick = startTick + tickCount - 1;
 const inWindow = events.filter(e => Number(e?.tick) >= startTick && Number(e?.tick) <= endTick);
-const times = inWindow.map(e => Date.parse(e?.capturedAt)).filter(Number.isFinite);
-const errorEvidence = readErrorEvidence(times.length ? Math.min(...times) : null, times.length ? Math.max(...times) : null);
+const timeBounds = evidenceTimeBounds(inWindow);
+const errorEvidence = timeBounds
+  ? readErrorEvidence(timeBounds.startAt, timeBounds.endAt)
+  : { runtimeErrors: [], collectorErrors: [] };
 const retention = events.filter(e => e?.code === 'TELEMETRY_RETENTION_GAP' && Number(e?.tick || 0) <= endTick).map(e => Number(e?.ctx?.droppedThroughSeq) || 0);
 const input = {
   events,

@@ -32,3 +32,15 @@ export function filterTimestampedLogRecords(text, startAt, endAt) {
     })
     .map(record => record.lines.join('\n'));
 }
+
+
+export function evidenceTimeBounds(events) {
+  const times = (events || [])
+    .map(event => Date.parse(event?.capturedAt))
+    .filter(Number.isFinite);
+  if (!times.length) return null;
+  return {
+    startAt: Math.min(...times),
+    endAt: Math.max(...times)
+  };
+}
