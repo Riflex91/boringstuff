@@ -258,3 +258,70 @@ function spawnState(workerTtl) {
   assert.equal(spawnManager.spawnOne(s.state), true);
   assert.equal(s.spawned().opts.memory.role, 'hauler');
 }
+
+
+{
+  // Post-#76 live surplus regression: once construction is complete and both
+  // mining/logistics are healthy, sustained capped energy should buy exactly
+  // one bounded extra upgrader instead of leaving the spawn idle indefinitely.
+  const surplus = {
+    rcl: 3,
+    sites: [],
+    structures: [],
+    hostileCreeps: [],
+    sources: [{ id:'a' }, { id:'b' }],
+    energyStored: 5800,
+    energyAvailable: 800,
+    energyCapacityAvailable: 800,
+    byRole: { harvester:2, worker:1, builder:0, upgrader:2, hauler:3 },
+    economyMetrics: { energyCappedStreak: 75, spawnIdleStreak: 178 },
+    economyModel: {
+      recommendedHarvesterCount: 2,
+      recommendedHarvesterWorkParts: 10,
+      harvesterWorkParts: 10,
+      harvesterWorkDeficit: 0,
+      recommendedHaulerCount: 2,
+      recommendedHaulerCarryParts: 12,
+      haulerCarryParts: 20,
+      haulerCarryDeficit: 0,
+      consumerCriticalCount: 0,
+      consumerFallbackCount: 0,
+      sourceContainersReady: 2
+    },
+    emergency: false
+  };
+  const want = spawnManager.desired(surplus);
+  assert.equal(want.upgrader, 3);
+
+  const pressured = Object.assign({}, surplus, {
+    economyModel: Object.assign({}, surplus.economyModel, { consumerCriticalCount: 1 })
+  });
+  assert.equal(spawnManager.desired(pressured).upgrader, 2);
+
+  const building = Object.assign({}, surplus, { sites: [{ id:'site-live' }] });
+  assert.equal(spawnManager.desired(building).upgrader, 2);
+}
+
+{
+  global.Game = { time: 5700, creeps: { scout: { name:'scout', memory:{ role:'scout', home:'E8N1' }, room:{ name:'E8N1' } } } };
+  const s = spawnState(500);
+  const creeps = s.state.room.find(FIND_MY_CREEPS);
+  creeps.push({ name:'upgrader-second', ticksToLive:500, memory:{role:'upgrader'} });
+  s.state.byRole.upgrader = 2;
+  s.state.sites = [];
+  s.state.energyStored = 5800;
+  s.state.economyMetrics.energyCappedStreak = 75;
+  s.state.economyMetrics.spawnIdleStreak = 178;
+  Object.assign(s.state.economyModel, {
+    harvesterWorkDeficit: 0,
+    haulerCarryDeficit: 0,
+    consumerCriticalCount: 0,
+    consumerFallbackCount: 0,
+    sourceContainersReady: 2
+  });
+
+  assert.equal(spawnManager.desired(s.state).upgrader, 3);
+  assert.equal(spawnManager.spawnOne(s.state), true);
+  assert.equal(s.spawned().opts.memory.role, 'upgrader');
+  assert.equal(s.spawned().body.filter(p => p === WORK).length, 4);
+}
