@@ -335,10 +335,17 @@ function deliverToConsumer(creep) {
     return true;
   }
   if (rc === OK) {
-    if (freeEnergyCapacity(target) <= 0) {
+    if (target.memory) {
+      // Any confirmed hauler delivery means logistics has recovered for this
+      // consumer. Clear the self-supply fallback immediately, even when the
+      // transfer is partial, or the consumer remains falsely critical and
+      // re-enters self-harvest on its next empty cycle.
       target.memory.waitingEnergyTicks = 0;
       target.memory.logisticsFallback = false;
-      delete target.memory.lastHaulerDeliveryTick;
+    }
+
+    if (freeEnergyCapacity(target) <= 0) {
+      if (target.memory) delete target.memory.lastHaulerDeliveryTick;
       clearConsumerTarget(creep);
     } else if (target.memory && typeof Game !== 'undefined' && Number.isFinite(Game.time)) {
       // Partial delivery is still useful productive energy. Mark it explicitly
