@@ -1072,3 +1072,39 @@ Current stop rule after PR #80:
 - do not add a fourth upgrader or fourth hauler from the pre-fix replacement-shock window;
 - verify that an expiring optional third upgrader now ages out without an overlapping 600-energy replacement and that consumer fallback/critical pressure does not spike during the lifecycle transition;
 - keep E4 strictly `SHADOW` / `SHADOW_EVIDENCE`.
+
+
+## 2026-10-07 — post-#80 live validation / #82 containerized mining recovery
+
+The first post-#80 live window `3759401–3759500` confirms the optional third mature-surplus upgrader now ages out without an overlapping replacement spawn. The room starts the window with three upgraders and reaches two by tick `3759450`; no `SPAWN_OK` event appears in the window for another upgrader. This validates the lifecycle change from PR #80.
+
+The window still contains a temporary logistics-pressure phase, but a separate mining-model defect is now visible:
+
+- both source containers are ready;
+- theoretical source income remains `20 e/t`;
+- live harvesters provide only `7 WORK`, split `2 WORK` on the long route and `5 WORK` on the short route;
+- actual dedicated mining is therefore `14 e/t`;
+- the economy model nevertheless reports `recommendedHarvesterWorkParts = 7` and `harvesterWorkDeficit = 0`;
+- productive demand is only `8–9/t`, so the old recommendation logic treats the degraded mining state as self-sufficient.
+
+This matters because productive WORK demand excludes spawn/extension refill, creep lifecycle replacement, and reserve recovery. A degraded essential harvester can therefore become permanently accepted even though completed container logistics can sustain full source throughput.
+
+Observed post-#80 evidence also shows the room recovering consumer pressure after the optional third upgrader expires: by tick `3759500`, fallback/waiting/critical counts are all zero and Health returns to `100 / HEALTHY`. However, dedicated mining remains `14/20 e/t`, so the underlying capacity loss is still unresolved without an explicit recovery target.
+
+PR #82 corrects only that recovery target:
+
+- once all source containers are ready, full theoretical source throughput becomes the mining floor;
+- the live `7 WORK / 14 e/t` state now recommends `10 WORK`, reports `3 WORK` deficit, and temporarily requests one additional current-sized harvester;
+- with two normal `5 WORK` harvesters, mining returns to `20 e/t`, deficit returns to zero, and the recommended harvester count returns to two;
+- before all source containers are ready, the existing bootstrap demand-driven behavior is unchanged;
+- hauler floors/caps, mature-surplus upgrader cap, CPU thresholds, and E4/VNext authority are unchanged.
+
+Exact branch regression coverage passed before merge for both `economy-model.test.mjs` and `spawn-economy.test.mjs`.
+
+Current stop rule after PR #82:
+
+- deploy PR #82 before evaluating mining/logistics pressure further;
+- verify that the live `14/20 e/t` state produces a temporary harvester-capacity recovery request and returns to full `20/20 e/t` mining;
+- do not add a fourth hauler or fourth upgrader from the pre-recovery pressure window;
+- keep E4 strictly `SHADOW` / `SHADOW_EVIDENCE`;
+- after mining recovery, reassess exact productive and E4 windows before any additional scaling change.
