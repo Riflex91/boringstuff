@@ -1208,3 +1208,42 @@ Current stop rule after PR #88:
 - verify E1 assignment/request evidence is not inflated by `SCOUT_INTEL`;
 - legacy scout behavior must remain unchanged;
 - after I1 live validation, continue the roadmap with P2/P3 planner + defense-perimeter foundations rather than returning to general economy tuning.
+
+## 2026-10-07 — I1 contract completion / canonical CI (#90)
+
+PR #90 closes the remaining explicit I1 test-contract gaps after the functional SHADOW slice in PR #88.
+
+Additional regression coverage now explicitly verifies:
+
+- stale-only frontier demand;
+- threat uncertainty increasing both scout priority and urgency;
+- hard `maxDepth` and `maxRequests` bounds;
+- deterministic equal-score ordering;
+- source/target/domain/kind/capability/shadow request fields;
+- `request.shadow` publication into the E0 scouting domain and `scoutingFrontier` summary;
+- E1 request/unfilled evidence remaining unchanged by `SCOUT_INTEL`.
+
+PR #90 also adds `.github/workflows/npm-test.yml`, which runs the canonical `tools/package.json` `npm test` script with Node `24.21.0` on pull requests and pushes to `main`.
+
+Validation:
+
+- exact tested PR head: `bdbb54e7f2f249f665a168835bb76a94ab5c5ffd`;
+- pull-request workflow run `37672079001`: completed / success;
+- GitHub Check-Run `test`: completed / success;
+- Classic Statuses: none;
+- no review threads and no `CHANGES_REQUESTED`;
+- PR #90 merged with merge method `merge`;
+- merge SHA: `767fdc85d597bbb49cedfa19ddd45a8c401acab5`;
+- post-merge `main` Check-Run `test`: completed / success.
+
+No gameplay code, movement authority, spawn policy, CPU threshold, or E4 authority changed in PR #90.
+
+Current stop rule remains unchanged:
+
+- deploy current `main` before starting the next runtime slice;
+- verify I1 live telemetry remains `SHADOW`, bounded, sensible and self-closing when intel becomes fresh;
+- verify E1 evidence is not inflated by `SCOUT_INTEL`;
+- keep legacy `role.scout` authoritative;
+- keep E4 strictly `SHADOW` / `SHADOW_EVIDENCE`;
+- after I1 live validation, continue with P2/P3 planner + Min-Cut foundations rather than returning to general economy tuning.
+
