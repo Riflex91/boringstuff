@@ -247,3 +247,14 @@ function spawnState(workerTtl) {
   assert.equal(want.builder, 0);
   assert.equal(want.hauler, 2);
 }
+
+
+{
+  global.Game = { time: 5600, creeps: { scout: { name:'scout', memory:{ role:'scout', home:'E8N1' }, room:{ name:'E8N1' } } } };
+  const s = spawnState(500);
+  s.state.sites = [];
+  s.state.economyModel.recommendedHaulerCount = 2;
+  s.state.energyStored = 1000;
+  assert.equal(spawnManager.spawnOne(s.state), true);
+  assert.equal(s.spawned().opts.memory.role, 'hauler');
+}
