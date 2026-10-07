@@ -919,3 +919,54 @@ Current stop rule:
 - do not increase the two-hauler steady target or change CPU thresholds;
 - next useful verification is the exact `3757602–3757701` productive/assignment window, using retained telemetry after tick `3757701` exists;
 - reassess consumer fallback only from that exact window, not from phase-misaligned E4/productive windows.
+
+
+## 2026-10-07 — post-#76 sticky consumer fallback fix
+
+Exact historical verification for `3757602–3757701` is fully attributable. Retained telemetry contains an exact productive-flow carrier at tick `3757800`, and the verifier reports `17 PASS / 2 WATCH / 0 FAIL`.
+
+Exact assignment/productive evidence for `3757602–3757701`:
+
+- `controllerProgress = 448`;
+- `constructionProgress = 0`;
+- `usefulWorkPerTick = 4.48`;
+- `averageRequestLatency = 63.18`;
+- `maxRequestLatency = 145`;
+- `consumerTicks = 300`;
+- `waitingConsumerTicks = 36` (`12%`);
+- `criticalConsumerTicks = 141` (`47%`);
+- `fallbackConsumerTicks = 105` (`35%`);
+- committed productive capacity is `6 progress/tick`, so observed productive utilization is about `74.7%`.
+
+The adjacent E4 window `3757593–3757692` remained evidence-safe under three live haulers:
+
+- `averageHaulers = 3`;
+- `averageMatchedHaulers = 2.97`;
+- `haulerUtilization = 0.99`;
+- `criticalRequestTicks = 138`;
+- `criticalMatchedTicks = 138`;
+- `criticalCoverageRatio = 1`;
+- `criticalCandidateRatio = 1`;
+- `criticalSlotCoverageRatio = 1`;
+- `criticalNoCandidateTicks = 0`;
+- `duplicateReservationTicks = 0`.
+
+The exact window exposed a real legacy state-machine bug rather than insufficient candidate generation. Final consumer diagnostics showed an upgrader at `95/100` energy still carrying `logisticsFallback = true` while a hauler with `279` energy was actively reserved and delivering to that same consumer. This happened because `energy.deliverToConsumer()` cleared fallback only when a transfer completely filled the consumer. A successful partial transfer merely set `lastHaulerDeliveryTick`; after spending that delivered energy, the consumer could therefore re-enter self-harvest immediately without another normal logistics wait period. The stale fallback flag also kept the consumer classified as critical and could sustain the severe three-hauler service floor after logistics had already recovered.
+
+PR #76 fixes only that sticky-fallback transition:
+
+- every successful hauler-to-consumer transfer resets `waitingEnergyTicks` and clears `logisticsFallback` immediately;
+- partial deliveries still set `lastHaulerDeliveryTick`, so the consumer resumes productive work on its next turn;
+- full deliveries continue to clear the hauler reservation as before;
+- a later empty cycle now returns to the normal logistics wait path instead of immediately self-harvesting because of a stale fallback flag;
+- desired hauler counts, economy-model floors, CPU thresholds, E4 logic, and Shadow/VNext authority are unchanged.
+
+Exact branch `consumer-supply.test.mjs` regression coverage passed before merge, including the live-shaped case where a fallback consumer receives a partial hauler delivery to `95/100` and immediately stops being critical.
+
+Current stop rule after PR #76:
+
+- deploy PR #76 before interpreting another consumer-fallback window;
+- do not increase the steady two-hauler target or the severe three-hauler cap from the pre-fix window;
+- verify that partial hauler deliveries clear stale fallback/critical state and that the severe floor relaxes naturally when pressure clears;
+- compare an exact post-#76 productive window against `3757602–3757701`, especially fallback ratio (`35%` baseline), controller throughput (`4.48/tick`), and E4 duplicate-free critical coverage;
+- E4 remains strictly `SHADOW` / `SHADOW_EVIDENCE`.
