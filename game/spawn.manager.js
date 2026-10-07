@@ -130,6 +130,15 @@ function countRoleAvailable(state, role) {
   return active + spawning;
 }
 
+function productivePrespawnShortfall(state, role, wantCount) {
+  if (role !== 'worker' && role !== 'builder' && role !== 'upgrader') return false;
+  const want = Math.max(0, Number(wantCount) || 0);
+  if (want <= 0) return false;
+  const total = countRole(state.room, role);
+  const available = countRoleAvailable(state, role);
+  return total >= want && available < want;
+}
+
 function spawnOne(state) {
   const spawn = state.spawn;
   if (!spawn || spawn.spawning) return false;
@@ -151,7 +160,7 @@ function spawnOne(state) {
   if (!role && state.rcl >= 2) {
     const baseHarvesters = Math.max(1, state.sources.length);
     const harvesters = countRole(state.room, 'harvester');
-    const workers = countRole(state.room, 'worker');
+    const workers = countRoleAvailable(state, 'worker');
     const builders = countRoleAvailable(state, 'builder');
     const upgraders = countRoleAvailable(state, 'upgrader');
     const haulers = countRole(state.room, 'hauler');
@@ -204,10 +213,17 @@ function spawnOne(state) {
   }
 
   const available = state.emergency ? state.energyAvailable : state.energyCapacityAvailable;
+  const prespawnShortfall = productivePrespawnShortfall(state, role, want[role]);
   let creepBody = bodyFor(role, available, state);
   let cost = creepBody.reduce((sum, p) => sum + BODYPART_COST[p], 0);
   if (cost > state.energyAvailable) {
-    if (!state.emergency && state.energyAvailable < Math.min(300, state.energyCapacityAvailable)) return false;
+    const lowEnergyFloor = Math.min(300, state.energyCapacityAvailable);
+    if (!state.emergency && state.energyAvailable < lowEnergyFloor && !prespawnShortfall) return false;
+
+    // A productive prespawn is time-sensitive: waiting for the room to refill
+    // to 300+ energy can consume the remaining TTL and recreate the exact
+    // capacity gap prespawn is meant to prevent. Only a confirmed prespawn
+    // shortfall may use the smaller immediately-affordable replacement body.
     creepBody = bodyFor(role, state.energyAvailable, Object.assign({}, state, { emergency: true }));
     cost = creepBody.reduce((sum, p) => sum + BODYPART_COST[p], 0);
   }
@@ -225,4 +241,4 @@ function spawnOne(state) {
   return false;
 }
 
-module.exports = { desired, spawnOne, _test: { countRole, productivePrespawnHorizon, countRoleAvailable } };
+module.exports = { desired, spawnOne, _test: { countRole, productivePrespawnHorizon, countRoleAvailable, productivePrespawnShortfall } };
