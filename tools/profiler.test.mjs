@@ -18,7 +18,9 @@ global.Game = {
   }
 };
 
+const config = require('../game/config.js');
 const profiler = require('../game/profiler.js');
+assert.equal(config.CPU_PROFILE_HISTORY_LIMIT, 12);
 
 function cpuSequence(values) {
   let index = 0;
@@ -135,6 +137,20 @@ function cpuSequence(values) {
   assert.equal(sample.used, 4);
   assert.equal(sample.details['creep.hauler'], 2.5);
   assert.equal(sample.unattributed, 4);
+}
+
+{
+  // Persistent CPU history is diagnostic only and must remain bounded so the
+  // first Memory parse of a tick cannot grow without limit.
+  Memory.bot.cpu.history = [];
+  for (let i = 1; i <= 20; i++) {
+    Game.time = i * 25;
+    cpuSequence([i]);
+    profiler.finishTick();
+  }
+  assert.equal(Memory.bot.cpu.history.length, config.CPU_PROFILE_HISTORY_LIMIT);
+  assert.equal(Memory.bot.cpu.history[0].tick, 225);
+  assert.equal(Memory.bot.cpu.history.at(-1).tick, 500);
 }
 
 console.log('profiler tests passed');
