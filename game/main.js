@@ -14,6 +14,7 @@ const processScheduler = require('process.scheduler');
 const worldIntel = require('world.intel');
 const colonyState = require('colony.state');
 const plannerVNextShadow = require('planner.vnext.shadow');
+const defenseMinCutShadow = require('defense.mincut.shadow');
 
 function bootstrapMemory() {
   if (!Memory.bot) Memory.bot = { version: config.VERSION, born: Game.time };
@@ -134,7 +135,8 @@ function statusSnapshot(roomStates, tickCpu) {
           }
         : null,
       colonyState: colonyState.telemetrySummary(state.colonyState),
-      plannerVNext: plannerVNextShadow.telemetrySummary(state.plannerVNextShadow)
+      plannerVNext: plannerVNextShadow.telemetrySummary(state.plannerVNextShadow),
+      defenseMinCut: defenseMinCutShadow.telemetrySummary(state.defenseMinCutShadow)
     };
   }
   logger.info('STATUS_SNAPSHOT', 'Structured bot status snapshot', {
@@ -264,6 +266,46 @@ module.exports.loop = function() {
         plannerVNextShadow.snapshot(state.room.name, undefined, Game);
     }
 
+    const p3Eligible = roomStates.some(state =>
+      state.plannerVNextShadow &&
+      state.plannerVNextShadow.authority === 'SHADOW' &&
+      state.plannerVNextShadow.status === 'READY' &&
+      Number.isFinite(state.plannerVNextShadow.planTick) &&
+      state.plannerVNextShadow.planTick < Game.time
+    );
+
+    let defenseMinCutRun = { ran: false, result: null };
+    if (p3Eligible) {
+      defenseMinCutRun = processScheduler.run({
+        id: 'defense-mincut-shadow',
+        priorityClass: processScheduler.PRIORITY.OVERFLOW,
+        minimumInterval: Math.max(1, config.PLANNER_INTERVAL * 10),
+        freshnessRequirement: Math.max(1, config.PLANNER_INTERVAL * 30)
+      }, function() {
+        return profiler.section('defense-mincut-shadow', function() {
+          const byRoom = {};
+          for (const state of roomStates) {
+            const p2 = state.plannerVNextShadow;
+            if (!p2 || p2.authority !== 'SHADOW' || p2.status !== 'READY') continue;
+            byRoom[state.room.name] = defenseMinCutShadow.evaluate(state, p2, undefined, Game, {
+              margin: defenseMinCutShadow.DEFAULT_MARGIN,
+              maxGridTiles: defenseMinCutShadow.DEFAULT_MAX_GRID_TILES,
+              maxAugmentations: defenseMinCutShadow.DEFAULT_MAX_AUGMENTATIONS
+            });
+          }
+          return byRoom;
+        });
+      }, schedulerContext);
+    }
+
+    const currentDefensePlans = defenseMinCutRun.ran && defenseMinCutRun.result
+      ? defenseMinCutRun.result
+      : {};
+    for (const state of roomStates) {
+      state.defenseMinCutShadow = currentDefensePlans[state.room.name] ||
+        defenseMinCutShadow.snapshot(state.room.name, undefined, Game);
+    }
+
     processScheduler.run({
       id: 'stats',
       priorityClass: processScheduler.PRIORITY.STANDARD,
@@ -281,7 +323,7 @@ module.exports.loop = function() {
     }, schedulerContext);
 
     const scheduledTotal = Math.max(0, Game.cpu.getUsed() - scheduledStart);
-    const sectionTotal = currentSectionTotal(['rooms', 'creeps', 'world-intel', 'planner-vnext-shadow', 'stats', 'visuals']);
+    const sectionTotal = currentSectionTotal(['rooms', 'creeps', 'world-intel', 'planner-vnext-shadow', 'defense-mincut-shadow', 'stats', 'visuals']);
     profiler.detailValue('main.scheduler-overhead', Math.max(0, scheduledTotal - sectionTotal));
 
     profiler.finishTick(tickStart);
