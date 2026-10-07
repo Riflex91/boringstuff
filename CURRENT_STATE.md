@@ -1247,3 +1247,39 @@ Current stop rule remains unchanged:
 - keep E4 strictly `SHADOW` / `SHADOW_EVIDENCE`;
 - after I1 live validation, continue with P2/P3 planner + Min-Cut foundations rather than returning to general economy tuning.
 
+## 2026-10-07 — I1 live SHADOW gate
+
+Post-deploy smoke window `3761445–3761469` completed with `9 PASS / 0 WATCH / 0 FAIL`:
+
+- Node `24.21.0`;
+- exact bot version `0.3.0-shadow.8-node24`;
+- no runtime or collector errors;
+- CPU/bucket safe;
+- mining active;
+- no hard stall;
+- telemetry continuity intact.
+
+The dedicated I1 live verifier then evaluated `3761445–3761544`:
+
+- `4 PASS / 2 WATCH / 0 FAIL`;
+- `scoutingFrontier.authority = SHADOW` in every observed heartbeat;
+- frontier count/request count/depth/top-request telemetry remained within contract bounds;
+- E0 `byDomain.scouting` stayed synchronized with I1 request count;
+- latest frontier had `frontierCount = 19`, bounded `requestCount = 6`, `maxDepth = 3`;
+- top frontier candidates were stale/threat-uncertain rooms and scored consistently with I1 Value-of-Information inputs;
+- no live request-closure transition occurred inside this 100-tick sample;
+- no live transition isolated a scouting-demand change while non-scout E1 inputs were otherwise stable.
+
+The two WATCH results are observational gaps, not failures. Static regression coverage already proves fresh-intel reconciliation and hard exclusion of `SCOUT_INTEL` from E1 `requestAssignable()`. I1 therefore passes its initial SHADOW live gate without authority promotion.
+
+The adjacent general live window `3761445–3761544` completed `12 PASS / 7 WATCH / 0 FAIL`. Safety checks remained green. WATCH findings were cadence/optimization evidence gaps (productive attribution alignment, temporary consumer waiting/critical state without fallback, unavailable exact-window progress/throughput fields, Efficiency WATCH, and incomplete exact-window E4 evidence), not regressions attributable to I1.
+
+Decision:
+
+- I1 remains strictly `SHADOW`;
+- legacy `role.scout` remains authoritative;
+- no scout authority promotion is allowed from this evidence;
+- E4 remains strictly `SHADOW / SHADOW_EVIDENCE`;
+- no CPU thresholds or economy/logistics tuning changes are justified;
+- roadmap may proceed to P2 Planner VNext in SHADOW mode.
+
