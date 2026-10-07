@@ -16,7 +16,6 @@ const colonyState = require('colony.state');
 const plannerVNextShadow = require('planner.vnext.shadow');
 const defenseMinCutShadow = require('defense.mincut.shadow');
 const remoteRoiShadow = require('remote.roi.shadow');
-const telemetryJournal = require('telemetry.journal');
 
 function bootstrapMemory() {
   if (!Memory.bot) Memory.bot = { version: config.VERSION, born: Game.time };
@@ -109,7 +108,9 @@ function memoryFootprintSnapshot() {
     }
   } catch (err) {}
 
-  const journal = telemetryJournal.status();
+  const journal = Memory.bot && Memory.bot.telemetryJournal || null;
+  const snapshots = journal && Array.isArray(journal.snapshots) ? journal.snapshots.length : 0;
+  const events = journal && Array.isArray(journal.events) ? journal.events.length : 0;
   const logs = Memory.bot && Array.isArray(Memory.bot.logs) ? Memory.bot.logs.length : 0;
   const cpuHistory = Memory.bot && Memory.bot.cpu && Array.isArray(Memory.bot.cpu.history)
     ? Memory.bot.cpu.history.length
@@ -117,9 +118,11 @@ function memoryFootprintSnapshot() {
 
   return {
     rawBytes,
-    journalApproxBytes: journal.approxBytes,
-    journalRecords: journal.records,
-    journalDroppedThroughSeq: journal.droppedThroughSeq,
+    journalApproxBytes: journal && Number.isFinite(journal.approxBytes) ? journal.approxBytes : null,
+    journalRecords: snapshots + events,
+    journalDroppedThroughSeq: journal && Number.isFinite(journal.droppedThroughSeq)
+      ? journal.droppedThroughSeq
+      : 0,
     logs,
     cpuHistory
   };
