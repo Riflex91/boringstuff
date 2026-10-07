@@ -1334,3 +1334,60 @@ Current stop rule:
 - do not start P3 Min-Cut or promote P2 authority until the P2 live gate is reviewed;
 - E4 remains strictly `SHADOW / SHADOW_EVIDENCE`.
 
+## 2026-10-07 — P2 live SHADOW gate
+
+Deployment smoke window `3761879–3761903` passed with `9 PASS / 0 WATCH / 0 FAIL`.
+
+The complete 100-tick general live window `3761879–3761978` completed with `13 PASS / 6 WATCH / 0 FAIL`:
+
+- no runtime or collector errors;
+- CPU/bucket safe;
+- dedicated mining active;
+- no hard stall;
+- durable telemetry contiguous;
+- hauler capacity sufficient;
+- no consumer fallback/waiting/critical pressure;
+- K0/K1/I0 platform telemetry present;
+- VNext authority remained shadow/evidence-only.
+
+The remaining general WATCH findings were evidence cadence/optimization observations only: productive-flow window alignment, unavailable exact-window controller/construction/throughput values, Efficiency WATCH, and E4 exact-window evidence alignment.
+
+The dedicated P2 verifier completed `7 PASS / 0 WATCH / 0 FAIL` for the same window:
+
+- `plannerVNext.authority = SHADOW`;
+- legacy planner authority remained `UNCHANGED`;
+- P2 produced a valid `READY` plan;
+- candidate/evaluated counts, path budget, objective scores and feasibility contracts were valid;
+- exact P1-backed in-room route evidence was used;
+- `planner-vnext-shadow` remained an independent scheduler process;
+- plan freshness was valid.
+
+Observed selected P2 candidate:
+
+- anchor `E8N1 (20,29)`, source `CENTROID_OFFSET_6`;
+- variant `CORE_BALANCED`;
+- score `83.58`;
+- extension feasibility `0.806`;
+- whole-plan feasibility `0.808`;
+- `criticalBlocked = 0`;
+- source average route cost `14.5`;
+- controller route cost `5`;
+- exact route count `4`, fallback route count `0`.
+
+Observed P2 scheduler cost:
+
+- first run CPU `17.485`;
+- process class remains `OVERFLOW`;
+- minimum interval remains 100 ticks;
+- no safety/bucket failure occurred.
+
+Decision:
+
+- P2 passes its initial SHADOW live gate;
+- P2 remains SHADOW; no construction authority promotion;
+- legacy `game/room.planner.js` remains authoritative;
+- the 17.485 CPU planner sample is retained as an optimization target and must not be hidden by threshold changes;
+- roadmap may proceed to P3 Min-Cut Defense Perimeter in SHADOW mode;
+- P3 must consume economic topology first, generate versioned defensive artifacts, evaluate rampart count/repair burden/tower coverage/breach routes/exit exposure/traffic crossings, and remain non-authoritative;
+- E4 remains strictly `SHADOW / SHADOW_EVIDENCE`.
+
