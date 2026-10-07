@@ -240,7 +240,7 @@ module.exports.loop = function() {
 
     const plannerVNextRun = processScheduler.run({
       id: 'planner-vnext-shadow',
-      priorityClass: processScheduler.PRIORITY.BACKGROUND,
+      priorityClass: processScheduler.PRIORITY.OVERFLOW,
       minimumInterval: Math.max(1, config.PLANNER_INTERVAL * 2),
       freshnessRequirement: Math.max(1, config.PLANNER_INTERVAL * 6)
     }, function() {
