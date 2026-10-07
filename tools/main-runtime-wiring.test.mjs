@@ -34,4 +34,26 @@ assert.match(
   'STATUS_SNAPSHOT must expose compact P2 SHADOW telemetry'
 );
 
+
+assert.match(
+  mainSource,
+  /const\s+defenseMinCutShadow\s*=\s*require\(['"]defense\.mincut\.shadow['"]\);/,
+  'main.js must import defense.mincut.shadow for P3 SHADOW'
+);
+assert.match(
+  mainSource,
+  /id:\s*['"]defense-mincut-shadow['"][\s\S]*?priorityClass:\s*processScheduler\.PRIORITY\.OVERFLOW/,
+  'P3 min-cut must run only on the OVERFLOW scheduler budget'
+);
+assert.match(
+  mainSource,
+  /state\.plannerVNextShadow\.planTick\s*<\s*Game\.time/,
+  'P3 must not run in the same tick as a freshly computed P2 plan'
+);
+assert.match(
+  mainSource,
+  /defenseMinCut:\s*defenseMinCutShadow\.telemetrySummary\(state\.defenseMinCutShadow\)/,
+  'STATUS_SNAPSHOT must expose compact P3 SHADOW telemetry'
+);
+
 console.log('main runtime wiring tests passed');

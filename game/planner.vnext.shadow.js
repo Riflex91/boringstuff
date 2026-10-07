@@ -429,7 +429,7 @@ function routeMetrics(state, anchor, options, memoryRoot, game) {
     const fallback = fallbackRouteCost(anchor, goal.pos);
     if (budget.remaining <= 0) {
       budget.fallback += 1;
-      results.push({ kind: goal.kind, cost: fallback, exact: false, reason: 'PATH_BUDGET' });
+      results.push({ kind: goal.kind, cost: fallback, exact: false, reason: 'PATH_BUDGET', path: [] });
       continue;
     }
     budget.remaining -= 1;
@@ -446,7 +446,12 @@ function routeMetrics(state, anchor, options, memoryRoot, game) {
       kind: goal.kind,
       cost: normalizePathCost(response, fallback),
       exact,
-      reason: exact ? null : (response && response.reason || (response && response.incomplete ? 'INCOMPLETE' : 'FALLBACK'))
+      reason: exact ? null : (response && response.reason || (response && response.incomplete ? 'INCOMPLETE' : 'FALLBACK')),
+      path: exact && Array.isArray(response.path)
+        ? response.path
+            .filter(step => step && Number.isFinite(step.x) && Number.isFinite(step.y))
+            .map(step => ({ x: Math.round(step.x), y: Math.round(step.y), roomName }))
+        : []
     });
   }
 

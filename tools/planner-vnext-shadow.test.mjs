@@ -60,7 +60,11 @@ function routeProvider(from, to) {
   return {
     ok: true,
     incomplete: false,
-    cost: Math.max(Math.abs(from.x - to.x), Math.abs(from.y - to.y)) * 2
+    cost: Math.max(Math.abs(from.x - to.x), Math.abs(from.y - to.y)) * 2,
+    path: [
+      { x: from.x, y: from.y, roomName: from.roomName || to.roomName },
+      { x: to.x, y: to.y, roomName: to.roomName || from.roomName }
+    ]
   };
 }
 
@@ -133,6 +137,24 @@ function routeProvider(from, to) {
   assert.equal(telemetry.legacyPlannerAuthority, 'UNCHANGED');
   assert.ok(telemetry.topCandidates.length <= 3);
   assert.equal(Object.hasOwn(telemetry.selected || {}, 'plannedStructures'), false);
+  assert.equal(Object.hasOwn(telemetry.selected?.routes || {}, 'routes'), false);
+}
+
+{
+  const state = makeState();
+  const routes = planner.routeMetrics(
+    state,
+    { x: 25, y: 25, roomName: 'E8N1' },
+    { pathSearchBudget: 4, routeCostProvider: routeProvider },
+    {},
+    { time: 1050 }
+  );
+  assert.equal(routes.exactRouteCount, 4);
+  assert.equal(routes.fallbackRouteCount, 0);
+  assert.ok(routes.routes.every(route => route.path.length > 0));
+  assert.ok(routes.routes.every(route =>
+    route.path.every(step => Number.isFinite(step.x) && Number.isFinite(step.y))
+  ));
 }
 
 {
