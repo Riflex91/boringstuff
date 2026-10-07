@@ -145,7 +145,7 @@ function routeProvider(from, to) {
   const routes = planner.routeMetrics(
     state,
     { x: 25, y: 25, roomName: 'E8N1' },
-    { pathSearchBudget: 4, routeCostProvider },
+    { pathSearchBudget: 4, routeCostProvider: routeProvider },
     {},
     { time: 1050 }
   );
