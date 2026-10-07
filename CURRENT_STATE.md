@@ -1649,3 +1649,108 @@ Decision:
 - the next roadmap slice is I2 — Remote ROI, because I2 depends on I0 and is now unblocked, while D1 still requires D0 + P3;
 - I2 must start in SHADOW/evidence-only mode and must not enable remote mining or create remote execution authority from its first release.
 
+## 2026-10-07 — I2 Remote ROI SHADOW pending live gate
+
+I2 — Remote ROI is implemented in strict SHADOW/evidence-only mode.
+
+Runtime implementation PR #106:
+
+- exact tested PR head `3bd5e988de1bacc7cd371bacb66fcc80bb4b5697`;
+- merge SHA `a34dc53175956a1600760e962e08c24a42841b52`;
+- canonical PR `npm test`: success;
+- post-merge `main` canonical test: success;
+- new module: `game/remote.roi.shadow.js`;
+- new regression suite: `tools/remote-roi-shadow.test.mjs`;
+- runtime wiring is covered by `tools/main-runtime-wiring.test.mjs`.
+
+I2 model contract:
+
+- discovers only known I0 frontier candidates within bounded depth;
+- unknown frontier rooms remain I1's responsibility and are not invented by I2;
+- requires fresh intel;
+- rejects owned rooms, occupied rooms, foreign reservations, no-source rooms and unsupported room status;
+- uses P1 world-route feasibility;
+- bounds route hops;
+- computes expected gross income and separate cost components for:
+  - miner amortization;
+  - hauling amortization;
+  - reservation;
+  - infrastructure;
+  - repair;
+  - travel loss;
+  - expected hostile loss;
+  - CPU opportunity cost;
+- derives confidence-adjusted net energy/tick and normalized score;
+- persists compact per-home `WorldIntel.economics.remoteScore` evidence.
+
+Safety/authority contract:
+
+- `authority = SHADOW`;
+- `activationAuthority = NONE`;
+- `ENABLE_REMOTE_MINING = false` remains unchanged;
+- I2 creates no remote creeps;
+- I2 creates no spawn requests;
+- I2 creates no logistics requests;
+- I2 creates no claim intents;
+- I2 creates no construction intents;
+- recommendation states are evidence-only: `CANDIDATE`, `SUSPENDED`, `THREATENED`;
+- I2 must never emit `ACTIVE` in this release;
+- legacy gameplay remains authoritative.
+
+CPU isolation:
+
+- process id `remote-roi-shadow`;
+- scheduler class `OVERFLOW`;
+- minimum interval `PLANNER_INTERVAL * 5` = 250 ticks;
+- freshness requirement `PLANNER_INTERVAL * 20` = 1000 ticks;
+- I2 does not execute on a tick where P2 or P3 actually ran;
+- this preserves the CPU-stacking mitigation validated during the P3 gate.
+
+Read-only live verifier PR #107:
+
+- exact tested PR head `304e4060cc3329bfe08708e623371f81b99c9477`;
+- merge SHA/current main `8ec8725fbeb1b18b253e4c39f8cf44f1ab6e63a9`;
+- canonical PR `npm test`: success;
+- post-merge `main` canonical test: success;
+- command: `npm run verify:i2`;
+- verifier checks:
+  - STATUS_SNAPSHOT remote ROI evidence;
+  - SHADOW authority;
+  - activation authority NONE;
+  - remote mining disabled;
+  - READY artifact status;
+  - ROI count ordering and candidate contracts;
+  - no ACTIVE recommendation;
+  - live candidate observation;
+  - independent scheduler evidence;
+  - isolated I2 CPU;
+  - artifact freshness.
+
+I2 isolated CPU diagnostics:
+
+- PASS at `<= 5 CPU`;
+- WATCH at `> 5 CPU` and `<= 10 CPU`;
+- FAIL at `> 10 CPU`.
+
+These thresholds are I2-specific diagnostics and do not change or weaken the general live CPU safety threshold.
+
+Pending-live stop rule:
+
+1. deploy current `main` at or after `8ec8725fbeb1b18b253e4c39f8cf44f1ab6e63a9`;
+2. require a new 25-tick smoke gate with no FAIL;
+3. collect a complete fresh 100-tick window from the same deployment;
+4. run:
+   - `verify:live`;
+   - `verify:i1`;
+   - `verify:i2`;
+   - `verify:p2`;
+   - `verify:p3`;
+5. require no general hard CPU/bucket/runtime/collector/mining/stall failure;
+6. require I2 authority `SHADOW`, activation authority `NONE`, remote mining disabled and no ACTIVE recommendation;
+7. require I2 scheduler isolation and isolated CPU `<= 10`;
+8. candidate-observation may be WATCH if no known candidate exists, but any observed candidate must satisfy the ROI contract;
+9. do not enable remote mining or grant I2 execution authority from this first live gate;
+10. do not start I3 expansion scoring or D0 threat-model implementation until the I2 live evidence has been reviewed and recorded.
+
+P2/P3 remain SHADOW and legacy planner authority remains unchanged. E4 remains strictly `SHADOW / SHADOW_EVIDENCE`.
+
