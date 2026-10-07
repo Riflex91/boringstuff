@@ -126,10 +126,6 @@ function routeProvider(from, to) {
   assert.ok(result.selected.plannedStructures.every(slot => typeof slot.earliestCapability === 'string'));
   assert.ok(result.selected.plannedStructures.some(slot => slot.type === 'extension'));
   assert.ok(result.selected.plannedStructures.some(slot => slot.type === 'tower'));
-  assert.ok(result.selected.routes.routes.some(route => route.path.length > 0));
-  assert.ok(result.selected.routes.routes.every(route =>
-    !route.exact || route.path.every(step => Number.isFinite(step.x) && Number.isFinite(step.y))
-  ));
   assert.equal(state.room.constructionCalls(), 0);
 
   const stored = planner.snapshot('E8N1', memory, { time: 1001 });
@@ -142,6 +138,23 @@ function routeProvider(from, to) {
   assert.ok(telemetry.topCandidates.length <= 3);
   assert.equal(Object.hasOwn(telemetry.selected || {}, 'plannedStructures'), false);
   assert.equal(Object.hasOwn(telemetry.selected?.routes || {}, 'routes'), false);
+}
+
+{
+  const state = makeState();
+  const routes = planner.routeMetrics(
+    state,
+    { x: 25, y: 25, roomName: 'E8N1' },
+    { pathSearchBudget: 4, routeCostProvider },
+    {},
+    { time: 1050 }
+  );
+  assert.equal(routes.exactRouteCount, 4);
+  assert.equal(routes.fallbackRouteCount, 0);
+  assert.ok(routes.routes.every(route => route.path.length > 0));
+  assert.ok(routes.routes.every(route =>
+    route.path.every(step => Number.isFinite(step.x) && Number.isFinite(step.y))
+  ));
 }
 
 {
