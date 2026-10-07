@@ -56,4 +56,26 @@ assert.match(
   'STATUS_SNAPSHOT must expose compact P3 SHADOW telemetry'
 );
 
+
+assert.match(
+  mainSource,
+  /const\s+remoteRoiShadow\s*=\s*require\(['"]remote\.roi\.shadow['"]\);/,
+  'main.js must import remote.roi.shadow for I2 SHADOW'
+);
+assert.match(
+  mainSource,
+  /id:\s*['"]remote-roi-shadow['"][\s\S]*?priorityClass:\s*processScheduler\.PRIORITY\.OVERFLOW/,
+  'I2 remote ROI must run only on the OVERFLOW scheduler budget'
+);
+assert.match(
+  mainSource,
+  /const\s+i2CanRun\s*=\s*!plannerVNextRun\.ran\s*&&\s*!defenseMinCutRun\.ran/,
+  'I2 must not stack on the same tick as an actual P2 or P3 run'
+);
+assert.match(
+  mainSource,
+  /remoteRoi:\s*remoteRoiShadow\.telemetrySummary\(state\.remoteRoiShadow\)/,
+  'STATUS_SNAPSHOT must expose compact I2 SHADOW telemetry'
+);
+
 console.log('main runtime wiring tests passed');
