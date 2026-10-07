@@ -16,6 +16,7 @@ const colonyState = require('colony.state');
 const plannerVNextShadow = require('planner.vnext.shadow');
 const defenseMinCutShadow = require('defense.mincut.shadow');
 const remoteRoiShadow = require('remote.roi.shadow');
+const telemetryJournal = require('telemetry.journal');
 
 function bootstrapMemory() {
   if (!Memory.bot) Memory.bot = { version: config.VERSION, born: Game.time };
@@ -99,6 +100,31 @@ function consumerSupplySnapshot(state) {
   };
 }
 
+function memoryFootprintSnapshot() {
+  let rawBytes = null;
+  try {
+    if (typeof RawMemory !== 'undefined' && RawMemory && typeof RawMemory.get === 'function') {
+      const raw = RawMemory.get();
+      if (typeof raw === 'string') rawBytes = raw.length;
+    }
+  } catch (err) {}
+
+  const journal = telemetryJournal.status();
+  const logs = Memory.bot && Array.isArray(Memory.bot.logs) ? Memory.bot.logs.length : 0;
+  const cpuHistory = Memory.bot && Memory.bot.cpu && Array.isArray(Memory.bot.cpu.history)
+    ? Memory.bot.cpu.history.length
+    : 0;
+
+  return {
+    rawBytes,
+    journalApproxBytes: journal.approxBytes,
+    journalRecords: journal.records,
+    journalDroppedThroughSeq: journal.droppedThroughSeq,
+    logs,
+    cpuHistory
+  };
+}
+
 function statusSnapshot(roomStates, tickCpu) {
   const rooms = {};
   const profile = serverProfile.snapshot();
@@ -150,6 +176,7 @@ function statusSnapshot(roomStates, tickCpu) {
     serverProfile: profile,
     scheduler: schedulerState,
     worldIntel: worldIntelState,
+    memoryFootprint: memoryFootprintSnapshot(),
     rooms
   }, { force: true, persist: false, dedupeTicks: 0 });
 }
