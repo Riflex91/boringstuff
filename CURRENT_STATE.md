@@ -1555,3 +1555,97 @@ Revalidation stop rule:
 - review P3 dependency freshness again after the new P2 artifact is visible;
 - do not begin the next roadmap slice or promote P2/P3 authority until this revalidation is complete.
 
+## 2026-10-07 — P3 SHADOW live gate passed
+
+Revalidation deployment after the SHADOW CPU-headroom mitigation completed successfully.
+
+Smoke gate:
+
+- window `3762764–3762788`;
+- `9 PASS / 0 WATCH / 0 FAIL`;
+- Node `24.21.0`;
+- runtime/collector health, CPU/bucket, mining, hard-stall and telemetry continuity all passed.
+
+Complete 100-tick live window:
+
+- window `3762764–3762863`;
+- general verifier: `12 PASS / 7 WATCH / 0 FAIL`;
+- P2 verifier: `7 PASS / 0 WATCH / 0 FAIL`;
+- P3 verifier after cadence-safe dependency fix: `8 PASS / 0 WATCH / 0 FAIL`.
+
+General live hard-safety result:
+
+- window complete;
+- no runtime errors;
+- no collector errors;
+- CPU and bucket stayed within safety thresholds;
+- mining remained active;
+- no hard spawn/economy stall;
+- durable telemetry remained contiguous;
+- modeled hauler capacity passed;
+- K0/K1/I0 telemetry remained present;
+- VNext authority remained shadow/evidence-only.
+
+Remaining general WATCH findings are non-safety evidence/optimization observations only:
+
+- productive-flow window cadence does not align exactly with the deployment-relative window;
+- consumer self-supply fallback occurred;
+- exact-window controller progress unavailable;
+- exact-window construction progress unavailable;
+- exact-window productive throughput unavailable;
+- Efficiency reported `UNDERUTILIZED`;
+- E4 matching evidence did not align exactly with the requested window.
+
+These findings do not justify blind economy/logistics tuning; the previously frozen optimization rule remains in force unless a real regression is demonstrated.
+
+P2 result:
+
+- `authority = SHADOW`;
+- legacy planner authority remained `UNCHANGED`;
+- plan status `READY`;
+- selected `CORE_BALANCED` at `E8N1 (20,29)`;
+- score `83.58`;
+- feasibility `0.808`, extension feasibility `0.806`, `criticalBlocked = 0`;
+- exact route count `4`, fallback route count `0`;
+- latest observed plan tick `3762779`;
+- isolated planner CPU `10.797`, EMA `11.26`;
+- P2 remains SHADOW and does not gain construction authority.
+
+P3 result:
+
+- `authority = SHADOW`;
+- `constructionAuthority = NONE`;
+- legacy planner authority remained `UNCHANGED`;
+- status `READY`;
+- graph complete;
+- `breachRouteCount = 0`;
+- `exposedAssetCount = 0`;
+- `28` rampart candidates in `4` groups;
+- planned tower minimum/average coverage score `100`;
+- defense score `74.8`;
+- isolated P3 CPU `9.846`;
+- plan freshness passed;
+- scheduler isolation passed;
+- P2→P3 dependency ordering passed.
+
+PR #104 corrected a read-only verifier false positive caused by P2/P3 cadence mismatch:
+
+- P2 may refresh every 100 ticks while P3 runs every 500 ticks;
+- a later STATUS_SNAPSHOT may legitimately contain a newer P2 plan than the source consumed by the earlier P3 run;
+- the verifier still hard-fails invalid same-tick/newer-than-observed dependency ordering;
+- exact PR head `bd712a5245d55808c043d12ed2be43638b784cca`;
+- merge SHA `def25c9e1bf0ad634a052214f1d40ffa08e82ddb`;
+- canonical PR and post-merge tests succeeded;
+- tooling only, with no runtime/scheduler/authority/threshold change.
+
+Decision:
+
+- P3 passes its initial SHADOW live gate;
+- the prior CPU revalidation stop rule is satisfied;
+- P2 and P3 remain strictly non-authoritative for construction;
+- legacy `game/room.planner.js` remains authoritative;
+- E4 remains strictly `SHADOW / SHADOW_EVIDENCE`;
+- no CPU/live-verifier threshold is relaxed;
+- the next roadmap slice is I2 — Remote ROI, because I2 depends on I0 and is now unblocked, while D1 still requires D0 + P3;
+- I2 must start in SHADOW/evidence-only mode and must not enable remote mining or create remote execution authority from its first release.
+
