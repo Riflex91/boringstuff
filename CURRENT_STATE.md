@@ -869,3 +869,53 @@ Current stop rule after PR #73:
 - do not increase hauler count: current two-hauler logistics meets modeled capacity and E4 critical coverage is complete;
 - after deployment, verify Efficiency v3 reports controller-only productive capacity near 6 rather than 26 and that CPU/bucket/Health remain safe;
 - E4 remains strictly `SHADOW` / `SHADOW_EVIDENCE`.
+
+
+## 2026-10-07 — post-#73 live validation
+
+The live window `3757601–3757700` confirms Efficiency v3 is active and the controller-only capacity correction behaves as intended. The verifier reports `13 PASS / 6 WATCH / 0 FAIL`; the remaining WATCH results are cadence or optimization findings rather than safety failures.
+
+Current controller-only state:
+
+- Efficiency `modelVersion = 3`;
+- `productiveThroughputPerTick = 6.16`;
+- committed `productiveCapacityPerTick = 6`;
+- status `EFFICIENT`;
+- dedicated mining remains `20 / 20 e/t`;
+- CPU bucket remains `10000` and Health remains `HEALTHY`.
+
+The exact retained productive window `3757502–3757601` reports:
+
+- `controllerProgress = 616`;
+- `constructionProgress = 0`;
+- `usefulWorkPerTick = 6.16`;
+- `waitingRatio = 0.18`;
+- `criticalRatio = 0.193`;
+- `fallbackRatio = 0.013`;
+- `averageConstructionCapacityPerTick = 0`;
+- `averageDedicatedControllerCapacityPerTick = 6`.
+
+The slight `6.16 > 6` controller result is not treated as a new bug: the 6/tick value is committed/dedicated upgrader capacity, while the legacy worker can opportunistically fall through to controller upgrade after build/repair checks. A broader total-capacity experiment was audited and intentionally not promoted because Repair work is not yet measured in the same productive-throughput stream; counting opportunistic worker capacity without Repair attribution would create false underutilization signals.
+
+The adjacent E4 window `3757593–3757692` remains evidence-safe under a three-hauler pressure phase:
+
+- `averageHaulers = 3`;
+- `averageMatchedHaulers = 2.97`;
+- `haulerUtilization = 0.99`;
+- `criticalRequestTicks = 138`;
+- `criticalMatchedTicks = 138`;
+- `criticalCoverageRatio = 1`;
+- `criticalCandidateRatio = 1`;
+- `criticalSlotCoverageRatio = 1`;
+- `criticalNoCandidateTicks = 0`;
+- `duplicateReservationTicks = 0`.
+
+The third live hauler is not a reason to raise the steady target. Severe consumer pressure temporarily raised `consumerServiceHaulerFloor` / `recommendedHaulerCount` to 3; by tick `3757700` pressure had fallen back to one fallback consumer and the recommendation returned to 2 while all three existing haulers remained alive. No despawn or target tuning is justified from this transition window.
+
+Current stop rule:
+
+- no gameplay or authority change from this window;
+- keep E4 strictly `SHADOW` / `SHADOW_EVIDENCE`;
+- do not increase the two-hauler steady target or change CPU thresholds;
+- next useful verification is the exact `3757602–3757701` productive/assignment window, using retained telemetry after tick `3757701` exists;
+- reassess consumer fallback only from that exact window, not from phase-misaligned E4/productive windows.
