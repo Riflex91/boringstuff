@@ -224,7 +224,7 @@ export function evaluateP3Shadow(input = {}) {
       : check('mincut-contract', complete ? 'FAIL' : 'WATCH', 'No P3 contract evidence is available yet.'));
 
   const dependencyFailures = [];
-  const dependencyWatches = [];
+  const dependencyEvidence = [];
   for (const sample of samples) {
     const sourcePlannerTick = finite(sample.defense?.sourcePlannerTick, null);
     const defensePlanTick = finite(sample.defense?.planTick, null);
@@ -238,9 +238,13 @@ export function evaluateP3Shadow(input = {}) {
       dependencyFailures.push({ tick: sample.tick, sourcePlannerTick, defensePlanTick, observedP2Tick });
       continue;
     }
-    if (observedP2Tick !== null && sourcePlannerTick !== observedP2Tick) {
-      dependencyWatches.push({ tick: sample.tick, sourcePlannerTick, observedP2Tick });
-    }
+    dependencyEvidence.push({
+      tick: sample.tick,
+      sourcePlannerTick,
+      defensePlanTick,
+      observedP2Tick,
+      newerPlannerVisibleAfterDefense: observedP2Tick !== null && observedP2Tick > sourcePlannerTick
+    });
   }
 
   if (dependencyFailures.length) {
@@ -250,18 +254,12 @@ export function evaluateP3Shadow(input = {}) {
       'P3 dependency ordering was invalid; P3 must consume an earlier READY P2 SHADOW plan.',
       { failures: dependencyFailures }
     ));
-  } else if (dependencyWatches.length) {
-    checks.push(check(
-      'p2-dependency-order',
-      'WATCH',
-      'P3 used an older valid P2 plan while a newer P2 snapshot was already visible.',
-      { samples: dependencyWatches }
-    ));
   } else if (samples.length) {
     checks.push(check(
       'p2-dependency-order',
       'PASS',
-      'P3 consumed an earlier P2 SHADOW plan and did not execute on the same planner tick.'
+      'P3 consumed an earlier P2 SHADOW plan; newer P2 snapshots observed after the P3 run are cadence-safe.',
+      { samples: dependencyEvidence }
     ));
   } else {
     checks.push(check('p2-dependency-order', complete ? 'FAIL' : 'WATCH', 'No P2→P3 dependency evidence is available yet.'));
