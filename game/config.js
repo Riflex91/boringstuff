@@ -44,6 +44,13 @@ module.exports = {
   RCL1_SURPLUS_UPGRADERS: 2,
   RCL1_SURPLUS_STREAK_TICKS: 10,
 
+  // Mature RCL2-RCL7 rooms may convert sustained, demonstrable surplus into
+  // one bounded extra upgrader. Keep this separate from the RCL1 bootstrap
+  // rule so controller scaling cannot mask logistics/mining pressure.
+  RCL2_PLUS_SURPLUS_UPGRADERS: 3,
+  RCL2_PLUS_SURPLUS_STREAK_TICKS: 25,
+  RCL2_PLUS_SURPLUS_MIN_STORED: 5000,
+
   // Dedicated upgrader diagnostics. Warn only after a meaningful no-progress
   // interval so normal travel/harvest cycles do not generate noise.
   UPGRADER_STALL_TICKS: 150,
