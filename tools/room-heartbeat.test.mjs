@@ -69,4 +69,64 @@ assert.equal(Object.hasOwn(snapshot, 'economy'), false);
 assert.equal(Object.hasOwn(snapshot, 'colonyState'), false);
 assert.equal(JSON.stringify(snapshot).includes('shouldNotBeSerializedIntoRoomHeartbeat'), false);
 
+{
+  const game = {
+    cpu: {
+      limit: 20,
+      getUsed() { return 7; }
+    }
+  };
+  assert.equal(
+    roomManager._test.shadowCpuHeadroom('room.assignment', game, {}),
+    true,
+    'shadow assignment should run when measured work plus reserve fits the tick limit'
+  );
+}
+
+{
+  const game = {
+    cpu: {
+      limit: 20,
+      getUsed() { return 10; }
+    }
+  };
+  assert.equal(
+    roomManager._test.shadowCpuHeadroom('room.assignment', game, {}),
+    false,
+    'shadow assignment should defer before consuming reserved authoritative headroom'
+  );
+}
+
+{
+  const memory = {
+    bot: {
+      cpu: {
+        details: {
+          'room.capacity-spawn': { avg: 4, last: 3 }
+        }
+      }
+    }
+  };
+  const game = {
+    cpu: {
+      limit: 20,
+      getUsed() { return 8; }
+    }
+  };
+  assert.equal(
+    roomManager._test.shadowCpuHeadroom('room.capacity-spawn', game, memory),
+    false,
+    'historical profiler cost should raise the estimated shadow-stage cost'
+  );
+}
+
+{
+  const game = { cpu: { getUsed() { return 100; } } };
+  assert.equal(
+    roomManager._test.shadowCpuHeadroom('room.assignment', game, {}),
+    true,
+    'missing runtime CPU limit must fail open rather than suppress SHADOW evidence'
+  );
+}
+
 console.log('room heartbeat tests passed');
