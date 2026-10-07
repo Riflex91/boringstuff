@@ -33,7 +33,8 @@ const state = {
   efficiency: { status: 'WATCH' },
   requestShadow: {
     summary: { open: 10 },
-    logisticsGraph: { total: 5 }
+    logisticsGraph: { total: 5 },
+    scoutingFrontier: { authority: 'SHADOW', requestCount: 2 }
   },
   capacitySpawnShadow: { summary: { spawnRequestCount: 1 } },
   assignmentShadow: { summary: { assignmentCount: 4 } },
@@ -58,6 +59,7 @@ const snapshot = roomManager._test.status(state);
 assert.equal(snapshot.room, 'E8N1');
 assert.equal(snapshot.energy, '300/650');
 assert.deepEqual(snapshot.economyModel, state.economyModel);
+assert.deepEqual(snapshot.scoutingFrontier, state.requestShadow.scoutingFrontier);
 assert.deepEqual(snapshot.logisticsMatching, state.logisticsMatchingShadow.summary);
 assert.deepEqual(snapshot.logisticsMatchingEvidence, state.logisticsMatchingEvidence.lastWindow);
 assert.deepEqual(snapshot.assignmentEvidence, state.assignmentEvidence.lastWindow);
