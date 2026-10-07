@@ -60,7 +60,11 @@ function routeProvider(from, to) {
   return {
     ok: true,
     incomplete: false,
-    cost: Math.max(Math.abs(from.x - to.x), Math.abs(from.y - to.y)) * 2
+    cost: Math.max(Math.abs(from.x - to.x), Math.abs(from.y - to.y)) * 2,
+    path: [
+      { x: from.x, y: from.y, roomName: from.roomName || to.roomName },
+      { x: to.x, y: to.y, roomName: to.roomName || from.roomName }
+    ]
   };
 }
 
@@ -122,6 +126,10 @@ function routeProvider(from, to) {
   assert.ok(result.selected.plannedStructures.every(slot => typeof slot.earliestCapability === 'string'));
   assert.ok(result.selected.plannedStructures.some(slot => slot.type === 'extension'));
   assert.ok(result.selected.plannedStructures.some(slot => slot.type === 'tower'));
+  assert.ok(result.selected.routes.routes.some(route => route.path.length > 0));
+  assert.ok(result.selected.routes.routes.every(route =>
+    !route.exact || route.path.every(step => Number.isFinite(step.x) && Number.isFinite(step.y))
+  ));
   assert.equal(state.room.constructionCalls(), 0);
 
   const stored = planner.snapshot('E8N1', memory, { time: 1001 });
@@ -133,6 +141,7 @@ function routeProvider(from, to) {
   assert.equal(telemetry.legacyPlannerAuthority, 'UNCHANGED');
   assert.ok(telemetry.topCandidates.length <= 3);
   assert.equal(Object.hasOwn(telemetry.selected || {}, 'plannedStructures'), false);
+  assert.equal(Object.hasOwn(telemetry.selected?.routes || {}, 'routes'), false);
 }
 
 {
