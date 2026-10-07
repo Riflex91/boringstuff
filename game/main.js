@@ -13,6 +13,7 @@ const serverProfile = require('server.profile');
 const processScheduler = require('process.scheduler');
 const worldIntel = require('world.intel');
 const colonyState = require('colony.state');
+const plannerVNextShadow = require('planner.vnext.shadow');
 
 function bootstrapMemory() {
   if (!Memory.bot) Memory.bot = { version: config.VERSION, born: Game.time };
@@ -132,7 +133,8 @@ function statusSnapshot(roomStates, tickCpu) {
             lastWindow: state.logisticsMatchingEvidence.lastWindow || null
           }
         : null,
-      colonyState: colonyState.telemetrySummary(state.colonyState)
+      colonyState: colonyState.telemetrySummary(state.colonyState),
+      plannerVNext: plannerVNextShadow.telemetrySummary(state.plannerVNextShadow)
     };
   }
   logger.info('STATUS_SNAPSHOT', 'Structured bot status snapshot', {
@@ -236,6 +238,32 @@ module.exports.loop = function() {
       profiler.section('world-intel', function() { worldIntel.observeVisibleRooms(); });
     }, schedulerContext);
 
+    const plannerVNextRun = processScheduler.run({
+      id: 'planner-vnext-shadow',
+      priorityClass: processScheduler.PRIORITY.OVERFLOW,
+      minimumInterval: Math.max(1, config.PLANNER_INTERVAL * 2),
+      freshnessRequirement: Math.max(1, config.PLANNER_INTERVAL * 6)
+    }, function() {
+      return profiler.section('planner-vnext-shadow', function() {
+        const byRoom = {};
+        for (const state of roomStates) {
+          byRoom[state.room.name] = plannerVNextShadow.evaluate(state, undefined, Game, {
+            maxAnchors: plannerVNextShadow.DEFAULT_MAX_ANCHORS,
+            pathSearchBudget: plannerVNextShadow.DEFAULT_PATH_SEARCH_BUDGET
+          });
+        }
+        return byRoom;
+      });
+    }, schedulerContext);
+
+    const currentPlannerPlans = plannerVNextRun.ran && plannerVNextRun.result
+      ? plannerVNextRun.result
+      : {};
+    for (const state of roomStates) {
+      state.plannerVNextShadow = currentPlannerPlans[state.room.name] ||
+        plannerVNextShadow.snapshot(state.room.name, undefined, Game);
+    }
+
     processScheduler.run({
       id: 'stats',
       priorityClass: processScheduler.PRIORITY.STANDARD,
@@ -253,7 +281,7 @@ module.exports.loop = function() {
     }, schedulerContext);
 
     const scheduledTotal = Math.max(0, Game.cpu.getUsed() - scheduledStart);
-    const sectionTotal = currentSectionTotal(['rooms', 'creeps', 'world-intel', 'stats', 'visuals']);
+    const sectionTotal = currentSectionTotal(['rooms', 'creeps', 'world-intel', 'planner-vnext-shadow', 'stats', 'visuals']);
     profiler.detailValue('main.scheduler-overhead', Math.max(0, scheduledTotal - sectionTotal));
 
     profiler.finishTick(tickStart);
