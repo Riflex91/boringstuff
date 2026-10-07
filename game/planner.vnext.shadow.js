@@ -133,6 +133,19 @@ function withinRoom(x, y, margin) {
   return x >= m && y >= m && x <= 49 - m && y <= 49 - m;
 }
 
+function mineralOfState(state) {
+  if (state && state.mineral) return state.mineral;
+  const room = state && state.room;
+  const findMinerals = typeof FIND_MINERALS !== 'undefined' ? FIND_MINERALS : null;
+  if (!room || findMinerals === null || typeof room.find !== 'function') return null;
+  try {
+    const minerals = room.find(findMinerals) || [];
+    return minerals[0] || null;
+  } catch (err) {
+    return null;
+  }
+}
+
 function fixedObjectPositions(state) {
   const positions = [];
   for (const source of state && state.sources || []) {
@@ -141,9 +154,7 @@ function fixedObjectPositions(state) {
   }
   const controller = posOf(state && state.room && state.room.controller, state && state.room && state.room.name);
   if (controller) positions.push({ type: 'controller', pos: controller, minRange: 3 });
-  const mineral = state && state.mineral
-    ? posOf(state.mineral, state.room && state.room.name)
-    : null;
+  const mineral = posOf(mineralOfState(state), state && state.room && state.room.name);
   if (mineral) positions.push({ type: 'mineral', pos: mineral, minRange: 2 });
   return positions;
 }
@@ -186,7 +197,8 @@ function seedPositions(state) {
   const spawn = posOf(state && state.spawn, roomName);
   const controller = posOf(state && state.room && state.room.controller, roomName);
   const sources = (state && state.sources || []).map(source => posOf(source, roomName)).filter(Boolean);
-  const points = [spawn, controller, ...sources].filter(Boolean);
+  const mineral = posOf(mineralOfState(state), roomName);
+  const points = [spawn, controller, mineral, ...sources].filter(Boolean);
   const center = centroid(points, roomName);
   const seeds = [];
 
@@ -197,6 +209,7 @@ function seedPositions(state) {
     if (spawn) seeds.push({ source: 'SPAWN_SOURCE_MIDPOINT_' + i, pos: midpoint(spawn, sources[i], roomName) });
     if (controller) seeds.push({ source: 'CONTROLLER_SOURCE_MIDPOINT_' + i, pos: midpoint(controller, sources[i], roomName) });
   }
+  if (spawn && mineral) seeds.push({ source: 'SPAWN_MINERAL_MIDPOINT', pos: midpoint(spawn, mineral, roomName) });
 
   if (center) {
     const offsets = [
@@ -684,6 +697,7 @@ module.exports = {
     centroid,
     terrainAt,
     withinRoom,
+    mineralOfState,
     fixedObjectPositions,
     anchorAllowed,
     opennessScore,
