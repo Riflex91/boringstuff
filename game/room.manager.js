@@ -75,6 +75,30 @@ function maybeWarnUpgraderStall(state) {
   }, { dedupeTicks: config.UPGRADER_STALL_TICKS });
 }
 
+const SHADOW_STAGE_FALLBACK_CPU = Object.freeze({
+  'room.capacity-spawn': 2.5,
+  'room.assignment': 2.5,
+  'room.logistics-match': 1.0
+});
+
+function shadowCpuHeadroom(detailName, game, memoryRoot) {
+  game = game || (typeof Game !== 'undefined' ? Game : null);
+  if (!game || !game.cpu || typeof game.cpu.getUsed !== 'function' || !Number.isFinite(game.cpu.limit)) return true;
+
+  memoryRoot = memoryRoot || (typeof Memory !== 'undefined' ? Memory : null);
+  const reserve = Number.isFinite(config.SHADOW_CPU_RESERVE)
+    ? Math.max(0, config.SHADOW_CPU_RESERVE)
+    : 0;
+  const fallback = SHADOW_STAGE_FALLBACK_CPU[detailName] || 1;
+  const sample = memoryRoot && memoryRoot.bot && memoryRoot.bot.cpu &&
+    memoryRoot.bot.cpu.details && memoryRoot.bot.cpu.details[detailName];
+  const historical = sample
+    ? Math.max(0, Number(sample.avg) || 0, Number(sample.last) || 0)
+    : 0;
+  const estimated = Math.max(fallback, historical * 1.15);
+  return game.cpu.getUsed() + estimated + reserve <= game.cpu.limit;
+}
+
 function run(room, lowCpu) {
   const state = profiler.detailSection('room.state', function() {
     return stateBuilder.get(room);
@@ -113,39 +137,49 @@ function run(room, lowCpu) {
     return requestShadow.produce(state);
   });
 
+  let shadowDeferred = !!lowCpu;
+  let shadowDeferReason = lowCpu ? 'LOW_CPU' : null;
+  function canRunShadowStage(detailName) {
+    if (shadowDeferred) return false;
+    if (shadowCpuHeadroom(detailName, Game, Memory)) return true;
+    shadowDeferred = true;
+    shadowDeferReason = 'CPU_HEADROOM';
+    return false;
+  }
+
   state.capacitySpawnShadow = profiler.detailSection('room.capacity-spawn', function() {
-    const snapshot = lowCpu
-      ? capacitySpawnShadow.deferredSnapshot('LOW_CPU')
-      : capacitySpawnShadow.plan(state, state.requestShadow.requests, Game);
+    const snapshot = canRunShadowStage('room.capacity-spawn')
+      ? capacitySpawnShadow.plan(state, state.requestShadow.requests, Game)
+      : capacitySpawnShadow.deferredSnapshot(shadowDeferReason);
     snapshot.summary.legacyDesired = spawnManager.desired(state);
     return snapshot;
   });
 
   state.assignmentShadow = profiler.detailSection('room.assignment', function() {
-    return lowCpu
-      ? {
-          assignments: [],
-          unfilled: [],
-          summary: assignmentShadow.deferredSnapshot(state.room.name, 'LOW_CPU')
-        }
-      : assignmentShadow.plan(
+    return canRunShadowStage('room.assignment')
+      ? assignmentShadow.plan(
           state.room.name,
           state.requestShadow.requests,
           state.creeps,
           undefined,
           Game
-        );
+        )
+      : {
+          assignments: [],
+          unfilled: [],
+          summary: assignmentShadow.deferredSnapshot(state.room.name, shadowDeferReason)
+        };
   });
 
   state.logisticsMatchingShadow = profiler.detailSection('room.logistics-match', function() {
-    const snapshot = lowCpu
-      ? logisticsMatchingShadow.deferredSnapshot('LOW_CPU')
-      : logisticsMatchingShadow.plan(
+    const snapshot = canRunShadowStage('room.logistics-match')
+      ? logisticsMatchingShadow.plan(
           state,
           state.requestShadow.requests,
           undefined,
           Game
-        );
+        )
+      : logisticsMatchingShadow.deferredSnapshot(shadowDeferReason);
     if (snapshot.requestSummary) state.requestShadow.summary = snapshot.requestSummary;
     return snapshot;
   });
@@ -200,4 +234,4 @@ function run(room, lowCpu) {
   return state;
 }
 
-module.exports = { run, _test: { status } };
+module.exports = { run, _test: { status, shadowCpuHeadroom } };

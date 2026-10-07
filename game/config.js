@@ -23,6 +23,10 @@ module.exports = {
   CPU_BUCKET_CRITICAL: 1000,
   CPU_BUCKET_LOW: 3000,
   CPU_BUCKET_HEALTHY: 7000,
+  // Reserve real tick headroom for authoritative creep/legacy work. Optional
+  // SHADOW planners defer before consuming this reserve; this does not alter
+  // live verification thresholds or legacy authority.
+  SHADOW_CPU_RESERVE: 8,
   PLANNER_INTERVAL: 50,
   INTEL_INTERVAL: 25,
   VISUALS: true,
