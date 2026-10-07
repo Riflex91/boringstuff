@@ -1030,3 +1030,45 @@ Current stop rule after PR #78:
 - do not increase the steady two-hauler recommendation or change the severe three-hauler cap;
 - keep E4 strictly `SHADOW` / `SHADOW_EVIDENCE`;
 - compare the next exact post-#78 productive window against `3758002–3758101` (fallback `0.7%`, throughput `4.48/tick`, latency `15.33`).
+
+
+## 2026-10-07 — post-#80 optional surplus-upgrader prespawn fix
+
+Exact E4 verification for `3758493–3758592` completed and exposed a lifecycle-induced logistics shock rather than a permanent steady-state three-upgrader deficit.
+
+Exact E4 evidence:
+
+- `averageHaulers = 3`;
+- `averageMatchedHaulers = 2.79`;
+- `haulerUtilization = 0.93`;
+- `criticalRequestTicks = 657`;
+- `criticalMatchedTicks = 167`;
+- `criticalCoverageRatio = 0.254`;
+- `criticalCandidateRatio = 1`;
+- `criticalSlotCoverageRatio = 0.726`;
+- `averageConsumerWaiting = 0.93`;
+- `averageConsumerCritical = 1.92`;
+- `averageConsumerFallback = 0.99`;
+- `duplicateReservationTicks = 0`.
+
+The window contains a decisive lifecycle event at tick `3758525`: while three upgraders were already live, legacy prespawn created `upg-E8N1-3758525`, a 600-energy, 4-WORK replacement. Room energy subsequently fell from `800/800` to about `225/800` by tick `3758550`, after which consumer critical/fallback pressure surged. Candidate availability remained healthy; the bottleneck was temporary slot pressure created by the replacement energy shock.
+
+The preceding exact productive window `3758402–3758501` confirms the three-upgrader state itself is healthy: `controllerProgress = 845`, `usefulWorkPerTick = 8.45`, average committed productive capacity `8.4/tick`, zero fallback, and only about 5.5% waiting/critical consumer exposure.
+
+PR #80 changes only surplus-upgrader lifecycle semantics:
+
+- the two base RCL2+ upgraders remain prespawn-protected;
+- the optional third mature-surplus upgrader is no longer prespawn-replaced while both base upgraders remain safely available;
+- the optional third is allowed to age out naturally;
+- after it expires, it is recreated only if mature-surplus conditions still justify `desired.upgrader = 3`;
+- base-upgrader low-energy prespawn protection remains intact;
+- no change to the three-upgrader cap, hauler targets, economy model, CPU thresholds, or E4/VNext authority.
+
+Exact branch `spawn-economy.test.mjs` coverage passed before merge, including both the optional-third no-prespawn case and preserved base-upgrader prespawn continuity.
+
+Current stop rule after PR #80:
+
+- deploy PR #80 before evaluating another surplus-upgrader replacement cycle;
+- do not add a fourth upgrader or fourth hauler from the pre-fix replacement-shock window;
+- verify that an expiring optional third upgrader now ages out without an overlapping 600-energy replacement and that consumer fallback/critical pressure does not spike during the lifecycle transition;
+- keep E4 strictly `SHADOW` / `SHADOW_EVIDENCE`.
