@@ -28,6 +28,24 @@ function desired(state) {
     desiredUpgraders = Math.max(desiredUpgraders, config.RCL1_SURPLUS_UPGRADERS);
   }
 
+  if (state.rcl >= 2 && state.rcl < 8 &&
+      state.sites.length === 0 &&
+      state.economyMetrics &&
+      state.economyMetrics.energyCappedStreak >= config.RCL2_PLUS_SURPLUS_STREAK_TICKS &&
+      state.economyMetrics.spawnIdleStreak >= config.RCL2_PLUS_SURPLUS_STREAK_TICKS &&
+      state.energyStored > config.RCL2_PLUS_SURPLUS_MIN_STORED &&
+      state.economyModel &&
+      (state.economyModel.harvesterWorkDeficit || 0) <= 0 &&
+      (state.economyModel.haulerCarryDeficit || 0) <= 0 &&
+      (state.economyModel.consumerCriticalCount || 0) <= 0 &&
+      (state.economyModel.consumerFallbackCount || 0) <= 0 &&
+      (state.economyModel.sourceContainersReady || 0) === state.sources.length) {
+    desiredUpgraders = Math.max(
+      desiredUpgraders,
+      Math.min(config.MAX_UPGRADERS, config.RCL2_PLUS_SURPLUS_UPGRADERS)
+    );
+  }
+
   // Phase 2A: activate only one narrow model-driven control loop. When RCL2+
   // has productive work and dedicated mining produces energy that must travel,
   // provision the number of haulers calculated from current mining throughput
