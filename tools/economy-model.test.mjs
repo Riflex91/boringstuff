@@ -264,3 +264,30 @@ assert.equal(restoredMining.dedicatedHarvestCapacityPerTick, 20);
 assert.equal(restoredMining.recommendedHarvesterWorkParts, 10);
 assert.equal(restoredMining.harvesterWorkDeficit, 0);
 assert.equal(restoredMining.recommendedHarvesterCount, 2);
+
+
+Memory.rooms = {};
+const overRecoveredMiningState = Object.assign({}, degradedMiningState, {
+  room: Object.assign({}, degradedMiningState.room, { name: 'E8N1-mining-over-recovered' }),
+  spawn: { id: 'spawn-mining-over-recovered', pos: { x: 20, y: 29 } },
+  creeps: [
+    countedCreep('harvester', { [WORK]: 2, [CARRY]: 1 }, 'rs1'),
+    countedCreep('harvester', { [WORK]: 2, [CARRY]: 1 }, 'rs1'),
+    countedCreep('harvester', { [WORK]: 2, [CARRY]: 1 }, 'rs1'),
+    countedCreep('harvester', { [WORK]: 2, [CARRY]: 1 }, 'rs2'),
+    countedCreep('harvester', { [WORK]: 3, [CARRY]: 2 }, 'rs2'),
+    countedCreep('worker', { [WORK]: 4, [CARRY]: 2 }),
+    countedCreep('upgrader', { [WORK]: 4, [CARRY]: 2 }),
+    countedCreep('upgrader', { [WORK]: 4, [CARRY]: 2 }),
+    countedCreep('hauler', { [CARRY]: 8 }),
+    countedCreep('hauler', { [CARRY]: 8 }),
+    countedCreep('hauler', { [CARRY]: 8 })
+  ]
+});
+const overRecoveredMining = require('../game/economy.model.js').analyze(overRecoveredMiningState);
+assert.equal(overRecoveredMining.dedicatedHarvestCapacityPerTick, 20);
+assert.equal(overRecoveredMining.harvesterWorkParts, 11);
+assert.equal(overRecoveredMining.recommendedHarvesterWorkParts, 10);
+assert.equal(overRecoveredMining.harvesterWorkDeficit, 0);
+assert.equal(overRecoveredMining.nextHarvesterWorkParts, 5);
+assert.equal(overRecoveredMining.recommendedHarvesterCount, 2);
