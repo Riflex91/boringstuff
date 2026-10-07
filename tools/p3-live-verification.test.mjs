@@ -170,8 +170,25 @@ function status(tick, options = {}) {
     { tick: 5099, code: 'BOT_HEARTBEAT', ctx: {} }
   ];
   const result = evaluateP3Shadow({ events, startTick: 5000, tickCount: 100 });
-  assert.equal(result.outcome, 'WATCH');
-  assert.equal(result.checks.find(c => c.id === 'p2-dependency-order').status, 'WATCH');
+  assert.equal(result.outcome, 'PASS');
+  const dependency = result.checks.find(c => c.id === 'p2-dependency-order');
+  assert.equal(dependency.status, 'PASS');
+  assert.equal(dependency.data.samples[0].newerPlannerVisibleAfterDefense, true);
+}
+
+
+{
+  const events = [
+    status(5550, {
+      plannerTick: 5500,
+      observedPlannerTick: 5499,
+      defenseTick: 5501
+    }),
+    { tick: 5599, code: 'BOT_HEARTBEAT', ctx: {} }
+  ];
+  const result = evaluateP3Shadow({ events, startTick: 5500, tickCount: 100 });
+  assert.equal(result.outcome, 'FAIL');
+  assert.equal(result.checks.find(c => c.id === 'p2-dependency-order').status, 'FAIL');
 }
 
 {
