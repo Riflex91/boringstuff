@@ -1649,3 +1649,93 @@ Decision:
 - the next roadmap slice is I2 — Remote ROI, because I2 depends on I0 and is now unblocked, while D1 still requires D0 + P3;
 - I2 must start in SHADOW/evidence-only mode and must not enable remote mining or create remote execution authority from its first release.
 
+## 2026-10-07 — I2 Remote ROI SHADOW pending live
+
+P3 passed its initial SHADOW live gate before I2 work began:
+
+- complete deployment window `3762764–3762863`;
+- general live verifier: `12 PASS / 7 WATCH / 0 FAIL`;
+- P2 verifier: `7 PASS / 0 WATCH / 0 FAIL`;
+- P3 verifier: `8 PASS / 0 WATCH / 0 FAIL`;
+- CPU/bucket, runtime health, collector health, mining, hard-stall safety and telemetry continuity remained green;
+- P2 and P3 remain non-authoritative and legacy planning remains unchanged.
+
+PR #106 implements I2 — Remote ROI in strict SHADOW/evidence-only mode.
+
+I2 now:
+
+- discovers only known I0 frontier rooms within bounded depth; unknown rooms remain I1 scouting responsibility;
+- requires fresh RoomIntel before economic evaluation;
+- rejects owned, occupied, foreign-reserved, source-less and unsupported room-status candidates;
+- uses the P1 world-route cache for route feasibility;
+- bounds route depth before economic scoring;
+- computes expected gross source income;
+- separately accounts for miner amortized spawn cost, hauling amortized spawn cost, reservation cost, infrastructure cost, repair cost, travel loss, expected hostile loss and CPU opportunity cost;
+- computes confidence-adjusted net energy per tick and a normalized ROI score;
+- publishes RemoteAsset-style recommendations only as `CANDIDATE`, `SUSPENDED` or `THREATENED`;
+- stores per-home compact remote-score evidence in WorldIntel;
+- persists a bounded I2 SHADOW artifact for live verification.
+
+I2 safety invariants:
+
+- `authority = SHADOW`;
+- `activationAuthority = NONE`;
+- `ENABLE_REMOTE_MINING = false` remains unchanged;
+- no candidate may become `ACTIVE` from I2;
+- I2 creates no spawn, creep, logistics, claim or construction authority;
+- legacy remote/gameplay execution remains unchanged;
+- I2 runs only as K1 `OVERFLOW`;
+- minimum interval is `PLANNER_INTERVAL * 5 = 250` ticks;
+- freshness requirement is `PLANNER_INTERVAL * 20 = 1000` ticks;
+- I2 is explicitly prevented from running on a tick where P2 or P3 actually ran;
+- no general live CPU threshold or scheduler bucket threshold was relaxed.
+
+Exact offline validation for PR #106:
+
+- tested head `3bd5e988de1bacc7cd371bacb66fcc80bb4b5697`;
+- canonical GitHub `npm test`: success;
+- merge method: `merge`;
+- merge SHA `a34dc53175956a1600760e962e08c24a42841b52`;
+- post-merge `main` canonical test: success.
+
+PR #107 adds the read-only I2 live verifier:
+
+- command: `npm run verify:i2 -- --start-tick <tick>`;
+- validates I2 STATUS_SNAPSHOT evidence;
+- requires `SHADOW`, `activationAuthority = NONE`, and remote mining disabled;
+- requires a READY I2 artifact;
+- validates candidate/ready/viable/recommended count ordering and compact candidate contracts;
+- hard-fails any `ACTIVE` recommendation;
+- records whether at least one real candidate was observed;
+- validates independent `remote-roi-shadow` scheduler evidence;
+- isolated I2 CPU diagnostic thresholds: PASS at or below 5, WATCH above 5 through 10, FAIL above 10;
+- validates I2 artifact freshness;
+- tooling only; no runtime authority or gameplay behavior change.
+
+Exact offline validation for PR #107:
+
+- tested head `304e4060cc3329bfe08708e623371f81b99c9477`;
+- canonical GitHub `npm test`: success;
+- merge method: `merge`;
+- merge SHA `8ec8725fbeb1b18b253e4c39f8cf44f1ab6e63a9`;
+- post-merge `main` canonical test: success.
+
+Current stop rule:
+
+- deploy current `main`;
+- require a new 25-tick smoke gate with zero FAIL;
+- collect a complete 100-tick live window;
+- run `verify:live`, `verify:p2`, `verify:p3` and `verify:i2` over the same deployment window;
+- require no hard general runtime/collector/CPU/bucket/mining/stall/telemetry failure;
+- require P2 to remain SHADOW/READY and legacy planner authority `UNCHANGED`;
+- require P3 to remain SHADOW/READY with `constructionAuthority = NONE`, graph complete and zero breach routes;
+- require I2 to remain `SHADOW`, `activationAuthority = NONE`, `remoteMiningEnabled = false`, and READY;
+- require I2 candidate/count contracts to remain valid and no `ACTIVE` remote recommendation;
+- require independent I2 scheduler evidence;
+- isolated I2 CPU above 5 is an optimization WATCH and above 10 is a hard I2 FAIL;
+- a `candidate-observation` WATCH is acceptable only as evidence that no known remote candidate existed in that window; it does not authorize activation or justify inventing a target;
+- do not enable remote mining or create remote execution authority from this release;
+- do not start the next major roadmap slice until I2 live evidence is reviewed;
+- E4 remains strictly `SHADOW / SHADOW_EVIDENCE`;
+- P2/P3 remain non-authoritative for construction.
+
