@@ -19,7 +19,7 @@ function desired(state) {
   }
   const baseWorkers = state.rcl <= 2 ? 2 : 1;
 
-  let desiredUpgraders = state.rcl < 8 ? Math.min(config.MAX_UPGRADERS, state.energyStored > 5000 ? 2 : 1) : 0;
+  let desiredUpgraders = baseUpgraderTarget(state);
 
   if (state.rcl === 1 && state.economyMetrics &&
       state.economyMetrics.energyCappedStreak >= config.RCL1_SURPLUS_STREAK_TICKS &&
@@ -79,6 +79,10 @@ function desired(state) {
     d.scout = 0;
   }
   return d;
+}
+
+function baseUpgraderTarget(state) {
+  return state.rcl < 8 ? Math.min(config.MAX_UPGRADERS, state.energyStored > 5000 ? 2 : 1) : 0;
 }
 
 function countRole(room, role) {
@@ -151,9 +155,30 @@ function countRoleAvailable(state, role) {
   return active + spawning;
 }
 
+function countRoleForDesired(state, role, wantCount) {
+  if (role !== 'upgrader' || state.rcl < 2) return countRoleAvailable(state, role);
+
+  const raw = countRole(state.room, role);
+  const available = countRoleAvailable(state, role);
+  const baseTarget = baseUpgraderTarget(state);
+  const want = Math.max(0, Number(wantCount) || 0);
+
+  // The mature-surplus third upgrader is optional throughput, not an essential
+  // colony role. Do not pre-spawn-replace it while the two base upgraders are
+  // still safely available; let it age out naturally and recreate it only if
+  // surplus conditions are still true afterwards.
+  if (want > baseTarget && raw >= want && available >= baseTarget) return raw;
+  return available;
+}
+
 function productivePrespawnShortfall(state, role, wantCount) {
   if (role !== 'worker' && role !== 'builder' && role !== 'upgrader') return false;
-  const want = Math.max(0, Number(wantCount) || 0);
+  let want = Math.max(0, Number(wantCount) || 0);
+  if (role === 'upgrader' && state.rcl >= 2) {
+    // Only the base upgrader target is lifecycle-critical. The optional surplus
+    // upgrader may expire without triggering a prespawn or low-energy bypass.
+    want = Math.min(want, baseUpgraderTarget(state));
+  }
   if (want <= 0) return false;
   const total = countRole(state.room, role);
   const available = countRoleAvailable(state, role);
@@ -183,7 +208,7 @@ function spawnOne(state) {
     const harvesters = countRole(state.room, 'harvester');
     const workers = countRoleAvailable(state, 'worker');
     const builders = countRoleAvailable(state, 'builder');
-    const upgraders = countRoleAvailable(state, 'upgrader');
+    const upgraders = countRoleForDesired(state, 'upgrader', want.upgrader);
     const haulers = countRole(state.room, 'hauler');
 
     // Preserve essential colony functions before scaling throughput.
@@ -210,7 +235,7 @@ function spawnOne(state) {
   if (!role) {
     for (const r of priority) {
       const count = (r === 'worker' || r === 'builder' || r === 'upgrader')
-        ? countRoleAvailable(state, r)
+        ? countRoleForDesired(state, r, want[r])
         : countRole(state.room, r);
       if (count < want[r]) { role = r; break; }
     }
@@ -262,4 +287,4 @@ function spawnOne(state) {
   return false;
 }
 
-module.exports = { desired, spawnOne, _test: { countRole, productivePrespawnHorizon, countRoleAvailable, productivePrespawnShortfall } };
+module.exports = { desired, spawnOne, _test: { countRole, baseUpgraderTarget, productivePrespawnHorizon, countRoleAvailable, countRoleForDesired, productivePrespawnShortfall } };
