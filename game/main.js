@@ -16,6 +16,7 @@ const colonyState = require('colony.state');
 const plannerVNextShadow = require('planner.vnext.shadow');
 const defenseMinCutShadow = require('defense.mincut.shadow');
 const remoteRoiShadow = require('remote.roi.shadow');
+const threatModelShadow = require('threat.model.shadow');
 
 function bootstrapMemory() {
   if (!Memory.bot) Memory.bot = { version: config.VERSION, born: Game.time };
@@ -167,7 +168,8 @@ function statusSnapshot(roomStates, tickCpu) {
       colonyState: colonyState.telemetrySummary(state.colonyState),
       plannerVNext: plannerVNextShadow.telemetrySummary(state.plannerVNextShadow),
       defenseMinCut: defenseMinCutShadow.telemetrySummary(state.defenseMinCutShadow),
-      remoteRoi: remoteRoiShadow.telemetrySummary(state.remoteRoiShadow)
+      remoteRoi: remoteRoiShadow.telemetrySummary(state.remoteRoiShadow),
+      threatModel: threatModelShadow.telemetrySummary(state.threatModelShadow)
     };
   }
   logger.info('STATUS_SNAPSHOT', 'Structured bot status snapshot', {
@@ -270,6 +272,18 @@ module.exports.loop = function() {
       freshnessRequirement: config.INTEL_INTERVAL
     }, function() {
       profiler.section('world-intel', function() { worldIntel.observeVisibleRooms(); });
+    }, schedulerContext);
+
+    processScheduler.run({
+      id: 'threat-model-shadow',
+      priorityClass: processScheduler.PRIORITY.BACKGROUND,
+      minimumInterval: 0
+    }, function() {
+      profiler.section('threat-model-shadow', function() {
+        for (const state of roomStates) {
+          state.threatModelShadow = threatModelShadow.evaluate(state, Game);
+        }
+      });
     }, schedulerContext);
 
     const plannerVNextRun = processScheduler.run({
@@ -382,7 +396,7 @@ module.exports.loop = function() {
     }, schedulerContext);
 
     const scheduledTotal = Math.max(0, Game.cpu.getUsed() - scheduledStart);
-    const sectionTotal = currentSectionTotal(['rooms', 'creeps', 'world-intel', 'planner-vnext-shadow', 'defense-mincut-shadow', 'remote-roi-shadow', 'stats', 'visuals']);
+    const sectionTotal = currentSectionTotal(['rooms', 'creeps', 'world-intel', 'threat-model-shadow', 'planner-vnext-shadow', 'defense-mincut-shadow', 'remote-roi-shadow', 'stats', 'visuals']);
     profiler.detailValue('main.scheduler-overhead', Math.max(0, scheduledTotal - sectionTotal));
 
     profiler.finishTick(tickStart);
