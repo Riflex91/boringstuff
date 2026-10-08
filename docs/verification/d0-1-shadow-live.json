@@ -1,0 +1,5141 @@
+{
+  "sourceHead": "25167a5182b41432486a9724661ef0e7c32b6538",
+  "deploymentId": "20261007215630456-4492",
+  "version": "0.3.0-shadow.9-node24",
+  "runtimeModules": 50,
+  "exactServerSourceMatch": true,
+  "offlineTests": "PASS (Node 24.21.0)",
+  "checks": {
+    "general-live-result": {
+      "mode": "live",
+      "startTick": 3764254,
+      "endTick": 3764353,
+      "tickCount": 100,
+      "evidenceMaxTick": 3764375,
+      "complete": true,
+      "events": [
+        {
+          "capturedAt": "2026-10-07T21:56:32.625Z",
+          "shard": null,
+          "source": "live-console",
+          "v": "0.3.0-shadow.9-node24",
+          "session": "E8N1-3669884",
+          "tick": 3764254,
+          "level": "INFO",
+          "code": "VERSION_CHANGE",
+          "msg": "Bot code version changed",
+          "ctx": {
+            "from": "0.3.0-shadow.8-node24",
+            "to": "0.3.0-shadow.9-node24"
+          },
+          "jseq": 4935
+        },
+        {
+          "capturedAt": "2026-10-07T21:56:32.626Z",
+          "shard": null,
+          "source": "live-console",
+          "v": "0.3.0-shadow.9-node24",
+          "session": "E8N1-3669884",
+          "tick": 3764254,
+          "level": "INFO",
+          "code": "DEPLOYMENT_MARKER",
+          "msg": "Bot deployment activated",
+          "ctx": {
+            "deploymentId": "20261007215630456-4492",
+            "previousDeploymentId": "20261007213851193-15588",
+            "version": "0.3.0-shadow.9-node24"
+          },
+          "jseq": 4936
+        },
+        {
+          "capturedAt": "2026-10-07T21:57:18.836Z",
+          "shard": null,
+          "source": "live-console",
+          "v": "0.3.0-shadow.9-node24",
+          "session": "E8N1-3669884",
+          "tick": 3764267,
+          "level": "INFO",
+          "code": "SPAWN_OK",
+          "msg": "Spawned creep",
+          "ctx": {
+            "room": "E8N1",
+            "creep": "har-E8N1-3764267",
+            "role": "harvester",
+            "cost": 950,
+            "body": [
+              "work",
+              "work",
+              "carry",
+              "move",
+              "work",
+              "move",
+              "work",
+              "move",
+              "work",
+              "move",
+              "carry",
+              "move",
+              "carry",
+              "move"
+            ]
+          },
+          "jseq": 4937
+        },
+        {
+          "capturedAt": "2026-10-07T21:57:46.554Z",
+          "shard": null,
+          "source": "live-console",
+          "v": "0.3.0-shadow.9-node24",
+          "session": "E8N1-3669884",
+          "tick": 3764275,
+          "level": "INFO",
+          "code": "ROOM_HEARTBEAT",
+          "msg": "Room operational snapshot",
+          "ctx": {
+            "room": "E8N1",
+            "rcl": 4,
+            "energy": "351/1000",
+            "stored": 6114,
+            "creeps": {
+              "harvester": 2,
+              "upgrader": 2,
+              "scout": 1,
+              "repairer": 1,
+              "hauler": 3,
+              "builder": 1,
+              "worker": 1
+            },
+            "sites": 1,
+            "hostiles": 0,
+            "economyModel": {
+              "mode": "container-logistics",
+              "sourceCount": 2,
+              "theoreticalIncomePerTick": 20,
+              "dedicatedHarvestCapacityPerTick": 10,
+              "productiveDemandPerTick": 16,
+              "harvesterWorkParts": 5,
+              "harvesterCarryParts": 2,
+              "haulerCarryParts": 30,
+              "recommendedHarvesterWorkParts": 10,
+              "nextHarvesterWorkParts": 5,
+              "recommendedHarvesterCount": 3,
+              "harvesterWorkDeficit": 5,
+              "consumerFallbackCount": 1,
+              "consumerWaitingCount": 1,
+              "consumerCriticalCount": 2,
+              "consumerRequestCount": 2,
+              "consumerDeliveryReservations": 2,
+              "recommendedHaulerCarryParts": 8,
+              "nextHaulerCarryParts": 12,
+              "haulerCarryDeficit": 0,
+              "consumerServiceHaulerFloor": 3,
+              "recommendedHaulerCount": 3,
+              "sourceContainersReady": 2,
+              "sourceRoutes": [
+                {
+                  "sourceId": "6a3ee23cacf5a10039391e88",
+                  "spawnDistance": 20,
+                  "assignedHarvesterWorkParts": 5,
+                  "dedicatedIncomePerTick": 10,
+                  "containerReady": true
+                },
+                {
+                  "sourceId": "6a3ee23cacf5a10039391e8a",
+                  "spawnDistance": 9,
+                  "assignedHarvesterWorkParts": 0,
+                  "dedicatedIncomePerTick": 0,
+                  "containerReady": true
+                }
+              ]
+            },
+            "health": {
+              "modelVersion": 1,
+              "overallScore": 84,
+              "status": "WATCH",
+              "scores": {
+                "economy": 63,
+                "logistics": 90,
+                "infrastructure": 70,
+                "controller": 100,
+                "defense": 100,
+                "recovery": 100,
+                "cpu": 100
+              },
+              "reasons": [
+                "MINING_DEFICIT",
+                "CONSUMER_FALLBACK_ACTIVE",
+                "CONSTRUCTION_SLOW"
+              ]
+            },
+            "efficiency": {
+              "modelVersion": 3,
+              "overallScore": 35,
+              "status": "UNDERUTILIZED",
+              "components": {
+                "productiveUse": 50,
+                "energyUse": 0,
+                "spawnUse": 0,
+                "flow": 85
+              },
+              "pressure": {
+                "state": "SURPLUS",
+                "score": 100,
+                "surplus": 100,
+                "demand": 50
+              },
+              "metrics": {
+                "productiveThroughputPerTick": 10.4,
+                "productiveCapacityPerTick": 21,
+                "dedicatedHarvestCapacityPerTick": 10,
+                "energyCappedRatio": 1,
+                "spawnUtilization": 0,
+                "productiveBacklog": true
+              },
+              "reasons": [
+                "PRODUCTIVE_THROUGHPUT_LOW",
+                "ENERGY_SURPLUS_UNCONSUMED",
+                "SPAWN_IDLE_WITH_SURPLUS",
+                "CONSUMER_FALLBACK_ACTIVE",
+                "MODELED_DEMAND_NOT_REALIZED"
+              ]
+            },
+            "requests": {
+              "schemaVersion": 1,
+              "authority": "SHADOW",
+              "total": 38,
+              "stored": 125,
+              "terminal": 87,
+              "open": 38,
+              "blocked": 0,
+              "reservationCount": 4,
+              "byStatus": {
+                "OPEN": 34,
+                "SATISFIED": 87,
+                "RESERVED": 4
+              },
+              "byDomain": {
+                "economy": 1,
+                "logistics": 21,
+                "scouting": 6,
+                "work": 10
+              }
+            },
+            "logisticsRequests": {
+              "schemaVersion": 1,
+              "authority": "SHADOW",
+              "total": 18,
+              "totalAmount": 6036,
+              "byKind": {
+                "BALANCE": 1,
+                "DELIVER": 14,
+                "EMERGENCY_DELIVER": 1,
+                "PICKUP": 2
+              },
+              "amountByKind": {
+                "BALANCE": 1237,
+                "DELIVER": 749,
+                "EMERGENCY_DELIVER": 50,
+                "PICKUP": 4000
+              }
+            },
+            "scoutingFrontier": {
+              "schemaVersion": 1,
+              "authority": "SHADOW",
+              "homeRoom": "E8N1",
+              "frontierCount": 19,
+              "requestCount": 6,
+              "maxDepth": 3,
+              "refreshAge": 1500,
+              "topRequests": [
+                {
+                  "roomName": "E7N1",
+                  "fromRoom": "E8N1",
+                  "depth": 1,
+                  "score": 95,
+                  "urgency": 75,
+                  "age": 48649,
+                  "unknown": false,
+                  "stale": true,
+                  "threatDue": true,
+                  "risk": 10,
+                  "components": {
+                    "frontier": 20,
+                    "unknown": 0,
+                    "stale": 35,
+                    "threatUncertainty": 20,
+                    "sourceValue": 10,
+                    "routeValue": 5,
+                    "remoteValue": 0,
+                    "expansionValue": 0,
+                    "noObserver": 5,
+                    "depthPenalty": 0
+                  }
+                },
+                {
+                  "roomName": "E6N1",
+                  "fromRoom": "E7N1",
+                  "depth": 2,
+                  "score": 87,
+                  "urgency": 75,
+                  "age": 48641,
+                  "unknown": false,
+                  "stale": true,
+                  "threatDue": true,
+                  "risk": 30,
+                  "components": {
+                    "frontier": 20,
+                    "unknown": 0,
+                    "stale": 35,
+                    "threatUncertainty": 20,
+                    "sourceValue": 10,
+                    "routeValue": 5,
+                    "remoteValue": 0,
+                    "expansionValue": 0,
+                    "noObserver": 5,
+                    "depthPenalty": 8
+                  }
+                },
+                {
+                  "roomName": "E9N2",
+                  "fromRoom": "E8N2",
+                  "depth": 2,
+                  "score": 81,
+                  "urgency": 75,
+                  "age": 49049,
+                  "unknown": false,
+                  "stale": true,
+                  "threatDue": true,
+                  "risk": 10,
+                  "components": {
+                    "frontier": 20,
+                    "unknown": 0,
+                    "stale": 35,
+                    "threatUncertainty": 20,
+                    "sourceValue": 4,
+                    "routeValue": 5,
+                    "remoteValue": 0,
+                    "expansionValue": 0,
+                    "noObserver": 5,
+                    "depthPenalty": 8
+                  }
+                },
+                {
+                  "roomName": "E6N2",
+                  "fromRoom": "E6N1",
+                  "depth": 3,
+                  "score": 79,
+                  "urgency": 75,
+                  "age": 48574,
+                  "unknown": false,
+                  "stale": true,
+                  "threatDue": true,
+                  "risk": 30,
+                  "components": {
+                    "frontier": 20,
+                    "unknown": 0,
+                    "stale": 35,
+                    "threatUncertainty": 20,
+                    "sourceValue": 10,
+                    "routeValue": 5,
+                    "remoteValue": 0,
+                    "expansionValue": 0,
+                    "noObserver": 5,
+                    "depthPenalty": 16
+                  }
+                },
+                {
+                  "roomName": "E8N3",
+                  "fromRoom": "E8N2",
+                  "depth": 2,
+                  "score": 75,
+                  "urgency": 63,
+                  "age": 2474,
+                  "unknown": false,
+                  "stale": true,
+                  "threatDue": true,
+                  "risk": 30,
+                  "components": {
+                    "frontier": 20,
+                    "unknown": 0,
+                    "stale": 28,
+                    "threatUncertainty": 20,
+                    "sourceValue": 10,
+                    "routeValue": 0,
+                    "remoteValue": 0,
+                    "expansionValue": 0,
+                    "noObserver": 5,
+                    "depthPenalty": 8
+                  }
+                },
+                {
+                  "roomName": "E10N0",
+                  "fromRoom": "E10N1",
+                  "depth": 3,
+                  "score": 69,
+                  "urgency": 75,
+                  "age": 50349,
+                  "unknown": false,
+                  "stale": true,
+                  "threatDue": true,
+                  "risk": 10,
+                  "components": {
+                    "frontier": 20,
+                    "unknown": 0,
+                    "stale": 35,
+                    "threatUncertainty": 20,
+                    "sourceValue": 0,
+                    "routeValue": 5,
+                    "remoteValue": 0,
+                    "expansionValue": 0,
+                    "noObserver": 5,
+                    "depthPenalty": 16
+                  }
+                }
+              ]
+            },
+            "capacitySpawn": {
+              "schemaVersion": 1,
+              "authority": "SHADOW",
+              "deferred": false,
+              "requirementCount": 2,
+              "deficitCount": 1,
+              "spawnRequestCount": 1,
+              "preSpawnCount": 0,
+              "proposedCapacity": 3,
+              "uncoveredAfterPlan": 0,
+              "proposedByRole": {
+                "harvester": 1
+              },
+              "bodySource": "OPTIMIZER_V1",
+              "legacyDesired": {
+                "harvester": 3,
+                "hauler": 3,
+                "worker": 1,
+                "builder": 1,
+                "repairer": 1,
+                "upgrader": 2,
+                "defender": 0,
+                "scout": 1
+              }
+            },
+            "assignments": {
+              "schemaVersion": 1,
+              "authority": "SHADOW",
+              "planTick": 3764275,
+              "deferred": false,
+              "deferReason": null,
+              "requestCount": 12,
+              "executorCount": 11,
+              "assignmentCount": 5,
+              "switchCount": 1,
+              "unfilledCount": 10,
+              "totalUnfilled": 3393
+            },
+            "logisticsMatching": {
+              "schemaVersion": 1,
+              "authority": "SHADOW",
+              "planTick": 3764275,
+              "deferred": false,
+              "deferReason": null,
+              "haulerCount": 3,
+              "candidateCount": 61,
+              "jobCount": 3,
+              "matchedHaulerCount": 3,
+              "haulerUtilization": 1,
+              "pairedJobCount": 1,
+              "directCarriedJobCount": 2,
+              "criticalRequestCount": 1,
+              "criticalMatchedCount": 1,
+              "unmatchedCriticalCount": 0,
+              "criticalCandidateRequestCount": 1,
+              "criticalNoCandidateCount": 0,
+              "criticalCandidateUnmatchedCount": 0,
+              "criticalSlotCapacity": 1,
+              "reservedAmount": 150,
+              "averageTransportTicks": 1.67
+            },
+            "logisticsMatchingEvidence": {
+              "schemaVersion": 1,
+              "authority": "SHADOW_EVIDENCE",
+              "startTick": 3764093,
+              "endTick": 3764192,
+              "ticks": 100,
+              "deferredRatio": 0,
+              "averageHaulers": 3,
+              "averageMatchedHaulers": 1.79,
+              "haulerUtilization": 0.597,
+              "averageCandidatesPerTick": 4.99,
+              "averageJobsPerTick": 1.79,
+              "averagePairedJobsPerTick": 0.97,
+              "averageDirectCarriedJobsPerTick": 0.82,
+              "criticalRequestTicks": 83,
+              "criticalMatchedTicks": 83,
+              "unmatchedCriticalTicks": 0,
+              "criticalCandidateRequestTicks": 83,
+              "criticalNoCandidateTicks": 0,
+              "criticalCandidateUnmatchedTicks": 0,
+              "criticalSlotCapacityTicks": 83,
+              "criticalCoverageRatio": 1,
+              "criticalCandidateRatio": 1,
+              "criticalCandidateCoverageRatio": 1,
+              "criticalSlotCoverageRatio": 1,
+              "averageReservedAmountPerTick": 362.3,
+              "averagePredictedTransportTicks": 10.51,
+              "averageConsumerWaiting": 0.83,
+              "averageConsumerCritical": 0.93,
+              "averageConsumerFallback": 0.1,
+              "duplicateReservationTicks": 0,
+              "__truncated": true
+            },
+            "assignmentEvidence": {
+              "schemaVersion": 1,
+              "authority": "SHADOW_EVIDENCE",
+              "startTick": 3764102,
+              "endTick": 3764201,
+              "ticks": 100,
+              "requestsOpened": 50,
+              "requestsClosed": 43,
+              "averageRequestLatency": 10.56,
+              "maxRequestLatency": 307,
+              "averageActiveRequests": 20.41,
+              "averageBlockedRequests": 0,
+              "blockedReasons": {},
+              "assignmentsPerTick": 4.99,
+              "switchesPerTick": 0.01,
+              "deferredRatio": 0,
+              "averageUnfilledRequests": 7.18,
+              "averageUnfilledNeed": 3489.97,
+              "averageCandidateExecutorsWhenUnfilled": 3.91,
+              "idleCompatibleExecutorRatio": 0,
+              "controllerProgress": 580,
+              "constructionProgress": 460,
+              "usefulWorkPerTick": 10.4
+            },
+            "colonyStateAvailable": true
+          }
+        },
+        {
+          "capturedAt": "2026-10-07T21:57:46.554Z",
+          "shard": null,
+          "source": "live-console",
+          "v": "0.3.0-shadow.9-node24",
+          "session": "E8N1-3669884",
+          "tick": 3764275,
+          "level": "INFO",
+          "code": "BOT_HEARTBEAT",
+          "msg": "Bot tick completed",
+          "ctx": {
+            "cpu": 11.69,
+            "bucket": 10000,
+            "rooms": 1,
+            "creeps": 12,
+            "profile": {
+              "sections": {
+                "rooms": 4.57,
+                "creeps": 3.218,
+                "stats": 0.004,
+                "visuals": 0.025,
+                "world-intel": 0,
+                "planner-vnext-shadow": 0,
+                "defense-mincut-shadow": 0,
+                "remote-roi-shadow": 0,
+                "threat-model-shadow": 0.014
+              },
+              "details": {
+                "room.state": 0.117,
+                "room.economy": 0.206,
+                "room.requests": 2.134,
+                "room.capacity-spawn": 0.34,
+                "room.assignment": 0.445,
+                "room.evidence": 0.175,
+                "room.colony-state": 0.077,
+                "room.legacy": 0.016,
+                "room.heartbeat": 0.458,
+                "room.planner": 0,
+                "room.logistics-match": 0.554,
+                "room.logistics-evidence": 0.026,
+                "creep.harvester": 0.444,
+                "creep.builder": 0.353,
+                "creep.scout": 0.105,
+                "creep.upgrader": 0.671,
+                "creep.hauler": 0.95,
+                "creep.worker": 0.3,
+                "creep.repairer": 0.364,
+                "main.bootstrap": 3.675,
+                "main.commands": 0.004,
+                "main.logger-prune": 0.002,
+                "main.cleanup": 0.002,
+                "main.scheduler-setup": 0.002,
+                "scout.legacy-intel": 0.006,
+                "scout.target": 0.003,
+                "scout.move": 0.078,
+                "scout.world-intel": 0,
+                "main.scheduler-overhead": 0.062,
+                "creep.defender": 0
+              },
+              "attributed": 7.831,
+              "unattributed": 3.758
+            }
+          },
+          "jseq": 4938
+        },
+        {
+          "capturedAt": "2026-10-07T21:58:45.783Z",
+          "shard": null,
+          "source": "live-console",
+          "v": "0.3.0-shadow.9-node24",
+          "session": "E8N1-3669884",
+          "tick": 3764292,
+          "level": "INFO",
+          "code": "LOGISTICS_MATCHING_EVIDENCE_WINDOW",
+          "msg": "E4 shadow matching evidence window completed",
+          "ctx": {
+            "room": "E8N1",
+            "evidence": {
+              "schemaVersion": 1,
+              "authority": "SHADOW_EVIDENCE",
+              "startTick": 3764193,
+              "endTick": 3764292,
+              "ticks": 100,
+              "deferredRatio": 0,
+              "averageHaulers": 3,
+              "averageMatchedHaulers": 2.65,
+              "haulerUtilization": 0.883,
+              "averageCandidatesPerTick": 18.36,
+              "averageJobsPerTick": 2.65,
+              "averagePairedJobsPerTick": 0.95,
+              "averageDirectCarriedJobsPerTick": 1.7,
+              "criticalRequestTicks": 188,
+              "criticalMatchedTicks": 175,
+              "unmatchedCriticalTicks": 13,
+              "criticalCandidateRequestTicks": 188,
+              "criticalNoCandidateTicks": 0,
+              "criticalCandidateUnmatchedTicks": 13,
+              "criticalSlotCapacityTicks": 175,
+              "criticalCoverageRatio": 0.931,
+              "criticalCandidateRatio": 1,
+              "criticalCandidateCoverageRatio": 0.931,
+              "criticalSlotCoverageRatio": 1,
+              "averageReservedAmountPerTick": 216.63,
+              "averagePredictedTransportTicks": 4.35,
+              "averageConsumerWaiting": 0.41,
+              "averageConsumerCritical": 1.79,
+              "averageConsumerFallback": 1.38,
+              "duplicateReservationTicks": 0,
+              "__truncated": true
+            }
+          },
+          "jseq": 4939
+        },
+        {
+          "capturedAt": "2026-10-07T21:59:13.080Z",
+          "shard": null,
+          "source": "live-console",
+          "v": "0.3.0-shadow.9-node24",
+          "session": "E8N1-3669884",
+          "tick": 3764300,
+          "level": "INFO",
+          "code": "ROOM_HEARTBEAT",
+          "msg": "Room operational snapshot",
+          "ctx": {
+            "room": "E8N1",
+            "rcl": 4,
+            "energy": "797/1000",
+            "stored": 6360,
+            "creeps": {
+              "upgrader": 2,
+              "repairer": 1,
+              "hauler": 3,
+              "harvester": 1,
+              "builder": 1,
+              "worker": 1
+            },
+            "sites": 1,
+            "hostiles": 0,
+            "economyModel": {
+              "mode": "container-logistics",
+              "sourceCount": 2,
+              "theoreticalIncomePerTick": 20,
+              "dedicatedHarvestCapacityPerTick": 4,
+              "productiveDemandPerTick": 16,
+              "harvesterWorkParts": 2,
+              "harvesterCarryParts": 1,
+              "haulerCarryParts": 30,
+              "recommendedHarvesterWorkParts": 10,
+              "nextHarvesterWorkParts": 5,
+              "recommendedHarvesterCount": 3,
+              "harvesterWorkDeficit": 8,
+              "consumerFallbackCount": 0,
+              "consumerWaitingCount": 0,
+              "consumerCriticalCount": 0,
+              "consumerRequestCount": 0,
+              "consumerDeliveryReservations": 0,
+              "recommendedHaulerCarryParts": 4,
+              "nextHaulerCarryParts": 12,
+              "haulerCarryDeficit": 0,
+              "consumerServiceHaulerFloor": 0,
+              "recommendedHaulerCount": 1,
+              "sourceContainersReady": 2,
+              "sourceRoutes": [
+                {
+                  "sourceId": "6a3ee23cacf5a10039391e88",
+                  "spawnDistance": 20,
+                  "assignedHarvesterWorkParts": 2,
+                  "dedicatedIncomePerTick": 4,
+                  "containerReady": true
+                },
+                {
+                  "sourceId": "6a3ee23cacf5a10039391e8a",
+                  "spawnDistance": 9,
+                  "assignedHarvesterWorkParts": 0,
+                  "dedicatedIncomePerTick": 0,
+                  "containerReady": true
+                }
+              ]
+            },
+            "health": {
+              "modelVersion": 1,
+              "overallScore": 77,
+              "status": "WATCH",
+              "scores": {
+                "economy": 25,
+                "logistics": 100,
+                "infrastructure": 70,
+                "controller": 100,
+                "defense": 100,
+                "recovery": 100,
+                "cpu": 100
+              },
+              "reasons": [
+                "MINING_DEFICIT",
+                "CONSTRUCTION_SLOW"
+              ]
+            },
+            "efficiency": {
+              "modelVersion": 3,
+              "overallScore": 38,
+              "status": "UNDERUTILIZED",
+              "components": {
+                "productiveUse": 50,
+                "energyUse": 0,
+                "spawnUse": 0,
+                "flow": 100
+              },
+              "pressure": {
+                "state": "SURPLUS",
+                "score": 100,
+                "surplus": 100,
+                "demand": 80
+              },
+              "metrics": {
+                "productiveThroughputPerTick": 10.4,
+                "productiveCapacityPerTick": 21,
+                "dedicatedHarvestCapacityPerTick": 4,
+                "energyCappedRatio": 1,
+                "spawnUtilization": 0,
+                "productiveBacklog": true
+              },
+              "reasons": [
+                "PRODUCTIVE_THROUGHPUT_LOW",
+                "ENERGY_SURPLUS_UNCONSUMED",
+                "SPAWN_IDLE_WITH_SURPLUS",
+                "MODELED_DEMAND_NOT_REALIZED"
+              ]
+            },
+            "requests": {
+              "schemaVersion": 1,
+              "authority": "SHADOW",
+              "total": 26,
+              "stored": 125,
+              "terminal": 99,
+              "open": 26,
+              "blocked": 0,
+              "reservationCount": 5,
+              "byStatus": {
+                "OPEN": 22,
+                "SATISFIED": 99,
+                "RESERVED": 4
+              },
+              "byDomain": {
+                "economy": 1,
+                "logistics": 9,
+                "scouting": 6,
+                "work": 10
+              }
+            },
+            "logisticsRequests": {
+              "schemaVersion": 1,
+              "authority": "SHADOW",
+              "total": 8,
+              "totalAmount": 5640,
+              "byKind": {
+                "BALANCE": 1,
+                "DELIVER": 5,
+                "PICKUP": 2
+              },
+              "amountByKind": {
+                "BALANCE": 1437,
+                "DELIVER": 203,
+                "PICKUP": 4000
+              }
+            },
+            "scoutingFrontier": {
+              "schemaVersion": 1,
+              "authority": "SHADOW",
+              "homeRoom": "E8N1",
+              "frontierCount": 19,
+              "requestCount": 6,
+              "maxDepth": 3,
+              "refreshAge": 1500,
+              "topRequests": [
+                {
+                  "roomName": "E7N1",
+                  "fromRoom": "E8N1",
+                  "depth": 1,
+                  "score": 95,
+                  "urgency": 75,
+                  "age": 48674,
+                  "unknown": false,
+                  "stale": true,
+                  "threatDue": true,
+                  "risk": 10,
+                  "components": {
+                    "frontier": 20,
+                    "unknown": 0,
+                    "stale": 35,
+                    "threatUncertainty": 20,
+                    "sourceValue": 10,
+                    "routeValue": 5,
+                    "remoteValue": 0,
+                    "expansionValue": 0,
+                    "noObserver": 5,
+                    "depthPenalty": 0
+                  }
+                },
+                {
+                  "roomName": "E6N1",
+                  "fromRoom": "E7N1",
+                  "depth": 2,
+                  "score": 87,
+                  "urgency": 75,
+                  "age": 48666,
+                  "unknown": false,
+                  "stale": true,
+                  "threatDue": true,
+                  "risk": 30,
+                  "components": {
+                    "frontier": 20,
+                    "unknown": 0,
+                    "stale": 35,
+                    "threatUncertainty": 20,
+                    "sourceValue": 10,
+                    "routeValue": 5,
+                    "remoteValue": 0,
+                    "expansionValue": 0,
+                    "noObserver": 5,
+                    "depthPenalty": 8
+                  }
+                },
+                {
+                  "roomName": "E9N2",
+                  "fromRoom": "E8N2",
+                  "depth": 2,
+                  "score": 81,
+                  "urgency": 75,
+                  "age": 49074,
+                  "unknown": false,
+                  "stale": true,
+                  "threatDue": true,
+                  "risk": 10,
+                  "components": {
+                    "frontier": 20,
+                    "unknown": 0,
+                    "stale": 35,
+                    "threatUncertainty": 20,
+                    "sourceValue": 4,
+                    "routeValue": 5,
+                    "remoteValue": 0,
+                    "expansionValue": 0,
+                    "noObserver": 5,
+                    "depthPenalty": 8
+                  }
+                },
+                {
+                  "roomName": "E6N2",
+                  "fromRoom": "E6N1",
+                  "depth": 3,
+                  "score": 79,
+                  "urgency": 75,
+                  "age": 48599,
+                  "unknown": false,
+                  "stale": true,
+                  "threatDue": true,
+                  "risk": 30,
+                  "components": {
+                    "frontier": 20,
+                    "unknown": 0,
+                    "stale": 35,
+                    "threatUncertainty": 20,
+                    "sourceValue": 10,
+                    "routeValue": 5,
+                    "remoteValue": 0,
+                    "expansionValue": 0,
+                    "noObserver": 5,
+                    "depthPenalty": 16
+                  }
+                },
+                {
+                  "roomName": "E8N3",
+                  "fromRoom": "E8N2",
+                  "depth": 2,
+                  "score": 75,
+                  "urgency": 63,
+                  "age": 2499,
+                  "unknown": false,
+                  "stale": true,
+                  "threatDue": true,
+                  "risk": 30,
+                  "components": {
+                    "frontier": 20,
+                    "unknown": 0,
+                    "stale": 28,
+                    "threatUncertainty": 20,
+                    "sourceValue": 10,
+                    "routeValue": 0,
+                    "remoteValue": 0,
+                    "expansionValue": 0,
+                    "noObserver": 5,
+                    "depthPenalty": 8
+                  }
+                },
+                {
+                  "roomName": "E10N0",
+                  "fromRoom": "E10N1",
+                  "depth": 3,
+                  "score": 69,
+                  "urgency": 75,
+                  "age": 50374,
+                  "unknown": false,
+                  "stale": true,
+                  "threatDue": true,
+                  "risk": 10,
+                  "components": {
+                    "frontier": 20,
+                    "unknown": 0,
+                    "stale": 35,
+                    "threatUncertainty": 20,
+                    "sourceValue": 0,
+                    "routeValue": 5,
+                    "remoteValue": 0,
+                    "expansionValue": 0,
+                    "noObserver": 5,
+                    "depthPenalty": 16
+                  }
+                }
+              ]
+            },
+            "capacitySpawn": {
+              "schemaVersion": 1,
+              "authority": "SHADOW",
+              "deferred": false,
+              "requirementCount": 2,
+              "deficitCount": 1,
+              "spawnRequestCount": 1,
+              "preSpawnCount": 0,
+              "proposedCapacity": 3,
+              "uncoveredAfterPlan": 0,
+              "proposedByRole": {
+                "harvester": 1
+              },
+              "bodySource": "OPTIMIZER_V1",
+              "legacyDesired": {
+                "harvester": 3,
+                "hauler": 1,
+                "worker": 1,
+                "builder": 1,
+                "repairer": 1,
+                "upgrader": 2,
+                "defender": 0,
+                "scout": 1
+              }
+            },
+            "assignments": {
+              "schemaVersion": 1,
+              "authority": "SHADOW",
+              "planTick": 3764300,
+              "deferred": false,
+              "deferReason": null,
+              "requestCount": 10,
+              "executorCount": 9,
+              "assignmentCount": 5,
+              "switchCount": 0,
+              "unfilledCount": 10,
+              "totalUnfilled": 3345
+            },
+            "logisticsMatching": {
+              "schemaVersion": 1,
+              "authority": "SHADOW",
+              "planTick": 3764300,
+              "deferred": false,
+              "deferReason": null,
+              "haulerCount": 3,
+              "candidateCount": 27,
+              "jobCount": 3,
+              "matchedHaulerCount": 3,
+              "haulerUtilization": 1,
+              "pairedJobCount": 2,
+              "directCarriedJobCount": 1,
+              "criticalRequestCount": 0,
+              "criticalMatchedCount": 0,
+              "unmatchedCriticalCount": 0,
+              "criticalCandidateRequestCount": 0,
+              "criticalNoCandidateCount": 0,
+              "criticalCandidateUnmatchedCount": 0,
+              "criticalSlotCapacity": 0,
+              "reservedAmount": 103,
+              "averageTransportTicks": 5.33
+            },
+            "logisticsMatchingEvidence": {
+              "schemaVersion": 1,
+              "authority": "SHADOW_EVIDENCE",
+              "startTick": 3764193,
+              "endTick": 3764292,
+              "ticks": 100,
+              "deferredRatio": 0,
+              "averageHaulers": 3,
+              "averageMatchedHaulers": 2.65,
+              "haulerUtilization": 0.883,
+              "averageCandidatesPerTick": 18.36,
+              "averageJobsPerTick": 2.65,
+              "averagePairedJobsPerTick": 0.95,
+              "averageDirectCarriedJobsPerTick": 1.7,
+              "criticalRequestTicks": 188,
+              "criticalMatchedTicks": 175,
+              "unmatchedCriticalTicks": 13,
+              "criticalCandidateRequestTicks": 188,
+              "criticalNoCandidateTicks": 0,
+              "criticalCandidateUnmatchedTicks": 13,
+              "criticalSlotCapacityTicks": 175,
+              "criticalCoverageRatio": 0.931,
+              "criticalCandidateRatio": 1,
+              "criticalCandidateCoverageRatio": 0.931,
+              "criticalSlotCoverageRatio": 1,
+              "averageReservedAmountPerTick": 216.63,
+              "averagePredictedTransportTicks": 4.35,
+              "averageConsumerWaiting": 0.41,
+              "averageConsumerCritical": 1.79,
+              "averageConsumerFallback": 1.38,
+              "duplicateReservationTicks": 0,
+              "__truncated": true
+            },
+            "assignmentEvidence": {
+              "schemaVersion": 1,
+              "authority": "SHADOW_EVIDENCE",
+              "startTick": 3764102,
+              "endTick": 3764201,
+              "ticks": 100,
+              "requestsOpened": 50,
+              "requestsClosed": 43,
+              "averageRequestLatency": 10.56,
+              "maxRequestLatency": 307,
+              "averageActiveRequests": 20.41,
+              "averageBlockedRequests": 0,
+              "blockedReasons": {},
+              "assignmentsPerTick": 4.99,
+              "switchesPerTick": 0.01,
+              "deferredRatio": 0,
+              "averageUnfilledRequests": 7.18,
+              "averageUnfilledNeed": 3489.97,
+              "averageCandidateExecutorsWhenUnfilled": 3.91,
+              "idleCompatibleExecutorRatio": 0,
+              "controllerProgress": 580,
+              "constructionProgress": 460,
+              "usefulWorkPerTick": 10.4
+            },
+            "colonyStateAvailable": true
+          }
+        },
+        {
+          "capturedAt": "2026-10-07T21:59:13.081Z",
+          "shard": null,
+          "source": "live-console",
+          "v": "0.3.0-shadow.9-node24",
+          "session": "E8N1-3669884",
+          "tick": 3764300,
+          "level": "INFO",
+          "code": "STATUS_SNAPSHOT",
+          "msg": "Structured bot status snapshot",
+          "ctx": {
+            "cpu": 9.901,
+            "bucket": 10000,
+            "gcl": {
+              "level": 1,
+              "progress": 192405,
+              "progressTotal": 1000000
+            },
+            "totalCreeps": 11,
+            "capabilities": {
+              "schemaVersion": 1,
+              "environment": {
+                "shardName": "newbieland",
+                "serverFingerprint": null
+              },
+              "cpu": {
+                "limit": 100,
+                "bucket": 10000,
+                "observedBucketMax": null,
+                "heapStatsAvailable": true
+              },
+              "persistence": {
+                "segmentsAvailable": true,
+                "interShardMemoryAvailable": false
+              },
+              "systems": {
+                "marketAvailable": true,
+                "powerCreepsAvailable": true,
+                "factoriesAvailable": true,
+                "labsAvailable": true,
+                "observersAvailable": true,
+                "nukersAvailable": true
+              },
+              "ownership": {
+                "gclLevel": 1,
+                "ownedRooms": 1,
+                "activeClaimCommitments": 0,
+                "discoveredClaimLimit": null,
+                "claimPolicyConfidence": 0,
+                "lastClaimFailure": null
+              },
+              "world": {
+                "roomStatusAvailable": true,
+                "worldStatusAvailable": false
+              },
+              "observed": {
+                "tickDurationMsEMA": null,
+                "lastUpdatedTick": 3764300
+              }
+            },
+            "serverProfile": {
+              "schemaVersion": 1,
+              "claimPolicy": {
+                "discoveredClaimLimit": null,
+                "confidence": 0,
+                "lastFailure": null,
+                "observationCount": 0
+              }
+            },
+            "scheduler": {
+              "schemaVersion": 1,
+              "processes": {
+                "rooms": {
+                  "lastRunTick": 3764300,
+                  "lastCpu": 4.518,
+                  "cpuEMA": 3.331,
+                  "runCount": 73799,
+                  "skippedCount": 0,
+                  "lastDecision": "CRITICAL",
+                  "lastSkipReason": null
+                },
+                "creeps": {
+                  "lastRunTick": 3764300,
+                  "lastCpu": 2.521,
+                  "cpuEMA": 2.85,
+                  "runCount": 73799,
+                  "skippedCount": 0,
+                  "lastDecision": "CRITICAL",
+                  "lastSkipReason": null
+                },
+                "world-intel": {
+                  "lastRunTick": 3764276,
+                  "lastCpu": 0.825,
+                  "cpuEMA": 0.721,
+                  "runCount": 2952,
+                  "skippedCount": 70847,
+                  "lastDecision": "MINIMUM_INTERVAL",
+                  "lastSkipReason": "MINIMUM_INTERVAL"
+                },
+                "stats": {
+                  "lastRunTick": 3764300,
+                  "lastCpu": 0.007,
+                  "cpuEMA": 0.009,
+                  "runCount": 73799,
+                  "skippedCount": 0,
+                  "lastDecision": "READY",
+                  "lastSkipReason": null
+                },
+                "visuals": {
+                  "lastRunTick": 3764300,
+                  "lastCpu": 0.032,
+                  "cpuEMA": 0.032,
+                  "runCount": 73799,
+                  "skippedCount": 0,
+                  "lastDecision": "READY",
+                  "lastSkipReason": null
+                },
+                "planner-vnext-shadow": {
+                  "lastRunTick": 3764279,
+                  "lastCpu": 13.84,
+                  "cpuEMA": 8.227,
+                  "runCount": 25,
+                  "skippedCount": 2397,
+                  "lastDecision": "MINIMUM_INTERVAL",
+                  "lastSkipReason": "MINIMUM_INTERVAL"
+                },
+                "defense-mincut-shadow": {
+                  "lastRunTick": 3763915,
+                  "lastCpu": 4.805,
+                  "cpuEMA": 9.358,
+                  "runCount": 4,
+                  "skippedCount": 1863,
+                  "lastDecision": "MINIMUM_INTERVAL",
+                  "lastSkipReason": "MINIMUM_INTERVAL"
+                },
+                "remote-roi-shadow": {
+                  "lastRunTick": 3764266,
+                  "lastCpu": 1.973,
+                  "cpuEMA": 1.985,
+                  "runCount": 5,
+                  "skippedCount": 1017,
+                  "lastDecision": "MINIMUM_INTERVAL",
+                  "lastSkipReason": "MINIMUM_INTERVAL"
+                },
+                "threat-model-shadow": {
+                  "lastRunTick": 3764300,
+                  "lastCpu": 0.021,
+                  "cpuEMA": 0.024,
+                  "runCount": 47,
+                  "skippedCount": 0,
+                  "lastDecision": "READY",
+                  "lastSkipReason": null
+                }
+              }
+            },
+            "worldIntel": {
+              "schemaVersion": 1,
+              "roomCount": 98
+            },
+            "memoryFootprint": {
+              "rawBytes": 597319,
+              "journalApproxBytes": 233114,
+              "journalRecords": 80,
+              "journalDroppedThroughSeq": 4859,
+              "logs": 80,
+              "cpuHistory": 12
+            },
+            "rooms": {
+              "E8N1": {
+                "rcl": 4,
+                "controllerProgress": 12205,
+                "controllerProgressTotal": 405000,
+                "ticksToDowngrade": 40000,
+                "energyAvailable": 797,
+                "energyCapacity": 1000,
+                "energyStored": 6360,
+                "creeps": {
+                  "upgrader": 2,
+                  "repairer": 1,
+                  "hauler": 3,
+                  "harvester": 1,
+                  "builder": 1,
+                  "worker": 1
+                },
+                "constructionSites": 1,
+                "hostiles": 0,
+                "spawnBusy": true,
+                "spawnRemainingTime": 9,
+                "economy": {
+                  "energyCappedStreak": 0,
+                  "spawnIdleStreak": 0,
+                  "upgraderPresentStreak": 23701,
+                  "controllerIdleTicks": 0,
+                  "rclAge": 3591,
+                  "productiveFlow": {
+                    "consumers": {
+                      "count": 5,
+                      "waitingCount": 0,
+                      "criticalCount": 0,
+                      "fallbackCount": 0,
+                      "emptyCount": 0,
+                      "waitingAgeTotal": 0,
+                      "maxWaitingEnergyTicks": 0,
+                      "energy": 133,
+                      "capacity": 350,
+                      "byRole": {
+                        "builder": "[depth-limit]",
+                        "worker": "[depth-limit]",
+                        "repairer": "[depth-limit]",
+                        "upgrader": "[depth-limit]"
+                      }
+                    },
+                    "work": {
+                      "productiveWorkParts": 9,
+                      "constructionCapableWorkParts": 3,
+                      "dedicatedControllerWorkParts": 6,
+                      "constructionCapacityPerTick": 15,
+                      "dedicatedControllerCapacityPerTick": 6
+                    },
+                    "construction": {
+                      "siteCount": 1,
+                      "remainingProgress": 1391,
+                      "byType": {
+                        "extension": "[depth-limit]"
+                      }
+                    },
+                    "controller": {
+                      "level": 4,
+                      "demandActive": true,
+                      "progress": 12205,
+                      "progressTotal": 405000,
+                      "remainingProgress": 392795,
+                      "ticksToDowngrade": 40000
+                    }
+                  },
+                  "last100": {
+                    "startTick": 3764102,
+                    "endTick": 3764201,
+                    "ticks": 100,
+                    "spawnUtilization": 0,
+                    "energyCappedRatio": 1,
+                    "controllerProgress": 580,
+                    "constructionProgress": 460,
+                    "sitesCompleted": 0,
+                    "productiveFlow": {
+                      "consumerTicks": 500,
+                      "waitingConsumerTicks": 76,
+                      "criticalConsumerTicks": 104,
+                      "fallbackConsumerTicks": 28,
+                      "emptyConsumerTicks": 112,
+                      "waitingRatio": 0.152,
+                      "criticalRatio": 0.208,
+                      "fallbackRatio": 0.056,
+                      "emptyRatio": 0.224,
+                      "averageWaitingAgeWhenWaiting": 4.53,
+                      "maxWaitingEnergyTicks": 12,
+                      "averageBuilderWorkParts": 1,
+                      "averageWorkerWorkParts": 1,
+                      "averageRepairerWorkParts": 1,
+                      "averageUpgraderWorkParts": 6,
+                      "averageProductiveWorkParts": 9,
+                      "averageConstructionCapacityPerTick": 15,
+                      "averageDedicatedControllerCapacityPerTick": 6,
+                      "constructionBacklogRatio": 1,
+                      "controllerDemandRatio": 1,
+                      "constructionPerTick": 4.6,
+                      "controllerPerTick": 5.8,
+                      "actualProductiveThroughputPerTick": 10.4,
+                      "endingConstructionSiteCount": 1,
+                      "endingConstructionRemainingProgress": 1586,
+                      "endingControllerRemainingProgress": 393373,
+                      "endingControllerTicksToDowngrade": 40000,
+                      "consumerSupply": {
+                        "consumerTicks": "[depth-limit]",
+                        "waitingConsumerTicks": "[depth-limit]",
+                        "criticalConsumerTicks": "[depth-limit]",
+                        "fallbackConsumerTicks": "[depth-limit]",
+                        "emptyConsumerTicks": "[depth-limit]",
+                        "waitingRatio": "[depth-limit]",
+                        "criticalRatio": "[depth-limit]",
+                        "fallbackRatio": "[depth-limit]",
+                        "emptyRatio": "[depth-limit]",
+                        "averageWaitingAgeWhenWaiting": "[depth-limit]",
+                        "maxWaitingEnergyTicks": "[depth-limit]"
+                      },
+                      "workCapacity": {
+                        "averageWorkPartsByRole": "[depth-limit]",
+                        "averageProductiveWorkParts": "[depth-limit]",
+                        "averageConstructionCapacityPerTick": "[depth-limit]",
+                        "averageDedicatedControllerCapacityPerTick": "[depth-limit]",
+                        "constructionBacklogRatio": "[depth-limit]",
+                        "controllerDemandRatio": "[depth-limit]"
+                      },
+                      "actualThroughput": {
+                        "constructionPerTick": "[depth-limit]",
+                        "controllerPerTick": "[depth-limit]",
+                        "totalPerTick": "[depth-limit]"
+                      }
+                    }
+                  }
+                },
+                "economyModel": {
+                  "mode": "container-logistics",
+                  "sourceCount": 2,
+                  "theoreticalIncomePerTick": 20,
+                  "dedicatedHarvestCapacityPerTick": 4,
+                  "productiveDemandPerTick": 16,
+                  "harvesterWorkParts": 2,
+                  "harvesterCarryParts": 1,
+                  "haulerCarryParts": 30,
+                  "recommendedHarvesterWorkParts": 10,
+                  "nextHarvesterWorkParts": 5,
+                  "recommendedHarvesterCount": 3,
+                  "harvesterWorkDeficit": 8,
+                  "consumerFallbackCount": 0,
+                  "consumerWaitingCount": 0,
+                  "consumerCriticalCount": 0,
+                  "consumerRequestCount": 0,
+                  "consumerDeliveryReservations": 0,
+                  "recommendedHaulerCarryParts": 4,
+                  "nextHaulerCarryParts": 12,
+                  "haulerCarryDeficit": 0,
+                  "consumerServiceHaulerFloor": 0,
+                  "recommendedHaulerCount": 1,
+                  "sourceContainersReady": 2,
+                  "sourceRoutes": [
+                    {
+                      "sourceId": "6a3ee23cacf5a10039391e88",
+                      "spawnDistance": 20,
+                      "assignedHarvesterWorkParts": 2,
+                      "dedicatedIncomePerTick": 4,
+                      "containerReady": true
+                    },
+                    {
+                      "sourceId": "6a3ee23cacf5a10039391e8a",
+                      "spawnDistance": 9,
+                      "assignedHarvesterWorkParts": 0,
+                      "dedicatedIncomePerTick": 0,
+                      "containerReady": true
+                    }
+                  ]
+                },
+                "consumerSupply": {
+                  "criticalConsumers": [],
+                  "consumerReservations": []
+                },
+                "health": {
+                  "modelVersion": 1,
+                  "overallScore": 77,
+                  "status": "WATCH",
+                  "scores": {
+                    "economy": 25,
+                    "logistics": 100,
+                    "infrastructure": 70,
+                    "controller": 100,
+                    "defense": 100,
+                    "recovery": 100,
+                    "cpu": 100
+                  },
+                  "reasons": [
+                    "MINING_DEFICIT",
+                    "CONSTRUCTION_SLOW"
+                  ]
+                },
+                "efficiency": {
+                  "modelVersion": 3,
+                  "overallScore": 38,
+                  "status": "UNDERUTILIZED",
+                  "components": {
+                    "productiveUse": 50,
+                    "energyUse": 0,
+                    "spawnUse": 0,
+                    "flow": 100
+                  },
+                  "pressure": {
+                    "state": "SURPLUS",
+                    "score": 100,
+                    "surplus": 100,
+                    "demand": 80
+                  },
+                  "metrics": {
+                    "productiveThroughputPerTick": 10.4,
+                    "productiveCapacityPerTick": 21,
+                    "dedicatedHarvestCapacityPerTick": 4,
+                    "energyCappedRatio": 1,
+                    "spawnUtilization": 0,
+                    "productiveBacklog": true
+                  },
+                  "reasons": [
+                    "PRODUCTIVE_THROUGHPUT_LOW",
+                    "ENERGY_SURPLUS_UNCONSUMED",
+                    "SPAWN_IDLE_WITH_SURPLUS",
+                    "MODELED_DEMAND_NOT_REALIZED"
+                  ]
+                },
+                "logisticsMatchingEvidence": {
+                  "authority": "SHADOW_EVIDENCE",
+                  "current": {
+                    "schemaVersion": 1,
+                    "authority": "SHADOW_EVIDENCE",
+                    "startTick": 3764293,
+                    "endTick": 3764300,
+                    "ticks": 8,
+                    "deferredRatio": 0,
+                    "averageHaulers": 3,
+                    "averageMatchedHaulers": 3,
+                    "haulerUtilization": 1,
+                    "averageCandidatesPerTick": 27,
+                    "averageJobsPerTick": 3,
+                    "averagePairedJobsPerTick": 1.5,
+                    "averageDirectCarriedJobsPerTick": 1.5,
+                    "criticalRequestTicks": 0,
+                    "criticalMatchedTicks": 0,
+                    "unmatchedCriticalTicks": 0,
+                    "criticalCandidateRequestTicks": 0,
+                    "criticalNoCandidateTicks": 0,
+                    "criticalCandidateUnmatchedTicks": 0,
+                    "criticalSlotCapacityTicks": 0,
+                    "criticalCoverageRatio": 1,
+                    "criticalCandidateRatio": 1,
+                    "criticalCandidateCoverageRatio": 1,
+                    "criticalSlotCoverageRatio": 1,
+                    "averageReservedAmountPerTick": 106.75,
+                    "averagePredictedTransportTicks": 4.33,
+                    "averageConsumerWaiting": 0,
+                    "averageConsumerCritical": 0,
+                    "averageConsumerFallback": 0,
+                    "duplicateReservationTicks": 0,
+                    "__truncated": true
+                  },
+                  "lastWindow": {
+                    "schemaVersion": 1,
+                    "authority": "SHADOW_EVIDENCE",
+                    "startTick": 3764193,
+                    "endTick": 3764292,
+                    "ticks": 100,
+                    "deferredRatio": 0,
+                    "averageHaulers": 3,
+                    "averageMatchedHaulers": 2.65,
+                    "haulerUtilization": 0.883,
+                    "averageCandidatesPerTick": 18.36,
+                    "averageJobsPerTick": 2.65,
+                    "averagePairedJobsPerTick": 0.95,
+                    "averageDirectCarriedJobsPerTick": 1.7,
+                    "criticalRequestTicks": 188,
+                    "criticalMatchedTicks": 175,
+                    "unmatchedCriticalTicks": 13,
+                    "criticalCandidateRequestTicks": 188,
+                    "criticalNoCandidateTicks": 0,
+                    "criticalCandidateUnmatchedTicks": 13,
+                    "criticalSlotCapacityTicks": 175,
+                    "criticalCoverageRatio": 0.931,
+                    "criticalCandidateRatio": 1,
+                    "criticalCandidateCoverageRatio": 0.931,
+                    "criticalSlotCoverageRatio": 1,
+                    "averageReservedAmountPerTick": 216.63,
+                    "averagePredictedTransportTicks": 4.35,
+                    "averageConsumerWaiting": 0.41,
+                    "averageConsumerCritical": 1.79,
+                    "averageConsumerFallback": 1.38,
+                    "duplicateReservationTicks": 0,
+                    "__truncated": true
+                  }
+                },
+                "colonyState": {
+                  "schemaVersion": 1,
+                  "authority": "SHADOW",
+                  "requests": {
+                    "available": true,
+                    "authority": "SHADOW"
+                  },
+                  "assignments": {
+                    "available": true,
+                    "authority": "SHADOW"
+                  },
+                  "capacity": {
+                    "projected": {
+                      "available": true,
+                      "authority": "SHADOW"
+                    }
+                  },
+                  "spawnPlan": {
+                    "available": true,
+                    "authority": "SHADOW"
+                  },
+                  "assignmentEvidence": {
+                    "available": true,
+                    "authority": "SHADOW_EVIDENCE"
+                  },
+                  "logisticsMatching": {
+                    "available": true,
+                    "authority": "SHADOW",
+                    "evidence": {
+                      "authority": "SHADOW_EVIDENCE"
+                    }
+                  }
+                },
+                "plannerVNext": {
+                  "schemaVersion": 1,
+                  "authority": "SHADOW",
+                  "status": "READY",
+                  "roomName": "E8N1",
+                  "planTick": 3764279,
+                  "phase": "ANCHOR_AND_CORE_GEOMETRY",
+                  "candidateAnchorCount": 6,
+                  "evaluatedCandidateCount": 12,
+                  "pathSearchBudget": 24,
+                  "pathSearches": 24,
+                  "selected": {
+                    "anchor": {
+                      "x": 20,
+                      "y": 29,
+                      "roomName": "E8N1",
+                      "source": "CENTROID_OFFSET_6"
+                    },
+                    "variant": "CORE_BALANCED",
+                    "score": 83.58,
+                    "valid": true,
+                    "components": {
+                      "openness": 89,
+                      "sourceLogistics": 65,
+                      "upgradeLogistics": 89,
+                      "legacySpawnContinuity": 100,
+                      "extensionFeasibility": 81,
+                      "futureStructureFeasibility": 81,
+                      "towerCoverage": 99,
+                      "traffic": 88
+                    },
+                    "feasibility": {
+                      "ratio": 0.808,
+                      "extensionRatio": 0.806,
+                      "criticalBlocked": 0,
+                      "blocked": [
+                        "[depth-limit]",
+                        "[depth-limit]",
+                        "[depth-limit]",
+                        "[depth-limit]",
+                        "[depth-limit]",
+                        "[depth-limit]",
+                        "[depth-limit]",
+                        "[depth-limit]",
+                        "[depth-limit]",
+                        "[depth-limit]"
+                      ]
+                    },
+                    "routes": {
+                      "sourceAverageCost": 14.5,
+                      "controllerCost": 5,
+                      "spawnCost": 0,
+                      "exactRouteCount": 4,
+                      "fallbackRouteCount": 0,
+                      "pathSearches": 4
+                    }
+                  },
+                  "topCandidates": [
+                    {
+                      "anchor": {
+                        "x": "[depth-limit]",
+                        "y": "[depth-limit]",
+                        "roomName": "[depth-limit]",
+                        "source": "[depth-limit]"
+                      },
+                      "variant": "CORE_BALANCED",
+                      "score": 83.58,
+                      "valid": true,
+                      "components": {
+                        "openness": "[depth-limit]",
+                        "sourceLogistics": "[depth-limit]",
+                        "upgradeLogistics": "[depth-limit]",
+                        "legacySpawnContinuity": "[depth-limit]",
+                        "extensionFeasibility": "[depth-limit]",
+                        "futureStructureFeasibility": "[depth-limit]",
+                        "towerCoverage": "[depth-limit]",
+                        "traffic": "[depth-limit]"
+                      },
+                      "feasibility": {
+                        "ratio": "[depth-limit]",
+                        "extensionRatio": "[depth-limit]",
+                        "criticalBlocked": "[depth-limit]",
+                        "blocked": "[depth-limit]"
+                      },
+                      "routes": {
+                        "sourceAverageCost": "[depth-limit]",
+                        "controllerCost": "[depth-limit]",
+                        "spawnCost": "[depth-limit]",
+                        "exactRouteCount": "[depth-limit]",
+                        "fallbackRouteCount": "[depth-limit]",
+                        "pathSearches": "[depth-limit]"
+                      }
+                    },
+                    {
+                      "anchor": {
+                        "x": "[depth-limit]",
+                        "y": "[depth-limit]",
+                        "roomName": "[depth-limit]",
+                        "source": "[depth-limit]"
+                      },
+                      "variant": "CORE_BALANCED",
+                      "score": 77.8,
+                      "valid": true,
+                      "components": {
+                        "openness": "[depth-limit]",
+                        "sourceLogistics": "[depth-limit]",
+                        "upgradeLogistics": "[depth-limit]",
+                        "legacySpawnContinuity": "[depth-limit]",
+                        "extensionFeasibility": "[depth-limit]",
+                        "futureStructureFeasibility": "[depth-limit]",
+                        "towerCoverage": "[depth-limit]",
+                        "traffic": "[depth-limit]"
+                      },
+                      "feasibility": {
+                        "ratio": "[depth-limit]",
+                        "extensionRatio": "[depth-limit]",
+                        "criticalBlocked": "[depth-limit]",
+                        "blocked": "[depth-limit]"
+                      },
+                      "routes": {
+                        "sourceAverageCost": "[depth-limit]",
+                        "controllerCost": "[depth-limit]",
+                        "spawnCost": "[depth-limit]",
+                        "exactRouteCount": "[depth-limit]",
+                        "fallbackRouteCount": "[depth-limit]",
+                        "pathSearches": "[depth-limit]"
+                      }
+                    },
+                    {
+                      "anchor": {
+                        "x": "[depth-limit]",
+                        "y": "[depth-limit]",
+                        "roomName": "[depth-limit]",
+                        "source": "[depth-limit]"
+                      },
+                      "variant": "CORE_COMPACT",
+                      "score": 53.72,
+                      "valid": false,
+                      "components": {
+                        "openness": "[depth-limit]",
+                        "sourceLogistics": "[depth-limit]",
+                        "upgradeLogistics": "[depth-limit]",
+                        "legacySpawnContinuity": "[depth-limit]",
+                        "extensionFeasibility": "[depth-limit]",
+                        "futureStructureFeasibility": "[depth-limit]",
+                        "towerCoverage": "[depth-limit]",
+                        "traffic": "[depth-limit]"
+                      },
+                      "feasibility": {
+                        "ratio": "[depth-limit]",
+                        "extensionRatio": "[depth-limit]",
+                        "criticalBlocked": "[depth-limit]",
+                        "blocked": "[depth-limit]"
+                      },
+                      "routes": {
+                        "sourceAverageCost": "[depth-limit]",
+                        "controllerCost": "[depth-limit]",
+                        "spawnCost": "[depth-limit]",
+                        "exactRouteCount": "[depth-limit]",
+                        "fallbackRouteCount": "[depth-limit]",
+                        "pathSearches": "[depth-limit]"
+                      }
+                    }
+                  ],
+                  "legacyPlannerAuthority": "UNCHANGED",
+                  "nextPhase": "P3_DEFENSE_PERIMETER_NOT_IMPLEMENTED"
+                },
+                "defenseMinCut": {
+                  "schemaVersion": 1,
+                  "authority": "SHADOW",
+                  "status": "READY",
+                  "reason": null,
+                  "roomName": "E8N1",
+                  "planTick": 3763915,
+                  "sourcePlannerTick": 3763879,
+                  "phase": "DEFENSE_MINCUT",
+                  "bounds": {
+                    "minX": 11,
+                    "minY": 20,
+                    "maxX": 29,
+                    "maxY": 38,
+                    "width": 19,
+                    "height": 19,
+                    "area": 361
+                  },
+                  "protectedAssetCount": 43,
+                  "trafficTileCount": 32,
+                  "graph": {
+                    "walkableTiles": 252,
+                    "nodeCount": 506,
+                    "edgeCount": 2048,
+                    "augmentations": 32,
+                    "maxFlow": 3300,
+                    "complete": true
+                  },
+                  "rampartCount": 28,
+                  "ramparts": [
+                    {
+                      "x": 18,
+                      "y": 20,
+                      "trafficCrossing": false,
+                      "existingRampart": false
+                    },
+                    {
+                      "x": 19,
+                      "y": 20,
+                      "trafficCrossing": false,
+                      "existingRampart": false
+                    },
+                    {
+                      "x": 20,
+                      "y": 20,
+                      "trafficCrossing": false,
+                      "existingRampart": false
+                    },
+                    {
+                      "x": 15,
+                      "y": 22,
+                      "trafficCrossing": false,
+                      "existingRampart": false
+                    },
+                    {
+                      "x": 15,
+                      "y": 23,
+                      "trafficCrossing": false,
+                      "existingRampart": false
+                    },
+                    {
+                      "x": 14,
+                      "y": 24,
+                      "trafficCrossing": false,
+                      "existingRampart": false
+                    },
+                    {
+                      "x": 15,
+                      "y": 24,
+                      "trafficCrossing": false,
+                      "existingRampart": false
+                    },
+                    {
+                      "x": 27,
+                      "y": 24,
+                      "trafficCrossing": false,
+                      "existingRampart": false
+                    },
+                    {
+                      "x": 14,
+                      "y": 25,
+                      "trafficCrossing": false,
+                      "existingRampart": false
+                    },
+                    {
+                      "x": 27,
+                      "y": 25,
+                      "trafficCrossing": true,
+                      "existingRampart": false
+                    },
+                    {
+                      "x": 14,
+                      "y": 26,
+                      "trafficCrossing": false,
+                      "existingRampart": false
+                    },
+                    {
+                      "x": 14,
+                      "y": 27,
+                      "trafficCrossing": false,
+                      "existingRampart": false
+                    },
+                    {
+                      "x": 14,
+                      "y": 28,
+                      "trafficCrossing": false,
+                      "existingRampart": false
+                    },
+                    {
+                      "x": 14,
+                      "y": 29,
+                      "trafficCrossing": false,
+                      "existingRampart": false
+                    },
+                    {
+                      "x": 14,
+                      "y": 30,
+                      "trafficCrossing": false,
+                      "existingRampart": false
+                    },
+                    {
+                      "x": 14,
+                      "y": 31,
+                      "trafficCrossing": false,
+                      "existingRampart": false
+                    }
+                  ],
+                  "rampartGroupCount": 4,
+                  "metrics": {
+                    "repairBurdenIndex": 28,
+                    "towerCount": 4,
+                    "towerMinimumDamage": 1920,
+                    "towerAverageDamage": 2140.71,
+                    "towerMinimumCoverageScore": 100,
+                    "towerAverageCoverageScore": 100,
+                    "breachRouteCount": 0,
+                    "exposedAssetCount": 0,
+                    "exitExposedWithin5": 0,
+                    "exitExposureRatio": 0,
+                    "averageExitDistance": 15.39,
+                    "trafficCrossings": 2
+                  },
+                  "score": {
+                    "total": 74.1,
+                    "components": {
+                      "rampartEconomy": 16,
+                      "repairBurden": 44,
+                      "towerCoverage": 100,
+                      "breachResistance": 100,
+                      "exitExposure": 100,
+                      "traffic": 93
+                    }
+                  },
+                  "phaseEvidence": [
+                    {
+                      "phase": "PROTECTED_TOPOLOGY",
+                      "cpuUsed": 0.558,
+                      "failureReason": null
+                    },
+                    {
+                      "phase": "MINCUT",
+                      "cpuUsed": 3.264,
+                      "failureReason": null
+                    },
+                    {
+                      "phase": "DEFENSE_SCORE",
+                      "cpuUsed": 0.488,
+                      "failureReason": null
+                    }
+                  ],
+                  "legacyPlannerAuthority": "UNCHANGED",
+                  "constructionAuthority": "NONE"
+                },
+                "remoteRoi": {
+                  "schemaVersion": 1,
+                  "authority": "SHADOW",
+                  "activationAuthority": "NONE",
+                  "remoteMiningEnabled": false,
+                  "homeRoom": "E8N1",
+                  "evaluatedTick": 3764266,
+                  "status": "READY",
+                  "reason": null,
+                  "candidateCount": 10,
+                  "readyCount": 1,
+                  "viableCount": 1,
+                  "recommendedCandidateCount": 1,
+                  "bestCandidate": {
+                    "roomName": "E9N1",
+                    "depth": 1,
+                    "status": "READY",
+                    "reason": null,
+                    "score": 69.61,
+                    "netEnergyPerTick": 6.961,
+                    "economicallyViable": true,
+                    "capacityBudgetEligible": true,
+                    "recommendedState": "CANDIDATE",
+                    "routeHops": 1,
+                    "sourceCount": 1,
+                    "grossIncomePerTick": 10,
+                    "totalCostPerTick": 3.039,
+                    "confidence": 1
+                  },
+                  "topCandidates": [
+                    {
+                      "roomName": "E9N1",
+                      "depth": 1,
+                      "status": "READY",
+                      "reason": null,
+                      "score": 69.61,
+                      "netEnergyPerTick": 6.961,
+                      "economicallyViable": true,
+                      "capacityBudgetEligible": true,
+                      "recommendedState": "CANDIDATE",
+                      "routeHops": 1,
+                      "sourceCount": 1,
+                      "grossIncomePerTick": 10,
+                      "totalCostPerTick": 3.039,
+                      "confidence": 1
+                    },
+                    {
+                      "roomName": "E7N1",
+                      "depth": 1,
+                      "status": "UNAVAILABLE",
+                      "reason": "INTEL_STALE",
+                      "score": 0,
+                      "netEnergyPerTick": null,
+                      "economicallyViable": false,
+                      "capacityBudgetEligible": true,
+                      "recommendedState": "SUSPENDED",
+                      "routeHops": null,
+                      "sourceCount": null,
+                      "grossIncomePerTick": null,
+                      "totalCostPerTick": null,
+                      "confidence": 1
+                    },
+                    {
+                      "roomName": "E8N2",
+                      "depth": 1,
+                      "status": "UNAVAILABLE",
+                      "reason": "INTEL_STALE",
+                      "score": 0,
+                      "netEnergyPerTick": null,
+                      "economicallyViable": false,
+                      "capacityBudgetEligible": true,
+                      "recommendedState": "SUSPENDED",
+                      "routeHops": null,
+                      "sourceCount": null,
+                      "grossIncomePerTick": null,
+                      "totalCostPerTick": null,
+                      "confidence": 1
+                    },
+                    {
+                      "roomName": "E10N1",
+                      "depth": 2,
+                      "status": "UNAVAILABLE",
+                      "reason": "INTEL_STALE",
+                      "score": 0,
+                      "netEnergyPerTick": null,
+                      "economicallyViable": false,
+                      "capacityBudgetEligible": true,
+                      "recommendedState": "SUSPENDED",
+                      "routeHops": null,
+                      "sourceCount": null,
+                      "grossIncomePerTick": null,
+                      "totalCostPerTick": null,
+                      "confidence": 1
+                    },
+                    {
+                      "roomName": "E6N1",
+                      "depth": 2,
+                      "status": "UNAVAILABLE",
+                      "reason": "INTEL_STALE",
+                      "score": 0,
+                      "netEnergyPerTick": null,
+                      "economicallyViable": false,
+                      "capacityBudgetEligible": true,
+                      "recommendedState": "SUSPENDED",
+                      "routeHops": null,
+                      "sourceCount": null,
+                      "grossIncomePerTick": null,
+                      "totalCostPerTick": null,
+                      "confidence": 1
+                    },
+                    {
+                      "roomName": "E7N0",
+                      "depth": 2,
+                      "status": "UNAVAILABLE",
+                      "reason": "INTEL_STALE",
+                      "score": 0,
+                      "netEnergyPerTick": null,
+                      "economicallyViable": false,
+                      "capacityBudgetEligible": true,
+                      "recommendedState": "SUSPENDED",
+                      "routeHops": null,
+                      "sourceCount": null,
+                      "grossIncomePerTick": null,
+                      "totalCostPerTick": null,
+                      "confidence": 1
+                    },
+                    {
+                      "roomName": "E7N2",
+                      "depth": 2,
+                      "status": "UNAVAILABLE",
+                      "reason": "INTEL_STALE",
+                      "score": 0,
+                      "netEnergyPerTick": null,
+                      "economicallyViable": false,
+                      "capacityBudgetEligible": true,
+                      "recommendedState": "SUSPENDED",
+                      "routeHops": null,
+                      "sourceCount": null,
+                      "grossIncomePerTick": null,
+                      "totalCostPerTick": null,
+                      "confidence": 1
+                    },
+                    {
+                      "roomName": "E8N3",
+                      "depth": 2,
+                      "status": "UNAVAILABLE",
+                      "reason": "INTEL_STALE",
+                      "score": 0,
+                      "netEnergyPerTick": null,
+                      "economicallyViable": false,
+                      "capacityBudgetEligible": true,
+                      "recommendedState": "SUSPENDED",
+                      "routeHops": null,
+                      "sourceCount": null,
+                      "grossIncomePerTick": null,
+                      "totalCostPerTick": null,
+                      "confidence": 1
+                    }
+                  ],
+                  "assumptions": {
+                    "maxDepth": 2,
+                    "maxRouteHops": 3,
+                    "intelMaxAge": 1500,
+                    "ticksPerRoom": 50,
+                    "localEndpointTicks": 25
+                  }
+                },
+                "threatModel": {
+                  "schemaVersion": 1,
+                  "authority": "SHADOW",
+                  "actionAuthority": "NONE",
+                  "tick": 3764300,
+                  "status": "READY",
+                  "hostileCount": 0,
+                  "armedCount": 0,
+                  "aggregate": {
+                    "meleeDps": 0,
+                    "rangedDps": 0,
+                    "healPerTick": 0,
+                    "dismantlePerTick": 0,
+                    "effectiveTough": 0,
+                    "mobility": 0
+                  },
+                  "riskState": "NORMAL",
+                  "recommendedSafeMode": false,
+                  "safetyAuthority": "LEGACY_UNCHANGED",
+                  "coreLossProbability": null,
+                  "assetsAtRisk": 0,
+                  "earliestImpactTick": null,
+                  "unknownPaths": 0,
+                  "pathSearches": 0
+                }
+              }
+            }
+          },
+          "jseq": 4940
+        },
+        {
+          "capturedAt": "2026-10-07T21:59:13.083Z",
+          "shard": null,
+          "source": "live-console",
+          "v": "0.3.0-shadow.9-node24",
+          "session": "E8N1-3669884",
+          "tick": 3764300,
+          "level": "INFO",
+          "code": "BOT_HEARTBEAT",
+          "msg": "Bot tick completed",
+          "ctx": {
+            "cpu": 9.901,
+            "bucket": 10000,
+            "rooms": 1,
+            "creeps": 11,
+            "profile": {
+              "sections": {
+                "rooms": 4.515,
+                "creeps": 2.519,
+                "stats": 0.005,
+                "visuals": 0.031,
+                "world-intel": 0,
+                "planner-vnext-shadow": 0,
+                "defense-mincut-shadow": 0,
+                "remote-roi-shadow": 0,
+                "threat-model-shadow": 0.02
+              },
+              "details": {
+                "room.state": 0.129,
+                "room.economy": 0.228,
+                "room.requests": 0.636,
+                "room.capacity-spawn": 0.267,
+                "room.assignment": 0.208,
+                "room.evidence": 0.211,
+                "room.colony-state": 1.321,
+                "room.legacy": 0.049,
+                "room.heartbeat": 0.388,
+                "room.planner": 0.805,
+                "room.logistics-match": 0.213,
+                "room.logistics-evidence": 0.02,
+                "creep.harvester": 0.219,
+                "creep.builder": 0.135,
+                "creep.scout": 0.148,
+                "creep.upgrader": 0.45,
+                "creep.hauler": 0.903,
+                "creep.worker": 0.255,
+                "creep.repairer": 0.368,
+                "main.bootstrap": 2.656,
+                "main.commands": 0.004,
+                "main.logger-prune": 0.006,
+                "main.cleanup": 0.002,
+                "main.scheduler-setup": 0.002,
+                "scout.legacy-intel": 0.007,
+                "scout.target": 0.001,
+                "scout.move": 0.116,
+                "scout.world-intel": 0,
+                "main.scheduler-overhead": 0.049,
+                "creep.defender": 0
+              },
+              "attributed": 7.09,
+              "unattributed": 2.765
+            }
+          },
+          "jseq": 4941
+        },
+        {
+          "capturedAt": "2026-10-07T21:59:17.845Z",
+          "shard": null,
+          "source": "live-console",
+          "v": "0.3.0-shadow.9-node24",
+          "session": "E8N1-3669884",
+          "tick": 3764301,
+          "level": "INFO",
+          "code": "ASSIGNMENT_EVIDENCE_WINDOW",
+          "msg": "Shadow request/assignment evidence window completed",
+          "ctx": {
+            "room": "E8N1",
+            "evidence": {
+              "schemaVersion": 1,
+              "authority": "SHADOW_EVIDENCE",
+              "startTick": 3764202,
+              "endTick": 3764301,
+              "ticks": 100,
+              "requestsOpened": 62,
+              "requestsClosed": 57,
+              "averageRequestLatency": 17.84,
+              "maxRequestLatency": 134,
+              "averageActiveRequests": 28.66,
+              "averageBlockedRequests": 0,
+              "blockedReasons": {},
+              "assignmentsPerTick": 5,
+              "switchesPerTick": 0.01,
+              "deferredRatio": 0,
+              "averageUnfilledRequests": 11.2,
+              "averageUnfilledNeed": 3395.39,
+              "averageCandidateExecutorsWhenUnfilled": 3.33,
+              "idleCompatibleExecutorRatio": 0,
+              "controllerProgress": 584,
+              "constructionProgress": 200,
+              "usefulWorkPerTick": 7.84
+            }
+          },
+          "jseq": 4942
+        },
+        {
+          "capturedAt": "2026-10-07T21:59:45.010Z",
+          "shard": null,
+          "source": "live-console",
+          "v": "0.3.0-shadow.9-node24",
+          "session": "E8N1-3669884",
+          "tick": 3764309,
+          "level": "INFO",
+          "code": "SPAWN_OK",
+          "msg": "Spawned creep",
+          "ctx": {
+            "room": "E8N1",
+            "creep": "har-E8N1-3764309",
+            "role": "harvester",
+            "cost": 850,
+            "body": [
+              "work",
+              "work",
+              "carry",
+              "move",
+              "work",
+              "move",
+              "work",
+              "move",
+              "work",
+              "move",
+              "carry",
+              "move"
+            ]
+          },
+          "jseq": 4943
+        },
+        {
+          "capturedAt": "2026-10-07T22:00:41.431Z",
+          "shard": null,
+          "source": "live-console",
+          "v": "0.3.0-shadow.9-node24",
+          "session": "E8N1-3669884",
+          "tick": 3764325,
+          "level": "INFO",
+          "code": "ROOM_HEARTBEAT",
+          "msg": "Room operational snapshot",
+          "ctx": {
+            "room": "E8N1",
+            "rcl": 4,
+            "energy": "189/1000",
+            "stored": 5652,
+            "creeps": {
+              "upgrader": 2,
+              "scout": 1,
+              "repairer": 1,
+              "hauler": 3,
+              "harvester": 2,
+              "builder": 1,
+              "worker": 1
+            },
+            "sites": 1,
+            "hostiles": 0,
+            "economyModel": {
+              "mode": "container-logistics",
+              "sourceCount": 2,
+              "theoreticalIncomePerTick": 20,
+              "dedicatedHarvestCapacityPerTick": 14,
+              "productiveDemandPerTick": 16,
+              "harvesterWorkParts": 7,
+              "harvesterCarryParts": 4,
+              "haulerCarryParts": 30,
+              "recommendedHarvesterWorkParts": 10,
+              "nextHarvesterWorkParts": 5,
+              "recommendedHarvesterCount": 3,
+              "harvesterWorkDeficit": 3,
+              "consumerFallbackCount": 0,
+              "consumerWaitingCount": 3,
+              "consumerCriticalCount": 3,
+              "consumerRequestCount": 3,
+              "consumerDeliveryReservations": 2,
+              "recommendedHaulerCarryParts": 7,
+              "nextHaulerCarryParts": 12,
+              "haulerCarryDeficit": 0,
+              "consumerServiceHaulerFloor": 2,
+              "recommendedHaulerCount": 2,
+              "sourceContainersReady": 2,
+              "sourceRoutes": [
+                {
+                  "sourceId": "6a3ee23cacf5a10039391e88",
+                  "spawnDistance": 20,
+                  "assignedHarvesterWorkParts": 2,
+                  "dedicatedIncomePerTick": 4,
+                  "containerReady": true
+                },
+                {
+                  "sourceId": "6a3ee23cacf5a10039391e8a",
+                  "spawnDistance": 9,
+                  "assignedHarvesterWorkParts": 5,
+                  "dedicatedIncomePerTick": 10,
+                  "containerReady": true
+                }
+              ]
+            },
+            "health": {
+              "modelVersion": 1,
+              "overallScore": 93,
+              "status": "HEALTHY",
+              "scores": {
+                "economy": 88,
+                "logistics": 100,
+                "infrastructure": 70,
+                "controller": 100,
+                "defense": 100,
+                "recovery": 100,
+                "cpu": 100
+              },
+              "reasons": [
+                "MINING_DEFICIT",
+                "CONSTRUCTION_SLOW"
+              ]
+            },
+            "efficiency": {
+              "modelVersion": 3,
+              "overallScore": 55,
+              "status": "UNDERUTILIZED",
+              "components": {
+                "productiveUse": 37,
+                "energyUse": 34,
+                "spawnUse": 100,
+                "flow": 100
+              },
+              "pressure": {
+                "state": "SURPLUS",
+                "score": 59,
+                "surplus": 59,
+                "demand": 30
+              },
+              "metrics": {
+                "productiveThroughputPerTick": 7.84,
+                "productiveCapacityPerTick": 21,
+                "dedicatedHarvestCapacityPerTick": 14,
+                "energyCappedRatio": 0.66,
+                "spawnUtilization": 0.34,
+                "productiveBacklog": true
+              },
+              "reasons": [
+                "PRODUCTIVE_THROUGHPUT_LOW",
+                "ENERGY_SURPLUS_UNCONSUMED",
+                "MODELED_DEMAND_NOT_REALIZED"
+              ]
+            },
+            "requests": {
+              "schemaVersion": 1,
+              "authority": "SHADOW",
+              "total": 43,
+              "stored": 125,
+              "terminal": 82,
+              "open": 43,
+              "blocked": 0,
+              "reservationCount": 4,
+              "byStatus": {
+                "OPEN": 39,
+                "SATISFIED": 82,
+                "RESERVED": 4
+              },
+              "byDomain": {
+                "economy": 1,
+                "logistics": 24,
+                "scouting": 6,
+                "work": 12
+              }
+            },
+            "logisticsRequests": {
+              "schemaVersion": 1,
+              "authority": "SHADOW",
+              "total": 20,
+              "totalAmount": 6609,
+              "byKind": {
+                "BALANCE": 1,
+                "EMERGENCY_DELIVER": 16,
+                "PICKUP": 2,
+                "RESERVE": 1
+              },
+              "amountByKind": {
+                "BALANCE": 1537,
+                "EMERGENCY_DELIVER": 961,
+                "PICKUP": 4000,
+                "RESERVE": 111
+              }
+            },
+            "scoutingFrontier": {
+              "schemaVersion": 1,
+              "authority": "SHADOW",
+              "homeRoom": "E8N1",
+              "frontierCount": 19,
+              "requestCount": 6,
+              "maxDepth": 3,
+              "refreshAge": 1500,
+              "topRequests": [
+                {
+                  "roomName": "E7N1",
+                  "fromRoom": "E8N1",
+                  "depth": 1,
+                  "score": 95,
+                  "urgency": 75,
+                  "age": 48699,
+                  "unknown": false,
+                  "stale": true,
+                  "threatDue": true,
+                  "risk": 10,
+                  "components": {
+                    "frontier": 20,
+                    "unknown": 0,
+                    "stale": 35,
+                    "threatUncertainty": 20,
+                    "sourceValue": 10,
+                    "routeValue": 5,
+                    "remoteValue": 0,
+                    "expansionValue": 0,
+                    "noObserver": 5,
+                    "depthPenalty": 0
+                  }
+                },
+                {
+                  "roomName": "E6N1",
+                  "fromRoom": "E7N1",
+                  "depth": 2,
+                  "score": 87,
+                  "urgency": 75,
+                  "age": 48691,
+                  "unknown": false,
+                  "stale": true,
+                  "threatDue": true,
+                  "risk": 30,
+                  "components": {
+                    "frontier": 20,
+                    "unknown": 0,
+                    "stale": 35,
+                    "threatUncertainty": 20,
+                    "sourceValue": 10,
+                    "routeValue": 5,
+                    "remoteValue": 0,
+                    "expansionValue": 0,
+                    "noObserver": 5,
+                    "depthPenalty": 8
+                  }
+                },
+                {
+                  "roomName": "E9N2",
+                  "fromRoom": "E8N2",
+                  "depth": 2,
+                  "score": 81,
+                  "urgency": 75,
+                  "age": 49099,
+                  "unknown": false,
+                  "stale": true,
+                  "threatDue": true,
+                  "risk": 10,
+                  "components": {
+                    "frontier": 20,
+                    "unknown": 0,
+                    "stale": 35,
+                    "threatUncertainty": 20,
+                    "sourceValue": 4,
+                    "routeValue": 5,
+                    "remoteValue": 0,
+                    "expansionValue": 0,
+                    "noObserver": 5,
+                    "depthPenalty": 8
+                  }
+                },
+                {
+                  "roomName": "E6N2",
+                  "fromRoom": "E6N1",
+                  "depth": 3,
+                  "score": 79,
+                  "urgency": 75,
+                  "age": 48624,
+                  "unknown": false,
+                  "stale": true,
+                  "threatDue": true,
+                  "risk": 30,
+                  "components": {
+                    "frontier": 20,
+                    "unknown": 0,
+                    "stale": 35,
+                    "threatUncertainty": 20,
+                    "sourceValue": 10,
+                    "routeValue": 5,
+                    "remoteValue": 0,
+                    "expansionValue": 0,
+                    "noObserver": 5,
+                    "depthPenalty": 16
+                  }
+                },
+                {
+                  "roomName": "E8N3",
+                  "fromRoom": "E8N2",
+                  "depth": 2,
+                  "score": 76,
+                  "urgency": 64,
+                  "age": 2524,
+                  "unknown": false,
+                  "stale": true,
+                  "threatDue": true,
+                  "risk": 30,
+                  "components": {
+                    "frontier": 20,
+                    "unknown": 0,
+                    "stale": 29,
+                    "threatUncertainty": 20,
+                    "sourceValue": 10,
+                    "routeValue": 0,
+                    "remoteValue": 0,
+                    "expansionValue": 0,
+                    "noObserver": 5,
+                    "depthPenalty": 8
+                  }
+                },
+                {
+                  "roomName": "E10N0",
+                  "fromRoom": "E10N1",
+                  "depth": 3,
+                  "score": 69,
+                  "urgency": 75,
+                  "age": 50399,
+                  "unknown": false,
+                  "stale": true,
+                  "threatDue": true,
+                  "risk": 10,
+                  "components": {
+                    "frontier": 20,
+                    "unknown": 0,
+                    "stale": 35,
+                    "threatUncertainty": 20,
+                    "sourceValue": 0,
+                    "routeValue": 5,
+                    "remoteValue": 0,
+                    "expansionValue": 0,
+                    "noObserver": 5,
+                    "depthPenalty": 16
+                  }
+                }
+              ]
+            },
+            "capacitySpawn": {
+              "schemaVersion": 1,
+              "authority": "SHADOW",
+              "deferred": false,
+              "requirementCount": 2,
+              "deficitCount": 0,
+              "spawnRequestCount": 0,
+              "preSpawnCount": 0,
+              "proposedCapacity": 0,
+              "uncoveredAfterPlan": 0,
+              "proposedByRole": {},
+              "bodySource": "OPTIMIZER_V1",
+              "legacyDesired": {
+                "harvester": 3,
+                "hauler": 2,
+                "worker": 1,
+                "builder": 1,
+                "repairer": 1,
+                "upgrader": 2,
+                "defender": 0,
+                "scout": 1
+              }
+            },
+            "assignments": {
+              "schemaVersion": 1,
+              "authority": "SHADOW",
+              "planTick": 3764325,
+              "deferred": false,
+              "deferReason": null,
+              "requestCount": 15,
+              "executorCount": 11,
+              "assignmentCount": 5,
+              "switchCount": 0,
+              "unfilledCount": 12,
+              "totalUnfilled": 3360
+            },
+            "logisticsMatching": {
+              "schemaVersion": 1,
+              "authority": "SHADOW",
+              "planTick": 3764325,
+              "deferred": false,
+              "deferReason": null,
+              "haulerCount": 3,
+              "candidateCount": 69,
+              "jobCount": 3,
+              "matchedHaulerCount": 3,
+              "haulerUtilization": 1,
+              "pairedJobCount": 1,
+              "directCarriedJobCount": 2,
+              "criticalRequestCount": 16,
+              "criticalMatchedCount": 3,
+              "unmatchedCriticalCount": 13,
+              "criticalCandidateRequestCount": 16,
+              "criticalNoCandidateCount": 0,
+              "criticalCandidateUnmatchedCount": 13,
+              "criticalSlotCapacity": 3,
+              "reservedAmount": 311,
+              "averageTransportTicks": 3.33
+            },
+            "logisticsMatchingEvidence": {
+              "schemaVersion": 1,
+              "authority": "SHADOW_EVIDENCE",
+              "startTick": 3764193,
+              "endTick": 3764292,
+              "ticks": 100,
+              "deferredRatio": 0,
+              "averageHaulers": 3,
+              "averageMatchedHaulers": 2.65,
+              "haulerUtilization": 0.883,
+              "averageCandidatesPerTick": 18.36,
+              "averageJobsPerTick": 2.65,
+              "averagePairedJobsPerTick": 0.95,
+              "averageDirectCarriedJobsPerTick": 1.7,
+              "criticalRequestTicks": 188,
+              "criticalMatchedTicks": 175,
+              "unmatchedCriticalTicks": 13,
+              "criticalCandidateRequestTicks": 188,
+              "criticalNoCandidateTicks": 0,
+              "criticalCandidateUnmatchedTicks": 13,
+              "criticalSlotCapacityTicks": 175,
+              "criticalCoverageRatio": 0.931,
+              "criticalCandidateRatio": 1,
+              "criticalCandidateCoverageRatio": 0.931,
+              "criticalSlotCoverageRatio": 1,
+              "averageReservedAmountPerTick": 216.63,
+              "averagePredictedTransportTicks": 4.35,
+              "averageConsumerWaiting": 0.41,
+              "averageConsumerCritical": 1.79,
+              "averageConsumerFallback": 1.38,
+              "duplicateReservationTicks": 0,
+              "__truncated": true
+            },
+            "assignmentEvidence": {
+              "schemaVersion": 1,
+              "authority": "SHADOW_EVIDENCE",
+              "startTick": 3764202,
+              "endTick": 3764301,
+              "ticks": 100,
+              "requestsOpened": 62,
+              "requestsClosed": 57,
+              "averageRequestLatency": 17.84,
+              "maxRequestLatency": 134,
+              "averageActiveRequests": 28.66,
+              "averageBlockedRequests": 0,
+              "blockedReasons": {},
+              "assignmentsPerTick": 5,
+              "switchesPerTick": 0.01,
+              "deferredRatio": 0,
+              "averageUnfilledRequests": 11.2,
+              "averageUnfilledNeed": 3395.39,
+              "averageCandidateExecutorsWhenUnfilled": 3.33,
+              "idleCompatibleExecutorRatio": 0,
+              "controllerProgress": 584,
+              "constructionProgress": 200,
+              "usefulWorkPerTick": 7.84
+            },
+            "colonyStateAvailable": true
+          }
+        },
+        {
+          "capturedAt": "2026-10-07T22:00:41.431Z",
+          "shard": null,
+          "source": "live-console",
+          "v": "0.3.0-shadow.9-node24",
+          "session": "E8N1-3669884",
+          "tick": 3764325,
+          "level": "INFO",
+          "code": "BOT_HEARTBEAT",
+          "msg": "Bot tick completed",
+          "ctx": {
+            "cpu": 10.442,
+            "bucket": 10000,
+            "rooms": 1,
+            "creeps": 12,
+            "profile": {
+              "sections": {
+                "rooms": 2.293,
+                "creeps": 2.89,
+                "stats": 0.006,
+                "visuals": 0.033,
+                "world-intel": 0,
+                "planner-vnext-shadow": 0,
+                "defense-mincut-shadow": 0,
+                "remote-roi-shadow": 0,
+                "threat-model-shadow": 0.019
+              },
+              "details": {
+                "room.state": 0.114,
+                "room.economy": 0.238,
+                "room.requests": 0.626,
+                "room.capacity-spawn": 0.174,
+                "room.assignment": 0.187,
+                "room.evidence": 0.177,
+                "room.colony-state": 0.079,
+                "room.legacy": 0.014,
+                "room.heartbeat": 0.332,
+                "room.planner": 0,
+                "room.logistics-match": 0.27,
+                "room.logistics-evidence": 0.053,
+                "creep.harvester": 0.425,
+                "creep.builder": 0.059,
+                "creep.scout": 0.139,
+                "creep.upgrader": 0.448,
+                "creep.hauler": 0.977,
+                "creep.worker": 0.625,
+                "creep.repairer": 0.181,
+                "main.bootstrap": 4.988,
+                "main.commands": 0.004,
+                "main.logger-prune": 0.003,
+                "main.cleanup": 0.003,
+                "main.scheduler-setup": 0.002,
+                "scout.legacy-intel": 0.005,
+                "scout.target": 0.002,
+                "scout.move": 0.112,
+                "scout.world-intel": 0,
+                "main.scheduler-overhead": 0.077,
+                "creep.defender": 0
+              },
+              "attributed": 5.241,
+              "unattributed": 5.161
+            }
+          },
+          "jseq": 4944
+        },
+        {
+          "capturedAt": "2026-10-07T22:02:08.058Z",
+          "shard": null,
+          "source": "live-console",
+          "v": "0.3.0-shadow.9-node24",
+          "session": "E8N1-3669884",
+          "tick": 3764350,
+          "level": "INFO",
+          "code": "ROOM_HEARTBEAT",
+          "msg": "Room operational snapshot",
+          "ctx": {
+            "room": "E8N1",
+            "rcl": 4,
+            "energy": "640/1000",
+            "stored": 5903,
+            "creeps": {
+              "upgrader": 2,
+              "repairer": 1,
+              "hauler": 3,
+              "harvester": 3,
+              "builder": 1,
+              "worker": 1
+            },
+            "sites": 1,
+            "hostiles": 0,
+            "economyModel": {
+              "mode": "container-logistics",
+              "sourceCount": 2,
+              "theoreticalIncomePerTick": 20,
+              "dedicatedHarvestCapacityPerTick": 20,
+              "productiveDemandPerTick": 16,
+              "harvesterWorkParts": 12,
+              "harvesterCarryParts": 6,
+              "haulerCarryParts": 30,
+              "recommendedHarvesterWorkParts": 10,
+              "nextHarvesterWorkParts": 5,
+              "recommendedHarvesterCount": 2,
+              "harvesterWorkDeficit": 0,
+              "consumerFallbackCount": 0,
+              "consumerWaitingCount": 0,
+              "consumerCriticalCount": 0,
+              "consumerRequestCount": 1,
+              "consumerDeliveryReservations": 0,
+              "recommendedHaulerCarryParts": 12,
+              "nextHaulerCarryParts": 12,
+              "haulerCarryDeficit": 0,
+              "consumerServiceHaulerFloor": 0,
+              "recommendedHaulerCount": 1,
+              "sourceContainersReady": 2,
+              "sourceRoutes": [
+                {
+                  "sourceId": "6a3ee23cacf5a10039391e88",
+                  "spawnDistance": 20,
+                  "assignedHarvesterWorkParts": 7,
+                  "dedicatedIncomePerTick": 10,
+                  "containerReady": true
+                },
+                {
+                  "sourceId": "6a3ee23cacf5a10039391e8a",
+                  "spawnDistance": 9,
+                  "assignedHarvesterWorkParts": 5,
+                  "dedicatedIncomePerTick": 10,
+                  "containerReady": true
+                }
+              ]
+            },
+            "health": {
+              "modelVersion": 1,
+              "overallScore": 96,
+              "status": "HEALTHY",
+              "scores": {
+                "economy": 100,
+                "logistics": 100,
+                "infrastructure": 70,
+                "controller": 100,
+                "defense": 100,
+                "recovery": 100,
+                "cpu": 100
+              },
+              "reasons": [
+                "CONSTRUCTION_SLOW"
+              ]
+            },
+            "efficiency": {
+              "modelVersion": 3,
+              "overallScore": 55,
+              "status": "UNDERUTILIZED",
+              "components": {
+                "productiveUse": 37,
+                "energyUse": 34,
+                "spawnUse": 100,
+                "flow": 100
+              },
+              "pressure": {
+                "state": "SURPLUS",
+                "score": 59,
+                "surplus": 59,
+                "demand": 0
+              },
+              "metrics": {
+                "productiveThroughputPerTick": 7.84,
+                "productiveCapacityPerTick": 21,
+                "dedicatedHarvestCapacityPerTick": 20,
+                "energyCappedRatio": 0.66,
+                "spawnUtilization": 0.34,
+                "productiveBacklog": true
+              },
+              "reasons": [
+                "PRODUCTIVE_THROUGHPUT_LOW",
+                "ENERGY_SURPLUS_UNCONSUMED",
+                "MODELED_DEMAND_NOT_REALIZED"
+              ]
+            },
+            "requests": {
+              "schemaVersion": 1,
+              "authority": "SHADOW",
+              "total": 33,
+              "stored": 124,
+              "terminal": 91,
+              "open": 33,
+              "blocked": 0,
+              "reservationCount": 4,
+              "byStatus": {
+                "OPEN": 29,
+                "SATISFIED": 91,
+                "RESERVED": 4
+              },
+              "byDomain": {
+                "economy": 1,
+                "logistics": 14,
+                "scouting": 6,
+                "work": 12
+              }
+            },
+            "logisticsRequests": {
+              "schemaVersion": 1,
+              "authority": "SHADOW",
+              "total": 12,
+              "totalAmount": 6147,
+              "byKind": {
+                "BALANCE": 1,
+                "DELIVER": 9,
+                "PICKUP": 2
+              },
+              "amountByKind": {
+                "BALANCE": 1737,
+                "DELIVER": 410,
+                "PICKUP": 4000
+              }
+            },
+            "scoutingFrontier": {
+              "schemaVersion": 1,
+              "authority": "SHADOW",
+              "homeRoom": "E8N1",
+              "frontierCount": 19,
+              "requestCount": 6,
+              "maxDepth": 3,
+              "refreshAge": 1500,
+              "topRequests": [
+                {
+                  "roomName": "E7N1",
+                  "fromRoom": "E8N1",
+                  "depth": 1,
+                  "score": 95,
+                  "urgency": 75,
+                  "age": 48724,
+                  "unknown": false,
+                  "stale": true,
+                  "threatDue": true,
+                  "risk": 10,
+                  "components": {
+                    "frontier": 20,
+                    "unknown": 0,
+                    "stale": 35,
+                    "threatUncertainty": 20,
+                    "sourceValue": 10,
+                    "routeValue": 5,
+                    "remoteValue": 0,
+                    "expansionValue": 0,
+                    "noObserver": 5,
+                    "depthPenalty": 0
+                  }
+                },
+                {
+                  "roomName": "E6N1",
+                  "fromRoom": "E7N1",
+                  "depth": 2,
+                  "score": 87,
+                  "urgency": 75,
+                  "age": 48716,
+                  "unknown": false,
+                  "stale": true,
+                  "threatDue": true,
+                  "risk": 30,
+                  "components": {
+                    "frontier": 20,
+                    "unknown": 0,
+                    "stale": 35,
+                    "threatUncertainty": 20,
+                    "sourceValue": 10,
+                    "routeValue": 5,
+                    "remoteValue": 0,
+                    "expansionValue": 0,
+                    "noObserver": 5,
+                    "depthPenalty": 8
+                  }
+                },
+                {
+                  "roomName": "E9N2",
+                  "fromRoom": "E8N2",
+                  "depth": 2,
+                  "score": 81,
+                  "urgency": 75,
+                  "age": 49124,
+                  "unknown": false,
+                  "stale": true,
+                  "threatDue": true,
+                  "risk": 10,
+                  "components": {
+                    "frontier": 20,
+                    "unknown": 0,
+                    "stale": 35,
+                    "threatUncertainty": 20,
+                    "sourceValue": 4,
+                    "routeValue": 5,
+                    "remoteValue": 0,
+                    "expansionValue": 0,
+                    "noObserver": 5,
+                    "depthPenalty": 8
+                  }
+                },
+                {
+                  "roomName": "E6N2",
+                  "fromRoom": "E6N1",
+                  "depth": 3,
+                  "score": 79,
+                  "urgency": 75,
+                  "age": 48649,
+                  "unknown": false,
+                  "stale": true,
+                  "threatDue": true,
+                  "risk": 30,
+                  "components": {
+                    "frontier": 20,
+                    "unknown": 0,
+                    "stale": 35,
+                    "threatUncertainty": 20,
+                    "sourceValue": 10,
+                    "routeValue": 5,
+                    "remoteValue": 0,
+                    "expansionValue": 0,
+                    "noObserver": 5,
+                    "depthPenalty": 16
+                  }
+                },
+                {
+                  "roomName": "E8N3",
+                  "fromRoom": "E8N2",
+                  "depth": 2,
+                  "score": 76,
+                  "urgency": 64,
+                  "age": 2549,
+                  "unknown": false,
+                  "stale": true,
+                  "threatDue": true,
+                  "risk": 30,
+                  "components": {
+                    "frontier": 20,
+                    "unknown": 0,
+                    "stale": 29,
+                    "threatUncertainty": 20,
+                    "sourceValue": 10,
+                    "routeValue": 0,
+                    "remoteValue": 0,
+                    "expansionValue": 0,
+                    "noObserver": 5,
+                    "depthPenalty": 8
+                  }
+                },
+                {
+                  "roomName": "E10N0",
+                  "fromRoom": "E10N1",
+                  "depth": 3,
+                  "score": 69,
+                  "urgency": 75,
+                  "age": 50424,
+                  "unknown": false,
+                  "stale": true,
+                  "threatDue": true,
+                  "risk": 10,
+                  "components": {
+                    "frontier": 20,
+                    "unknown": 0,
+                    "stale": 35,
+                    "threatUncertainty": 20,
+                    "sourceValue": 0,
+                    "routeValue": 5,
+                    "remoteValue": 0,
+                    "expansionValue": 0,
+                    "noObserver": 5,
+                    "depthPenalty": 16
+                  }
+                }
+              ]
+            },
+            "capacitySpawn": {
+              "schemaVersion": 1,
+              "authority": "SHADOW",
+              "deferred": false,
+              "requirementCount": 2,
+              "deficitCount": 0,
+              "spawnRequestCount": 0,
+              "preSpawnCount": 0,
+              "proposedCapacity": 0,
+              "uncoveredAfterPlan": 0,
+              "proposedByRole": {},
+              "bodySource": "OPTIMIZER_V1",
+              "legacyDesired": {
+                "harvester": 2,
+                "hauler": 1,
+                "worker": 1,
+                "builder": 1,
+                "repairer": 1,
+                "upgrader": 2,
+                "defender": 0,
+                "scout": 1
+              }
+            },
+            "assignments": {
+              "schemaVersion": 1,
+              "authority": "SHADOW",
+              "planTick": 3764350,
+              "deferred": false,
+              "deferReason": null,
+              "requestCount": 13,
+              "executorCount": 11,
+              "assignmentCount": 5,
+              "switchCount": 0,
+              "unfilledCount": 12,
+              "totalUnfilled": 3370
+            },
+            "logisticsMatching": {
+              "schemaVersion": 1,
+              "authority": "SHADOW",
+              "planTick": 3764350,
+              "deferred": false,
+              "deferReason": null,
+              "haulerCount": 3,
+              "candidateCount": 37,
+              "jobCount": 3,
+              "matchedHaulerCount": 3,
+              "haulerUtilization": 1,
+              "pairedJobCount": 1,
+              "directCarriedJobCount": 2,
+              "criticalRequestCount": 0,
+              "criticalMatchedCount": 0,
+              "unmatchedCriticalCount": 0,
+              "criticalCandidateRequestCount": 0,
+              "criticalNoCandidateCount": 0,
+              "criticalCandidateUnmatchedCount": 0,
+              "criticalSlotCapacity": 0,
+              "reservedAmount": 130,
+              "averageTransportTicks": 1.67
+            },
+            "logisticsMatchingEvidence": {
+              "schemaVersion": 1,
+              "authority": "SHADOW_EVIDENCE",
+              "startTick": 3764193,
+              "endTick": 3764292,
+              "ticks": 100,
+              "deferredRatio": 0,
+              "averageHaulers": 3,
+              "averageMatchedHaulers": 2.65,
+              "haulerUtilization": 0.883,
+              "averageCandidatesPerTick": 18.36,
+              "averageJobsPerTick": 2.65,
+              "averagePairedJobsPerTick": 0.95,
+              "averageDirectCarriedJobsPerTick": 1.7,
+              "criticalRequestTicks": 188,
+              "criticalMatchedTicks": 175,
+              "unmatchedCriticalTicks": 13,
+              "criticalCandidateRequestTicks": 188,
+              "criticalNoCandidateTicks": 0,
+              "criticalCandidateUnmatchedTicks": 13,
+              "criticalSlotCapacityTicks": 175,
+              "criticalCoverageRatio": 0.931,
+              "criticalCandidateRatio": 1,
+              "criticalCandidateCoverageRatio": 0.931,
+              "criticalSlotCoverageRatio": 1,
+              "averageReservedAmountPerTick": 216.63,
+              "averagePredictedTransportTicks": 4.35,
+              "averageConsumerWaiting": 0.41,
+              "averageConsumerCritical": 1.79,
+              "averageConsumerFallback": 1.38,
+              "duplicateReservationTicks": 0,
+              "__truncated": true
+            },
+            "assignmentEvidence": {
+              "schemaVersion": 1,
+              "authority": "SHADOW_EVIDENCE",
+              "startTick": 3764202,
+              "endTick": 3764301,
+              "ticks": 100,
+              "requestsOpened": 62,
+              "requestsClosed": 57,
+              "averageRequestLatency": 17.84,
+              "maxRequestLatency": 134,
+              "averageActiveRequests": 28.66,
+              "averageBlockedRequests": 0,
+              "blockedReasons": {},
+              "assignmentsPerTick": 5,
+              "switchesPerTick": 0.01,
+              "deferredRatio": 0,
+              "averageUnfilledRequests": 11.2,
+              "averageUnfilledNeed": 3395.39,
+              "averageCandidateExecutorsWhenUnfilled": 3.33,
+              "idleCompatibleExecutorRatio": 0,
+              "controllerProgress": 584,
+              "constructionProgress": 200,
+              "usefulWorkPerTick": 7.84
+            },
+            "colonyStateAvailable": true
+          }
+        },
+        {
+          "capturedAt": "2026-10-07T22:02:08.059Z",
+          "shard": null,
+          "source": "live-console",
+          "v": "0.3.0-shadow.9-node24",
+          "session": "E8N1-3669884",
+          "tick": 3764350,
+          "level": "INFO",
+          "code": "BOT_HEARTBEAT",
+          "msg": "Bot tick completed",
+          "ctx": {
+            "cpu": 11.924,
+            "bucket": 10000,
+            "rooms": 1,
+            "creeps": 12,
+            "profile": {
+              "sections": {
+                "rooms": 4.92,
+                "creeps": 2.977,
+                "stats": 0.005,
+                "visuals": 0.03,
+                "world-intel": 0,
+                "planner-vnext-shadow": 0,
+                "defense-mincut-shadow": 0,
+                "remote-roi-shadow": 0,
+                "threat-model-shadow": 0.02
+              },
+              "details": {
+                "room.state": 0.163,
+                "room.economy": 0.28,
+                "room.requests": 1.428,
+                "room.capacity-spawn": 0.268,
+                "room.assignment": 0.272,
+                "room.evidence": 0.261,
+                "room.colony-state": 0.097,
+                "room.legacy": 0.154,
+                "room.heartbeat": 1.138,
+                "room.planner": 0.543,
+                "room.logistics-match": 0.231,
+                "room.logistics-evidence": 0.022,
+                "creep.harvester": 0.663,
+                "creep.builder": 0.262,
+                "creep.scout": 0.142,
+                "creep.upgrader": 0.452,
+                "creep.hauler": 0.876,
+                "creep.worker": 0.082,
+                "creep.repairer": 0.444,
+                "main.bootstrap": 3.808,
+                "main.commands": 0.004,
+                "main.logger-prune": 0.003,
+                "main.cleanup": 0.003,
+                "main.scheduler-setup": 0.002,
+                "scout.legacy-intel": 0.007,
+                "scout.target": 0.002,
+                "scout.move": 0.114,
+                "scout.world-intel": 0,
+                "main.scheduler-overhead": 0.057,
+                "creep.defender": 0
+              },
+              "attributed": 7.952,
+              "unattributed": 3.932
+            }
+          },
+          "jseq": 4945
+        }
+      ],
+      "attributionWindow": {
+        "matches": false,
+        "requestedStartTick": 3764254,
+        "requestedEndTick": 3764353,
+        "observedStartTick": 3764102,
+        "observedEndTick": 3764201,
+        "observedTicks": 100,
+        "carrierTick": null,
+        "carrierAfterWindow": false
+      },
+      "assignmentEvidenceWindow": null,
+      "outcome": "WATCH",
+      "checks": [
+        {
+          "id": "node-version",
+          "status": "PASS",
+          "message": "Node runtime is 24.21.0.",
+          "data": {
+            "actual": "24.21.0"
+          }
+        },
+        {
+          "id": "bot-version",
+          "status": "PASS",
+          "message": "Window contains only 0.3.0-shadow.9-node24 bot events.",
+          "data": {
+            "botVersion": "0.3.0-shadow.9-node24"
+          }
+        },
+        {
+          "id": "window-complete",
+          "status": "PASS",
+          "message": "Evidence reaches tick 3764353.",
+          "data": {
+            "startTick": 3764254,
+            "endTick": 3764353
+          }
+        },
+        {
+          "id": "runtime-errors",
+          "status": "PASS",
+          "message": "No bot/runtime errors were observed in the window.",
+          "data": {}
+        },
+        {
+          "id": "collector-health",
+          "status": "PASS",
+          "message": "No collector errors were observed in the window.",
+          "data": {}
+        },
+        {
+          "id": "cpu-bucket",
+          "status": "PASS",
+          "message": "CPU and bucket remained inside safety thresholds.",
+          "data": {
+            "samples": 4
+          }
+        },
+        {
+          "id": "mining-active",
+          "status": "PASS",
+          "message": "Dedicated mining is active.",
+          "data": {
+            "latest": {
+              "tick": 3764350,
+              "dedicated": 20,
+              "theoretical": 20
+            }
+          }
+        },
+        {
+          "id": "hard-stall",
+          "status": "PASS",
+          "message": "No hard spawn/economy stall evidence was observed.",
+          "data": {}
+        },
+        {
+          "id": "telemetry-continuity",
+          "status": "PASS",
+          "message": "Durable telemetry jseq values are contiguous.",
+          "data": {
+            "first": 4935,
+            "last": 4945,
+            "count": 11
+          }
+        },
+        {
+          "id": "productive-attribution",
+          "status": "WATCH",
+          "message": "A complete productive-flow window exists, but its fixed runtime cadence does not align exactly with the requested live-verification window.",
+          "data": {
+            "requestedWindow": {
+              "startTick": 3764254,
+              "endTick": 3764353
+            },
+            "observedLast100": {
+              "startTick": 3764102,
+              "endTick": 3764201,
+              "ticks": 100
+            }
+          }
+        },
+        {
+          "id": "hauler-capacity",
+          "status": "PASS",
+          "message": "Hauler capacity meets modeled requirement.",
+          "data": {
+            "haulerCarryDeficit": 0
+          }
+        },
+        {
+          "id": "consumer-supply",
+          "status": "PASS",
+          "message": "No consumer fallback/waiting/critical pressure was observed in the latest snapshot.",
+          "data": {
+            "fallback": 0,
+            "critical": 0,
+            "waiting": 0,
+            "diagnostics": {
+              "criticalConsumers": [],
+              "consumerReservations": []
+            }
+          }
+        },
+        {
+          "id": "controller-progress",
+          "status": "WATCH",
+          "message": "No 100-tick controller progress metric was available.",
+          "data": {}
+        },
+        {
+          "id": "construction-progress",
+          "status": "WATCH",
+          "message": "No 100-tick construction progress metric was available.",
+          "data": {}
+        },
+        {
+          "id": "productive-throughput",
+          "status": "WATCH",
+          "message": "No productive throughput metric was available.",
+          "data": {
+            "throughput": null,
+            "productiveCapacity": 16,
+            "mining": 4,
+            "utilization": null
+          }
+        },
+        {
+          "id": "efficiency-status",
+          "status": "WATCH",
+          "message": "Efficiency is UNDERUTILIZED; optimization finding only.",
+          "data": {
+            "reasons": [
+              "PRODUCTIVE_THROUGHPUT_LOW",
+              "ENERGY_SURPLUS_UNCONSUMED",
+              "SPAWN_IDLE_WITH_SURPLUS",
+              "MODELED_DEMAND_NOT_REALIZED"
+            ]
+          }
+        },
+        {
+          "id": "vnext-platform-shadow",
+          "status": "PASS",
+          "message": "K0/K1/I0 platform telemetry is present.",
+          "data": {}
+        },
+        {
+          "id": "vnext-shadow-authority",
+          "status": "PASS",
+          "message": "VNext authority remains shadow/evidence-only in live telemetry.",
+          "data": {}
+        },
+        {
+          "id": "e4-matching-evidence",
+          "status": "WATCH",
+          "message": "E4 matching evidence is not complete for the exact verification window yet.",
+          "data": {
+            "requestedWindow": {
+              "startTick": 3764254,
+              "endTick": 3764353
+            },
+            "observedLastWindow": {
+              "startTick": 3764193,
+              "endTick": 3764292,
+              "ticks": 100
+            },
+            "observedMetrics": {
+              "averageHaulers": 3,
+              "averageMatchedHaulers": 2.65,
+              "haulerUtilization": 0.883,
+              "averageCandidatesPerTick": 18.36,
+              "averageJobsPerTick": 2.65,
+              "criticalRequestTicks": 188,
+              "criticalMatchedTicks": 175,
+              "unmatchedCriticalTicks": 13,
+              "criticalCandidateRequestTicks": 188,
+              "criticalNoCandidateTicks": 0,
+              "criticalCandidateUnmatchedTicks": 13,
+              "criticalSlotCapacityTicks": 175,
+              "criticalCoverageRatio": 0.931,
+              "criticalCandidateRatio": 1,
+              "criticalCandidateCoverageRatio": 0.931,
+              "criticalSlotCoverageRatio": 1,
+              "averageReservedAmountPerTick": 216.63,
+              "averagePredictedTransportTicks": 4.35,
+              "averageConsumerWaiting": 0.41,
+              "averageConsumerCritical": 1.79,
+              "averageConsumerFallback": 1.38,
+              "duplicateReservationTicks": 0
+            },
+            "currentTicks": 8
+          }
+        }
+      ],
+      "counts": {
+        "pass": 13,
+        "watch": 6,
+        "fail": 0
+      }
+    },
+    "smoke-result": {
+      "mode": "smoke",
+      "startTick": 3764254,
+      "endTick": 3764278,
+      "tickCount": 25,
+      "evidenceMaxTick": 3764375,
+      "complete": true,
+      "events": [
+        {
+          "capturedAt": "2026-10-07T21:56:32.625Z",
+          "shard": null,
+          "source": "live-console",
+          "v": "0.3.0-shadow.9-node24",
+          "session": "E8N1-3669884",
+          "tick": 3764254,
+          "level": "INFO",
+          "code": "VERSION_CHANGE",
+          "msg": "Bot code version changed",
+          "ctx": {
+            "from": "0.3.0-shadow.8-node24",
+            "to": "0.3.0-shadow.9-node24"
+          },
+          "jseq": 4935
+        },
+        {
+          "capturedAt": "2026-10-07T21:56:32.626Z",
+          "shard": null,
+          "source": "live-console",
+          "v": "0.3.0-shadow.9-node24",
+          "session": "E8N1-3669884",
+          "tick": 3764254,
+          "level": "INFO",
+          "code": "DEPLOYMENT_MARKER",
+          "msg": "Bot deployment activated",
+          "ctx": {
+            "deploymentId": "20261007215630456-4492",
+            "previousDeploymentId": "20261007213851193-15588",
+            "version": "0.3.0-shadow.9-node24"
+          },
+          "jseq": 4936
+        },
+        {
+          "capturedAt": "2026-10-07T21:57:18.836Z",
+          "shard": null,
+          "source": "live-console",
+          "v": "0.3.0-shadow.9-node24",
+          "session": "E8N1-3669884",
+          "tick": 3764267,
+          "level": "INFO",
+          "code": "SPAWN_OK",
+          "msg": "Spawned creep",
+          "ctx": {
+            "room": "E8N1",
+            "creep": "har-E8N1-3764267",
+            "role": "harvester",
+            "cost": 950,
+            "body": [
+              "work",
+              "work",
+              "carry",
+              "move",
+              "work",
+              "move",
+              "work",
+              "move",
+              "work",
+              "move",
+              "carry",
+              "move",
+              "carry",
+              "move"
+            ]
+          },
+          "jseq": 4937
+        },
+        {
+          "capturedAt": "2026-10-07T21:57:46.554Z",
+          "shard": null,
+          "source": "live-console",
+          "v": "0.3.0-shadow.9-node24",
+          "session": "E8N1-3669884",
+          "tick": 3764275,
+          "level": "INFO",
+          "code": "ROOM_HEARTBEAT",
+          "msg": "Room operational snapshot",
+          "ctx": {
+            "room": "E8N1",
+            "rcl": 4,
+            "energy": "351/1000",
+            "stored": 6114,
+            "creeps": {
+              "harvester": 2,
+              "upgrader": 2,
+              "scout": 1,
+              "repairer": 1,
+              "hauler": 3,
+              "builder": 1,
+              "worker": 1
+            },
+            "sites": 1,
+            "hostiles": 0,
+            "economyModel": {
+              "mode": "container-logistics",
+              "sourceCount": 2,
+              "theoreticalIncomePerTick": 20,
+              "dedicatedHarvestCapacityPerTick": 10,
+              "productiveDemandPerTick": 16,
+              "harvesterWorkParts": 5,
+              "harvesterCarryParts": 2,
+              "haulerCarryParts": 30,
+              "recommendedHarvesterWorkParts": 10,
+              "nextHarvesterWorkParts": 5,
+              "recommendedHarvesterCount": 3,
+              "harvesterWorkDeficit": 5,
+              "consumerFallbackCount": 1,
+              "consumerWaitingCount": 1,
+              "consumerCriticalCount": 2,
+              "consumerRequestCount": 2,
+              "consumerDeliveryReservations": 2,
+              "recommendedHaulerCarryParts": 8,
+              "nextHaulerCarryParts": 12,
+              "haulerCarryDeficit": 0,
+              "consumerServiceHaulerFloor": 3,
+              "recommendedHaulerCount": 3,
+              "sourceContainersReady": 2,
+              "sourceRoutes": [
+                {
+                  "sourceId": "6a3ee23cacf5a10039391e88",
+                  "spawnDistance": 20,
+                  "assignedHarvesterWorkParts": 5,
+                  "dedicatedIncomePerTick": 10,
+                  "containerReady": true
+                },
+                {
+                  "sourceId": "6a3ee23cacf5a10039391e8a",
+                  "spawnDistance": 9,
+                  "assignedHarvesterWorkParts": 0,
+                  "dedicatedIncomePerTick": 0,
+                  "containerReady": true
+                }
+              ]
+            },
+            "health": {
+              "modelVersion": 1,
+              "overallScore": 84,
+              "status": "WATCH",
+              "scores": {
+                "economy": 63,
+                "logistics": 90,
+                "infrastructure": 70,
+                "controller": 100,
+                "defense": 100,
+                "recovery": 100,
+                "cpu": 100
+              },
+              "reasons": [
+                "MINING_DEFICIT",
+                "CONSUMER_FALLBACK_ACTIVE",
+                "CONSTRUCTION_SLOW"
+              ]
+            },
+            "efficiency": {
+              "modelVersion": 3,
+              "overallScore": 35,
+              "status": "UNDERUTILIZED",
+              "components": {
+                "productiveUse": 50,
+                "energyUse": 0,
+                "spawnUse": 0,
+                "flow": 85
+              },
+              "pressure": {
+                "state": "SURPLUS",
+                "score": 100,
+                "surplus": 100,
+                "demand": 50
+              },
+              "metrics": {
+                "productiveThroughputPerTick": 10.4,
+                "productiveCapacityPerTick": 21,
+                "dedicatedHarvestCapacityPerTick": 10,
+                "energyCappedRatio": 1,
+                "spawnUtilization": 0,
+                "productiveBacklog": true
+              },
+              "reasons": [
+                "PRODUCTIVE_THROUGHPUT_LOW",
+                "ENERGY_SURPLUS_UNCONSUMED",
+                "SPAWN_IDLE_WITH_SURPLUS",
+                "CONSUMER_FALLBACK_ACTIVE",
+                "MODELED_DEMAND_NOT_REALIZED"
+              ]
+            },
+            "requests": {
+              "schemaVersion": 1,
+              "authority": "SHADOW",
+              "total": 38,
+              "stored": 125,
+              "terminal": 87,
+              "open": 38,
+              "blocked": 0,
+              "reservationCount": 4,
+              "byStatus": {
+                "OPEN": 34,
+                "SATISFIED": 87,
+                "RESERVED": 4
+              },
+              "byDomain": {
+                "economy": 1,
+                "logistics": 21,
+                "scouting": 6,
+                "work": 10
+              }
+            },
+            "logisticsRequests": {
+              "schemaVersion": 1,
+              "authority": "SHADOW",
+              "total": 18,
+              "totalAmount": 6036,
+              "byKind": {
+                "BALANCE": 1,
+                "DELIVER": 14,
+                "EMERGENCY_DELIVER": 1,
+                "PICKUP": 2
+              },
+              "amountByKind": {
+                "BALANCE": 1237,
+                "DELIVER": 749,
+                "EMERGENCY_DELIVER": 50,
+                "PICKUP": 4000
+              }
+            },
+            "scoutingFrontier": {
+              "schemaVersion": 1,
+              "authority": "SHADOW",
+              "homeRoom": "E8N1",
+              "frontierCount": 19,
+              "requestCount": 6,
+              "maxDepth": 3,
+              "refreshAge": 1500,
+              "topRequests": [
+                {
+                  "roomName": "E7N1",
+                  "fromRoom": "E8N1",
+                  "depth": 1,
+                  "score": 95,
+                  "urgency": 75,
+                  "age": 48649,
+                  "unknown": false,
+                  "stale": true,
+                  "threatDue": true,
+                  "risk": 10,
+                  "components": {
+                    "frontier": 20,
+                    "unknown": 0,
+                    "stale": 35,
+                    "threatUncertainty": 20,
+                    "sourceValue": 10,
+                    "routeValue": 5,
+                    "remoteValue": 0,
+                    "expansionValue": 0,
+                    "noObserver": 5,
+                    "depthPenalty": 0
+                  }
+                },
+                {
+                  "roomName": "E6N1",
+                  "fromRoom": "E7N1",
+                  "depth": 2,
+                  "score": 87,
+                  "urgency": 75,
+                  "age": 48641,
+                  "unknown": false,
+                  "stale": true,
+                  "threatDue": true,
+                  "risk": 30,
+                  "components": {
+                    "frontier": 20,
+                    "unknown": 0,
+                    "stale": 35,
+                    "threatUncertainty": 20,
+                    "sourceValue": 10,
+                    "routeValue": 5,
+                    "remoteValue": 0,
+                    "expansionValue": 0,
+                    "noObserver": 5,
+                    "depthPenalty": 8
+                  }
+                },
+                {
+                  "roomName": "E9N2",
+                  "fromRoom": "E8N2",
+                  "depth": 2,
+                  "score": 81,
+                  "urgency": 75,
+                  "age": 49049,
+                  "unknown": false,
+                  "stale": true,
+                  "threatDue": true,
+                  "risk": 10,
+                  "components": {
+                    "frontier": 20,
+                    "unknown": 0,
+                    "stale": 35,
+                    "threatUncertainty": 20,
+                    "sourceValue": 4,
+                    "routeValue": 5,
+                    "remoteValue": 0,
+                    "expansionValue": 0,
+                    "noObserver": 5,
+                    "depthPenalty": 8
+                  }
+                },
+                {
+                  "roomName": "E6N2",
+                  "fromRoom": "E6N1",
+                  "depth": 3,
+                  "score": 79,
+                  "urgency": 75,
+                  "age": 48574,
+                  "unknown": false,
+                  "stale": true,
+                  "threatDue": true,
+                  "risk": 30,
+                  "components": {
+                    "frontier": 20,
+                    "unknown": 0,
+                    "stale": 35,
+                    "threatUncertainty": 20,
+                    "sourceValue": 10,
+                    "routeValue": 5,
+                    "remoteValue": 0,
+                    "expansionValue": 0,
+                    "noObserver": 5,
+                    "depthPenalty": 16
+                  }
+                },
+                {
+                  "roomName": "E8N3",
+                  "fromRoom": "E8N2",
+                  "depth": 2,
+                  "score": 75,
+                  "urgency": 63,
+                  "age": 2474,
+                  "unknown": false,
+                  "stale": true,
+                  "threatDue": true,
+                  "risk": 30,
+                  "components": {
+                    "frontier": 20,
+                    "unknown": 0,
+                    "stale": 28,
+                    "threatUncertainty": 20,
+                    "sourceValue": 10,
+                    "routeValue": 0,
+                    "remoteValue": 0,
+                    "expansionValue": 0,
+                    "noObserver": 5,
+                    "depthPenalty": 8
+                  }
+                },
+                {
+                  "roomName": "E10N0",
+                  "fromRoom": "E10N1",
+                  "depth": 3,
+                  "score": 69,
+                  "urgency": 75,
+                  "age": 50349,
+                  "unknown": false,
+                  "stale": true,
+                  "threatDue": true,
+                  "risk": 10,
+                  "components": {
+                    "frontier": 20,
+                    "unknown": 0,
+                    "stale": 35,
+                    "threatUncertainty": 20,
+                    "sourceValue": 0,
+                    "routeValue": 5,
+                    "remoteValue": 0,
+                    "expansionValue": 0,
+                    "noObserver": 5,
+                    "depthPenalty": 16
+                  }
+                }
+              ]
+            },
+            "capacitySpawn": {
+              "schemaVersion": 1,
+              "authority": "SHADOW",
+              "deferred": false,
+              "requirementCount": 2,
+              "deficitCount": 1,
+              "spawnRequestCount": 1,
+              "preSpawnCount": 0,
+              "proposedCapacity": 3,
+              "uncoveredAfterPlan": 0,
+              "proposedByRole": {
+                "harvester": 1
+              },
+              "bodySource": "OPTIMIZER_V1",
+              "legacyDesired": {
+                "harvester": 3,
+                "hauler": 3,
+                "worker": 1,
+                "builder": 1,
+                "repairer": 1,
+                "upgrader": 2,
+                "defender": 0,
+                "scout": 1
+              }
+            },
+            "assignments": {
+              "schemaVersion": 1,
+              "authority": "SHADOW",
+              "planTick": 3764275,
+              "deferred": false,
+              "deferReason": null,
+              "requestCount": 12,
+              "executorCount": 11,
+              "assignmentCount": 5,
+              "switchCount": 1,
+              "unfilledCount": 10,
+              "totalUnfilled": 3393
+            },
+            "logisticsMatching": {
+              "schemaVersion": 1,
+              "authority": "SHADOW",
+              "planTick": 3764275,
+              "deferred": false,
+              "deferReason": null,
+              "haulerCount": 3,
+              "candidateCount": 61,
+              "jobCount": 3,
+              "matchedHaulerCount": 3,
+              "haulerUtilization": 1,
+              "pairedJobCount": 1,
+              "directCarriedJobCount": 2,
+              "criticalRequestCount": 1,
+              "criticalMatchedCount": 1,
+              "unmatchedCriticalCount": 0,
+              "criticalCandidateRequestCount": 1,
+              "criticalNoCandidateCount": 0,
+              "criticalCandidateUnmatchedCount": 0,
+              "criticalSlotCapacity": 1,
+              "reservedAmount": 150,
+              "averageTransportTicks": 1.67
+            },
+            "logisticsMatchingEvidence": {
+              "schemaVersion": 1,
+              "authority": "SHADOW_EVIDENCE",
+              "startTick": 3764093,
+              "endTick": 3764192,
+              "ticks": 100,
+              "deferredRatio": 0,
+              "averageHaulers": 3,
+              "averageMatchedHaulers": 1.79,
+              "haulerUtilization": 0.597,
+              "averageCandidatesPerTick": 4.99,
+              "averageJobsPerTick": 1.79,
+              "averagePairedJobsPerTick": 0.97,
+              "averageDirectCarriedJobsPerTick": 0.82,
+              "criticalRequestTicks": 83,
+              "criticalMatchedTicks": 83,
+              "unmatchedCriticalTicks": 0,
+              "criticalCandidateRequestTicks": 83,
+              "criticalNoCandidateTicks": 0,
+              "criticalCandidateUnmatchedTicks": 0,
+              "criticalSlotCapacityTicks": 83,
+              "criticalCoverageRatio": 1,
+              "criticalCandidateRatio": 1,
+              "criticalCandidateCoverageRatio": 1,
+              "criticalSlotCoverageRatio": 1,
+              "averageReservedAmountPerTick": 362.3,
+              "averagePredictedTransportTicks": 10.51,
+              "averageConsumerWaiting": 0.83,
+              "averageConsumerCritical": 0.93,
+              "averageConsumerFallback": 0.1,
+              "duplicateReservationTicks": 0,
+              "__truncated": true
+            },
+            "assignmentEvidence": {
+              "schemaVersion": 1,
+              "authority": "SHADOW_EVIDENCE",
+              "startTick": 3764102,
+              "endTick": 3764201,
+              "ticks": 100,
+              "requestsOpened": 50,
+              "requestsClosed": 43,
+              "averageRequestLatency": 10.56,
+              "maxRequestLatency": 307,
+              "averageActiveRequests": 20.41,
+              "averageBlockedRequests": 0,
+              "blockedReasons": {},
+              "assignmentsPerTick": 4.99,
+              "switchesPerTick": 0.01,
+              "deferredRatio": 0,
+              "averageUnfilledRequests": 7.18,
+              "averageUnfilledNeed": 3489.97,
+              "averageCandidateExecutorsWhenUnfilled": 3.91,
+              "idleCompatibleExecutorRatio": 0,
+              "controllerProgress": 580,
+              "constructionProgress": 460,
+              "usefulWorkPerTick": 10.4
+            },
+            "colonyStateAvailable": true
+          }
+        },
+        {
+          "capturedAt": "2026-10-07T21:57:46.554Z",
+          "shard": null,
+          "source": "live-console",
+          "v": "0.3.0-shadow.9-node24",
+          "session": "E8N1-3669884",
+          "tick": 3764275,
+          "level": "INFO",
+          "code": "BOT_HEARTBEAT",
+          "msg": "Bot tick completed",
+          "ctx": {
+            "cpu": 11.69,
+            "bucket": 10000,
+            "rooms": 1,
+            "creeps": 12,
+            "profile": {
+              "sections": {
+                "rooms": 4.57,
+                "creeps": 3.218,
+                "stats": 0.004,
+                "visuals": 0.025,
+                "world-intel": 0,
+                "planner-vnext-shadow": 0,
+                "defense-mincut-shadow": 0,
+                "remote-roi-shadow": 0,
+                "threat-model-shadow": 0.014
+              },
+              "details": {
+                "room.state": 0.117,
+                "room.economy": 0.206,
+                "room.requests": 2.134,
+                "room.capacity-spawn": 0.34,
+                "room.assignment": 0.445,
+                "room.evidence": 0.175,
+                "room.colony-state": 0.077,
+                "room.legacy": 0.016,
+                "room.heartbeat": 0.458,
+                "room.planner": 0,
+                "room.logistics-match": 0.554,
+                "room.logistics-evidence": 0.026,
+                "creep.harvester": 0.444,
+                "creep.builder": 0.353,
+                "creep.scout": 0.105,
+                "creep.upgrader": 0.671,
+                "creep.hauler": 0.95,
+                "creep.worker": 0.3,
+                "creep.repairer": 0.364,
+                "main.bootstrap": 3.675,
+                "main.commands": 0.004,
+                "main.logger-prune": 0.002,
+                "main.cleanup": 0.002,
+                "main.scheduler-setup": 0.002,
+                "scout.legacy-intel": 0.006,
+                "scout.target": 0.003,
+                "scout.move": 0.078,
+                "scout.world-intel": 0,
+                "main.scheduler-overhead": 0.062,
+                "creep.defender": 0
+              },
+              "attributed": 7.831,
+              "unattributed": 3.758
+            }
+          },
+          "jseq": 4938
+        }
+      ],
+      "outcome": "PASS",
+      "checks": [
+        {
+          "id": "node-version",
+          "status": "PASS",
+          "message": "Node runtime is 24.21.0.",
+          "data": {
+            "actual": "24.21.0"
+          }
+        },
+        {
+          "id": "bot-version",
+          "status": "PASS",
+          "message": "Window contains only 0.3.0-shadow.9-node24 bot events.",
+          "data": {
+            "botVersion": "0.3.0-shadow.9-node24"
+          }
+        },
+        {
+          "id": "window-complete",
+          "status": "PASS",
+          "message": "Evidence reaches tick 3764278.",
+          "data": {
+            "startTick": 3764254,
+            "endTick": 3764278
+          }
+        },
+        {
+          "id": "runtime-errors",
+          "status": "PASS",
+          "message": "No bot/runtime errors were observed in the window.",
+          "data": {}
+        },
+        {
+          "id": "collector-health",
+          "status": "PASS",
+          "message": "No collector errors were observed in the window.",
+          "data": {}
+        },
+        {
+          "id": "cpu-bucket",
+          "status": "PASS",
+          "message": "CPU and bucket remained inside safety thresholds.",
+          "data": {
+            "samples": 1
+          }
+        },
+        {
+          "id": "mining-active",
+          "status": "PASS",
+          "message": "Dedicated mining is active.",
+          "data": {
+            "latest": {
+              "tick": 3764275,
+              "dedicated": 10,
+              "theoretical": 20
+            }
+          }
+        },
+        {
+          "id": "hard-stall",
+          "status": "PASS",
+          "message": "No hard spawn/economy stall evidence was observed.",
+          "data": {}
+        },
+        {
+          "id": "telemetry-continuity",
+          "status": "PASS",
+          "message": "Durable telemetry jseq values are contiguous.",
+          "data": {
+            "first": 4935,
+            "last": 4938,
+            "count": 4
+          }
+        }
+      ],
+      "counts": {
+        "pass": 9,
+        "watch": 0,
+        "fail": 0
+      }
+    },
+    "d0-live-result": {
+      "startTick": 3764254,
+      "endTick": 3764353,
+      "complete": true,
+      "counts": {
+        "pass": 6,
+        "watch": 1,
+        "fail": 0
+      },
+      "outcome": "WATCH",
+      "checks": [
+        {
+          "id": "window-complete",
+          "status": "PASS",
+          "message": "Evidence must reach tick 3764353."
+        },
+        {
+          "id": "threat-evidence",
+          "status": "PASS",
+          "message": "Every observed room snapshot must contain D0 evidence."
+        },
+        {
+          "id": "shadow-authority",
+          "status": "PASS",
+          "message": "D0 must remain observational with no Safe Mode authority."
+        },
+        {
+          "id": "model-contract",
+          "status": "PASS",
+          "message": "Counts, strengths, current tick, risk states and bounded path work must be valid."
+        },
+        {
+          "id": "scheduler-isolation",
+          "status": "PASS",
+          "message": "D0 must have independent current-tick scheduler evidence."
+        },
+        {
+          "id": "cpu-budget",
+          "status": "PASS",
+          "message": "D0 isolated CPU must stay at or below 5."
+        },
+        {
+          "id": "combat-observation",
+          "status": "WATCH",
+          "message": "A peaceful live window does not validate combat predictions; attack fixtures remain required."
+        }
+      ],
+      "latest": {
+        "schemaVersion": 1,
+        "authority": "SHADOW",
+        "actionAuthority": "NONE",
+        "tick": 3764300,
+        "status": "READY",
+        "hostileCount": 0,
+        "armedCount": 0,
+        "aggregate": {
+          "meleeDps": 0,
+          "rangedDps": 0,
+          "healPerTick": 0,
+          "dismantlePerTick": 0,
+          "effectiveTough": 0,
+          "mobility": 0
+        },
+        "riskState": "NORMAL",
+        "recommendedSafeMode": false,
+        "safetyAuthority": "LEGACY_UNCHANGED",
+        "coreLossProbability": null,
+        "assetsAtRisk": 0,
+        "earliestImpactTick": null,
+        "unknownPaths": 0,
+        "pathSearches": 0
+      }
+    },
+    "p2-live-result": {
+      "mode": "p2-shadow",
+      "roomName": "E8N1",
+      "startTick": 3764254,
+      "endTick": 3764353,
+      "tickCount": 100,
+      "evidenceMaxTick": 3764375,
+      "complete": true,
+      "latestTick": 3764300,
+      "latestPlanner": {
+        "schemaVersion": 1,
+        "authority": "SHADOW",
+        "status": "READY",
+        "roomName": "E8N1",
+        "planTick": 3764279,
+        "phase": "ANCHOR_AND_CORE_GEOMETRY",
+        "candidateAnchorCount": 6,
+        "evaluatedCandidateCount": 12,
+        "pathSearchBudget": 24,
+        "pathSearches": 24,
+        "selected": {
+          "anchor": {
+            "x": 20,
+            "y": 29,
+            "roomName": "E8N1",
+            "source": "CENTROID_OFFSET_6"
+          },
+          "variant": "CORE_BALANCED",
+          "score": 83.58,
+          "valid": true,
+          "components": {
+            "openness": 89,
+            "sourceLogistics": 65,
+            "upgradeLogistics": 89,
+            "legacySpawnContinuity": 100,
+            "extensionFeasibility": 81,
+            "futureStructureFeasibility": 81,
+            "towerCoverage": 99,
+            "traffic": 88
+          },
+          "feasibility": {
+            "ratio": 0.808,
+            "extensionRatio": 0.806,
+            "criticalBlocked": 0,
+            "blocked": [
+              "[depth-limit]",
+              "[depth-limit]",
+              "[depth-limit]",
+              "[depth-limit]",
+              "[depth-limit]",
+              "[depth-limit]",
+              "[depth-limit]",
+              "[depth-limit]",
+              "[depth-limit]",
+              "[depth-limit]"
+            ]
+          },
+          "routes": {
+            "sourceAverageCost": 14.5,
+            "controllerCost": 5,
+            "spawnCost": 0,
+            "exactRouteCount": 4,
+            "fallbackRouteCount": 0,
+            "pathSearches": 4
+          }
+        },
+        "topCandidates": [
+          {
+            "anchor": {
+              "x": "[depth-limit]",
+              "y": "[depth-limit]",
+              "roomName": "[depth-limit]",
+              "source": "[depth-limit]"
+            },
+            "variant": "CORE_BALANCED",
+            "score": 83.58,
+            "valid": true,
+            "components": {
+              "openness": "[depth-limit]",
+              "sourceLogistics": "[depth-limit]",
+              "upgradeLogistics": "[depth-limit]",
+              "legacySpawnContinuity": "[depth-limit]",
+              "extensionFeasibility": "[depth-limit]",
+              "futureStructureFeasibility": "[depth-limit]",
+              "towerCoverage": "[depth-limit]",
+              "traffic": "[depth-limit]"
+            },
+            "feasibility": {
+              "ratio": "[depth-limit]",
+              "extensionRatio": "[depth-limit]",
+              "criticalBlocked": "[depth-limit]",
+              "blocked": "[depth-limit]"
+            },
+            "routes": {
+              "sourceAverageCost": "[depth-limit]",
+              "controllerCost": "[depth-limit]",
+              "spawnCost": "[depth-limit]",
+              "exactRouteCount": "[depth-limit]",
+              "fallbackRouteCount": "[depth-limit]",
+              "pathSearches": "[depth-limit]"
+            }
+          },
+          {
+            "anchor": {
+              "x": "[depth-limit]",
+              "y": "[depth-limit]",
+              "roomName": "[depth-limit]",
+              "source": "[depth-limit]"
+            },
+            "variant": "CORE_BALANCED",
+            "score": 77.8,
+            "valid": true,
+            "components": {
+              "openness": "[depth-limit]",
+              "sourceLogistics": "[depth-limit]",
+              "upgradeLogistics": "[depth-limit]",
+              "legacySpawnContinuity": "[depth-limit]",
+              "extensionFeasibility": "[depth-limit]",
+              "futureStructureFeasibility": "[depth-limit]",
+              "towerCoverage": "[depth-limit]",
+              "traffic": "[depth-limit]"
+            },
+            "feasibility": {
+              "ratio": "[depth-limit]",
+              "extensionRatio": "[depth-limit]",
+              "criticalBlocked": "[depth-limit]",
+              "blocked": "[depth-limit]"
+            },
+            "routes": {
+              "sourceAverageCost": "[depth-limit]",
+              "controllerCost": "[depth-limit]",
+              "spawnCost": "[depth-limit]",
+              "exactRouteCount": "[depth-limit]",
+              "fallbackRouteCount": "[depth-limit]",
+              "pathSearches": "[depth-limit]"
+            }
+          },
+          {
+            "anchor": {
+              "x": "[depth-limit]",
+              "y": "[depth-limit]",
+              "roomName": "[depth-limit]",
+              "source": "[depth-limit]"
+            },
+            "variant": "CORE_COMPACT",
+            "score": 53.72,
+            "valid": false,
+            "components": {
+              "openness": "[depth-limit]",
+              "sourceLogistics": "[depth-limit]",
+              "upgradeLogistics": "[depth-limit]",
+              "legacySpawnContinuity": "[depth-limit]",
+              "extensionFeasibility": "[depth-limit]",
+              "futureStructureFeasibility": "[depth-limit]",
+              "towerCoverage": "[depth-limit]",
+              "traffic": "[depth-limit]"
+            },
+            "feasibility": {
+              "ratio": "[depth-limit]",
+              "extensionRatio": "[depth-limit]",
+              "criticalBlocked": "[depth-limit]",
+              "blocked": "[depth-limit]"
+            },
+            "routes": {
+              "sourceAverageCost": "[depth-limit]",
+              "controllerCost": "[depth-limit]",
+              "spawnCost": "[depth-limit]",
+              "exactRouteCount": "[depth-limit]",
+              "fallbackRouteCount": "[depth-limit]",
+              "pathSearches": "[depth-limit]"
+            }
+          }
+        ],
+        "legacyPlannerAuthority": "UNCHANGED",
+        "nextPhase": "P3_DEFENSE_PERIMETER_NOT_IMPLEMENTED"
+      },
+      "latestScheduler": {
+        "lastRunTick": 3764279,
+        "lastCpu": 13.84,
+        "cpuEMA": 8.227,
+        "runCount": 25,
+        "skippedCount": 2397,
+        "lastDecision": "MINIMUM_INTERVAL",
+        "lastSkipReason": "MINIMUM_INTERVAL"
+      },
+      "outcome": "PASS",
+      "checks": [
+        {
+          "id": "planner-evidence",
+          "status": "PASS",
+          "message": "Observed 1 P2 plannerVNext STATUS_SNAPSHOT sample(s) for E8N1.",
+          "data": {
+            "ticks": [
+              3764300
+            ]
+          }
+        },
+        {
+          "id": "shadow-authority",
+          "status": "PASS",
+          "message": "P2 remained SHADOW and legacy planner authority remained unchanged.",
+          "data": {}
+        },
+        {
+          "id": "plan-ready",
+          "status": "PASS",
+          "message": "P2 produced a READY shadow plan.",
+          "data": {}
+        },
+        {
+          "id": "plan-contract",
+          "status": "PASS",
+          "message": "P2 candidate, path-budget, score and feasibility contracts remained valid.",
+          "data": {}
+        },
+        {
+          "id": "p1-route-evidence",
+          "status": "PASS",
+          "message": "P2 used exact P1-backed in-room route evidence in live planning.",
+          "data": {
+            "ticks": [
+              3764300
+            ]
+          }
+        },
+        {
+          "id": "scheduler-isolation",
+          "status": "PASS",
+          "message": "planner-vnext-shadow is tracked as an independent scheduler process.",
+          "data": {
+            "latest": {
+              "lastRunTick": 3764279,
+              "lastCpu": 13.84,
+              "cpuEMA": 8.227,
+              "runCount": 25,
+              "skippedCount": 2397,
+              "lastDecision": "MINIMUM_INTERVAL",
+              "lastSkipReason": "MINIMUM_INTERVAL"
+            }
+          }
+        },
+        {
+          "id": "plan-freshness",
+          "status": "PASS",
+          "message": "P2 shadow plan telemetry remained fresh enough for live observation.",
+          "data": {}
+        }
+      ],
+      "counts": {
+        "pass": 7,
+        "watch": 0,
+        "fail": 0
+      }
+    },
+    "p3-live-result": {
+      "mode": "p3-shadow",
+      "roomName": "E8N1",
+      "startTick": 3764254,
+      "endTick": 3764353,
+      "tickCount": 100,
+      "evidenceMaxTick": 3764375,
+      "complete": true,
+      "latestTick": 3764300,
+      "latestDefense": {
+        "schemaVersion": 1,
+        "authority": "SHADOW",
+        "status": "READY",
+        "reason": null,
+        "roomName": "E8N1",
+        "planTick": 3763915,
+        "sourcePlannerTick": 3763879,
+        "phase": "DEFENSE_MINCUT",
+        "bounds": {
+          "minX": 11,
+          "minY": 20,
+          "maxX": 29,
+          "maxY": 38,
+          "width": 19,
+          "height": 19,
+          "area": 361
+        },
+        "protectedAssetCount": 43,
+        "trafficTileCount": 32,
+        "graph": {
+          "walkableTiles": 252,
+          "nodeCount": 506,
+          "edgeCount": 2048,
+          "augmentations": 32,
+          "maxFlow": 3300,
+          "complete": true
+        },
+        "rampartCount": 28,
+        "ramparts": [
+          {
+            "x": 18,
+            "y": 20,
+            "trafficCrossing": false,
+            "existingRampart": false
+          },
+          {
+            "x": 19,
+            "y": 20,
+            "trafficCrossing": false,
+            "existingRampart": false
+          },
+          {
+            "x": 20,
+            "y": 20,
+            "trafficCrossing": false,
+            "existingRampart": false
+          },
+          {
+            "x": 15,
+            "y": 22,
+            "trafficCrossing": false,
+            "existingRampart": false
+          },
+          {
+            "x": 15,
+            "y": 23,
+            "trafficCrossing": false,
+            "existingRampart": false
+          },
+          {
+            "x": 14,
+            "y": 24,
+            "trafficCrossing": false,
+            "existingRampart": false
+          },
+          {
+            "x": 15,
+            "y": 24,
+            "trafficCrossing": false,
+            "existingRampart": false
+          },
+          {
+            "x": 27,
+            "y": 24,
+            "trafficCrossing": false,
+            "existingRampart": false
+          },
+          {
+            "x": 14,
+            "y": 25,
+            "trafficCrossing": false,
+            "existingRampart": false
+          },
+          {
+            "x": 27,
+            "y": 25,
+            "trafficCrossing": true,
+            "existingRampart": false
+          },
+          {
+            "x": 14,
+            "y": 26,
+            "trafficCrossing": false,
+            "existingRampart": false
+          },
+          {
+            "x": 14,
+            "y": 27,
+            "trafficCrossing": false,
+            "existingRampart": false
+          },
+          {
+            "x": 14,
+            "y": 28,
+            "trafficCrossing": false,
+            "existingRampart": false
+          },
+          {
+            "x": 14,
+            "y": 29,
+            "trafficCrossing": false,
+            "existingRampart": false
+          },
+          {
+            "x": 14,
+            "y": 30,
+            "trafficCrossing": false,
+            "existingRampart": false
+          },
+          {
+            "x": 14,
+            "y": 31,
+            "trafficCrossing": false,
+            "existingRampart": false
+          }
+        ],
+        "rampartGroupCount": 4,
+        "metrics": {
+          "repairBurdenIndex": 28,
+          "towerCount": 4,
+          "towerMinimumDamage": 1920,
+          "towerAverageDamage": 2140.71,
+          "towerMinimumCoverageScore": 100,
+          "towerAverageCoverageScore": 100,
+          "breachRouteCount": 0,
+          "exposedAssetCount": 0,
+          "exitExposedWithin5": 0,
+          "exitExposureRatio": 0,
+          "averageExitDistance": 15.39,
+          "trafficCrossings": 2
+        },
+        "score": {
+          "total": 74.1,
+          "components": {
+            "rampartEconomy": 16,
+            "repairBurden": 44,
+            "towerCoverage": 100,
+            "breachResistance": 100,
+            "exitExposure": 100,
+            "traffic": 93
+          }
+        },
+        "phaseEvidence": [
+          {
+            "phase": "PROTECTED_TOPOLOGY",
+            "cpuUsed": 0.558,
+            "failureReason": null
+          },
+          {
+            "phase": "MINCUT",
+            "cpuUsed": 3.264,
+            "failureReason": null
+          },
+          {
+            "phase": "DEFENSE_SCORE",
+            "cpuUsed": 0.488,
+            "failureReason": null
+          }
+        ],
+        "legacyPlannerAuthority": "UNCHANGED",
+        "constructionAuthority": "NONE"
+      },
+      "latestPlanner": {
+        "schemaVersion": 1,
+        "authority": "SHADOW",
+        "status": "READY",
+        "roomName": "E8N1",
+        "planTick": 3764279,
+        "phase": "ANCHOR_AND_CORE_GEOMETRY",
+        "candidateAnchorCount": 6,
+        "evaluatedCandidateCount": 12,
+        "pathSearchBudget": 24,
+        "pathSearches": 24,
+        "selected": {
+          "anchor": {
+            "x": 20,
+            "y": 29,
+            "roomName": "E8N1",
+            "source": "CENTROID_OFFSET_6"
+          },
+          "variant": "CORE_BALANCED",
+          "score": 83.58,
+          "valid": true,
+          "components": {
+            "openness": 89,
+            "sourceLogistics": 65,
+            "upgradeLogistics": 89,
+            "legacySpawnContinuity": 100,
+            "extensionFeasibility": 81,
+            "futureStructureFeasibility": 81,
+            "towerCoverage": 99,
+            "traffic": 88
+          },
+          "feasibility": {
+            "ratio": 0.808,
+            "extensionRatio": 0.806,
+            "criticalBlocked": 0,
+            "blocked": [
+              "[depth-limit]",
+              "[depth-limit]",
+              "[depth-limit]",
+              "[depth-limit]",
+              "[depth-limit]",
+              "[depth-limit]",
+              "[depth-limit]",
+              "[depth-limit]",
+              "[depth-limit]",
+              "[depth-limit]"
+            ]
+          },
+          "routes": {
+            "sourceAverageCost": 14.5,
+            "controllerCost": 5,
+            "spawnCost": 0,
+            "exactRouteCount": 4,
+            "fallbackRouteCount": 0,
+            "pathSearches": 4
+          }
+        },
+        "topCandidates": [
+          {
+            "anchor": {
+              "x": "[depth-limit]",
+              "y": "[depth-limit]",
+              "roomName": "[depth-limit]",
+              "source": "[depth-limit]"
+            },
+            "variant": "CORE_BALANCED",
+            "score": 83.58,
+            "valid": true,
+            "components": {
+              "openness": "[depth-limit]",
+              "sourceLogistics": "[depth-limit]",
+              "upgradeLogistics": "[depth-limit]",
+              "legacySpawnContinuity": "[depth-limit]",
+              "extensionFeasibility": "[depth-limit]",
+              "futureStructureFeasibility": "[depth-limit]",
+              "towerCoverage": "[depth-limit]",
+              "traffic": "[depth-limit]"
+            },
+            "feasibility": {
+              "ratio": "[depth-limit]",
+              "extensionRatio": "[depth-limit]",
+              "criticalBlocked": "[depth-limit]",
+              "blocked": "[depth-limit]"
+            },
+            "routes": {
+              "sourceAverageCost": "[depth-limit]",
+              "controllerCost": "[depth-limit]",
+              "spawnCost": "[depth-limit]",
+              "exactRouteCount": "[depth-limit]",
+              "fallbackRouteCount": "[depth-limit]",
+              "pathSearches": "[depth-limit]"
+            }
+          },
+          {
+            "anchor": {
+              "x": "[depth-limit]",
+              "y": "[depth-limit]",
+              "roomName": "[depth-limit]",
+              "source": "[depth-limit]"
+            },
+            "variant": "CORE_BALANCED",
+            "score": 77.8,
+            "valid": true,
+            "components": {
+              "openness": "[depth-limit]",
+              "sourceLogistics": "[depth-limit]",
+              "upgradeLogistics": "[depth-limit]",
+              "legacySpawnContinuity": "[depth-limit]",
+              "extensionFeasibility": "[depth-limit]",
+              "futureStructureFeasibility": "[depth-limit]",
+              "towerCoverage": "[depth-limit]",
+              "traffic": "[depth-limit]"
+            },
+            "feasibility": {
+              "ratio": "[depth-limit]",
+              "extensionRatio": "[depth-limit]",
+              "criticalBlocked": "[depth-limit]",
+              "blocked": "[depth-limit]"
+            },
+            "routes": {
+              "sourceAverageCost": "[depth-limit]",
+              "controllerCost": "[depth-limit]",
+              "spawnCost": "[depth-limit]",
+              "exactRouteCount": "[depth-limit]",
+              "fallbackRouteCount": "[depth-limit]",
+              "pathSearches": "[depth-limit]"
+            }
+          },
+          {
+            "anchor": {
+              "x": "[depth-limit]",
+              "y": "[depth-limit]",
+              "roomName": "[depth-limit]",
+              "source": "[depth-limit]"
+            },
+            "variant": "CORE_COMPACT",
+            "score": 53.72,
+            "valid": false,
+            "components": {
+              "openness": "[depth-limit]",
+              "sourceLogistics": "[depth-limit]",
+              "upgradeLogistics": "[depth-limit]",
+              "legacySpawnContinuity": "[depth-limit]",
+              "extensionFeasibility": "[depth-limit]",
+              "futureStructureFeasibility": "[depth-limit]",
+              "towerCoverage": "[depth-limit]",
+              "traffic": "[depth-limit]"
+            },
+            "feasibility": {
+              "ratio": "[depth-limit]",
+              "extensionRatio": "[depth-limit]",
+              "criticalBlocked": "[depth-limit]",
+              "blocked": "[depth-limit]"
+            },
+            "routes": {
+              "sourceAverageCost": "[depth-limit]",
+              "controllerCost": "[depth-limit]",
+              "spawnCost": "[depth-limit]",
+              "exactRouteCount": "[depth-limit]",
+              "fallbackRouteCount": "[depth-limit]",
+              "pathSearches": "[depth-limit]"
+            }
+          }
+        ],
+        "legacyPlannerAuthority": "UNCHANGED",
+        "nextPhase": "P3_DEFENSE_PERIMETER_NOT_IMPLEMENTED"
+      },
+      "latestScheduler": {
+        "lastRunTick": 3763915,
+        "lastCpu": 4.805,
+        "cpuEMA": 9.358,
+        "runCount": 4,
+        "skippedCount": 1863,
+        "lastDecision": "MINIMUM_INTERVAL",
+        "lastSkipReason": "MINIMUM_INTERVAL"
+      },
+      "outcome": "PASS",
+      "checks": [
+        {
+          "id": "mincut-evidence",
+          "status": "PASS",
+          "message": "Observed 1 P3 defenseMinCut STATUS_SNAPSHOT sample(s) for E8N1.",
+          "data": {
+            "ticks": [
+              3764300
+            ]
+          }
+        },
+        {
+          "id": "shadow-authority",
+          "status": "PASS",
+          "message": "P3 remained SHADOW, construction authority remained NONE, and legacy planner authority remained unchanged.",
+          "data": {}
+        },
+        {
+          "id": "mincut-ready",
+          "status": "PASS",
+          "message": "P3 produced a READY defensive cut.",
+          "data": {}
+        },
+        {
+          "id": "mincut-contract",
+          "status": "PASS",
+          "message": "P3 graph, cut, breach, and scoring contracts remained valid.",
+          "data": {}
+        },
+        {
+          "id": "p2-dependency-order",
+          "status": "PASS",
+          "message": "P3 consumed an earlier P2 SHADOW plan; newer P2 snapshots observed after the P3 run are cadence-safe.",
+          "data": {
+            "samples": [
+              {
+                "tick": 3764300,
+                "sourcePlannerTick": 3763879,
+                "defensePlanTick": 3763915,
+                "observedP2Tick": 3764279,
+                "newerPlannerVisibleAfterDefense": true
+              }
+            ]
+          }
+        },
+        {
+          "id": "scheduler-isolation",
+          "status": "PASS",
+          "message": "defense-mincut-shadow is tracked as an independent scheduler process.",
+          "data": {
+            "latest": {
+              "lastRunTick": 3763915,
+              "lastCpu": 4.805,
+              "cpuEMA": 9.358,
+              "runCount": 4,
+              "skippedCount": 1863,
+              "lastDecision": "MINIMUM_INTERVAL",
+              "lastSkipReason": "MINIMUM_INTERVAL"
+            }
+          }
+        },
+        {
+          "id": "mincut-cpu",
+          "status": "PASS",
+          "message": "P3 isolated scheduler CPU stayed at or below 10 CPU.",
+          "data": {
+            "samples": [
+              {
+                "tick": 3764300,
+                "cpu": 4.805
+              }
+            ],
+            "watchThreshold": 10,
+            "failThreshold": 20
+          }
+        },
+        {
+          "id": "plan-freshness",
+          "status": "PASS",
+          "message": "P3 defensive artifact remained within its freshness horizon.",
+          "data": {}
+        }
+      ],
+      "counts": {
+        "pass": 8,
+        "watch": 0,
+        "fail": 0
+      }
+    },
+    "i2-live-result": {
+      "mode": "i2-shadow",
+      "roomName": "E8N1",
+      "startTick": 3764254,
+      "endTick": 3764353,
+      "tickCount": 100,
+      "evidenceMaxTick": 3764375,
+      "complete": true,
+      "latestTick": 3764300,
+      "latestRoi": {
+        "schemaVersion": 1,
+        "authority": "SHADOW",
+        "activationAuthority": "NONE",
+        "remoteMiningEnabled": false,
+        "homeRoom": "E8N1",
+        "evaluatedTick": 3764266,
+        "status": "READY",
+        "reason": null,
+        "candidateCount": 10,
+        "readyCount": 1,
+        "viableCount": 1,
+        "recommendedCandidateCount": 1,
+        "bestCandidate": {
+          "roomName": "E9N1",
+          "depth": 1,
+          "status": "READY",
+          "reason": null,
+          "score": 69.61,
+          "netEnergyPerTick": 6.961,
+          "economicallyViable": true,
+          "capacityBudgetEligible": true,
+          "recommendedState": "CANDIDATE",
+          "routeHops": 1,
+          "sourceCount": 1,
+          "grossIncomePerTick": 10,
+          "totalCostPerTick": 3.039,
+          "confidence": 1
+        },
+        "topCandidates": [
+          {
+            "roomName": "E9N1",
+            "depth": 1,
+            "status": "READY",
+            "reason": null,
+            "score": 69.61,
+            "netEnergyPerTick": 6.961,
+            "economicallyViable": true,
+            "capacityBudgetEligible": true,
+            "recommendedState": "CANDIDATE",
+            "routeHops": 1,
+            "sourceCount": 1,
+            "grossIncomePerTick": 10,
+            "totalCostPerTick": 3.039,
+            "confidence": 1
+          },
+          {
+            "roomName": "E7N1",
+            "depth": 1,
+            "status": "UNAVAILABLE",
+            "reason": "INTEL_STALE",
+            "score": 0,
+            "netEnergyPerTick": null,
+            "economicallyViable": false,
+            "capacityBudgetEligible": true,
+            "recommendedState": "SUSPENDED",
+            "routeHops": null,
+            "sourceCount": null,
+            "grossIncomePerTick": null,
+            "totalCostPerTick": null,
+            "confidence": 1
+          },
+          {
+            "roomName": "E8N2",
+            "depth": 1,
+            "status": "UNAVAILABLE",
+            "reason": "INTEL_STALE",
+            "score": 0,
+            "netEnergyPerTick": null,
+            "economicallyViable": false,
+            "capacityBudgetEligible": true,
+            "recommendedState": "SUSPENDED",
+            "routeHops": null,
+            "sourceCount": null,
+            "grossIncomePerTick": null,
+            "totalCostPerTick": null,
+            "confidence": 1
+          },
+          {
+            "roomName": "E10N1",
+            "depth": 2,
+            "status": "UNAVAILABLE",
+            "reason": "INTEL_STALE",
+            "score": 0,
+            "netEnergyPerTick": null,
+            "economicallyViable": false,
+            "capacityBudgetEligible": true,
+            "recommendedState": "SUSPENDED",
+            "routeHops": null,
+            "sourceCount": null,
+            "grossIncomePerTick": null,
+            "totalCostPerTick": null,
+            "confidence": 1
+          },
+          {
+            "roomName": "E6N1",
+            "depth": 2,
+            "status": "UNAVAILABLE",
+            "reason": "INTEL_STALE",
+            "score": 0,
+            "netEnergyPerTick": null,
+            "economicallyViable": false,
+            "capacityBudgetEligible": true,
+            "recommendedState": "SUSPENDED",
+            "routeHops": null,
+            "sourceCount": null,
+            "grossIncomePerTick": null,
+            "totalCostPerTick": null,
+            "confidence": 1
+          },
+          {
+            "roomName": "E7N0",
+            "depth": 2,
+            "status": "UNAVAILABLE",
+            "reason": "INTEL_STALE",
+            "score": 0,
+            "netEnergyPerTick": null,
+            "economicallyViable": false,
+            "capacityBudgetEligible": true,
+            "recommendedState": "SUSPENDED",
+            "routeHops": null,
+            "sourceCount": null,
+            "grossIncomePerTick": null,
+            "totalCostPerTick": null,
+            "confidence": 1
+          },
+          {
+            "roomName": "E7N2",
+            "depth": 2,
+            "status": "UNAVAILABLE",
+            "reason": "INTEL_STALE",
+            "score": 0,
+            "netEnergyPerTick": null,
+            "economicallyViable": false,
+            "capacityBudgetEligible": true,
+            "recommendedState": "SUSPENDED",
+            "routeHops": null,
+            "sourceCount": null,
+            "grossIncomePerTick": null,
+            "totalCostPerTick": null,
+            "confidence": 1
+          },
+          {
+            "roomName": "E8N3",
+            "depth": 2,
+            "status": "UNAVAILABLE",
+            "reason": "INTEL_STALE",
+            "score": 0,
+            "netEnergyPerTick": null,
+            "economicallyViable": false,
+            "capacityBudgetEligible": true,
+            "recommendedState": "SUSPENDED",
+            "routeHops": null,
+            "sourceCount": null,
+            "grossIncomePerTick": null,
+            "totalCostPerTick": null,
+            "confidence": 1
+          }
+        ],
+        "assumptions": {
+          "maxDepth": 2,
+          "maxRouteHops": 3,
+          "intelMaxAge": 1500,
+          "ticksPerRoom": 50,
+          "localEndpointTicks": 25
+        }
+      },
+      "latestScheduler": {
+        "lastRunTick": 3764266,
+        "lastCpu": 1.973,
+        "cpuEMA": 1.985,
+        "runCount": 5,
+        "skippedCount": 1017,
+        "lastDecision": "MINIMUM_INTERVAL",
+        "lastSkipReason": "MINIMUM_INTERVAL"
+      },
+      "outcome": "PASS",
+      "checks": [
+        {
+          "id": "roi-evidence",
+          "status": "PASS",
+          "message": "Observed 1 I2 remoteRoi STATUS_SNAPSHOT sample(s) for E8N1.",
+          "data": {
+            "ticks": [
+              3764300
+            ]
+          }
+        },
+        {
+          "id": "shadow-authority",
+          "status": "PASS",
+          "message": "I2 remained SHADOW with activation authority NONE and remote mining disabled.",
+          "data": {}
+        },
+        {
+          "id": "roi-ready",
+          "status": "PASS",
+          "message": "I2 produced a READY remote ROI artifact.",
+          "data": {}
+        },
+        {
+          "id": "roi-contract",
+          "status": "PASS",
+          "message": "I2 ROI counts and candidate telemetry remained within contract bounds.",
+          "data": {}
+        },
+        {
+          "id": "no-activation",
+          "status": "PASS",
+          "message": "I2 emitted no ACTIVE remote state; recommendations remained evidence-only.",
+          "data": {}
+        },
+        {
+          "id": "candidate-observation",
+          "status": "PASS",
+          "message": "At least one live I2 candidate was observed.",
+          "data": {
+            "samples": [
+              {
+                "tick": 3764300,
+                "candidateCount": 10
+              }
+            ]
+          }
+        },
+        {
+          "id": "scheduler-isolation",
+          "status": "PASS",
+          "message": "remote-roi-shadow is tracked as an independent scheduler process.",
+          "data": {
+            "latest": {
+              "lastRunTick": 3764266,
+              "lastCpu": 1.973,
+              "cpuEMA": 1.985,
+              "runCount": 5,
+              "skippedCount": 1017,
+              "lastDecision": "MINIMUM_INTERVAL",
+              "lastSkipReason": "MINIMUM_INTERVAL"
+            }
+          }
+        },
+        {
+          "id": "roi-cpu",
+          "status": "PASS",
+          "message": "I2 isolated scheduler CPU stayed at or below 5 CPU.",
+          "data": {
+            "samples": [
+              {
+                "tick": 3764300,
+                "cpu": 1.973
+              }
+            ],
+            "watchThreshold": 5,
+            "failThreshold": 10
+          }
+        },
+        {
+          "id": "roi-freshness",
+          "status": "PASS",
+          "message": "I2 remote ROI artifact remained within its freshness horizon.",
+          "data": {}
+        }
+      ],
+      "counts": {
+        "pass": 9,
+        "watch": 0,
+        "fail": 0
+      }
+    }
+  }
+}

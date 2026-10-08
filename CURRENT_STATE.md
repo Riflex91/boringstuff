@@ -1756,3 +1756,25 @@ read-only D0 verifier. Full offline regression passes on Node 24.21.0. See
 `docs/D0_THREAT_MODEL_SHADOW.md` for implemented behavior and explicit limitations.
 This is not completion of D0, D1, or the overall autonomy roadmap.
 
+
+## 2026-10-08 — D0.1 initial SHADOW live window verified
+
+Runtime source head: `25167a5182b41432486a9724661ef0e7c32b6538`.
+Deployment: `20261007215630456-4492`, version `0.3.0-shadow.9-node24`.
+All 50 server modules matched the tested source after deployment ID normalization.
+
+- Smoke `3764254-3764278`: 9 PASS / 0 WATCH / 0 FAIL.
+- General live `3764254-3764353`: 13 PASS / 6 WATCH / 0 FAIL.
+- P2 on that same 100-tick window: 7 PASS / 0 WATCH / 0 FAIL.
+- P3: 8 PASS / 0 WATCH / 0 FAIL.
+- I2: 9 PASS / 0 WATCH / 0 FAIL.
+- D0: 6 PASS / 1 WATCH / 0 FAIL. No armed hostile was observed.
+- D0 snapshot tick 3764300: READY / NORMAL, SHADOW / NONE, 0.021 isolated CPU.
+- Offline full npm test and GitHub Actions tests passed.
+
+Append-only machine-readable evidence: `docs/verification/d0-1-shadow-live.json`.
+The general WATCH findings concern window alignment, unavailable exact-window
+productive metrics, and UNDERUTILIZED efficiency. They are not permission to
+relax gates. D0.1 remains observational; combat fixtures do not constitute live
+combat validation. Continue with D0 path/barrier and coordinated-attack modeling
+before any authoritative D1 migration.
