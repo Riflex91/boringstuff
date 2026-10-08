@@ -1,5 +1,15 @@
 # Screeps Autonomous Bot v0.2.19-node18
 
+## VNext autonomy architecture
+
+The next-generation zero-touch, server-portable architecture is documented in:
+
+- `SCREEPS_BOT_ULTIMATE_AUTONOMY_ROADMAP.md` — canonical VNext roadmap, architecture digest, parallel development lanes and acceptance target.
+- `docs/ULTIMATE_AUTONOMOUS_BOT_KNOWLEDGE_BASE.md` — detailed research synthesis of TooAngel/sklemmer, Code Addicts Anonymous, KasamiBot and The International.
+
+The active v0.2.x release line remains evidence-gated and separate from VNext architecture work until explicitly migrated.
+
+
 Canonical local repository:
 
 `C:\Users\hansi\AppData\Local\Screeps\scripts\screeps_newbieland_net___21025\boringstuff`
