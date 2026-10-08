@@ -1778,3 +1778,18 @@ productive metrics, and UNDERUTILIZED efficiency. They are not permission to
 relax gates. D0.1 remains observational; combat fixtures do not constitute live
 combat validation. Continue with D0 path/barrier and coordinated-attack modeling
 before any authoritative D1 migration.
+
+## 2026-10-08 — D0.2 candidate prepared
+
+D0.1 merged as PR #111 (`2978c17e1481c7f8543cc6085f4f25c1d1b8f6c2`).
+Candidate `0.3.0-shadow.10-node24` adds bounded breach-route estimates and
+piecewise coordinated-attack damage. Covering rampart hits are charged once per
+asset; an attacker is credited only after its estimated arrival. Matrix costs
+may saturate, but reported breach delay always uses actual barrier HP. Mineral
+positions remain blocked. Four total PathFinder calls per room remain the cap.
+
+Schema-2 compact telemetry exposes breach paths, coordinated assets and loss
+estimates. Breach-route scenarios remain PARTIAL because bounded route search
+and independently estimated route breaches are not an optimal tactical solver.
+No gameplay or Safe Mode authority changes. Full offline regression passes on
+Node 24.21.0; deployment and exact new live evidence are pending.
