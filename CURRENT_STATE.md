@@ -1918,3 +1918,41 @@ incremental D0.3 may be accepted as SHADOW-only, with preserved
 WATCH findings. No live combat proof, calibrated threat probability,
 D0 completion, Safe Mode authority or D1 advancement follows.
 **D1 remains blocked.**
+
+
+## 2026-10-09 — D0.4 cooperative single-route-barrier SHADOW candidate
+
+Previous D0.3 was merged via PR #113 at
+`092907c8a90efe748d2c5a3d8cd59452119fe8b8`, release
+`0.3.0-shadow.11-node24`. Its peaceful SHADOW gate remained WATCH
+with zero FAIL; no real combat validation or D1 authority followed.
+
+The next candidate `0.3.0-shadow.12-node24` addresses one remaining
+model limitation: independently accumulated route-barrier delays
+overestimated loss horizon when multiple attackers were observed
+to use the same single destructible barrier. For a bounded
+single-barrier scenario with a shared structure ID and identical
+positive HP, two or more *distinct* attackers contribute damage after
+their own estimated barrier approach tick. Cooperative barrier
+completion uses piecewise DPS integration; each attacker retains
+individual post-barrier travel. Independent route-breach baselines
+remain present for audit, and all such results remain PARTIAL.
+Multiple-barrier routes, unknown structures or unmatched barrier IDs
+do not get unearned shared-damage credit. Routes and enemy intent
+are not proven optimal or cooperative.
+
+New schema 3 adds the compact `sharedBarrierGroups` scenario count.
+Verifier checks the exact new schema and a bounded valid count.
+Regression fixtures cover equal/late arrivals, late reinforcements,
+same-creep multiweapon avoidance, missing/distinct/inconsistent IDs
+and HP, multi-barrier fallback, actual unchanged four-path-search cap
+and non-authoritative runtime behavior. Node remains pinned to
+24.21.0. No changes to Safe Mode, legacy tower/spawn, construction,
+remote activation or execution authority.
+
+**Stop rule:** full `npm test` / canonical GitHub CI must pass on
+the new PR head. Then deploy the exact `shadow.12` candidate
+with receipt and marker, complete new 25-tick smoke and 100-tick
+general-live and D0/P2/P3/I2 verifiers. Previous `shadow.11` live
+evidence cannot clear this gate. Until the new evidence is reviewed,
+keep PR draft and D1 blocked.
