@@ -139,4 +139,65 @@ const incompleteFinder = { CostMatrix: Matrix, search: () => ({ incomplete: true
 assert.equal(model.evaluate(breachState, game, { pathFinder: incompleteFinder }).status, 'PARTIAL');
 const crowded = { ...breachState, hostileCreeps: [distant, { ...distant, id: 'two' }, { ...distant, id: 'three' }] };
 assert.equal(model.evaluate(crowded, game, { pathFinder: incompleteFinder }).pathSearches, 4);
+
+// D0.3 regression: a mixed ATTACK/RANGED_ATTACK creep does not strike at
+// melee DPS from range 2–3. The unverified close route remains UNKNOWN.
+const mixed = creep([
+  part('attack'), part('attack'), part('attack'), part('attack'),
+  part('ranged_attack'), part('move')
+], 23, 25);
+const mixedAtRangeTwo = model.evaluate(state([mixed]), game);
+assert.equal(mixedAtRangeTwo.status, 'PARTIAL');
+assert.equal(mixedAtRangeTwo.access.breachPaths[0].attackMode, 'RANGED');
+assert.equal(mixedAtRangeTwo.access.breachPaths[0].attackRange, 3);
+assert.equal(mixedAtRangeTwo.access.breachPaths[0].status, 'REACHABLE');
+assert.equal(mixedAtRangeTwo.access.breachPaths[1].attackMode, 'CLOSE');
+assert.equal(mixedAtRangeTwo.access.breachPaths[1].status, 'UNKNOWN');
+assert.equal(mixedAtRangeTwo.access.criticalAssetsAtRisk[0].earliestLossTick, 600);
+assert.equal(mixedAtRangeTwo.access.criticalAssetsAtRisk[0].attackerCount, 1);
+assert.equal(mixedAtRangeTwo.risk.recommendedSafeMode, false);
+assert.equal(model.telemetrySummary(mixedAtRangeTwo).coordinatedAssets, 0);
+
+// With valid path evidence, close damage joins only after its own arrival.
+let mixedSearches = 0;
+const mixedPathFinder = { CostMatrix: Matrix, search(origin, goal, options) {
+  mixedSearches++;
+  assert.equal(goal.range, 1);
+  assert.equal(options.maxOps, 200);
+  return { incomplete: false, cost: 5, path: [pos(24, 25)] };
+} };
+const mixedWithRoute = model.evaluate(state([mixed]), game, { pathFinder: mixedPathFinder });
+assert.equal(mixedWithRoute.status, 'READY');
+assert.equal(mixedWithRoute.pathSearches, 1);
+assert.equal(mixedSearches, 1);
+assert.equal(mixedWithRoute.access.criticalAssetsAtRisk[0].earliestLossTick, 144);
+assert.equal(mixedWithRoute.access.criticalAssetsAtRisk[0].attackerCount, 1);
+
+// One dual-weapon creep never becomes two coordinated attackers.
+const mixedAdjacent = model.evaluate(state([{ ...mixed, pos: pos(24, 25) }]), game);
+assert.equal(mixedAdjacent.access.criticalAssetsAtRisk[0].earliestLossTick, 139);
+assert.equal(mixedAdjacent.access.criticalAssetsAtRisk[0].attackerCount, 1);
+assert.equal(model.telemetrySummary(mixedAdjacent).coordinatedAssets, 0);
+const mixedPair = model.evaluate(state([
+  { ...mixed, pos: pos(24, 25) },
+  { ...mixed, id: 'mixed-2', pos: pos(24, 25) }
+]), game);
+assert.equal(mixedPair.access.criticalAssetsAtRisk[0].attackerCount, 2);
+assert.equal(model.telemetrySummary(mixedPair).coordinatedAssets, 1);
+
+// Remaining route searches stay bounded even for dual-mode hostile groups.
+let boundedSearches = 0;
+const mixedBudgetPF = { CostMatrix: Matrix, search() {
+  boundedSearches++;
+  return { incomplete: false, cost: 10, path: [pos(24, 25)] };
+} };
+const mixedHorde = state(Array.from({ length: 6 }, (_, i) => ({
+  ...mixed, id: 'mixed-' + i, pos: pos(5, 5)
+})));
+const mixedBounded = model.evaluate(mixedHorde, game, { pathFinder: mixedBudgetPF });
+assert.equal(mixedBounded.pathSearches, 4);
+assert.equal(boundedSearches, 4);
+assert.equal(mixedBounded.status, 'PARTIAL');
+assert.ok(mixedBounded.access.breachPaths.some(p => p.reason === 'PATH_BUDGET'));
+
 console.log('D0 threat model shadow tests passed');
