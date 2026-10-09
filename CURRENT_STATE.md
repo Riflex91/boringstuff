@@ -1845,3 +1845,31 @@ merge with overall WATCH and zero FAIL, subject to GitHub CI/merge requirements.
 No Safe Mode, tower/spawn, remote activation, construction or other gameplay
 authority promotion follows from this result. D0 and combat modeling remain
 partial. D1 stays blocked until its separate roadmap gates are satisfied.
+
+
+## 2026-10-09 — D0.3 range-aware focused-loss SHADOW candidate
+
+D0.2 merged via PR #112 at `bbf60ffbfb72733ee1e4417bbcccef9660caadce`.
+Its recorded `shadow.10` D0/related live gates had zero FAIL, but D0 remained
+WATCH without real armed-hostile observation; D1 stayed blocked.
+
+This next narrow candidate is `0.3.0-shadow.11-node24`. A mixed
+ATTACK/WORK + RANGED_ATTACK hostile previously combined close and ranged DPS
+already from range 3. D0 now separately estimates range-3 ranged access and
+range-1 melee/dismantle access, including their different arrival times. Both
+channels may contribute when actually in range, but only one attacker is
+counted per creep even if it has two active damage channels. Unknown close
+access remains explicit PARTIAL. All channels retain the shared maximum four
+PathFinder searches at 200 operations each per room.
+
+Regression tests cover range-2/3 undercount/overcount boundary, a proven later
+range-1 arrival, one dual-weapon creep vs two actual hostile creeps, and a
+dual-mode hostile group exhausting the unchanged path budget.
+
+No intent/authority, spawn, tower, Safe Mode, remote mining, construction,
+scheduler priority or telemetry schema changes. Route breach coordination and
+path optimality remain unsolved. SHADOW only.
+
+Stop rule: new exact shadow.11 deployment and smoke + live + D0 + P2/P3/I2
+evidence are required before any acceptance/merge decision. No earlier
+shadow.10 live gate proves this new candidate. D1 remains blocked.
