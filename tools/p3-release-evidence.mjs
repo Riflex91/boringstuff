@@ -106,7 +106,22 @@ for (;;) {
   const signature = [witness.state, witness.reason, witness.markerTick,
     witness.samples.map(s => s.runTick).join(','),
     results.map(r => r.outcome).join(',')].join(':');
-  if (signature !== lastSignature || Date.now() - lastStatusAt >= 60000) {
+  const detailChanged = signature !== lastSignature;
+  if (detailChanged || Date.now() - lastStatusAt >= 60000) {
+    if (!detailChanged) {
+      // The collector advances many ticks between P3 executions. Avoid
+      // reprinting stale CPU readings and unchanged comparisons each minute.
+      if (args.json) console.log(JSON.stringify({
+        type: 'HEARTBEAT', latestEvidenceTick: witness.latestTick,
+        distinctReleaseRuns: witness.samples.length,
+        requiredRuns: args.observeRuns ?? args.minRuns,
+        state: witness.state
+      }));
+      else console.log('HEARTBEAT: latestEvidenceTick=' + witness.latestTick +
+        ' distinctReleaseRuns=' + witness.samples.length +
+        '/' + (args.observeRuns ?? args.minRuns) +
+        ' state=' + witness.state);
+    } else {
     if (args.json) console.log(JSON.stringify(outcome, null, 2));
     else console.log('State:', witness.state, witness.reason,
       'markerTick:', witness.markerTick, 'latestEvidenceTick:', witness.latestTick,
@@ -137,6 +152,7 @@ for (;;) {
         ' cpuDeltaSecondMinusFirst=' +
         JSON.stringify(comparison.cpuDeltaSecondMinusFirst));
       console.log('  NOT CAUSAL: ' + comparison.caveat);
+    }
     }
     lastSignature = signature;
     lastStatusAt = Date.now();
