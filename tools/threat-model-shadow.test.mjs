@@ -85,4 +85,58 @@ assert.deepEqual(global.Memory, { sentinel: true });
 assert.equal(model.telemetrySummary(blocked).unknownPaths, 1);
 delete global.BOOSTS;
 assert.equal(model.evaluate(state([boosted]), game).status, 'PARTIAL');
+
+// Together two individually non-emergency attackers can destroy the spawn
+// within the emergency horizon. The same covering rampart is not counted twice.
+const pair = model.evaluate(state([unboosted, { ...unboosted, id: 'enemy-2' }]), game);
+assert.equal(pair.risk.state, 'EMERGENCY');
+assert.equal(pair.access.criticalAssetsAtRisk.length, 1);
+assert.equal(pair.access.criticalAssetsAtRisk[0].attackerCount, 2);
+assert.equal(pair.access.criticalAssetsAtRisk[0].earliestLossTick, 121);
+assert.equal(model.telemetrySummary(pair).coordinatedAssets, 1);
+const focused = model._test.focusedLoss({ id: 'core', hits: 1000 }, [
+  { arrivalTicks: 0, dps: 100, barrierHits: 1000 },
+  { arrivalTicks: 5, dps: 100, barrierHits: 1000 }
+], 100);
+assert.equal(focused.barrierHits, 1000);
+assert.equal(focused.impactTick, 108);
+assert.equal(focused.earliestLossTick, 113);
+const late = model._test.focusedLoss({ id: 'core', hits: 100 }, [
+  { arrivalTicks: 0, dps: 100, barrierHits: 0 },
+  { arrivalTicks: 100, dps: 100, barrierHits: 0 }
+], 100);
+assert.equal(late.earliestLossTick, 101);
+assert.equal(late.attackerCount, 1);
+
+// Incomplete open path -> actual destructible barrier route. Matrix weights
+// saturate at 254, but the reported delay must account for all 30000 wall HP.
+const breachState = state([distant]);
+breachState.structures[0] = { ...spawn, pos: pos(8, 5) };
+breachState.structures.push({ id: 'wall', structureType: 'constructedWall', hits: 30000, pos: pos(6, 5) });
+breachState.room.getTerrain = () => ({ get: () => 0 });
+breachState.minerals = [{ pos: pos(8, 8) }];
+let breachCalls = 0;
+const breachFinder = { CostMatrix: Matrix, search(origin, goal, options) {
+  breachCalls++;
+  const costs = options.roomCallback('E8N1').values;
+  assert.equal(costs['8,8'], 255, 'minerals must remain impassable');
+  if (breachCalls % 2 === 1) { assert.equal(costs['6,5'], 255); return { incomplete: true, path: [] }; }
+  assert.equal(costs['6,5'], 254);
+  return { incomplete: false, cost: 254, path: [pos(6, 5), pos(7, 5)] };
+} };
+const breached = model.evaluate(breachState, game, { pathFinder: breachFinder });
+assert.equal(breached.pathSearches, 2);
+assert.equal(breached.status, 'PARTIAL', 'a bounded breach route is not a proven fastest combat path');
+assert.equal(breached.access.breachPaths[0].status, 'REACHABLE_WITH_BREACH');
+assert.equal(breached.access.breachPaths[0].routeBreachTicks, 1000);
+assert.equal(breached.access.breachPaths[0].routeBarrierHits, 30000);
+assert.equal(breached.access.breachPaths[0].travelTicks, 2);
+assert.equal(breached.access.earliestImpactTick, 1102);
+assert.equal(breached.risk.recommendedSafeMode, false);
+assert.equal(model.telemetrySummary(breached).breachPaths, 1);
+
+const incompleteFinder = { CostMatrix: Matrix, search: () => ({ incomplete: true, path: [] }) };
+assert.equal(model.evaluate(breachState, game, { pathFinder: incompleteFinder }).status, 'PARTIAL');
+const crowded = { ...breachState, hostileCreeps: [distant, { ...distant, id: 'two' }, { ...distant, id: 'three' }] };
+assert.equal(model.evaluate(crowded, game, { pathFinder: incompleteFinder }).pathSearches, 4);
 console.log('D0 threat model shadow tests passed');

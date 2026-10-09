@@ -14,13 +14,16 @@ export function evaluateD0Shadow({ events, startTick, tickCount = 100, roomName 
   check('shadow-authority', present.length > 0 && present.every(({ model: m }) => m.authority === 'SHADOW' && m.actionAuthority === 'NONE' && m.safetyAuthority === 'LEGACY_UNCHANGED'), 'D0 must remain observational with no Safe Mode authority.');
   check('model-contract', present.length > 0 && present.every(({ model: m, tick }) => {
     const nonnegative = n => Number.isFinite(n) && n >= 0;
-    return m.schemaVersion === 1 && ['READY', 'PARTIAL'].includes(m.status) && m.tick === tick &&
+    return m.schemaVersion === 2 && ['READY', 'PARTIAL'].includes(m.status) && m.tick === tick &&
       Number.isInteger(m.hostileCount) && m.hostileCount >= 0 && Number.isInteger(m.armedCount) && m.armedCount >= 0 && m.armedCount <= m.hostileCount &&
       ['NORMAL', 'WATCH', 'ALERT', 'DEFENSE', 'EMERGENCY'].includes(m.riskState) &&
       (!m.hostileCount ? m.riskState === 'NORMAL' && m.assetsAtRisk === 0 : m.riskState !== 'NORMAL') &&
       typeof m.recommendedSafeMode === 'boolean' && (!m.recommendedSafeMode || m.riskState === 'EMERGENCY') &&
       m.coreLossProbability === null && Number.isInteger(m.pathSearches) && m.pathSearches >= 0 && m.pathSearches <= 4 &&
       Number.isInteger(m.unknownPaths) && m.unknownPaths >= 0 && Number.isInteger(m.assetsAtRisk) && m.assetsAtRisk >= 0 &&
+      Number.isInteger(m.breachPaths) && m.breachPaths >= 0 && m.breachPaths <= m.pathSearches &&
+      Number.isInteger(m.coordinatedAssets) && m.coordinatedAssets >= 0 && m.coordinatedAssets <= m.assetsAtRisk &&
+      (m.earliestLossTick === null ? m.assetsAtRisk === 0 : Number.isInteger(m.earliestLossTick) && m.earliestLossTick >= tick && m.assetsAtRisk > 0) &&
       (m.earliestImpactTick === null || Number.isInteger(m.earliestImpactTick) && m.earliestImpactTick >= tick) &&
       ['meleeDps', 'rangedDps', 'healPerTick', 'dismantlePerTick', 'effectiveTough', 'mobility'].every(k => nonnegative(m.aggregate?.[k]));
   }), 'Counts, strengths, current tick, risk states and bounded path work must be valid.');
