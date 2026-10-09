@@ -2082,3 +2082,41 @@ coordinated combat, friendly defense and healing remain unresolved.
 exact new head, then new `shadow.13` live deployment receipt and
 25-tick smoke, 100-tick live/D0/P2/P3/I2 evidence. Do not infer
 validity from `shadow.12` observations. No merge before new evidence.
+
+
+## 2026-10-09 — D0.5 shadow.13 five-gate live evidence (smoke pending)
+
+User submitted five read-only verifier outputs for deployed
+`0.3.0-shadow.13-node24`, Node 24.21.0, E8N1, deployment
+`20261009184541935-15132`:
+
+- General live ticks `3811001–3811100`: **12 PASS / 7 WATCH / 0 FAIL**.
+- D0 ticks `3810954–3811053`: **6 PASS / 1 WATCH / 0 FAIL**.
+- P2 same D0 window: **7 PASS / 0 WATCH / 0 FAIL**.
+- P3 same D0 window: **8 PASS / 0 WATCH / 0 FAIL**.
+- I2 same D0 window: **9 PASS / 0 WATCH / 0 FAIL**.
+
+**Observed subtotal: 42 PASS / 8 WATCH / 0 FAIL, five gates only.
+`verify:smoke` not supplied; overall partial WATCH, no merge clearance.**
+
+Live release identity, continuity, collector/runtime error absence,
+CPU/bucket safety, mining, no hard stall and unchanged VNext authority
+PASS. D0 contract, isolated <=5 CPU and SHADOW/no Safe Mode PASS;
+no armed hostile observed, so real combat and D0.5 hostile
+path correctness are not live-validated.
+
+General-live `UNDERUTILIZED` and waiting/critical consumers with
+zero self-supply fallback are optimization findings. Progress/throughput
+exact-window metrics and E4 matching evidence incomplete. The earlier
+D0.4 window was EFFICIENT but no causality is established between
+separate time windows. P2 last CPU 10.992 (EMA 6.191); P3 last 7.897;
+I2 last 2.02; P2/P3/I2 maintain SHADOW/NONE authority.
+
+The deployment receipt/marker was created via a successful exact
+50-module `npm run deploy` with server-side verification and runtime
+version change; the extra locally observed `game/sw.js` was in
+the offline test mirror, not the deployed module folder.
+Detailed evidence:
+`docs/verification/d0-5-shadow-live-partial-0.3.0-2026-10-09.md`.
+**Keep PR #115 draft/unmerged; obtain fresh same-release smoke result.
+No D1 authority change.**
