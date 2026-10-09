@@ -22,8 +22,9 @@ for (const file of fs.readdirSync(logDir).filter(n => /^bot-events-.*\.ndjson$/.
   for (const line of fs.readFileSync(path.join(logDir, file), 'utf8').split(/\r?\n/)) {
     let event;
     try { event = JSON.parse(line); } catch { continue; }
-    if (event.v !== EXPECTED_BOT_VERSION) continue;
-    const key = event.jseq || JSON.stringify(event);
+    // Keep markers from every version until the deployment boundary is checked.
+    // Journal sequences can restart across deployments or collector sessions.
+    const key = JSON.stringify(event);
     if (seen.has(key)) continue;
     seen.add(key);
     events.push(event);
@@ -32,13 +33,14 @@ for (const file of fs.readdirSync(logDir).filter(n => /^bot-events-.*\.ndjson$/.
 events.sort((a, b) => a.tick - b.tick);
 const receipt = readDeploymentReceipt({ logDir, server: process.env.SCREEPS_SERVER || 'newbieland', branch: process.env.SCREEPS_BRANCH || 'chatgpt', version: EXPECTED_BOT_VERSION });
 if (!receipt) throw new Error('Exact deployment receipt required.');
-const marker = events.find(e => e.code === 'DEPLOYMENT_MARKER' && e.ctx?.deploymentId === receipt.receipt.deploymentId);
+const marker = events.find(e => e.code === 'DEPLOYMENT_MARKER' && e.v === EXPECTED_BOT_VERSION && e.ctx?.deploymentId === receipt.receipt.deploymentId);
 if (!marker) throw new Error('Exact deployment marker missing.');
 if (startTick === undefined) startTick = marker.tick;
 if (startTick < marker.tick) throw new Error('Window predates the exact deployment.');
-const subsequentDeploy = events.find(e => e.code === 'DEPLOYMENT_MARKER' && e.tick > marker.tick && e.tick <= startTick + 99);
+const subsequentDeploy = events.find(e => e.code === 'DEPLOYMENT_MARKER' && e.tick >= marker.tick && e.tick <= startTick + 99 &&
+  (e.ctx?.deploymentId !== receipt.receipt.deploymentId || e.v !== EXPECTED_BOT_VERSION));
 if (subsequentDeploy) throw new Error('Verification window crosses a deployment.');
-const result = evaluateD0Shadow({ events: events.filter(e => e.tick >= marker.tick), startTick, roomName });
+const result = evaluateD0Shadow({ events: events.filter(e => e.v === EXPECTED_BOT_VERSION && e.tick >= marker.tick), startTick, roomName });
 if (json) console.log(JSON.stringify(result, null, 2));
 else {
   console.log(`VERIFY D0 ${result.startTick}-${result.endTick}: ${result.outcome}`);

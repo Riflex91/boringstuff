@@ -63,3 +63,10 @@ receipt and marker, a complete 100-tick window, current D0 snapshot data,
 SHADOW/NONE/LEGACY_UNCHANGED authority, valid contracts and isolated CPU <= 5.
 Combat absence is WATCH, not proof of combat performance. Run the general smoke
 and live verifiers plus P2/P3/I2 on the same release. Do not relax their gates.
+
+The D0 verifier checks deployment markers from every bot version before selecting
+the current release's snapshots. A replacement deployment within the window,
+including the starting or final tick, rejects the window. Exact duplicate events
+are deduplicated by content; restarting journal sequence numbers cannot hide a
+deployment or discard distinct evidence. Foreign-version rows cannot complete
+the current release's required evidence window.
