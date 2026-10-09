@@ -51,6 +51,9 @@ console.log('Deployment ID:', receipt.deploymentId);
 if (args.observeRuns !== null && (!Number.isInteger(args.observeRuns) || args.observeRuns < 1 || args.observeRuns > 100)) {
   throw new Error('Invalid observeRuns');
 }
+// An observation quorum also raises the PASS quorum: a single PASS alongside
+// an earlier WATCH is never a two-run all-PASS acceptance result.
+if (args.observeRuns !== null) args.minRuns = Math.max(args.minRuns, args.observeRuns);
 console.log('Room:', args.roomName, 'minimum distinct PASS runs:', args.minRuns,
   'observation quorum:', args.observeRuns ?? 'disabled');
 console.log('Log directory:', args.logDir);
