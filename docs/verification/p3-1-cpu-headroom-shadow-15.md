@@ -43,6 +43,26 @@ No later live measurements can be inferred from Node benchmarks.
 4. With user-approved deployment only, collect a new P3 execution on shadow.15 with matching plan tick, scheduler lastRunTick, deployment marker, and new 100-tick verifier window. Compare multiple post-deploy executions/CPU samples and min-cut phase time, not just one lucky sample.
 5. Record all remaining General-Live and D0 WATCH independently. No change to legacy authority, D0 CPU <=5, P3 CPU WATCH 10/FAIL 20, D0 PathFinder max 4 searches with maxOps 200, P2/P3/I2 SHADOW, remote disabled, D1 blocked, max three owned rooms.
 
+## Initial offline CI evidence (not live)
+
+GitHub Actions run [#77](https://github.com/Riflex91/boringstuff/actions/runs/37983725955)
+on commit `d938c54c7779ab37a855dd38e2a60f55736c28e0`:
+full `npm test` successful on Node **v24.21.0**, including all
+50 `game/*.js` syntax checks and P3 regression tests. Paired
+`npm run bench:p3` passed exact D0.6 output equality on all fixtures.
+Seven alternating batches, ten iterations per batch *for each variant*:
+
+| Fixture | Tiles | Edges | D0.6 median ms | P3.1 median ms | Speedup | Equality |
+| --- | ---: | ---: | ---: | ---: | ---: | --- |
+| Open | 841 | 7340 | 2.430 | 1.708 | 1.42× | PASS |
+| Swamp | 841 | 7340 | 2.426 | 1.678 | 1.45× | PASS |
+| Walls | 731 | 5660 | 2.463 | 1.801 | 1.37× | PASS |
+| Corridor | 60 | 454 | 0.188 | 0.112 | 1.68× | PASS |
+
+These are synthetic Node wall-clock samples on one CI runner, NOT
+Screeps CPU units and NOT proof of steady live CPU headroom. Additional
+runs and post-deployment P3 scheduler/phase evidence remain necessary.
+
 ## Deployment status
 
 NOT DEPLOYED. NOT MERGED. Live CPU improvement UNVERIFIED.
