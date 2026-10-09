@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { assessP3Release } from './p3-release-evidence-core.mjs';
+import { assessP3Release, compareP3ReleaseSamples } from './p3-release-evidence-core.mjs';
 import { evaluateP3Shadow } from './p3-live-verification-core.mjs';
 import { deploymentReceiptPath } from './deployment-receipt.mjs';
 
@@ -92,7 +92,9 @@ function inspect() {
     return { sample, outcome: result.outcome, complete: result.complete,
       counts: result.counts, checks: result.checks };
   });
-  return { witness, results };
+  const comparisons = witness.samples.slice(1).map((sample, i) =>
+    compareP3ReleaseSamples(witness.samples[i], sample));
+  return { witness, results, comparisons };
 }
 
 const deadline = Date.now() + args.timeoutSeconds * 1000;
@@ -100,7 +102,7 @@ let lastSignature = '';
 let lastStatusAt = 0;
 for (;;) {
   const outcome = inspect();
-  const { witness, results } = outcome;
+  const { witness, results, comparisons } = outcome;
   const signature = [witness.state, witness.reason, witness.markerTick,
     witness.samples.map(s => s.runTick).join(','),
     results.map(r => r.outcome).join(',')].join(':');
@@ -124,6 +126,17 @@ for (;;) {
       for (const c of r.checks.filter(c => c.status !== 'PASS')) {
         console.log('  ' + c.status + ' ' + c.id + ': ' + c.message);
       }
+    }
+    if (!args.json) for (const comparison of comparisons) {
+      console.log('WORKLOAD COMPARISON: runTick=' + comparison.fromRunTick +
+        ' to=' + comparison.toRunTick +
+        ' geometryCountersMatch=' + String(comparison.geometryCountersMatch) +
+        ' knownGeometryFields=' + comparison.knownGeometryFields + '/' +
+        comparison.geometryFieldCount +
+        ' changedFields=' + JSON.stringify(comparison.changedGeometryFields) +
+        ' cpuDeltaSecondMinusFirst=' +
+        JSON.stringify(comparison.cpuDeltaSecondMinusFirst));
+      console.log('  NOT CAUSAL: ' + comparison.caveat);
     }
     lastSignature = signature;
     lastStatusAt = Date.now();
