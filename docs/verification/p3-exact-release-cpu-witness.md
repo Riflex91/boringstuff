@@ -62,3 +62,29 @@ it is not a reason to force a P3 run.
 - This tool does not validate D0 combat in the absence of armed hostiles,
   does not resolve General Live consumer-supply or exact-window WATCHs,
   and does not authorize any merge/deployment.
+
+## First confirmed shadow.15 P3 execution
+
+The operator observed the first matching new P3 release run at tick
+`3812915`, captured by snapshot tick `3813000` after the exact
+deployment marker at tick `3812491`.
+
+- Exact 100-tick P3 window `3812901–3813000`: **7 PASS / 1 WATCH / 0 FAIL**.
+- Isolated P3 scheduler CPU: **11.19** (>10 WATCH, <20 FAIL).
+- MINCUT phase: **4.434 CPU**.
+- D0.6 prior identified execution tick `3811915`: scheduler 9.978,
+  MINCUT 4.701. Workload comparability is not yet proven; neither a
+  total-CPU speedup nor a regression can be attributed to the code from
+  this single pair of observations.
+- A second distinct post-release run remains necessary. Do not
+  overwrite this WATCH with a cached pre-release CPU.
+
+The witness also reports `PROTECTED_TOPOLOGY`, `DEFENSE_SCORE`,
+`phaseSumCPU`, and `outsidePhasesCPU = schedulerCPU - phaseSumCPU` when
+all three phase measurements exist. `outsidePhasesCPU` is an
+**unattributed difference between measurement spans**, not a proven
+solver bottleneck or a CPU value that can automatically be recovered.
+If any phase is absent, duplicated or non-finite, the derived sum and
+difference remain unknown, not zero. CPU readings are rounded telemetry
+and may not perfectly balance.
+
