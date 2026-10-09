@@ -125,9 +125,10 @@ match. **Even true does not prove identical full terrain, graph,
 inputs, cache/JIT state or causal speedup.** A targeted topology change
 requires bounded benchmarks and exact output parity, not timing alone.
 
-Operator read-only one-shot diagnostic (uses existing receipt and logs):
+Operator read-only one-shot diagnostic for **two** release observations
+(uses existing receipt and logs):
 ```powershell
-node .\p3-release-evidence.mjs
+node .\p3-release-evidence.mjs --observe-runs 2
 ```
 Expected exit code is 3 (WATCH) while the first post-deployment
 CPU sample remains above 10. No deploy or merge is needed.
