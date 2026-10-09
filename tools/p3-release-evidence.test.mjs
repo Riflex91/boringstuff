@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { assessP3Release } from './p3-release-evidence-core.mjs';
+import { assessP3Release, compareP3ReleaseSamples } from './p3-release-evidence-core.mjs';
 
 const receipt = { server: 'newbieland', branch: 'chatgpt',
   version: '0.3.0-shadow.15-node24', deploymentId: '20261009200957502-9092' };
@@ -42,7 +42,12 @@ assert.equal(good.latestTick, 3813100);
 assert.equal(good.samples.length, 1);
 assert.deepEqual(good.samples[0], { runTick: 3812915, snapshotTick: 3813000,
   startTick: 3812901, endTick: 3813000, schedulerCpu: 6.7,
-  mincutPhaseCpu: 3.2, phases: { PROTECTED_TOPOLOGY: null, MINCUT: 3.2, DEFENSE_SCORE: null },
+  mincutPhaseCpu: 3.2, workload: {
+    boundsArea: null, boundsWidth: null, boundsHeight: null,
+    protectedAssetCount: null, trafficTileCount: null,
+    walkableTiles: null, graphNodeCount: null, graphEdgeCount: null,
+    graphAugmentations: null, rampartCount: null, towerCount: null
+  }, phases: { PROTECTED_TOPOLOGY: null, MINCUT: 3.2, DEFENSE_SCORE: null },
   accountedCpu: null, cpuOutsidePhases: null,
   planStatus: 'READY', authority: 'SHADOW',
   constructionAuthority: 'NONE' });
@@ -96,5 +101,53 @@ const corruptOtherPhase = assess([marker, snap(3813000, 3812915, {
 })]);
 assert.equal(corruptOtherPhase.samples[0].accountedCpu, null);
 assert.equal(corruptOtherPhase.samples[0].cpuOutsidePhases, null);
+
+
+const workloadSnapshot = (tick, runTick, cpu, topology, mincut, scoring, scene = {}) =>
+  snap(tick, runTick, {
+    scheduler: { lastCpu: cpu },
+    plan: {
+      bounds: { area: 361, width: 19, height: 19 },
+      protectedAssetCount: 43, trafficTileCount: 33,
+      rampartCount: 28,
+      graph: { walkableTiles: 252, nodeCount: 506, edgeCount: 2048,
+        augmentations: 32 },
+      metrics: { towerCount: 4 },
+      ...scene,
+      phaseEvidence: [
+        { phase: 'PROTECTED_TOPOLOGY', cpuUsed: topology },
+        { phase: 'MINCUT', cpuUsed: mincut },
+        { phase: 'DEFENSE_SCORE', cpuUsed: scoring }
+      ]
+    }
+  });
+const pair = assess([marker,
+  workloadSnapshot(3813000, 3812915, 11.19, 4.821, 4.434, 1.364),
+  workloadSnapshot(3813500, 3813415, 4.796, 0.674, 2.719, 0.856)]);
+assert.equal(pair.samples.length, 2);
+assert.equal(pair.samples[0].workload.walkableTiles, 252);
+assert.equal(pair.samples[1].workload.graphAugmentations, 32);
+const pairDiff = compareP3ReleaseSamples(pair.samples[0], pair.samples[1]);
+assert.equal(pairDiff.geometryCountersMatch, true,
+  'matching visible counters do not imply causal comparability');
+assert.equal(pairDiff.comparableEndToEndSpeedup, false);
+assert.equal(pairDiff.knownGeometryFields, 10);
+assert.deepEqual(pairDiff.changedGeometryFields, []);
+assert.deepEqual(pairDiff.cpuDeltaSecondMinusFirst, {
+  scheduler: -6.394, topology: -4.147, mincut: -1.715,
+  scoring: -0.508, outsidePhases: -0.024
+});
+const changedScene = assess([marker,
+  workloadSnapshot(3813000, 3812915, 11.19, 4.821, 4.434, 1.364),
+  workloadSnapshot(3813500, 3813415, 4.796, 0.674, 2.719, 0.856,
+    { protectedAssetCount: 42 })]);
+const changedDiff = compareP3ReleaseSamples(changedScene.samples[0], changedScene.samples[1]);
+assert.equal(changedDiff.geometryCountersMatch, false);
+assert.deepEqual(changedDiff.changedGeometryFields, ['protectedAssetCount']);
+const unknownDimensions = compareP3ReleaseSamples(good.samples[0], pair.samples[1]);
+assert.equal(unknownDimensions.geometryCountersMatch, null);
+assert.equal(unknownDimensions.knownGeometryFields, 0);
+assert.equal(unknownDimensions.cpuDeltaSecondMinusFirst.topology, null);
+assert.equal(unknownDimensions.comparableEndToEndSpeedup, false);
 
 console.log('P3 exact-release evidence selection tests passed');
