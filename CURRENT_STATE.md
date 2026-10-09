@@ -1873,3 +1873,48 @@ path optimality remain unsolved. SHADOW only.
 Stop rule: new exact shadow.11 deployment and smoke + live + D0 + P2/P3/I2
 evidence are required before any acceptance/merge decision. No earlier
 shadow.10 live gate proves this new candidate. D1 remains blocked.
+
+
+## 2026-10-09 — D0.3 range-aware SHADOW live evidence reviewed
+
+Candidate version `0.3.0-shadow.11-node24`, tested runtime/source head
+`b738c4ae4c72fc99d590355e2a2af4fbc619baa6`; local verifier Node 24.21.0.
+Exact deploy-receipt/marker D0 verifier completed successfully on this version,
+but the pasted console outputs did not expose the deployment ID or full server
+module-by-module comparison. GitHub canonical `npm test` for the original
+source head passed, workflow `37930706194`.
+
+- Smoke `3809946–3809970`: **9 PASS / 0 WATCH / 0 FAIL**.
+- General live `3810001–3810100`: **12 PASS / 7 WATCH / 0 FAIL**.
+- D0 `3809946–3810045`: **6 PASS / 1 WATCH / 0 FAIL**.
+- P2 same D0 interval: **7 PASS / 0 WATCH / 0 FAIL**.
+- P3 same D0 interval: **8 PASS / 0 WATCH / 0 FAIL**.
+- I2 same D0 interval: **9 PASS / 0 WATCH / 0 FAIL**.
+
+Aggregate: **51 PASS / 8 WATCH / 0 FAIL**, overall WATCH. D0 threat
+telemetry, schema-2 contract, SHADOW/NONE authority, isolated scheduler
+and <=5 CPU all passed. No armed hostile was observed; D0
+`combat-observation` remains WATCH, never a claim of real combat
+predictive validity.
+
+General live safety checks stayed green: exact bot/Node version,
+no runtime or collector errors, CPU/bucket safe, mining active,
+no hard economy stall, telemetry continuity, sufficient modeled
+hauler capacity, platform and VNext shadow authority. General WATCH:
+productive-window cadence mismatch; waiting/critical consumers but fallback
+zero; no exact-window controller/construction/throughput metrics;
+Efficiency WATCH; and E4 matching evidence window mismatch.
+
+P2/READY/SHADOW last reported 10.571 isolated CPU, EMA 5.768
+(monitor, not a P2 verifier FAIL). P3 READY with no construction
+authority and 0 breach routes; I2 READY with remote mining disabled
+and no ACTIVE remote activation. None gained authority.
+
+Append-only report:
+`docs/verification/d0-3-shadow-live-0.3.0-2026-10-09.md`.
+
+Disposition: all observed hard SHADOW gates pass with zero FAIL;
+incremental D0.3 may be accepted as SHADOW-only, with preserved
+WATCH findings. No live combat proof, calibrated threat probability,
+D0 completion, Safe Mode authority or D1 advancement follows.
+**D1 remains blocked.**
