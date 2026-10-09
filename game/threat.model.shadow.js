@@ -1,7 +1,7 @@
 'use strict';
 
 // D0 is observational. No intents, reservations, or persisted gameplay state.
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 const MAX_ACTORS = 50;
 const MAX_ASSETS = 8;
 const MAX_SEARCHES = 4;
@@ -110,6 +110,61 @@ function focusedLoss(asset, contributions, tick) {
     barrierHits, impactTick: tick + impact, earliestLossTick: tick + loss };
 }
 
+// Explicit single-obstacle scenario only. Every qualifying access path has
+// exactly one *observed* destructible barrier with the same structure ID/HP.
+// Attackers are not assumed to share routes, target choices, or future intents.
+// The scenario remains PARTIAL and does not authorize gameplay actions.
+function sharedBarrierFinish(entries, hits) {
+  const ordered = entries.slice().sort((a, b) => a.sharedRouteBarrier.approachTicks - b.sharedRouteBarrier.approachTicks);
+  let time = 0;
+  let damage = 0;
+  let dps = 0;
+  for (const entry of ordered) {
+    const arrival = entry.sharedRouteBarrier.approachTicks;
+    const duration = Math.max(0, arrival - time);
+    if (dps > 0 && damage + duration * dps >= hits) {
+      return time + Math.ceil((hits - damage) / dps);
+    }
+    damage += duration * dps;
+    time = arrival;
+    dps += entry.dps;
+  }
+  return dps > 0 ? time + Math.ceil(Math.max(0, hits - damage) / dps) : null;
+}
+
+function coordinateSingleRouteBarriers(contributions) {
+  let sharedBarrierGroups = 0;
+  for (const list of Object.values(contributions)) {
+    const byBarrier = new Map();
+    for (const entry of list) {
+      const shared = entry.sharedRouteBarrier;
+      if (!shared || !shared.id || !Number.isFinite(shared.hits) || shared.hits <= 0 ||
+          !Number.isFinite(shared.approachTicks) || !Number.isFinite(shared.remainingTravelTicks)) continue;
+      if (!byBarrier.has(shared.id)) byBarrier.set(shared.id, []);
+      byBarrier.get(shared.id).push(entry);
+    }
+    for (const group of byBarrier.values()) {
+      // Two weapon channels of a single creep are not two collaborators.
+      if (new Set(group.map(entry => entry.actorId)).size < 2) continue;
+      const hits = group[0].sharedRouteBarrier.hits;
+      if (!group.every(entry => entry.sharedRouteBarrier.hits === hits)) continue;
+      const finish = sharedBarrierFinish(group, hits);
+      if (!Number.isFinite(finish)) continue;
+      const collaborators = new Set(group.map(entry => entry.actorId)).size;
+      for (const entry of group) {
+        const approach = entry.sharedRouteBarrier.approachTicks;
+        entry.arrivalTicks = Math.max(approach, finish) + entry.sharedRouteBarrier.remainingTravelTicks;
+        // Keep the independently estimated baseline alongside this
+        // cooperative scenario for explicit auditability.
+        entry.access.coordinatedBreachTick = finish;
+        entry.access.sharedBarrierAttackers = collaborators;
+      }
+      sharedBarrierGroups++;
+    }
+  }
+  return sharedBarrierGroups;
+}
+
 // Use actual structures, never unbuilt P3 rampart proposals, for access evidence.
 function accessTo(creep, asset, strength, state, budget, options, attack) {
   const attackRange = attack ? attack.range : strength.rangedDps > 0 ? 3 : 1;
@@ -182,13 +237,16 @@ function accessTo(creep, asset, strength, state, budget, options, attack) {
       let routeHits = 0;
       let breachTicks = 0;
       let barrierCount = 0;
+      let firstBarrier = null;
       const paid = new Set();
       for (const pos of breach.path) {
         const t = tiles[key(pos)];
         const terrainType = terrain.get(pos.x, pos.y);
         if (terrainType & constant('TERRAIN_MASK_WALL', 1) || t && t.impassable) return Object.assign(base, { reason: 'BREACH_PATH_INVALID' });
+        const beforeTile = travel;
         travel += t && t.road ? strength.roadTicks : terrainType & constant('TERRAIN_MASK_SWAMP', 2) ? strength.swampTicks : strength.plainTicks;
         for (const s of t ? t.barriers : []) if (!paid.has(s.id)) {
+          if (barrierCount === 0) firstBarrier = { id: s.id, hits: s.hits, approachTicks: beforeTile };
           paid.add(s.id);
           routeHits += s.hits;
           breachTicks += Math.ceil(s.hits / damage);
@@ -196,7 +254,10 @@ function accessTo(creep, asset, strength, state, budget, options, attack) {
         }
       }
       return Object.assign(base, { status: 'REACHABLE_WITH_BREACH', travelTicks: travel,
-        routeBreachTicks: breachTicks, routeBarrierHits: routeHits, routeBarrierCount: barrierCount });
+        routeBreachTicks: breachTicks, routeBarrierHits: routeHits, routeBarrierCount: barrierCount,
+        sharedRouteBarrier: barrierCount === 1 && firstBarrier && firstBarrier.id &&
+          Number.isFinite(firstBarrier.hits) && firstBarrier.hits > 0
+          ? { ...firstBarrier, remainingTravelTicks: travel - firstBarrier.approachTicks } : null });
     }
     const cost = number(result.cost, (result.path || []).length * strength.plainTicks);
     return Object.assign(base, { status: 'REACHABLE', travelTicks: cost + Math.ceil(Math.max(0, number(creep.fatigue, 0)) / strength.movePower) });
@@ -254,10 +315,12 @@ function evaluate(state, game, options) {
         if (!contributions[asset.id]) contributions[asset.id] = [];
         contributions[asset.id].push({ actorId: creep.id || creep.name,
           arrivalTicks: access.travelTicks + access.routeBreachTicks,
-          dps: attack.damage, barrierHits: access.barrierHits });
+          dps: attack.damage, barrierHits: access.barrierHits,
+          sharedRouteBarrier: access.sharedRouteBarrier, access });
       }
     }
   }
+  const sharedBarrierGroups = coordinateSingleRouteBarriers(contributions);
   for (const asset of assets.slice(0, MAX_ASSETS)) {
     const loss = focusedLoss(asset, contributions[asset.id] || [], tick);
     if (!loss) continue;
@@ -272,12 +335,13 @@ function evaluate(state, game, options) {
     schemaVersion: SCHEMA_VERSION, authority: 'SHADOW', actionAuthority: 'NONE', tick, roomName: state.room.name,
     status: incomplete ? 'PARTIAL' : 'READY', hostileCount: hostiles.length, armedCount: armed,
     hostileActors: actors, aggregate,
-    access: { breachPaths: paths, criticalAssetsAtRisk: atRisk, earliestImpactTick: earliest },
+    access: { breachPaths: paths, criticalAssetsAtRisk: atRisk, earliestImpactTick: earliest,
+      sharedBarrierGroups },
     towers: { friendlyCoverage: actors.map(a => ({ actorId: a.id, damage: a.friendlyTowerDps })),
       hostileCoverage: towers.filter(t => !t.my && t.owner).map(t => ({ id: t.id, damageAtCore: assets.length ? round(towerDamage(t, assets[0].pos)) : 0 })) },
     risk: { state: riskState, coreLossProbability: null, recommendedSafeMode: urgentLoss && !!controller.my && !controller.safeMode && !controller.safeModeCooldown && number(controller.safeModeAvailable, 0) > 0,
       basis: 'BOUNDED_FOCUSED_DAMAGE_SCENARIO', safetyAuthority: 'LEGACY_UNCHANGED' },
-    pathSearches: budget.searches, assumptions: ['NO_FUTURE_TOWER_ENERGY_ASSUMED', 'INCOMPLETE_PATH_IS_UNKNOWN', 'SEPARATE_RANGED_AND_CLOSE_ACCESS', 'INDEPENDENT_ROUTE_BREACH_ESTIMATES', 'BOUNDED_NONOPTIMAL_BREACH_ROUTE', 'NO_COMBAT_INTENTS']
+    pathSearches: budget.searches, assumptions: ['NO_FUTURE_TOWER_ENERGY_ASSUMED', 'INCOMPLETE_PATH_IS_UNKNOWN', 'SEPARATE_RANGED_AND_CLOSE_ACCESS', 'COOPERATIVE_SINGLE_BARRIER_SCENARIO_ONLY', 'INDEPENDENT_MULTIBARRIER_ROUTE_ESTIMATES', 'BOUNDED_NONOPTIMAL_BREACH_ROUTE', 'NO_COMBAT_INTENTS']
   };
 }
 
@@ -290,8 +354,10 @@ function telemetrySummary(result) {
     assetsAtRisk: result.access.criticalAssetsAtRisk.length, earliestImpactTick: result.access.earliestImpactTick,
     unknownPaths: result.access.breachPaths.filter(p => p.status === 'UNKNOWN').length, pathSearches: result.pathSearches,
     breachPaths: result.access.breachPaths.filter(p => p.status === 'REACHABLE_WITH_BREACH').length,
+    sharedBarrierGroups: result.access.sharedBarrierGroups,
     coordinatedAssets: result.access.criticalAssetsAtRisk.filter(a => a.attackerCount > 1).length,
     earliestLossTick: result.access.criticalAssetsAtRisk.length ? Math.min(...result.access.criticalAssetsAtRisk.map(a => a.earliestLossTick)) : null };
 }
 
-module.exports = { SCHEMA_VERSION, evaluate, telemetrySummary, bodyStrength, towerDamage, _test: { accessTo, focusedLoss } };
+module.exports = { SCHEMA_VERSION, evaluate, telemetrySummary, bodyStrength, towerDamage,
+  _test: { accessTo, focusedLoss, sharedBarrierFinish, coordinateSingleRouteBarriers } };
