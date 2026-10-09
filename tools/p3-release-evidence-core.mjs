@@ -3,6 +3,69 @@ function nonnegativeTick(value) {
   return Number.isInteger(value) && value >= 0 ? value : null;
 }
 
+function observableWorkload(plan) {
+  const bounds = plan?.bounds || {};
+  const graph = plan?.graph || {};
+  const metrics = plan?.metrics || {};
+  const positiveOrZero = v => Number.isFinite(v) && v >= 0 ? v : null;
+  return {
+    boundsArea: positiveOrZero(bounds.area),
+    boundsWidth: positiveOrZero(bounds.width),
+    boundsHeight: positiveOrZero(bounds.height),
+    protectedAssetCount: positiveOrZero(plan?.protectedAssetCount),
+    trafficTileCount: positiveOrZero(plan?.trafficTileCount),
+    walkableTiles: positiveOrZero(graph.walkableTiles),
+    graphNodeCount: positiveOrZero(graph.nodeCount),
+    graphEdgeCount: positiveOrZero(graph.edgeCount),
+    graphAugmentations: positiveOrZero(graph.augmentations),
+    rampartCount: positiveOrZero(plan?.rampartCount),
+    towerCount: positiveOrZero(metrics.towerCount)
+  };
+}
+
+function round3(n) {
+  return Math.round(n * 1000) / 1000;
+}
+
+// Diagnostics only. Matching aggregate counters do NOT prove equal terrain,
+// full cut geometry, solver inputs, JIT state, or workload equivalence.
+export function compareP3ReleaseSamples(first, second) {
+  const dimensions = [
+    'boundsArea', 'boundsWidth', 'boundsHeight',
+    'protectedAssetCount', 'trafficTileCount',
+    'walkableTiles', 'graphNodeCount', 'graphEdgeCount',
+    'rampartCount', 'towerCount'
+  ];
+  const a = first?.workload || {};
+  const b = second?.workload || {};
+  const known = dimensions.filter(k => Number.isFinite(a[k]) && Number.isFinite(b[k]));
+  const changed = known.filter(k => a[k] !== b[k]);
+  const geometryCountersMatch = known.length === dimensions.length
+    ? changed.length === 0 : null;
+  const delta = {};
+  const cpuFields = {
+    scheduler: [first?.schedulerCpu, second?.schedulerCpu],
+    topology: [first?.phases?.PROTECTED_TOPOLOGY, second?.phases?.PROTECTED_TOPOLOGY],
+    mincut: [first?.phases?.MINCUT, second?.phases?.MINCUT],
+    scoring: [first?.phases?.DEFENSE_SCORE, second?.phases?.DEFENSE_SCORE],
+    outsidePhases: [first?.cpuOutsidePhases, second?.cpuOutsidePhases]
+  };
+  for (const [key, [x, y]] of Object.entries(cpuFields)) {
+    delta[key] = Number.isFinite(x) && Number.isFinite(y) ? round3(y - x) : null;
+  }
+  return {
+    fromRunTick: first?.runTick ?? null,
+    toRunTick: second?.runTick ?? null,
+    knownGeometryFields: known.length,
+    geometryFieldCount: dimensions.length,
+    changedGeometryFields: changed,
+    geometryCountersMatch,
+    cpuDeltaSecondMinusFirst: delta,
+    comparableEndToEndSpeedup: false,
+    caveat: 'Observable geometry counters are not proof of identical work, warm-up state, or causal speedup.'
+  };
+}
+
 export function assessP3Release({ events, receipt, roomName = 'E8N1' } = {}) {
   if (!receipt || !receipt.version || !receipt.deploymentId ||
       !receipt.server || !receipt.branch) {
@@ -61,6 +124,7 @@ export function assessP3Release({ events, receipt, roomName = 'E8N1' } = {}) {
     const cpuOutsidePhases = allMeasured
       ? Math.round((scheduler.lastCpu - accountedCpu) * 1000) / 1000 : null;
     const sample = {
+      workload: observableWorkload(plan),
       phases,
       accountedCpu,
       cpuOutsidePhases,
