@@ -1918,3 +1918,123 @@ incremental D0.3 may be accepted as SHADOW-only, with preserved
 WATCH findings. No live combat proof, calibrated threat probability,
 D0 completion, Safe Mode authority or D1 advancement follows.
 **D1 remains blocked.**
+
+
+## 2026-10-09 — D0.4 cooperative single-route-barrier SHADOW candidate
+
+Previous D0.3 was merged via PR #113 at
+`092907c8a90efe748d2c5a3d8cd59452119fe8b8`, release
+`0.3.0-shadow.11-node24`. Its peaceful SHADOW gate remained WATCH
+with zero FAIL; no real combat validation or D1 authority followed.
+
+The next candidate `0.3.0-shadow.12-node24` addresses one remaining
+model limitation: independently accumulated route-barrier delays
+overestimated loss horizon when multiple attackers were observed
+to use the same single destructible barrier. For a bounded
+single-barrier scenario with a shared structure ID and identical
+positive HP, two or more *distinct* attackers contribute damage after
+their own estimated barrier approach tick. Cooperative barrier
+completion uses piecewise DPS integration; each attacker retains
+individual post-barrier travel. Independent route-breach baselines
+remain present for audit, and all such results remain PARTIAL.
+Multiple-barrier routes, unknown structures or unmatched barrier IDs
+do not get unearned shared-damage credit. Routes and enemy intent
+are not proven optimal or cooperative.
+
+New schema 3 adds the compact `sharedBarrierGroups` scenario count.
+Verifier checks the exact new schema and a bounded valid count.
+Regression fixtures cover equal/late arrivals, late reinforcements,
+same-creep multiweapon avoidance, missing/distinct/inconsistent IDs
+and HP, multi-barrier fallback, actual unchanged four-path-search cap
+and non-authoritative runtime behavior. Node remains pinned to
+24.21.0. No changes to Safe Mode, legacy tower/spawn, construction,
+remote activation or execution authority.
+
+**Stop rule:** full `npm test` / canonical GitHub CI must pass on
+the new PR head. Then deploy the exact `shadow.12` candidate
+with receipt and marker, complete new 25-tick smoke and 100-tick
+general-live and D0/P2/P3/I2 verifiers. Previous `shadow.11` live
+evidence cannot clear this gate. Until the new evidence is reviewed,
+keep PR draft and D1 blocked.
+
+
+## 2026-10-09 — D0.4 shadow.12 partial live verification (five gates)
+
+User-supplied read-only console transcript for `0.3.0-shadow.12-node24`,
+Node `24.21.0`, room E8N1, covers **five** subsystem/general verifiers
+only (not the 25-tick smoke result and not the deployment console output):
+
+- General live `3810501–3810600`: 13 PASS / 6 WATCH / 0 FAIL.
+- D0 `3810466–3810565`: 6 PASS / 1 WATCH / 0 FAIL.
+- P2 same D0 interval: 7 PASS / 0 WATCH / 0 FAIL.
+- P3 same D0 interval: 8 PASS / 0 WATCH / 0 FAIL.
+- I2 same D0 interval: 9 PASS / 0 WATCH / 0 FAIL.
+
+**Observed subtotal: 43 PASS / 7 WATCH / 0 FAIL (five gates only);
+full release gate INCOMPLETE, overall WATCH for the supplied results.**
+General live 100-tick version/Node, no runtime/collector errors,
+CPU/bucket, mining, no hard stall, journal continuity, EFFICIENT
+classification and SHADOW authority PASS. Six general WATCH:
+productive cadence mismatch; consumer self-supply fallback occurred;
+controller/construction/throughput exact-window metrics unavailable;
+E4 matching evidence incomplete.
+
+D0 threat-model snapshot, schema-3 model contract, SHADOW/NONE authority,
+scheduler isolation and isolated CPU <=5 PASS; combat-observation WATCH
+because no armed hostile was observed. No nonzero shared-barrier
+cooperation was demonstrated in live combat.
+
+P2 isolated CPU latest 15.506, EMA 6.247 merits monitoring despite
+verifier PASS. P3 isolated CPU 7.568 and I2 1.408 both passed their
+verifier checks. P3 constructionAuthority NONE and I2 remote activation
+NONE unchanged.
+
+Original candidate GitHub CI passed: run `37971174451`, source head
+`6e939d185b2f65f6ba812de045ecf4aa31729978`.
+Detailed append-only report:
+`docs/verification/d0-4-shadow-live-partial-0.3.0-2026-10-09.md`.
+
+Unresolved release evidence: missing `verify:smoke` console output,
+missing `npm run deploy` output and deployment receipt ID; last
+local module comparison exposed an unexpected `sw.js` prior to
+recommended backup/removal. Do not infer actual deployed module tree
+from that diagnostic. **No D0.4 merge based on this incomplete record.
+D0 remains SHADOW and D1 blocked.**
+
+
+## 2026-10-09 — D0.4 shadow.12 smoke arrived: six verifier outputs complete
+
+The separately supplied `VERIFY SMOKE 3810466–3810490` was
+**9 PASS / 0 WATCH / 0 FAIL**. It confirmed `0.3.0-shadow.12-node24`,
+Node 24.21.0, complete 25-tick evidence, zero runtime/collector errors,
+safe CPU/bucket, active mining, no hard stall, contiguous journal.
+
+Together with the five previously recorded gates, the exact
+`shadow.12` **six-verifier tally is 52 PASS / 7 WATCH / 0 FAIL**
+(overall WATCH, **not** overall PASS):
+- Smoke 3810466–3810490: 9/0/0.
+- General live 3810501–3810600: 13/6/0.
+- D0 3810466–3810565: 6/1/0.
+- P2 same D0 window: 7/0/0.
+- P3 same D0 window: 8/0/0.
+- I2 same D0 window: 9/0/0.
+
+General-live consumer self-supply fallback did occur; efficiency
+was EFFICIENT. P2 isolated CPU peak 15.506 remains a monitoring point.
+D0 schema-3/SHADOW contract, CPU<=5 and scheduler evidence PASS;
+combat-observation remains WATCH due to zero observed armed hostiles.
+Offline cooperative single-barrier tests are not live combat proof.
+
+Documented:
+`docs/verification/d0-4-shadow-live-0.3.0-2026-10-09.md`.
+Earlier five-gate partial report remains retained for audit.
+
+The actual `npm run deploy` console output/receipt ID and final
+post-removal `sw.js`/remote module-integrity confirmation have **not**
+been supplied. Six read-only verifier gates are now covered; end-to-end
+deployment provenance is not yet independently confirmed. The D0
+verifier accepted the release's marker/receipt-controlled window.
+Do not redeploy merely to reproduce a historical command transcript.
+
+PR #114 remains draft and unmerged pending provenance review and
+explicit merge authorization. D0 remains SHADOW, D1 blocked.

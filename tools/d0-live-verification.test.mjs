@@ -14,7 +14,7 @@ const event = { tick: 100, code: 'STATUS_SNAPSHOT', ctx: { rooms: { E8N1: { thre
 const run = e => evaluateD0Shadow({ events: [e, { tick: 199 }], startTick: 100 });
 assert.equal(run(event).counts.fail, 0);
 assert.equal(run(event).outcome, 'WATCH');
-for (const change of [m => m.actionAuthority = 'VNEXT', m => m.riskState = 'EMERGENCY', m => m.tick = 99, m => m.aggregate.meleeDps = -1, m => m.pathSearches = 5, m => m.recommendedSafeMode = true, m => m.schemaVersion = 1, m => m.coordinatedAssets = 1, m => m.breachPaths = 5, m => m.earliestLossTick = 99]) {
+for (const change of [m => m.actionAuthority = 'VNEXT', m => m.riskState = 'EMERGENCY', m => m.tick = 99, m => m.aggregate.meleeDps = -1, m => m.pathSearches = 5, m => m.recommendedSafeMode = true, m => m.schemaVersion = 2, m => m.sharedBarrierGroups = -1, m => m.coordinatedAssets = 1, m => m.breachPaths = 5, m => m.earliestLossTick = 99]) {
   const altered = structuredClone(event);
   change(altered.ctx.rooms.E8N1.threatModel);
   assert.equal(run(altered).outcome, 'FAIL');
