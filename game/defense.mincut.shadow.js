@@ -108,10 +108,11 @@ function plannedBlockedSet(plan) {
   return set;
 }
 
-function protectedAssets(state, plan, terrain) {
+function protectedAssets(state, plan, terrain, knownNaturalSet) {
   const roomName = roomNameOf(state);
   const blocked = plannedBlockedSet(plan);
-  const natural = naturalObstacleSet(state);
+  // Grid assembly already gathered natural blockers; use the same snapshot.
+  const natural = knownNaturalSet || naturalObstacleSet(state);
   const rows = [];
   const seen = new Set();
   const slots = plan && plan.selected && Array.isArray(plan.selected.plannedStructures)
@@ -236,7 +237,11 @@ function buildGrid(state, plan, options) {
   // The view is static for one tick; avoid repeated getTerrain() calls.
   const terrain = typeof state.room.getTerrain === 'function'
     ? state.room.getTerrain() : state.room.terrain;
-  const assets = protectedAssets(state, plan, terrain);
+  // Collect natural blockers once per grid. Previously both the asset
+  // collector and tile collector rebuilt identical controller/source/mineral
+  // sets, including repeated room.find(FIND_MINERALS) lookups.
+  const naturalSet = naturalObstacleSet(state);
+  const assets = protectedAssets(state, plan, terrain, naturalSet);
   const bounds = defenseBounds(assets, options && options.margin);
   if (!assets.length || !bounds) {
     return { ok: false, reason: 'NO_PROTECTED_ASSETS', assets, bounds: null };
@@ -254,7 +259,6 @@ function buildGrid(state, plan, options) {
     };
   }
 
-  const naturalSet = naturalObstacleSet(state);
   const protectedSet = new Set(assets.map(a => key(a.x, a.y)));
   const trafficSet = trafficTiles(plan);
   const existingRamparts = existingRampartTiles(state);
