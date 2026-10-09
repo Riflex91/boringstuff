@@ -50,6 +50,8 @@ const distant = creep([part('attack'), part('move')], 5, 5);
 assert.equal(model.evaluate(state([distant]), game).status, 'PARTIAL');
 assert.equal(model.evaluate(state([distant]), game).access.breachPaths[0].reason, 'PATH_API_MISSING');
 class Matrix { constructor() { this.values = {}; } set(x, y, value) { this.values[x + ',' + y] = value; } }
+// Legal contiguous one-room path from (5,5) to range 1 of (25,25).
+const fullDiagonal = Array.from({ length: 19 }, (_, i) => pos(i + 6, i + 6));
 let searchCount = 0;
 const pf = { CostMatrix: Matrix, search(origin, goal, options) {
   searchCount++;
@@ -57,7 +59,7 @@ const pf = { CostMatrix: Matrix, search(origin, goal, options) {
   assert.equal(options.maxRooms, 1);
   assert.equal(options.roomCallback('E8N1').values['25,25'], 255);
   assert.equal(options.roomCallback('E9N1'), false);
-  return { incomplete: false, cost: 20, path: [] };
+  return { incomplete: false, cost: 20, path: fullDiagonal };
 } };
 const accessible = model.evaluate(state([distant]), game, { pathFinder: pf });
 assert.equal(accessible.access.earliestImpactTick, 120);
@@ -71,7 +73,7 @@ assert.equal(blocked.risk.recommendedSafeMode, false);
 assert.equal(blocked.access.earliestImpactTick, null);
 pf.search = () => { throw new Error('missing optional API'); };
 assert.equal(model.evaluate(state([distant]), game, { pathFinder: pf }).status, 'PARTIAL');
-pf.search = () => ({ incomplete: false, cost: 20, path: [] });
+pf.search = () => ({ incomplete: false, cost: 20, path: fullDiagonal });
 const many = state(Array.from({ length: 60 }, (_, i) => ({ ...distant, id: 'enemy-' + i })));
 const bounded = model.evaluate(many, game, { pathFinder: pf });
 assert.equal(bounded.hostileActors.length, 50);
@@ -189,7 +191,7 @@ assert.equal(model.telemetrySummary(mixedPair).coordinatedAssets, 1);
 let boundedSearches = 0;
 const mixedBudgetPF = { CostMatrix: Matrix, search() {
   boundedSearches++;
-  return { incomplete: false, cost: 10, path: [pos(24, 25)] };
+  return { incomplete: false, cost: 20, path: fullDiagonal };
 } };
 const mixedHorde = state(Array.from({ length: 6 }, (_, i) => ({
   ...mixed, id: 'mixed-' + i, pos: pos(5, 5)
@@ -281,5 +283,67 @@ assert.equal(model._test.coordinateSingleRouteBarriers({ core: distinctBarriers 
 const inconsistentHp = [routeEntry('one', 0, 30), routeEntry('two', 0, 30)];
 inconsistentHp[1].sharedRouteBarrier.hits = 200;
 assert.equal(model._test.coordinateSingleRouteBarriers({ core: inconsistentHp }), 0);
+
+
+// D0.5: result.incomplete=false is not itself proof of reachability.
+// Never promote an empty, discontinuous, off-room, out-of-range or
+// non-integer route to READY, or derive a false emergency from its cost.
+const malformedPaths = [
+  [],
+  [pos(24, 24)],
+  [pos(6, 6), pos(24, 24)],
+  fullDiagonal.slice(0, -1).map((point, i) => i === 2 ? { ...point, roomName: 'E9N1' } : point),
+  fullDiagonal.slice(0, -1),
+  fullDiagonal.map((point, i) => i === 2 ? { ...point, x: -1 } : point),
+  fullDiagonal.map((point, i) => i === 2 ? { ...point, x: 8.5 } : point),
+  fullDiagonal.map((point, i) => i === 2 ? { ...point, y: 50 } : point)
+];
+for (const path of malformedPaths) {
+  const invalid = model.evaluate(state([distant]), game, {
+    pathFinder: { CostMatrix: Matrix, search: () => ({ incomplete: false, cost: 20, path }) }
+  });
+  assert.equal(invalid.status, 'PARTIAL');
+  assert.equal(invalid.access.breachPaths[0].reason, 'PATH_INVALID');
+  assert.equal(invalid.access.earliestImpactTick, null);
+  assert.equal(invalid.risk.recommendedSafeMode, false);
+}
+for (const cost of [0, -1, NaN, Infinity, undefined]) {
+  const invalid = model.evaluate(state([distant]), game, {
+    pathFinder: { CostMatrix: Matrix, search: () => ({ incomplete: false, cost, path: fullDiagonal }) }
+  });
+  assert.equal(invalid.status, 'PARTIAL');
+  assert.equal(invalid.access.breachPaths[0].reason, 'PATH_COST_INVALID');
+  assert.equal(invalid.access.earliestImpactTick, null);
+}
+// A claimed "open" route across an observed blocking structure must be
+// rejected, rather than bypassing the separate bounded breach search.
+const observedWall = state([distant]);
+observedWall.structures.push({ id: 'wall-10', structureType: 'constructedWall', hits: 1000, pos: pos(10, 10) });
+const fakeOpenRoute = model.evaluate(observedWall, game, {
+  pathFinder: { CostMatrix: Matrix, search: () => ({ incomplete: false, cost: 20, path: fullDiagonal }) }
+});
+assert.equal(fakeOpenRoute.status, 'PARTIAL');
+assert.equal(fakeOpenRoute.access.breachPaths[0].reason, 'PATH_BLOCKED');
+assert.equal(fakeOpenRoute.access.earliestImpactTick, null);
+assert.equal(fakeOpenRoute.pathSearches, 1);
+
+// On a completed second search, geometry must still be legitimate.
+const fakeBreachRoute = model.evaluate(breachState, game, {
+  pathFinder: { CostMatrix: Matrix, search(origin, goal, options) {
+    const value = options.roomCallback('E8N1').values['6,5'];
+    return value === 255 ? { incomplete: true, path: [] }
+      : { incomplete: false, cost: 10, path: [pos(7, 5)] };
+  } }
+});
+assert.equal(fakeBreachRoute.status, 'PARTIAL');
+assert.equal(fakeBreachRoute.access.breachPaths[0].reason, 'BREACH_PATH_INVALID');
+assert.equal(fakeBreachRoute.access.earliestImpactTick, null);
+assert.equal(fakeBreachRoute.pathSearches, 2);
+
+// Existing legitimate D0.3 and D0.4 scenarios still preserve exact arrivals,
+// schema 3 telemetry and the unchanged four-search room budget.
+assert.equal(model.SCHEMA_VERSION, 3);
+assert.equal(model._test.validPathGeometry([pos(24, 25)], pos(23, 25), spawn.pos, 1), true);
+assert.equal(model._test.validPathGeometry([], pos(23, 25), spawn.pos, 1), false);
 
 console.log('D0 threat model shadow tests passed');

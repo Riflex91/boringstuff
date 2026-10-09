@@ -1,4 +1,4 @@
-# D0 — bounded threat observation (D0.4 shared single-barrier SHADOW candidate)
+# D0 — bounded threat observation (D0.5 path-evidence-integrity SHADOW candidate)
 
 This is an incremental D0 implementation, not completion of D0 or of the
 Ultimate Autonomous Roadmap. It introduces `threat.model.shadow` after the
@@ -15,6 +15,12 @@ authoritative room and creep executors. It cannot issue gameplay intents.
 - A bounded second search through observed destructible barriers when the open
   path is incomplete. Actual route barrier hits determine the reported breach
   time, even when the pathfinder matrix heuristic saturates at 254.
+- D0.5 validates the bounded PathFinder result's *returned route geometry*:
+  every step must be an adjacent, in-room integer coordinate, with a
+  nonempty path ending in the weapon's actual range. Complete open-path
+  evidence must have a finite positive cost and cannot cross any observed
+  blocked structure tile; breached routes must have a valid path shape too.
+  Invalid evidence stays `UNKNOWN`, never a claimed `REACHABLE` arrival.
 - Piecewise focused-damage integration for attackers with different arrival
   times. The rampart covering an asset is charged once to the attacking group.
 - D0.3 estimates mixed ATTACK/WORK and RANGED_ATTACK access as separate close
@@ -162,3 +168,43 @@ general live, D0, P2, P3 and I2 verification. Never reuse the
 `shadow.11` window. Actual hostile combat remains unverified absent armed
 attackers. No authoritative D1, Safe Mode, spawn, tower, construction or
 remote control permission is granted.
+
+## D0.5 release boundary — 0.3.0-shadow.13-node24 (awaiting fresh live gate)
+
+D0.4 `shadow.12` was merged via PR #114 and its complete six-verifier
+evidence total was **52 PASS / 7 WATCH / 0 FAIL** (overall WATCH),
+see `docs/verification/d0-4-shadow-live-0.3.0-2026-10-09.md`.
+D0 combat-observation remained WATCH without an armed hostile.
+The previous release's live windows do not validate this new build.
+
+D0.5 addresses a different concrete safety blind spot: `PathFinder.search`
+returns a path, a cost and an `incomplete` flag. Previously D0 accepted
+`incomplete: false` as positive access evidence even if the path was empty,
+jumped across the room, ended outside the attack's range or had an invalid
+cost. A mocked or malformed result could cause a false imminent asset loss
+and observational Safe Mode recommendation.
+
+The model now rejects:
+- Empty/missing, noncontiguous, wrong-room, non-integer or out-of-bounds paths.
+- Paths ending farther away from the target than the attack mode allows.
+- Complete open paths with missing, non-finite, zero or negative costs.
+- Claimed open paths crossing known impassable or destructible blocked tiles.
+- Breach-search paths with invalid or discontinuous geometry.
+
+These cases carry explicit `PATH_INVALID`, `PATH_COST_INVALID`,
+`PATH_BLOCKED` or `BREACH_PATH_INVALID` reasons and remain
+`UNKNOWN` and `PARTIAL`. The D0.3 weapon separation and D0.4
+cooperative single-barrier scenarios remain unchanged, and
+`schemaVersion=3` is retained: there is no persisted-data migration
+or new telemetry field. These checks validate shape and observed
+obstacles, **not** a tactical optimality proof. Future repair, actual
+enemy actions, tower fire, healing, and simultaneous movement are still
+not simulated. CPU isolation and exactly four searches at 200 maxOps
+each remain the same.
+
+**Stop rule:** Node 24.21.0 `npm test` / GitHub CI on the PR head,
+then fresh exact `shadow.13` receipt + 25-tick smoke, 100-tick live,
+D0/P2/P3/I2 read-only verifiers with zero hard FAIL. A peaceful D0
+window is WATCH, not combat validation. No authority transition,
+Safe Mode intent, tower/spawn action, construction or remote activation;
+D1 remains blocked.

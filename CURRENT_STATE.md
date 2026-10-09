@@ -2038,3 +2038,124 @@ Do not redeploy merely to reproduce a historical command transcript.
 
 PR #114 remains draft and unmerged pending provenance review and
 explicit merge authorization. D0 remains SHADOW, D1 blocked.
+
+
+## 2026-10-09 — D0.5 SHADOW PathFinder result-integrity candidate
+
+D0.4 `shadow.12` merged into `main` through PR #114
+(`994835dbb743e13fa1bfe38aedbab676c0d5f342`). Six read-only
+verifier outputs: 52 PASS / 7 WATCH / 0 FAIL, overall WATCH. No
+armed-hostile combat validation; D1 still blocked.
+
+Candidate version `0.3.0-shadow.13-node24` closes a specific
+false-positive risk in the D0 range-aware hostile scenario model:
+the old path evidence handler accepted a successful PathFinder
+`incomplete=false` result as REACHABLE without checking that the
+returned path was an actual continuous single-room route to the
+weapon-specific attack range, or that its cost was valid. A malformed
+path could otherwise manufacture imminent damage and an observational
+Safe Mode recommendation.
+
+D0.5 now requires a nonempty contiguous route of adjacent, in-bounds
+integer same-room positions that terminates within the selected range.
+Direct paths must carry a finite positive cost and must not claim a
+clear route through any observed blocking structure. Secondary
+destructible-barrier paths must also be continuous and end in range.
+Invalid route evidence remains UNKNOWN/PARTIAL with a stable error
+reason, with no fabricated arrival/loss horizon for that route.
+
+Regression tests cover empty paths, teleporting steps, wrong rooms,
+noninteger/out-of-bounds steps, insufficient goal reach, NaN/zero/
+negative/missing costs, spoofed open paths through observed walls,
+and malformed secondary breach paths. Prior D0.3 and D0.4 tests,
+including mixed weapon ranges, shared barrier scenario and bounded
+four-search budget, must continue to pass.
+
+SHADOW/NONE and LEGACY_UNCHANGED remain the only authorities.
+No gameplay intents, defense execution, remote activation, construction,
+persistent schema or planner cadence changes; D0 telemetry retains
+schemaVersion=3. The limits of enemy strategy, path optimality,
+coordinated combat, friendly defense and healing remain unresolved.
+**D1 blocked.**
+
+**Stop rule:** canonical Node 24.21.0 npm tests and GitHub CI on the
+exact new head, then new `shadow.13` live deployment receipt and
+25-tick smoke, 100-tick live/D0/P2/P3/I2 evidence. Do not infer
+validity from `shadow.12` observations. No merge before new evidence.
+
+
+## 2026-10-09 — D0.5 shadow.13 five-gate live evidence (smoke pending)
+
+User submitted five read-only verifier outputs for deployed
+`0.3.0-shadow.13-node24`, Node 24.21.0, E8N1, deployment
+`20261009184541935-15132`:
+
+- General live ticks `3811001–3811100`: **12 PASS / 7 WATCH / 0 FAIL**.
+- D0 ticks `3810954–3811053`: **6 PASS / 1 WATCH / 0 FAIL**.
+- P2 same D0 window: **7 PASS / 0 WATCH / 0 FAIL**.
+- P3 same D0 window: **8 PASS / 0 WATCH / 0 FAIL**.
+- I2 same D0 window: **9 PASS / 0 WATCH / 0 FAIL**.
+
+**Observed subtotal: 42 PASS / 8 WATCH / 0 FAIL, five gates only.
+`verify:smoke` not supplied; overall partial WATCH, no merge clearance.**
+
+Live release identity, continuity, collector/runtime error absence,
+CPU/bucket safety, mining, no hard stall and unchanged VNext authority
+PASS. D0 contract, isolated <=5 CPU and SHADOW/no Safe Mode PASS;
+no armed hostile observed, so real combat and D0.5 hostile
+path correctness are not live-validated.
+
+General-live `UNDERUTILIZED` and waiting/critical consumers with
+zero self-supply fallback are optimization findings. Progress/throughput
+exact-window metrics and E4 matching evidence incomplete. The earlier
+D0.4 window was EFFICIENT but no causality is established between
+separate time windows. P2 last CPU 10.992 (EMA 6.191); P3 last 7.897;
+I2 last 2.02; P2/P3/I2 maintain SHADOW/NONE authority.
+
+The deployment receipt/marker was created via a successful exact
+50-module `npm run deploy` with server-side verification and runtime
+version change; the extra locally observed `game/sw.js` was in
+the offline test mirror, not the deployed module folder.
+Detailed evidence:
+`docs/verification/d0-5-shadow-live-partial-0.3.0-2026-10-09.md`.
+**Keep PR #115 draft/unmerged; obtain fresh same-release smoke result.
+No D1 authority change.**
+
+
+## 2026-10-09 — D0.5 shadow.13 six-gate live review complete
+
+The separately provided `VERIFY SMOKE 3810954–3810978` now passes
+**9 PASS / 0 WATCH / 0 FAIL**, with correct Node 24.21.0 and only
+`0.3.0-shadow.13-node24` events. Complete 25-tick evidence,
+no bot or collector errors, safe CPU/bucket, dedicated mining,
+no hard stall and contiguous journal sequences PASS.
+
+**All six read-only verifiers are now available: 51 PASS /
+8 WATCH / 0 FAIL (overall WATCH).** Explicit windows:
+- Smoke `3810954–3810978`: 9/0/0.
+- General live `3811001–3811100`: 12/7/0.
+- D0 `3810954–3811053`: 6/1/0.
+- P2 `3810954–3811053`: 7/0/0.
+- P3 `3810954–3811053`: 8/0/0.
+- I2 `3810954–3811053`: 9/0/0.
+
+Previously confirmed local test/doctor and server-side deployment
+verification PASS, runtime 50 modules, deployment ID
+`20261009184541935-15132`. D0 contract, <=5 isolated CPU,
+scheduler evidence and SHADOW/NONE authority PASS. No armed
+hostile observed, so D0 actual combat/prediction remains WATCH
+and D1 stays blocked. General live `UNDERUTILIZED` and waiting/
+critical consumers (no self-supply fallback) remain optimization
+WATCH findings. Different sampled windows do not prove that D0.5
+caused the economy status change.
+
+Full audit report:
+`docs/verification/d0-5-shadow-live-0.3.0-2026-10-09.md`.
+The earlier five-gate partial report is retained as historical
+evidence of what was available at that point. Do not reinterpret
+its "smoke pending" status as still current.
+
+**Stop rule:** all six SHADOW verifier outputs have been reviewed;
+verify GitHub CI on the final documentation head and seek explicit
+merge authorization before integrating PR #115. There is no
+defense, Safe Mode, construction, remote or D1 authority promotion.

@@ -165,6 +165,23 @@ function coordinateSingleRouteBarriers(contributions) {
   return sharedBarrierGroups;
 }
 
+// PathFinder's incomplete=false flag does not replace geometry evidence.
+// An empty path, teleported step, cross-room step, malformed coordinate or
+// endpoint outside attack range must never be reported as REACHABLE.
+// This only checks the bounded returned route, not its tactical optimality.
+function validPathGeometry(path, from, goal, attackRange) {
+  if (!Array.isArray(path) || !path.length || !from || !goal || from.roomName !== goal.roomName) return false;
+  let previous = from;
+  for (const step of path) {
+    if (!step || step.roomName !== from.roomName ||
+        !Number.isInteger(step.x) || step.x < 0 || step.x >= 50 ||
+        !Number.isInteger(step.y) || step.y < 0 || step.y >= 50 ||
+        range(previous, step) !== 1) return false;
+    previous = step;
+  }
+  return range(previous, goal) <= attackRange;
+}
+
 // Use actual structures, never unbuilt P3 rampart proposals, for access evidence.
 function accessTo(creep, asset, strength, state, budget, options, attack) {
   const attackRange = attack ? attack.range : strength.rangedDps > 0 ? 3 : 1;
@@ -233,6 +250,7 @@ function accessTo(creep, asset, strength, state, budget, options, attack) {
       budget.searches++;
       const breach = pf.search(creep.pos, { pos: asset.pos, range: attackRange }, searchOptions);
       if (breach.incomplete || !Array.isArray(breach.path) || !breach.path.length) return Object.assign(base, { reason: 'BREACH_PATH_INCOMPLETE' });
+      if (!validPathGeometry(breach.path, creep.pos, asset.pos, attackRange)) return Object.assign(base, { reason: 'BREACH_PATH_INVALID' });
       let travel = Math.ceil(Math.max(0, number(creep.fatigue, 0)) / strength.movePower);
       let routeHits = 0;
       let breachTicks = 0;
@@ -259,8 +277,20 @@ function accessTo(creep, asset, strength, state, budget, options, attack) {
           Number.isFinite(firstBarrier.hits) && firstBarrier.hits > 0
           ? { ...firstBarrier, remainingTravelTicks: travel - firstBarrier.approachTicks } : null });
     }
-    const cost = number(result.cost, (result.path || []).length * strength.plainTicks);
-    return Object.assign(base, { status: 'REACHABLE', travelTicks: cost + Math.ceil(Math.max(0, number(creep.fatigue, 0)) / strength.movePower) });
+    if (!validPathGeometry(result.path, creep.pos, asset.pos, attackRange)) {
+      return Object.assign(base, { reason: 'PATH_INVALID' });
+    }
+    if (!Number.isFinite(result.cost) || result.cost <= 0) {
+      return Object.assign(base, { reason: 'PATH_COST_INVALID' });
+    }
+    // Do not claim a clear route through any structure the CostMatrix marks
+    // as blocking. The explicit destructible-barrier search above is the only
+    // accepted source of breach-route evidence.
+    if (result.path.some(pos => {
+      const t = tiles[key(pos)];
+      return t && (t.impassable || t.barriers.length > 0);
+    })) return Object.assign(base, { reason: 'PATH_BLOCKED' });
+    return Object.assign(base, { status: 'REACHABLE', travelTicks: result.cost + Math.ceil(Math.max(0, number(creep.fatigue, 0)) / strength.movePower) });
   } catch (err) {
     return Object.assign(base, { reason: 'PATH_API_ERROR' });
   }
@@ -360,4 +390,4 @@ function telemetrySummary(result) {
 }
 
 module.exports = { SCHEMA_VERSION, evaluate, telemetrySummary, bodyStrength, towerDamage,
-  _test: { accessTo, focusedLoss, sharedBarrierFinish, coordinateSingleRouteBarriers } };
+  _test: { accessTo, focusedLoss, sharedBarrierFinish, coordinateSingleRouteBarriers, validPathGeometry } };
