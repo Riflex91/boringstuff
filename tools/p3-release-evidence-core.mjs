@@ -41,7 +41,29 @@ export function assessP3Release({ events, receipt, roomName = 'E8N1' } = {}) {
     if (!Number.isFinite(scheduler.lastCpu) || scheduler.lastCpu < 0) continue;
     const phase = plan.phaseEvidence?.find(p => p?.phase === 'MINCUT');
     if (!phase || !Number.isFinite(phase.cpuUsed) || phase.cpuUsed < 0) continue;
+    const phases = {};
+    for (const name of ['PROTECTED_TOPOLOGY', 'MINCUT', 'DEFENSE_SCORE']) {
+      const entries = plan.phaseEvidence.filter(p => p?.phase === name);
+      if (entries.length !== 1 || !Number.isFinite(entries[0].cpuUsed) ||
+          entries[0].cpuUsed < 0) {
+        phases[name] = null;
+      } else {
+        phases[name] = entries[0].cpuUsed;
+      }
+    }
+    const measured = Object.values(phases).filter(v => v !== null);
+    const allMeasured = measured.length === 3;
+    const accountedCpu = allMeasured
+      ? Math.round(measured.reduce((sum, v) => sum + v, 0) * 1000) / 1000
+      : null;
+    // Profiling spans and rounding mean this is a diagnostic gap, not a
+    // proven algorithm bottleneck or exact attribution to any one subsystem.
+    const cpuOutsidePhases = allMeasured
+      ? Math.round((scheduler.lastCpu - accountedCpu) * 1000) / 1000 : null;
     const sample = {
+      phases,
+      accountedCpu,
+      cpuOutsidePhases,
       runTick,
       snapshotTick: e.tick,
       startTick: e.tick - 99,
