@@ -55,3 +55,31 @@ version, config, runtime cadence, thresholds or telemetry schemas.
 - [ ] After independent explicit deploy approval, require new marker,
   distinct release CPU windows and SHADOW authority verification
 - [ ] No merge into main without separate explicit approval
+
+
+## First GitHub Actions measurements (#94, candidate SHA 906612dd)
+
+[GitHub Actions #94](https://github.com/Riflex91/boringstuff/actions/runs/37992172972)
+passed Node v24.21.0 canonical tests, exact D0.6 parity, and exact
+P3.1 parity. Topology benchmark used nine alternating batches with
+20 iterations each per variant/fixture, and one **non-isolated**
+first invocation per variant before warm-up:
+
+| Fixture | Tiles | P3.1 first ms | P3.2 first ms | P3.1 warm median ms | P3.2 warm median ms | Warm ratio |
+|---|---:|---:|---:|---:|---:|---:|
+| Open | 840 | 13.161 | 9.456 | 0.987 | 0.916 | 1.08× |
+| Swamp | 840 | 1.354 | 1.123 | 0.886 | 0.894 | 0.99× |
+| Walls | 730 | 1.205 | 1.043 | 0.937 | 0.913 | 1.03× |
+| Corridor | 60 | 0.175 | 0.101 | 0.058 | 0.058 | 1.01× |
+
+All four output identities PASS; P3.1 `find(FIND_MINERALS)` count 2,
+P3.2 count 1. The changes are **not consistently faster when warm**;
+timing variance is large relative to the small optimization. The
+observed first-call timing difference does not recreate live Screeps
+V8 isolate startup, and cannot explain the first live topology
+measurement of 4.821 Screeps CPU.
+
+**Conclusions:** correctness and reduced redundant query are supported;
+a meaningful live CPU improvement is **not yet supported**. Preserve
+existing P3 WATCH threshold 10 and hard FAIL threshold 20. No live
+deployment without fresh operator authorization.
