@@ -200,4 +200,86 @@ assert.equal(boundedSearches, 4);
 assert.equal(mixedBounded.status, 'PARTIAL');
 assert.ok(mixedBounded.access.breachPaths.some(p => p.reason === 'PATH_BUDGET'));
 
+
+// D0.4: two distinct attackers can damage the same *observed* single route
+// barrier concurrently. They do not pay its HP independently.
+const cooperatingState = state([
+  creep([part('attack'), part('move')], 5, 5),
+  { ...creep([part('attack'), part('move')], 5, 6), id: 'breacher-2' }
+]);
+cooperatingState.structures[0] = { ...spawn, pos: pos(8, 5) };
+cooperatingState.structures.push({ id: 'shared-wall', structureType: 'constructedWall', hits: 300, pos: pos(6, 5) });
+cooperatingState.room.getTerrain = () => ({ get: () => 0 });
+const sharedFinder = { CostMatrix: Matrix, search(origin, goal, options) {
+  const matrix = options.roomCallback('E8N1').values;
+  assert.equal(options.maxOps, 200);
+  assert.equal(options.maxRooms, 1);
+  if (matrix['6,5'] === 255) return { incomplete: true, path: [] };
+  assert.equal(matrix['6,5'], 11); // 300 HP / 30 DPS + 1 plain movement
+  return { incomplete: false, cost: 11, path: [pos(6, 5), pos(7, 5)] };
+} };
+const cooperation = model.evaluate(cooperatingState, game, { pathFinder: sharedFinder });
+assert.equal(cooperation.status, 'PARTIAL');
+assert.equal(cooperation.pathSearches, 4, 'shared scenario must not require additional searches');
+assert.equal(cooperation.access.sharedBarrierGroups, 1);
+assert.equal(model.telemetrySummary(cooperation).schemaVersion, 3);
+assert.equal(model.telemetrySummary(cooperation).sharedBarrierGroups, 1);
+assert.equal(cooperation.access.earliestImpactTick, 107);
+assert.equal(cooperation.access.criticalAssetsAtRisk[0].earliestLossTick, 191);
+assert.equal(cooperation.access.criticalAssetsAtRisk[0].attackerCount, 2);
+for (const path of cooperation.access.breachPaths) {
+  assert.equal(path.routeBarrierHits, 300);
+  assert.equal(path.routeBarrierCount, 1);
+  assert.equal(path.routeBreachTicks, 10, 'independent baseline remains available');
+  assert.equal(path.coordinatedBreachTick, 5);
+  assert.equal(path.sharedBarrierAttackers, 2);
+}
+assert.equal(cooperation.risk.recommendedSafeMode, false);
+
+// Solo route retains baseline and no cooperative group.
+const singleBreach = model.evaluate({ ...cooperatingState, hostileCreeps: cooperatingState.hostileCreeps.slice(0, 1) }, game, { pathFinder: sharedFinder });
+assert.equal(singleBreach.access.sharedBarrierGroups, 0);
+assert.equal(singleBreach.access.earliestImpactTick, 112);
+assert.equal(singleBreach.access.breachPaths[0].coordinatedBreachTick, undefined);
+
+// Two observed barriers are deliberately not represented as a shared-route
+// plan. Both accesses remain independent and the scenario stays PARTIAL.
+const twoBarriers = { ...cooperatingState, structures: [
+  ...cooperatingState.structures,
+  { id: 'second-wall', structureType: 'constructedWall', hits: 300, pos: pos(7, 5) }
+] };
+const doubleBreach = model.evaluate(twoBarriers, game, { pathFinder: sharedFinder });
+assert.equal(doubleBreach.pathSearches, 4);
+assert.equal(doubleBreach.access.sharedBarrierGroups, 0);
+assert.equal(doubleBreach.access.earliestImpactTick, 122);
+assert.equal(doubleBreach.access.breachPaths[0].routeBarrierCount, 2);
+
+// Delayed collaborators start contributing only once they reach the barrier.
+// An attacker who arrives after it fell does not delay the breach.
+const routeEntry = (actorId, approachTicks, dps, id = 'same') => ({
+  actorId, dps, arrivalTicks: approachTicks + 10,
+  sharedRouteBarrier: { id, hits: 300, approachTicks, remainingTravelTicks: 2 },
+  access: {}
+});
+const staggered = [routeEntry('one', 0, 30), routeEntry('two', 5, 30)];
+assert.equal(model._test.sharedBarrierFinish(staggered, 300), 8);
+assert.equal(model._test.coordinateSingleRouteBarriers({ core: staggered }), 1);
+assert.deepEqual(staggered.map(e => e.arrivalTicks), [10, 10]);
+const lateBreacher = [routeEntry('one', 0, 30), routeEntry('two', 100, 30)];
+assert.equal(model._test.sharedBarrierFinish(lateBreacher, 300), 10);
+assert.equal(model._test.coordinateSingleRouteBarriers({ core: lateBreacher }), 1);
+assert.deepEqual(lateBreacher.map(e => e.arrivalTicks), [12, 102]);
+
+// Same creep with two weapon channels is not a cooperative group.
+const dualWeaponOnly = [routeEntry('dual', 0, 30), routeEntry('dual', 0, 10)];
+assert.equal(model._test.coordinateSingleRouteBarriers({ core: dualWeaponOnly }), 0);
+assert.equal(dualWeaponOnly[0].arrivalTicks, 10);
+
+// Merely having a barrier on each path is insufficient: ID and HP must match.
+const distinctBarriers = [routeEntry('one', 0, 30, 'barrier-a'), routeEntry('two', 0, 30, 'barrier-b')];
+assert.equal(model._test.coordinateSingleRouteBarriers({ core: distinctBarriers }), 0);
+const inconsistentHp = [routeEntry('one', 0, 30), routeEntry('two', 0, 30)];
+inconsistentHp[1].sharedRouteBarrier.hits = 200;
+assert.equal(model._test.coordinateSingleRouteBarriers({ core: inconsistentHp }), 0);
+
 console.log('D0 threat model shadow tests passed');
