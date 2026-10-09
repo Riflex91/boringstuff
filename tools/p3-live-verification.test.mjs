@@ -193,7 +193,7 @@ function status(tick, options = {}) {
 
 {
   const events = [
-    status(6050, { lastCpu: P3_CPU_WATCH + 0.5 }),
+    status(6050, { plannerTick: 6000, defenseTick: 6001, lastCpu: P3_CPU_WATCH + 0.5 }),
     { tick: 6099, code: 'BOT_HEARTBEAT', ctx: {} }
   ];
   const result = evaluateP3Shadow({ events, startTick: 6000, tickCount: 100 });
@@ -203,7 +203,7 @@ function status(tick, options = {}) {
 
 {
   const events = [
-    status(7050, { lastCpu: P3_CPU_FAIL + 0.5 }),
+    status(7050, { plannerTick: 7000, defenseTick: 7001, lastCpu: P3_CPU_FAIL + 0.5 }),
     { tick: 7099, code: 'BOT_HEARTBEAT', ctx: {} }
   ];
   const result = evaluateP3Shadow({ events, startTick: 7000, tickCount: 100 });

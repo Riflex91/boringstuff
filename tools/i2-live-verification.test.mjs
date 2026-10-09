@@ -142,7 +142,7 @@ function status(tick, options = {}) {
 
 {
   const events = [
-    status(6050, { lastCpu: I2_CPU_WATCH + 0.5 }),
+    status(6050, { evaluatedTick: 6001, lastCpu: I2_CPU_WATCH + 0.5 }),
     { tick: 6099, code: 'BOT_HEARTBEAT', ctx: {} }
   ];
   const result = evaluateI2Shadow({ events, startTick: 6000, tickCount: 100 });
@@ -152,7 +152,7 @@ function status(tick, options = {}) {
 
 {
   const events = [
-    status(7050, { lastCpu: I2_CPU_FAIL + 0.5 }),
+    status(7050, { evaluatedTick: 7001, lastCpu: I2_CPU_FAIL + 0.5 }),
     { tick: 7099, code: 'BOT_HEARTBEAT', ctx: {} }
   ];
   const result = evaluateI2Shadow({ events, startTick: 7000, tickCount: 100 });
