@@ -2120,3 +2120,42 @@ Detailed evidence:
 `docs/verification/d0-5-shadow-live-partial-0.3.0-2026-10-09.md`.
 **Keep PR #115 draft/unmerged; obtain fresh same-release smoke result.
 No D1 authority change.**
+
+
+## 2026-10-09 — D0.5 shadow.13 six-gate live review complete
+
+The separately provided `VERIFY SMOKE 3810954–3810978` now passes
+**9 PASS / 0 WATCH / 0 FAIL**, with correct Node 24.21.0 and only
+`0.3.0-shadow.13-node24` events. Complete 25-tick evidence,
+no bot or collector errors, safe CPU/bucket, dedicated mining,
+no hard stall and contiguous journal sequences PASS.
+
+**All six read-only verifiers are now available: 51 PASS /
+8 WATCH / 0 FAIL (overall WATCH).** Explicit windows:
+- Smoke `3810954–3810978`: 9/0/0.
+- General live `3811001–3811100`: 12/7/0.
+- D0 `3810954–3811053`: 6/1/0.
+- P2 `3810954–3811053`: 7/0/0.
+- P3 `3810954–3811053`: 8/0/0.
+- I2 `3810954–3811053`: 9/0/0.
+
+Previously confirmed local test/doctor and server-side deployment
+verification PASS, runtime 50 modules, deployment ID
+`20261009184541935-15132`. D0 contract, <=5 isolated CPU,
+scheduler evidence and SHADOW/NONE authority PASS. No armed
+hostile observed, so D0 actual combat/prediction remains WATCH
+and D1 stays blocked. General live `UNDERUTILIZED` and waiting/
+critical consumers (no self-supply fallback) remain optimization
+WATCH findings. Different sampled windows do not prove that D0.5
+caused the economy status change.
+
+Full audit report:
+`docs/verification/d0-5-shadow-live-0.3.0-2026-10-09.md`.
+The earlier five-gate partial report is retained as historical
+evidence of what was available at that point. Do not reinterpret
+its "smoke pending" status as still current.
+
+**Stop rule:** all six SHADOW verifier outputs have been reviewed;
+verify GitHub CI on the final documentation head and seek explicit
+merge authorization before integrating PR #115. There is no
+defense, Safe Mode, construction, remote or D1 authority promotion.
