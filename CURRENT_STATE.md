@@ -2,6 +2,30 @@
 
 Canonical repository: `Riflex91/boringstuff`
 
+## 2026-10-09 — D0.6 terrain and cost integrity SHADOW candidate
+
+D0.5 `shadow.13` merged through PR #115 at
+`b1ed41b71f9a54515586261f865e96c1cc37344f`.
+Its six live verifiers: 51 PASS / 8 WATCH / 0 FAIL (overall WATCH);
+armed hostiles absent. Deployment `20261009184541935-15132` was
+already completed; do not redeploy that release.
+
+D0.6 targets one remaining D0.5 path-evidence credibility issue:
+a geometrically valid direct PathFinder route could still cross natural
+terrain walls or report a positive cost below the observed step-cost
+lower bound. The new `0.3.0-shadow.14-node24` candidate rejects such
+route evidence, including absent/unreadable terrain, as UNKNOWN/PARTIAL
+rather than forecasting unjustified structure damage/loss.
+New regression scenarios cover wall, swamp, road over swamp, cost
+understatement and missing terrain. D0 retains schema 3, SHADOW/NONE,
+legacy execution unchanged, CPU <=5, and <=4 PathFinder searches
+with <=200 maxOps each. No D1 permission or active defense authority.
+
+Next: exact-commit Node 24.21.0 CI, then only the new candidate's
+installation/deployment and six read-only live verifiers. The draft PR
+must not be merged before new live evidence and explicit authorization.
+
+
 ## Canonical source baseline
 
 - Seed baseline: **v0.2.16-node18**

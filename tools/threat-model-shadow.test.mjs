@@ -7,7 +7,8 @@ const pos = (x, y) => ({ x, y, roomName: 'E8N1' });
 const part = (type, hits = 100, boost) => ({ type, hits, boost });
 const creep = (body, x = 24, y = 25) => ({ id: 'enemy', body, pos: pos(x, y), owner: { username: 'enemy' }, store: {} });
 const spawn = { id: 'spawn', my: true, structureType: 'spawn', hits: 5000, pos: pos(25, 25) };
-const state = hostileCreeps => ({ room: { name: 'E8N1', controller: { my: true, safeModeAvailable: 1 } }, hostileCreeps, structures: [spawn], sources: [] });
+const state = hostileCreeps => ({ room: { name: 'E8N1', controller: { my: true, safeModeAvailable: 1 },
+  getTerrain: () => ({ get: () => 0 }) }, hostileCreeps, structures: [spawn], sources: [] });
 const game = { time: 100 };
 
 assert.equal(model.evaluate(state([]), game).risk.state, 'NORMAL');
@@ -339,6 +340,59 @@ assert.equal(fakeBreachRoute.status, 'PARTIAL');
 assert.equal(fakeBreachRoute.access.breachPaths[0].reason, 'BREACH_PATH_INVALID');
 assert.equal(fakeBreachRoute.access.earliestImpactTick, null);
 assert.equal(fakeBreachRoute.pathSearches, 2);
+
+// D0.6: a complete, contiguous route is not credible if its cost is
+// below the number of steps, below observed swamp movement, or it crosses
+// a natural wall. None may create a fictional impact or Safe Mode advice.
+const understated = model.evaluate(state([distant]), game, {
+  pathFinder: { CostMatrix: Matrix, search: () => ({ incomplete: false, cost: 1, path: fullDiagonal }) }
+});
+assert.equal(understated.status, 'PARTIAL');
+assert.equal(understated.access.breachPaths[0].reason, 'PATH_COST_UNDERSTATED');
+assert.equal(understated.access.earliestImpactTick, null);
+assert.equal(understated.risk.recommendedSafeMode, false);
+assert.equal(understated.pathSearches, 1);
+
+const slow = creep([part('attack'), part('attack'), part('move')], 23, 25);
+const swampState = state([slow]);
+swampState.room.getTerrain = () => ({ get: (x, y) => x === 24 && y === 25 ? 2 : 0 });
+const slowPath = cost => ({ CostMatrix: Matrix, search: () => ({ incomplete: false, cost, path: [pos(24, 25)] }) });
+const swampUnderstated = model.evaluate(swampState, game, { pathFinder: slowPath(2) });
+assert.equal(swampUnderstated.access.breachPaths[0].reason, 'PATH_COST_UNDERSTATED');
+assert.equal(swampUnderstated.status, 'PARTIAL');
+assert.equal(swampUnderstated.access.earliestImpactTick, null);
+const validSwamp = model.evaluate(swampState, game, { pathFinder: slowPath(10) });
+assert.equal(validSwamp.status, 'READY');
+assert.equal(validSwamp.access.breachPaths[0].travelTicks, 10);
+const pavedSwamp = { ...swampState, structures: [...swampState.structures,
+  { id: 'road', structureType: 'road', pos: pos(24, 25) }] };
+const validRoad = model.evaluate(pavedSwamp, game, { pathFinder: slowPath(1) });
+assert.equal(validRoad.status, 'READY');
+assert.equal(validRoad.access.breachPaths[0].travelTicks, 1);
+
+const wallTerrain = state([distant]);
+wallTerrain.room.getTerrain = () => ({ get: (x, y) => x === 10 && y === 10 ? 1 : 0 });
+const throughTerrain = model.evaluate(wallTerrain, game, {
+  pathFinder: { CostMatrix: Matrix, search: () => ({ incomplete: false, cost: 20, path: fullDiagonal }) }
+});
+assert.equal(throughTerrain.access.breachPaths[0].reason, 'PATH_TERRAIN_BLOCKED');
+assert.equal(throughTerrain.access.earliestImpactTick, null);
+assert.equal(throughTerrain.risk.recommendedSafeMode, false);
+assert.equal(throughTerrain.status, 'PARTIAL');
+
+const noTerrain = state([distant]);
+delete noTerrain.room.getTerrain;
+const unknownTerrain = model.evaluate(noTerrain, game, {
+  pathFinder: { CostMatrix: Matrix, search: () => ({ incomplete: false, cost: 20, path: fullDiagonal }) }
+});
+assert.equal(unknownTerrain.access.breachPaths[0].reason, 'PATH_TERRAIN_UNKNOWN');
+assert.equal(unknownTerrain.status, 'PARTIAL');
+assert.equal(unknownTerrain.access.earliestImpactTick, null);
+const badTerrain = state([distant]);
+badTerrain.room.getTerrain = () => ({ get: () => undefined });
+assert.equal(model.evaluate(badTerrain, game, {
+  pathFinder: { CostMatrix: Matrix, search: () => ({ incomplete: false, cost: 20, path: fullDiagonal }) }
+}).access.breachPaths[0].reason, 'PATH_TERRAIN_UNKNOWN');
 
 // Existing legitimate D0.3 and D0.4 scenarios still preserve exact arrivals,
 // schema 3 telemetry and the unchanged four-search room budget.

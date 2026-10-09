@@ -1,4 +1,4 @@
-# D0 — bounded threat observation (D0.5 path-evidence-integrity SHADOW candidate)
+# D0 — bounded threat observation (D0.6 terrain/cost-evidence SHADOW candidate)
 
 This is an incremental D0 implementation, not completion of D0 or of the
 Ultimate Autonomous Roadmap. It introduces `threat.model.shadow` after the
@@ -208,3 +208,39 @@ D0/P2/P3/I2 read-only verifiers with zero hard FAIL. A peaceful D0
 window is WATCH, not combat validation. No authority transition,
 Safe Mode intent, tower/spawn action, construction or remote activation;
 D1 remains blocked.
+
+## D0.6 candidate — 0.3.0-shadow.14-node24 (fresh live gate required)
+
+D0.5 `shadow.13` was merged via PR #115 at
+`b1ed41b71f9a54515586261f865e96c1cc37344f`. Its exact six-verifier
+live evidence totaled 51 PASS / 8 WATCH / 0 FAIL (overall WATCH), without
+armed hostile combat. That is historical evidence, not proof for D0.6.
+
+**Observed gap:** D0.5 validated in-room, contiguous PathFinder geometry
+and positive cost, but a complete path could still cross a natural terrain
+wall, or report a positive cost less than the minimum terrain/road movement
+cost of the returned steps. Such input manufactured an earlier arrival and
+potentially a false SHADOW Safe Mode recommendation.
+
+D0.6 requires observed room terrain on complete *open* routes, rejects
+natural-wall crossings (`PATH_TERRAIN_BLOCKED`) and missing/malformed
+terrain evidence (`PATH_TERRAIN_UNKNOWN`), and checks the returned cost
+against the sum of the model's observed road/plain/swamp step costs
+(`PATH_COST_UNDERSTATED`). Unknown evidence remains `UNKNOWN/PARTIAL`,
+with no credited route arrival or fabricated structure-loss horizon from
+that route. Cost validation is a lower bound, not tactical optimality or a
+promise that the hostile will choose the route. The preexisting bounded
+breach-route geometry/terrain checks remain unchanged.
+
+Fixtures cover positive but understated costs, a swamp-only route, a
+road-over-swamp counterexample, a natural wall, unavailable/malformed
+terrain, and retention of valid route estimates. Four searches of at
+most 200 `maxOps` each, isolated <=5 D0 CPU, telemetry schema 3,
+`SHADOW` / `actionAuthority=NONE` and legacy gameplay authority are
+unchanged. No construction, mining, spawn, tower, Safe Mode or other
+game intent is created. D1 remains blocked.
+
+**Stop rule:** canonical Node 24.21.0 `npm test` and exact PR-head CI
+must pass, then install/deploy the *new* exact `shadow.14` candidate
+and collect a fresh receipt, 25-tick smoke, 100-tick general/D0 and
+P2/P3/I2 live evidence. Keep draft/unmerged pending explicit user approval.
