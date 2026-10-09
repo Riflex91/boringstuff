@@ -20,11 +20,16 @@ deployment ID `20261009200957502-9092`, the first post-release check at tick
 Set-Location "C:\Users\hansi\AppData\Local\Screeps\scripts\screeps_newbieland_net___21025\chatgpt\tools"
 node .\p3-release-evidence.mjs
 node .\p3-release-evidence.mjs --wait --min-runs 2 --timeout-seconds 1800
+node .\p3-release-evidence.mjs --wait --observe-runs 2 --timeout-seconds 1800
 ```
 
 The first command is a one-shot inspection. The second polls read-only for
-two **distinct** matching post-deployment execution ticks, with a 30-minute
-timeout. Both use the receipt (not a manually guessed start tick). If the
+two **distinct** matching post-deployment execution ticks that both have
+all-PASS P3 verification windows, with a 30-minute timeout. The third
+command is a diagnostic alternative: it exits after two distinct
+**complete** P3 windows even when CPU remains WATCH; in that case it
+returns exit code 3, not PASS. All commands use the receipt rather than
+a guessed start tick. If the
 collector is stopped or the scheduler defers, a WATCH/timeout is appropriate;
 it is not a reason to force a P3 run.
 
