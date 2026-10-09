@@ -93,3 +93,41 @@ If any phase is absent, duplicated or non-finite, the derived sum and
 difference remain unknown, not zero. CPU readings are rounded telemetry
 and may not perfectly balance.
 
+
+
+## Two distinct shadow.15 observations (operator evidence)
+
+Second complete P3 window: run tick `3813415`, snapshot `3813500`,
+window `3813401–3813500`: **8 PASS / 0 WATCH / 0 FAIL**. Exact
+release match to deployment marker tick `3812491`.
+
+| CPU (Screeps) | Run 3812915 | Run 3813415 | Change (second minus first) |
+|---|---:|---:|---:|
+| Full P3 scheduler | 11.190 | 4.796 | −6.394 |
+| Protected topology | 4.821 | 0.674 | −4.147 |
+| MINCUT | 4.434 | 2.719 | −1.715 |
+| Defense scoring | 1.364 | 0.856 | −0.508 |
+| Outside instrumented phases | 0.571 | 0.547 | −0.024 |
+
+One WATCH and one PASS means **overall diagnostic WATCH**, not a
+two-PASS release. Around 65% of the observed *difference* occurs in
+topology construction; this does not establish that topology has a
+repeatable performance defect or that the solver caused the variance.
+Inputs may differ, and Screeps first-run/JIT and tick conditions can
+matter. Do not extrapolate one run's CPU into steady-state headroom.
+
+The new diagnostic `compareP3ReleaseSamples` reports bounds,
+asset count, traffic tiles, graph size, augmentations, rampart and
+tower counts for the two observed windows. The `geometryCountersMatch`
+indicator is `null` when fields are missing, `false` if visible
+dimensions differ, and `true` when all visible geometry counters
+match. **Even true does not prove identical full terrain, graph,
+inputs, cache/JIT state or causal speedup.** A targeted topology change
+requires bounded benchmarks and exact output parity, not timing alone.
+
+Operator read-only one-shot diagnostic (uses existing receipt and logs):
+```powershell
+node .\p3-release-evidence.mjs
+```
+Expected exit code is 3 (WATCH) while the first post-deployment
+CPU sample remains above 10. No deploy or merge is needed.
