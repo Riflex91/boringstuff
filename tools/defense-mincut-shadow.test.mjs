@@ -349,7 +349,8 @@ function p2Plan({
     assert.equal(observed.constructionAuthority, 'NONE');
     assert.equal(mineralCalls, 1, 'evaluate obtains mineral obstacles once per grid');
     const independent = defense.protectedAssets(state, plan, room.getTerrain());
-    assert.ok(independent.some(asset => asset.type === 'legacy-spawn'));
+    assert.ok(independent.some(asset => asset.x === 10 && asset.y === 10),
+      'existing planned spawn coordinates stay protected');
     assert.equal(mineralCalls, 2, 'direct public API still resolves natural obstacles');
     const grid = defense.buildGrid(state, plan, { margin: 4, maxGridTiles: 400 });
     assert.equal(mineralCalls, 3, 'each new grid builds exactly one natural snapshot');
