@@ -2,6 +2,33 @@
 
 Canonical repository: `Riflex91/boringstuff`
 
+## 2026-10-09 — D0.6 first post-deployment verifier review / provenance correction
+
+User-supplied `0.3.0-shadow.14-node24` read-only evidence:
+general live `3811501–3811600` 13 PASS / 6 WATCH / 0 FAIL;
+D0 `3811448–3811547` 6/1/0 (armed combat absent);
+P2 7/0/0; P3 7/0/1; I2 9/0/0 in the D0 window.
+Only five command outputs were supplied (smoke and deployment transcript
+not included). **Do not merge on these outputs.**
+
+The P3 FAIL used a cached scheduler `lastCpu=24.19`, with actual
+`lastRunTick=3811415`, **33 ticks before** the new deployment
+verification boundary `3811448`. Its MINCUT phase recorded 20.252 CPU;
+that is a historical spike, not evidence of P3 execution after
+this deployment. Likewise I2 `lastRunTick=3811266` predates the new
+window despite the old verifier reporting a clean PASS. Persisted
+Scheduler Memory and cached SHADOW artifacts can cross releases.
+
+The tool-only read-only P2/P3/I2 verifier correction requires matching
+a planner/result tick and scheduler `lastRunTick` inside the exact
+verification window. Stale release evidence becomes WATCH instead of
+PASS or FAIL; genuinely post-window threshold breaches still FAIL.
+**No game/*.js changes, no game redeploy, no CPU threshold or
+authority changes**. Use updated, exact-commit tools and obtain new
+post-deployment scheduler executions and fresh verifier windows,
+plus smoke/deploy provenance. D0 remains SHADOW; D1 remains blocked.
+
+
 ## 2026-10-09 — D0.6 terrain and cost integrity SHADOW candidate
 
 D0.5 `shadow.13` merged through PR #115 at

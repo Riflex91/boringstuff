@@ -244,3 +244,24 @@ game intent is created. D1 remains blocked.
 must pass, then install/deploy the *new* exact `shadow.14` candidate
 and collect a fresh receipt, 25-tick smoke, 100-tick general/D0 and
 P2/P3/I2 live evidence. Keep draft/unmerged pending explicit user approval.
+
+## D0.6 verifier provenance follow-up (tools only)
+
+First reported shadow.14 live output contained five gates (smoke missing).
+General live 13/6/0, D0 6/1/0, P2 7/0/0, P3 7/0/1, I2 9/0/0
+were reported by the **old verifier**. P3's `lastCpu=24.19`
+came from a real execution at tick `3811415`, before the release
+verification start `3811448`; I2's `lastRunTick=3811266`
+was also pre-boundary. Durable Scheduler Memory crosses deployments.
+Neither cached value proves a new-release P3/I2 execution.
+
+The updated read-only P2/P3/I2 verifiers require an execution timestamp
+matching the observed artifact's tick inside the verification window,
+and only accept CPU evidence from those matched runs. Missing new-run
+evidence is WATCH; a real new-run CPU threshold breach still FAIL.
+Do not weaken the 20-CPU P3 threshold, alter planner scheduling,
+or silently turn historical failure evidence into a release PASS.
+The tool correction changes **no game module or version** and requires
+fresh Node24 CI on the exact new PR head and local tool reinstall,
+but **no redundant game deployment**. The new release remains
+unaccepted pending actual post-deploy P3/I2 runs and all six gates.

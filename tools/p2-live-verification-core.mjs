@@ -200,6 +200,13 @@ export function evaluateP2Shadow(input = {}) {
 
   const schedulerSamples = samples.filter(sample => sample.scheduler);
   const ran = schedulerSamples.filter(sample => finite(sample.scheduler?.runCount, 0) > 0);
+  // Scheduler Memory can survive a deployment. Only an execution with a
+  // matching plan tick inside this verification window proves this release ran.
+  const releaseRuns = ran.filter(sample => {
+    const runTick = sample.scheduler?.lastRunTick;
+    return Number.isInteger(runTick) && runTick >= startTick && runTick <= sample.tick &&
+      sample.planner?.planTick === runTick;
+  });
   if (!schedulerSamples.length) {
     checks.push(check(
       'scheduler-isolation',
@@ -208,13 +215,20 @@ export function evaluateP2Shadow(input = {}) {
     ));
   } else if (!ran.length) {
     checks.push(check('scheduler-isolation', 'FAIL', 'planner-vnext-shadow never ran according to scheduler telemetry.', { schedulerSamples }));
+  } else if (!releaseRuns.length) {
+    checks.push(check(
+      'scheduler-isolation',
+      'WATCH',
+      'P2 scheduler data exists, but no plan/execution pair belongs to this verification window.',
+      { latest: ran.at(-1).scheduler }
+    ));
   } else {
     checks.push(check(
       'scheduler-isolation',
       'PASS',
       'planner-vnext-shadow is tracked as an independent scheduler process.',
       {
-        latest: ran.at(-1).scheduler
+        latest: releaseRuns.at(-1).scheduler
       }
     ));
   }

@@ -180,4 +180,23 @@ function status(tick, options = {}) {
   assert.equal(result.checks.find(item => item.id === 'roi-freshness').status, 'WATCH');
 }
 
+// I2 cached before deployment may appear in a new-version STATUS_SNAPSHOT.
+for (const cpu of [1.13, 11]) {
+  const result = evaluateI2Shadow({
+    events: [status(10450, { evaluatedTick: 10199, lastCpu: cpu }),
+      { tick: 10499, code: 'BOT_HEARTBEAT', ctx: {} }],
+    startTick: 10400
+  });
+  assert.equal(result.outcome, 'WATCH');
+  assert.equal(result.checks.find(c => c.id === 'scheduler-isolation').status, 'WATCH');
+  assert.equal(result.checks.find(c => c.id === 'roi-cpu').status, 'WATCH');
+}
+{
+  const row = status(10550, { evaluatedTick: 10510 });
+  row.ctx.scheduler.processes['remote-roi-shadow'].lastRunTick = 10399;
+  const result = evaluateI2Shadow({
+    events: [row, { tick: 10599, code: 'BOT_HEARTBEAT', ctx: {} }], startTick: 10500
+  });
+  assert.equal(result.checks.find(c => c.id === 'scheduler-isolation').status, 'WATCH');
+}
 console.log('I2 live verification tests passed');
