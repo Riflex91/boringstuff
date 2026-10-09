@@ -107,6 +107,10 @@ for (;;) {
         ' window=' + r.sample.startTick + '-' + r.sample.endTick +
         ' schedulerCPU=' + r.sample.schedulerCpu +
         ' MINCUTphaseCPU=' + r.sample.mincutPhaseCpu +
+        ' topologyCPU=' + (r.sample.phases?.PROTECTED_TOPOLOGY ?? 'UNKNOWN') +
+        ' scoringCPU=' + (r.sample.phases?.DEFENSE_SCORE ?? 'UNKNOWN') +
+        ' phaseSumCPU=' + (r.sample.accountedCpu ?? 'UNKNOWN') +
+        ' outsidePhasesCPU=' + (r.sample.cpuOutsidePhases ?? 'UNKNOWN') +
         ' outcome=' + r.outcome + ' complete=' + r.complete +
         ' checks=' + JSON.stringify(r.counts));
       for (const c of r.checks.filter(c => c.status !== 'PASS')) {
@@ -138,6 +142,8 @@ for (;;) {
         ' window=' + r.sample.startTick + '-' + r.sample.endTick +
         ' schedulerCPU=' + r.sample.schedulerCpu +
         ' MINCUTphaseCPU=' + r.sample.mincutPhaseCpu +
+        ' phaseSumCPU=' + (r.sample.accountedCpu ?? 'UNKNOWN') +
+        ' outsidePhasesCPU=' + (r.sample.cpuOutsidePhases ?? 'UNKNOWN') +
         ' checks=' + r.counts.pass + ' PASS/' + r.counts.watch + ' WATCH/' + r.counts.fail + ' FAIL');
     }
     console.log('RELEASE CPU OBSERVED: ' + accepted.length + ' distinct post-deploy P3 execution(s).');
