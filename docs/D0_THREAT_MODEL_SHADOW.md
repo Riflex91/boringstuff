@@ -1,4 +1,4 @@
-# D0 — bounded threat observation (D0.3 range-aware SHADOW candidate)
+# D0 — bounded threat observation (D0.3 range-aware SHADOW)
 
 This is an incremental D0 implementation, not completion of D0 or of the
 Ultimate Autonomous Roadmap. It introduces `threat.model.shadow` after the
@@ -99,7 +99,15 @@ terrain-optimal tactical paths, enemy intent forecasting, or combat probability.
 No Safe Mode/gameplay intents, persistent migrations, authority transfers or
 PathFinder search/operation budget increases are included.
 
-**Gate:** full Node 24.21.0 offline suite and GitHub CI, then an exact new
-`shadow.11` deployment receipt, 25-tick smoke, 100-tick general live, D0,
-P2, P3 and I2 read-only verifiers. A peaceful D0 window remains WATCH; do not
-promote it to combat validation. Until reviewed, keep PR as draft and D1 blocked.
+**Live gate reviewed (2026-10-09):** Node 24.21.0 GitHub CI passed.
+Smoke `3809946–3809970` was 9/0/0 PASS; general live
+`3810001–3810100` was 12/7/0 WATCH; exact D0 window
+`3809946–3810045` was 6/1/0 WATCH. P2, P3 and I2 passed the
+same D0 100-tick window, each with zero FAIL. The D0 WATCH means no armed
+hostile was observed, not that combat forecasts passed. The general-live
+seven WATCH outcomes remain as recorded. Original console outputs did not
+include the deployment ID or full server module comparison.
+Full append-only report:
+`docs/verification/d0-3-shadow-live-0.3.0-2026-10-09.md`.
+Acceptable as a SHADOW-only incremental live gate with overall WATCH,
+**not** as D0 completion or D1 permission. D1 remains blocked.
