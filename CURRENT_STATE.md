@@ -2038,3 +2038,47 @@ Do not redeploy merely to reproduce a historical command transcript.
 
 PR #114 remains draft and unmerged pending provenance review and
 explicit merge authorization. D0 remains SHADOW, D1 blocked.
+
+
+## 2026-10-09 — D0.5 SHADOW PathFinder result-integrity candidate
+
+D0.4 `shadow.12` merged into `main` through PR #114
+(`994835dbb743e13fa1bfe38aedbab676c0d5f342`). Six read-only
+verifier outputs: 52 PASS / 7 WATCH / 0 FAIL, overall WATCH. No
+armed-hostile combat validation; D1 still blocked.
+
+Candidate version `0.3.0-shadow.13-node24` closes a specific
+false-positive risk in the D0 range-aware hostile scenario model:
+the old path evidence handler accepted a successful PathFinder
+`incomplete=false` result as REACHABLE without checking that the
+returned path was an actual continuous single-room route to the
+weapon-specific attack range, or that its cost was valid. A malformed
+path could otherwise manufacture imminent damage and an observational
+Safe Mode recommendation.
+
+D0.5 now requires a nonempty contiguous route of adjacent, in-bounds
+integer same-room positions that terminates within the selected range.
+Direct paths must carry a finite positive cost and must not claim a
+clear route through any observed blocking structure. Secondary
+destructible-barrier paths must also be continuous and end in range.
+Invalid route evidence remains UNKNOWN/PARTIAL with a stable error
+reason, with no fabricated arrival/loss horizon for that route.
+
+Regression tests cover empty paths, teleporting steps, wrong rooms,
+noninteger/out-of-bounds steps, insufficient goal reach, NaN/zero/
+negative/missing costs, spoofed open paths through observed walls,
+and malformed secondary breach paths. Prior D0.3 and D0.4 tests,
+including mixed weapon ranges, shared barrier scenario and bounded
+four-search budget, must continue to pass.
+
+SHADOW/NONE and LEGACY_UNCHANGED remain the only authorities.
+No gameplay intents, defense execution, remote activation, construction,
+persistent schema or planner cadence changes; D0 telemetry retains
+schemaVersion=3. The limits of enemy strategy, path optimality,
+coordinated combat, friendly defense and healing remain unresolved.
+**D1 blocked.**
+
+**Stop rule:** canonical Node 24.21.0 npm tests and GitHub CI on the
+exact new head, then new `shadow.13` live deployment receipt and
+25-tick smoke, 100-tick live/D0/P2/P3/I2 evidence. Do not infer
+validity from `shadow.12` observations. No merge before new evidence.
