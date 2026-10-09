@@ -132,3 +132,37 @@ node .\p3-release-evidence.mjs --observe-runs 2
 ```
 Expected exit code is 3 (WATCH) while the first post-deployment
 CPU sample remains above 10. No deploy or merge is needed.
+
+
+## Third observed release comparison (operator excerpt)
+
+Operator supplied the line:
+
+`WORKLOAD COMPARISON: runTick=3813415 to=3813915
+geometryCountersMatch=true knownGeometryFields=10/10 changedFields=[]
+cpuDeltaSecondMinusFirst={"scheduler":-1.026,"topology":-0.132,
+"mincut":-0.933,"scoring":-0.009,"outsidePhases":0.048}`
+
+Using the independently documented second-run values, the **derived**
+third-run CPU values (not copied from an `OBSERVED` or verifier line) are:
+
+| Phase (Screeps CPU) | Run 3813415 | Run 3813915 (derived) |
+|---|---:|---:|
+| Scheduler | 4.796 | 3.770 |
+| Protected topology | 0.674 | 0.542 |
+| MINCUT | 2.719 | 1.786 |
+| Defense scoring | 0.856 | 0.847 |
+| Outside measured phases | 0.547 | 0.595 |
+
+The third comparison provides 10 matching observable geometry fields
+with the second run. It does **not** contain the full third-run
+`OBSERVED` record, 100-tick completion bit or P3 check counts, so the
+third run is **not** independently marked 8 PASS / 0 WATCH / 0 FAIL
+in this document. Its derived scheduler CPU would be under the
+10-CPU WATCH threshold if confirmed by the full reading.
+
+The live release remains **WATCH** because run `3812915`
+was above the 10-CPU warning threshold. The operator's requested
+four-distinct-run diagnostic quorum has not yet been established by
+the excerpts available here. Do not change threshold or run identity
+to manufacture a PASS.
