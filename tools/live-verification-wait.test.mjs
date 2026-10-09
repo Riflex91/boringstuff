@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { formatWaitStatus, resolveAutoStart, waitForAutoStart } from './live-verification-wait.mjs';
 
-const version = '0.3.0-shadow.10-node24';
+const version = '0.3.0-shadow.11-node24';
 const room = 'E8N1';
 
 function versionChange(tick = 1000) {
