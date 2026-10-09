@@ -101,6 +101,18 @@ for (;;) {
     else console.log('State:', witness.state, witness.reason,
       'markerTick:', witness.markerTick, 'latestEvidenceTick:', witness.latestTick,
       'distinctReleaseRuns:', witness.samples.length);
+    for (const r of results) {
+      console.log('OBSERVED: runTick=' + r.sample.runTick +
+        ' snapshot=' + r.sample.snapshotTick +
+        ' window=' + r.sample.startTick + '-' + r.sample.endTick +
+        ' schedulerCPU=' + r.sample.schedulerCpu +
+        ' MINCUTphaseCPU=' + r.sample.mincutPhaseCpu +
+        ' outcome=' + r.outcome + ' complete=' + r.complete +
+        ' checks=' + JSON.stringify(r.counts));
+      for (const c of r.checks.filter(c => c.status !== 'PASS')) {
+        console.log('  ' + c.status + ' ' + c.id + ': ' + c.message);
+      }
+    }
     lastSignature = signature;
     lastStatusAt = Date.now();
   }
