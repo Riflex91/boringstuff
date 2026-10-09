@@ -1810,3 +1810,38 @@ foreign-version completion evidence. No game modules or release identity change.
 Full `npm test` passes on Node 24.21.0, including all 50 game-module syntax checks.
 D0.2 deployment and exact new live evidence remain pending; no historical live
 evidence is promoted to the new candidate and no gameplay authority is granted.
+
+## 2026-10-09 — D0.2 exact live SHADOW evidence reviewed
+
+Installed candidate `0.3.0-shadow.10-node24` was observed with local Node
+`24.21.0`. Read-only live verifiers yielded:
+
+- Smoke `3802115–3802139`: 9 PASS / 0 WATCH / 0 FAIL.
+- General live `3802201–3802300`: 12 PASS / 7 WATCH / 0 FAIL.
+- D0 `3802115–3802214`: 6 PASS / 1 WATCH / 0 FAIL.
+- P2 same D0 interval: 7 PASS / 0 WATCH / 0 FAIL.
+- P3 same D0 interval: 8 PASS / 0 WATCH / 0 FAIL.
+- I2 same D0 interval: 9 PASS / 0 WATCH / 0 FAIL.
+
+D0 shadow authority, schema-2 model contracts, independent current-tick CPU
+attribution and <=5 isolated CPU passed. No armed hostile appeared:
+`combat-observation` is WATCH, not simulated live validation.
+
+General live safety gates (versions, errors, collector, CPU/bucket, mining,
+stall, telemetry continuity, hauler capacity and shadow authority) passed.
+The seven WATCH observations concern cadence-aligned productive attribution,
+consumer waiting/critical with fallback zero, missing exact-window controller,
+construction and throughput metrics, UNDERUTILIZED efficiency, and incomplete
+exact-window E4 matching evidence. P2 isolated CPU last reported 12.293 and
+is a monitoring concern, not a recorded P2 verifier failure.
+
+Append-only report: `docs/verification/d0-2-shadow-live-0.3.0-2026-10-09.md`.
+The provided CLI transcript did not include the raw logs, deployment receipt ID
+or a full server module-content comparison. The exact-receipt D0 verifier
+completed successfully; do not extrapolate beyond that.
+
+Release disposition: shadow-only incremental D0.2 evidence is acceptable for
+merge with overall WATCH and zero FAIL, subject to GitHub CI/merge requirements.
+No Safe Mode, tower/spawn, remote activation, construction or other gameplay
+authority promotion follows from this result. D0 and combat modeling remain
+partial. D1 stays blocked until its separate roadmap gates are satisfied.
