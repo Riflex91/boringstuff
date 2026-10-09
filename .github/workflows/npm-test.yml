@@ -33,3 +33,5 @@ jobs:
         run: npm test
       - name: P3 paired benchmark and exact baseline equivalence
         run: npm run bench:p3
+      - name: P3.1 vs P3.2 topology parity and first-call/warm benchmark
+        run: npm run bench:p3:topology
