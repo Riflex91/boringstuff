@@ -13,7 +13,7 @@ const args = {
   server: process.env.SCREEPS_SERVER || 'newbieland',
   branch: process.env.SCREEPS_BRANCH || 'chatgpt',
   roomName: process.env.SCREEPS_ROOM || 'E8N1',
-  wait: false, timeoutSeconds: 1800, pollSeconds: 10, minRuns: 1, json: false
+  wait: false, timeoutSeconds: 1800, pollSeconds: 10, minRuns: 1, observeRuns: null, json: false
 };
 const argv = process.argv.slice(2);
 for (let i = 0; i < argv.length; i++) {
@@ -24,11 +24,12 @@ for (let i = 0; i < argv.length; i++) {
   else if (a === '--room') args.roomName = String(argv[++i] || '').toUpperCase();
   else if (a === '--wait') args.wait = true;
   else if (a === '--min-runs') args.minRuns = Number(argv[++i]);
+  else if (a === '--observe-runs') args.observeRuns = Number(argv[++i]);
   else if (a === '--timeout-seconds') args.timeoutSeconds = Number(argv[++i]);
   else if (a === '--poll-seconds') args.pollSeconds = Number(argv[++i]);
   else if (a === '--json') args.json = true;
   else if (a === '--help' || a === '-h') {
-    console.log('Read-only P3 release witness\n  node p3-release-evidence.mjs [--wait] [--min-runs 2] [--timeout-seconds 1800] [--poll-seconds 10] [--log-dir PATH] [--server newbieland] [--branch chatgpt] [--room E8N1] [--json]');
+    console.log('Read-only P3 release witness\n  node p3-release-evidence.mjs [--wait] [--min-runs 2] [--observe-runs 2] [--timeout-seconds 1800] [--poll-seconds 10] [--log-dir PATH] [--server newbieland] [--branch chatgpt] [--room E8N1] [--json]');
     process.exit(0);
   } else throw new Error('Unknown argument: ' + a);
 }
@@ -47,7 +48,11 @@ console.log('P3 RELEASE WITNESS (READ-ONLY)');
 console.log('Server/branch:', args.server + '/' + args.branch);
 console.log('Version:', receipt.version);
 console.log('Deployment ID:', receipt.deploymentId);
-console.log('Room:', args.roomName, 'minimum distinct new runs:', args.minRuns);
+if (args.observeRuns !== null && (!Number.isInteger(args.observeRuns) || args.observeRuns < 1 || args.observeRuns > 100)) {
+  throw new Error('Invalid observeRuns');
+}
+console.log('Room:', args.roomName, 'minimum distinct PASS runs:', args.minRuns,
+  'observation quorum:', args.observeRuns ?? 'disabled');
 console.log('Log directory:', args.logDir);
 
 function loadEvents() {
@@ -149,6 +154,21 @@ for (;;) {
     console.log('RELEASE CPU OBSERVED: ' + accepted.length + ' distinct post-deploy P3 execution(s).');
     console.log('NOTE: A reduction vs D0.6 requires comparisons across representative workloads, not one sample.');
     process.exitCode = 0;
+    break;
+  }
+  // Diagnostics can finish once enough distinct verified release executions
+  // were observed, even if their CPU status is WATCH. A WATCH is never PASS.
+  if (args.observeRuns !== null && final.length >= args.observeRuns) {
+    console.log('DIAGNOSTIC QUORUM: ' + final.length +
+      ' distinct completed post-deploy executions observed.');
+    for (const r of final) {
+      console.log('  runTick=' + r.sample.runTick +
+        ' schedulerCPU=' + r.sample.schedulerCpu +
+        ' MINCUTphaseCPU=' + r.sample.mincutPhaseCpu +
+        ' outcome=' + r.outcome + ' checks=' + JSON.stringify(r.counts));
+    }
+    console.log('RELEASE RESULT: WATCH — observation quorum is not an all-PASS acceptance criterion.');
+    process.exitCode = 3;
     break;
   }
   if (!args.wait || Date.now() >= deadline) {
