@@ -265,4 +265,64 @@ function p2Plan({
   assert.ok(score.total > 0 && score.total <= 100);
 }
 
+
+{
+  // Reuse one terrain view for both topology and cut capacities. Mixed
+  // wall/swamp terrain must preserve exact lookup and per-tile weighting.
+  let terrainCalls = 0;
+  const terrain = {
+    get(x, y) {
+      if (x === 11 && y === 11) return 1; // natural wall
+      if (x === 9 && y === 9) return 2;   // swamp
+      return 0;
+    }
+  };
+  const room = openRoom();
+  room.getTerrain = () => { terrainCalls += 1; return terrain; };
+  const state = stateFor(room);
+  const plan = p2Plan();
+  const result = defense.evaluate(state, plan, {}, { time: 1100 }, {
+    margin: 4, maxGridTiles: 400, maxAugmentations: 1000
+  });
+  assert.equal(terrainCalls, 1, 'P3 must not repeatedly obtain RoomTerrain');
+  assert.equal(result.authority, 'SHADOW');
+  assert.equal(result.constructionAuthority, 'NONE');
+  assert.equal(result.status, 'READY');
+  assert.equal(result.metrics.breachRouteCount, 0);
+
+  const grid = defense.buildGrid(state, plan, { margin: 4, maxGridTiles: 400 });
+  assert.ok(grid.ok);
+  assert.equal(grid.indexByCoord[11 * 50 + 11], -1, 'wall excluded from dense index');
+  assert.equal(grid.indexByKey.has('11,11'), false);
+  const swampId = grid.indexByCoord[9 * 50 + 9];
+  assert.equal(swampId, grid.indexByKey.get('9,9'));
+  assert.equal(grid.tiles[swampId].swamp, true);
+  const context = {
+    protectedSet: grid.protectedSet,
+    naturalSet: grid.naturalSet,
+    trafficSet: grid.trafficSet,
+    existingRamparts: grid.existingRamparts
+  };
+  assert.equal(
+    defense._test.cutCapacity(room, 9, 9, context, true),
+    defense._test.cutCapacity(room, 9, 9, context),
+    'cached swamp cost must match original terrain lookup'
+  );
+  assert.equal(grid.indexByCoord[5 * 50 + 5], -1, 'outside bounds is never a neighbor');
+}
+
+{
+  // Queue reuse cannot leak residual BFS state between max-flow calls.
+  const Dinic = defense._test.Dinic;
+  const graph = new Dinic(4, 100);
+  graph.addEdge(0, 1, 4);
+  graph.addEdge(1, 3, 4);
+  graph.addEdge(0, 2, 3);
+  graph.addEdge(2, 3, 3);
+  assert.equal(graph.maxFlow(0, 3), 7);
+  assert.equal(graph.maxFlow(0, 3), 0);
+  assert.equal(graph.reachable(0)[3], 0);
+  assert.equal(graph.edgeCount, 4);
+}
+
 console.log('P3 min-cut defense shadow tests passed');
