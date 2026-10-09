@@ -13,7 +13,7 @@ const SERVER = process.env.SCREEPS_SERVER || 'newbieland';
 const BRANCH = process.env.SCREEPS_BRANCH || 'chatgpt';
 
 function usage(code = 0) {
-  console.log(`\nLive Verification Harness v0.3.0-shadow.11\n\n  node live-verification.mjs smoke [--start-tick N] [--room E8N1] [--version 0.3.0-shadow.11-node24]\n  node live-verification.mjs live  [--start-tick N] [--room E8N1] [--version 0.3.0-shadow.11-node24]\n\nThe command is read-only. It evaluates existing collector evidence and never mutates Screeps or historical telemetry.\nIf --start-tick is omitted, the deployment receipt requires the exact matching DEPLOYMENT_MARKER; historical runs without a matching receipt may still fall back to VERSION_CHANGE.\n`);
+  console.log(`\nLive Verification Harness v0.3.0-shadow.12\n\n  node live-verification.mjs smoke [--start-tick N] [--room E8N1] [--version 0.3.0-shadow.12-node24]\n  node live-verification.mjs live  [--start-tick N] [--room E8N1] [--version 0.3.0-shadow.12-node24]\n\nThe command is read-only. It evaluates existing collector evidence and never mutates Screeps or historical telemetry.\nIf --start-tick is omitted, the deployment receipt requires the exact matching DEPLOYMENT_MARKER; historical runs without a matching receipt may still fall back to VERSION_CHANGE.\n`);
   process.exit(code);
 }
 
