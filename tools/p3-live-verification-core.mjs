@@ -266,6 +266,14 @@ export function evaluateP3Shadow(input = {}) {
   }
 
   const schedulerSamples = samples.filter(sample => sample.scheduler);
+  // A STATUS_SNAPSHOT can contain a persisted pre-deployment P3 result
+  // and its lastCpu. Match the actual run tick to its plan tick and the
+  // current verification boundary before treating it as release evidence.
+  const releaseRuns = schedulerSamples.filter(sample => {
+    const runTick = sample.scheduler?.lastRunTick;
+    return Number.isInteger(runTick) && runTick >= startTick && runTick <= sample.tick &&
+      sample.defense?.planTick === runTick;
+  });
   if (!schedulerSamples.length) {
     checks.push(check(
       'scheduler-isolation',
@@ -279,23 +287,32 @@ export function evaluateP3Shadow(input = {}) {
       'defense-mincut-shadow never ran according to scheduler telemetry.',
       { schedulerSamples }
     ));
+  } else if (!releaseRuns.length) {
+    checks.push(check(
+      'scheduler-isolation',
+      'WATCH',
+      'P3 scheduler data exists, but no matching P3 plan/execution belongs to this verification window.',
+      { latest: schedulerSamples.at(-1).scheduler }
+    ));
   } else {
     checks.push(check(
       'scheduler-isolation',
       'PASS',
       'defense-mincut-shadow is tracked as an independent scheduler process.',
-      { latest: schedulerSamples.at(-1).scheduler }
+      { latest: releaseRuns.at(-1).scheduler }
     ));
   }
 
-  const cpuSamples = schedulerSamples
-    .map(sample => ({ tick: sample.tick, cpu: finite(sample.scheduler?.lastCpu, null) }))
+  const cpuSamples = releaseRuns
+    .map(sample => ({ tick: sample.tick, runTick: sample.scheduler.lastRunTick,
+      cpu: finite(sample.scheduler?.lastCpu, null) }))
     .filter(sample => sample.cpu !== null);
   if (!cpuSamples.length) {
     checks.push(check(
       'mincut-cpu',
-      samples.length ? 'WATCH' : (complete ? 'FAIL' : 'WATCH'),
-      'No isolated P3 scheduler CPU sample is available yet.'
+      'WATCH',
+      'No P3 CPU reading from this verification window; cached pre-window lastCpu is excluded.',
+      { latest: schedulerSamples.at(-1)?.scheduler || null }
     ));
   } else {
     const worst = cpuSamples.reduce((a, b) => b.cpu > a.cpu ? b : a);

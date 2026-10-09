@@ -2,6 +2,57 @@
 
 Canonical repository: `Riflex91/boringstuff`
 
+## 2026-10-09 — D0.6 first post-deployment verifier review / provenance correction
+
+User-supplied `0.3.0-shadow.14-node24` read-only evidence:
+general live `3811501–3811600` 13 PASS / 6 WATCH / 0 FAIL;
+D0 `3811448–3811547` 6/1/0 (armed combat absent);
+P2 7/0/0; P3 7/0/1; I2 9/0/0 in the D0 window.
+Only five command outputs were supplied (smoke and deployment transcript
+not included). **Do not merge on these outputs.**
+
+The P3 FAIL used a cached scheduler `lastCpu=24.19`, with actual
+`lastRunTick=3811415`, **33 ticks before** the new deployment
+verification boundary `3811448`. Its MINCUT phase recorded 20.252 CPU;
+that is a historical spike, not evidence of P3 execution after
+this deployment. Likewise I2 `lastRunTick=3811266` predates the new
+window despite the old verifier reporting a clean PASS. Persisted
+Scheduler Memory and cached SHADOW artifacts can cross releases.
+
+The tool-only read-only P2/P3/I2 verifier correction requires matching
+a planner/result tick and scheduler `lastRunTick` inside the exact
+verification window. Stale release evidence becomes WATCH instead of
+PASS or FAIL; genuinely post-window threshold breaches still FAIL.
+**No game/*.js changes, no game redeploy, no CPU threshold or
+authority changes**. Use updated, exact-commit tools and obtain new
+post-deployment scheduler executions and fresh verifier windows,
+plus smoke/deploy provenance. D0 remains SHADOW; D1 remains blocked.
+
+
+## 2026-10-09 — D0.6 terrain and cost integrity SHADOW candidate
+
+D0.5 `shadow.13` merged through PR #115 at
+`b1ed41b71f9a54515586261f865e96c1cc37344f`.
+Its six live verifiers: 51 PASS / 8 WATCH / 0 FAIL (overall WATCH);
+armed hostiles absent. Deployment `20261009184541935-15132` was
+already completed; do not redeploy that release.
+
+D0.6 targets one remaining D0.5 path-evidence credibility issue:
+a geometrically valid direct PathFinder route could still cross natural
+terrain walls or report a positive cost below the observed step-cost
+lower bound. The new `0.3.0-shadow.14-node24` candidate rejects such
+route evidence, including absent/unreadable terrain, as UNKNOWN/PARTIAL
+rather than forecasting unjustified structure damage/loss.
+New regression scenarios cover wall, swamp, road over swamp, cost
+understatement and missing terrain. D0 retains schema 3, SHADOW/NONE,
+legacy execution unchanged, CPU <=5, and <=4 PathFinder searches
+with <=200 maxOps each. No D1 permission or active defense authority.
+
+Next: exact-commit Node 24.21.0 CI, then only the new candidate's
+installation/deployment and six read-only live verifiers. The draft PR
+must not be merged before new live evidence and explicit authorization.
+
+
 ## Canonical source baseline
 
 - Seed baseline: **v0.2.16-node18**

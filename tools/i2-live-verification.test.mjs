@@ -142,7 +142,7 @@ function status(tick, options = {}) {
 
 {
   const events = [
-    status(6050, { lastCpu: I2_CPU_WATCH + 0.5 }),
+    status(6050, { evaluatedTick: 6001, lastCpu: I2_CPU_WATCH + 0.5 }),
     { tick: 6099, code: 'BOT_HEARTBEAT', ctx: {} }
   ];
   const result = evaluateI2Shadow({ events, startTick: 6000, tickCount: 100 });
@@ -152,7 +152,7 @@ function status(tick, options = {}) {
 
 {
   const events = [
-    status(7050, { lastCpu: I2_CPU_FAIL + 0.5 }),
+    status(7050, { evaluatedTick: 7001, lastCpu: I2_CPU_FAIL + 0.5 }),
     { tick: 7099, code: 'BOT_HEARTBEAT', ctx: {} }
   ];
   const result = evaluateI2Shadow({ events, startTick: 7000, tickCount: 100 });
@@ -180,4 +180,23 @@ function status(tick, options = {}) {
   assert.equal(result.checks.find(item => item.id === 'roi-freshness').status, 'WATCH');
 }
 
+// I2 cached before deployment may appear in a new-version STATUS_SNAPSHOT.
+for (const cpu of [1.13, 11]) {
+  const result = evaluateI2Shadow({
+    events: [status(10450, { evaluatedTick: 10199, lastCpu: cpu }),
+      { tick: 10499, code: 'BOT_HEARTBEAT', ctx: {} }],
+    startTick: 10400
+  });
+  assert.equal(result.outcome, 'WATCH');
+  assert.equal(result.checks.find(c => c.id === 'scheduler-isolation').status, 'WATCH');
+  assert.equal(result.checks.find(c => c.id === 'roi-cpu').status, 'WATCH');
+}
+{
+  const row = status(10550, { evaluatedTick: 10510 });
+  row.ctx.scheduler.processes['remote-roi-shadow'].lastRunTick = 10399;
+  const result = evaluateI2Shadow({
+    events: [row, { tick: 10599, code: 'BOT_HEARTBEAT', ctx: {} }], startTick: 10500
+  });
+  assert.equal(result.checks.find(c => c.id === 'scheduler-isolation').status, 'WATCH');
+}
 console.log('I2 live verification tests passed');

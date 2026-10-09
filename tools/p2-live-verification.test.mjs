@@ -144,4 +144,21 @@ function status(tick, options = {}) {
   assert.equal(result.checks.find(c => c.id === 'plan-freshness').status, 'WATCH');
 }
 
+// Pre-release plans serialized into current-version snapshots cannot
+// satisfy the release scheduler check even when their age is acceptable.
+{
+  const row = status(9150, { planTick: 8999 });
+  const result = evaluateP2Shadow({ events: [row, { tick: 9199, code: 'BOT_HEARTBEAT', ctx: {} }], startTick: 9100 });
+  assert.equal(result.outcome, 'WATCH');
+  assert.equal(result.checks.find(c => c.id === 'scheduler-isolation').status, 'WATCH');
+  assert.equal(result.checks.find(c => c.id === 'plan-freshness').status, 'PASS');
+}
+// A new plan tick without the corresponding scheduler run is also insufficient.
+{
+  const row = status(9250, { planTick: 9250 });
+  row.ctx.scheduler.processes['planner-vnext-shadow'].lastRunTick = 9249;
+  const result = evaluateP2Shadow({ events: [row, { tick: 9299, code: 'BOT_HEARTBEAT', ctx: {} }], startTick: 9200 });
+  assert.equal(result.checks.find(c => c.id === 'scheduler-isolation').status, 'WATCH');
+}
+
 console.log('P2 live verification tests passed');

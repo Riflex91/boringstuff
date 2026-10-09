@@ -283,13 +283,26 @@ function accessTo(creep, asset, strength, state, budget, options, attack) {
     if (!Number.isFinite(result.cost) || result.cost <= 0) {
       return Object.assign(base, { reason: 'PATH_COST_INVALID' });
     }
-    // Do not claim a clear route through any structure the CostMatrix marks
-    // as blocking. The explicit destructible-barrier search above is the only
-    // accepted source of breach-route evidence.
+    // A contiguous path can still cross observed blockers or natural walls.
+    // PathFinder's reported cost must also cover the minimum movement cost
+    // of every returned tile; a positive but understated cost is not evidence
+    // for an imminent arrival. Never substitute a guessed travel time.
     if (result.path.some(pos => {
       const t = tiles[key(pos)];
       return t && (t.impassable || t.barriers.length > 0);
     })) return Object.assign(base, { reason: 'PATH_BLOCKED' });
+    const terrain = typeof state.room.getTerrain === 'function' ? state.room.getTerrain() : null;
+    if (!terrain || typeof terrain.get !== 'function') return Object.assign(base, { reason: 'PATH_TERRAIN_UNKNOWN' });
+    let minimumCost = 0;
+    for (const pos of result.path) {
+      const terrainType = terrain.get(pos.x, pos.y);
+      if (!Number.isInteger(terrainType) || terrainType < 0) return Object.assign(base, { reason: 'PATH_TERRAIN_UNKNOWN' });
+      if (terrainType & constant('TERRAIN_MASK_WALL', 1)) return Object.assign(base, { reason: 'PATH_TERRAIN_BLOCKED' });
+      const t = tiles[key(pos)];
+      minimumCost += t && t.road ? strength.roadTicks
+        : terrainType & constant('TERRAIN_MASK_SWAMP', 2) ? strength.swampTicks : strength.plainTicks;
+    }
+    if (result.cost < minimumCost) return Object.assign(base, { reason: 'PATH_COST_UNDERSTATED' });
     return Object.assign(base, { status: 'REACHABLE', travelTicks: result.cost + Math.ceil(Math.max(0, number(creep.fatigue, 0)) / strength.movePower) });
   } catch (err) {
     return Object.assign(base, { reason: 'PATH_API_ERROR' });

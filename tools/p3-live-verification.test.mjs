@@ -193,7 +193,7 @@ function status(tick, options = {}) {
 
 {
   const events = [
-    status(6050, { lastCpu: P3_CPU_WATCH + 0.5 }),
+    status(6050, { plannerTick: 6000, defenseTick: 6001, lastCpu: P3_CPU_WATCH + 0.5 }),
     { tick: 6099, code: 'BOT_HEARTBEAT', ctx: {} }
   ];
   const result = evaluateP3Shadow({ events, startTick: 6000, tickCount: 100 });
@@ -203,7 +203,7 @@ function status(tick, options = {}) {
 
 {
   const events = [
-    status(7050, { lastCpu: P3_CPU_FAIL + 0.5 }),
+    status(7050, { plannerTick: 7000, defenseTick: 7001, lastCpu: P3_CPU_FAIL + 0.5 }),
     { tick: 7099, code: 'BOT_HEARTBEAT', ctx: {} }
   ];
   const result = evaluateP3Shadow({ events, startTick: 7000, tickCount: 100 });
@@ -221,4 +221,25 @@ function status(tick, options = {}) {
   assert.equal(result.checks.find(c => c.id === 'mincut-ready').status, 'FAIL');
 }
 
+// Pre-deploy P3: a high lastCpu from tick 9149 must not FAIL a
+// new-version window starting at 9200; nor may a low cached CPU PASS.
+for (const cpu of [24.19, 5]) {
+  const result = evaluateP3Shadow({
+    events: [status(9250, { plannerTick: 9100, defenseTick: 9149, lastCpu: cpu }),
+      { tick: 9299, code: 'BOT_HEARTBEAT', ctx: {} }],
+    startTick: 9200
+  });
+  assert.equal(result.outcome, 'WATCH');
+  assert.equal(result.checks.find(c => c.id === 'scheduler-isolation').status, 'WATCH');
+  assert.equal(result.checks.find(c => c.id === 'mincut-cpu').status, 'WATCH');
+}
+// A post-deploy artifact without matching scheduler execution cannot count.
+{
+  const row = status(9350, { plannerTick: 9300, defenseTick: 9310, lastCpu: 24.19 });
+  row.ctx.scheduler.processes['defense-mincut-shadow'].lastRunTick = 9299;
+  const result = evaluateP3Shadow({
+    events: [row, { tick: 9399, code: 'BOT_HEARTBEAT', ctx: {} }], startTick: 9300
+  });
+  assert.equal(result.checks.find(c => c.id === 'mincut-cpu').status, 'WATCH');
+}
 console.log('P3 live verification tests passed');
