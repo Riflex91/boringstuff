@@ -2000,3 +2000,41 @@ local module comparison exposed an unexpected `sw.js` prior to
 recommended backup/removal. Do not infer actual deployed module tree
 from that diagnostic. **No D0.4 merge based on this incomplete record.
 D0 remains SHADOW and D1 blocked.**
+
+
+## 2026-10-09 — D0.4 shadow.12 smoke arrived: six verifier outputs complete
+
+The separately supplied `VERIFY SMOKE 3810466–3810490` was
+**9 PASS / 0 WATCH / 0 FAIL**. It confirmed `0.3.0-shadow.12-node24`,
+Node 24.21.0, complete 25-tick evidence, zero runtime/collector errors,
+safe CPU/bucket, active mining, no hard stall, contiguous journal.
+
+Together with the five previously recorded gates, the exact
+`shadow.12` **six-verifier tally is 52 PASS / 7 WATCH / 0 FAIL**
+(overall WATCH, **not** overall PASS):
+- Smoke 3810466–3810490: 9/0/0.
+- General live 3810501–3810600: 13/6/0.
+- D0 3810466–3810565: 6/1/0.
+- P2 same D0 window: 7/0/0.
+- P3 same D0 window: 8/0/0.
+- I2 same D0 window: 9/0/0.
+
+General-live consumer self-supply fallback did occur; efficiency
+was EFFICIENT. P2 isolated CPU peak 15.506 remains a monitoring point.
+D0 schema-3/SHADOW contract, CPU<=5 and scheduler evidence PASS;
+combat-observation remains WATCH due to zero observed armed hostiles.
+Offline cooperative single-barrier tests are not live combat proof.
+
+Documented:
+`docs/verification/d0-4-shadow-live-0.3.0-2026-10-09.md`.
+Earlier five-gate partial report remains retained for audit.
+
+The actual `npm run deploy` console output/receipt ID and final
+post-removal `sw.js`/remote module-integrity confirmation have **not**
+been supplied. Six read-only verifier gates are now covered; end-to-end
+deployment provenance is not yet independently confirmed. The D0
+verifier accepted the release's marker/receipt-controlled window.
+Do not redeploy merely to reproduce a historical command transcript.
+
+PR #114 remains draft and unmerged pending provenance review and
+explicit merge authorization. D0 remains SHADOW, D1 blocked.
