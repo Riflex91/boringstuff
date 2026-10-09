@@ -103,18 +103,22 @@ function focusedLoss(asset, contributions, tick) {
   if (impact === null) impact = time + Math.ceil((barrierHits - damage) / dps);
   if (loss === null) loss = time + Math.ceil((totalHits - damage) / dps);
   const useful = arrivals.filter(a => a.arrivalTicks < loss);
-  return { assetId: asset.id, attackerCount: useful.length, focusedDps: useful.reduce((sum, a) => sum + a.dps, 0),
+  // One creep can contribute ranged and close-range damage at different
+  // arrival ticks. Count distinct attackers, not weapon/arrival channels.
+  const attackers = new Set(useful.map((a, index) => a.actorId || 'unknown-' + index));
+  return { assetId: asset.id, attackerCount: attackers.size, focusedDps: useful.reduce((sum, a) => sum + a.dps, 0),
     barrierHits, impactTick: tick + impact, earliestLossTick: tick + loss };
 }
 
 // Use actual structures, never unbuilt P3 rampart proposals, for access evidence.
-function accessTo(creep, asset, strength, state, budget, options) {
-  const attackRange = strength.rangedDps > 0 ? 3 : 1;
+function accessTo(creep, asset, strength, state, budget, options, attack) {
+  const attackRange = attack ? attack.range : strength.rangedDps > 0 ? 3 : 1;
+  const damage = attack ? attack.damage : Math.max(strength.meleeDps, strength.dismantlePerTick) + strength.rangedDps;
   const distance = range(creep.pos, asset.pos);
   const protection = (state.structures || []).filter(s => s.structureType === 'rampart' && s.my && range(s.pos, asset.pos) === 0);
   const barrierHits = protection.reduce((sum, s) => sum + Math.max(0, number(s.hits, 0)), 0);
-  const damage = Math.max(strength.meleeDps, strength.dismantlePerTick) + strength.rangedDps;
-  const base = { actorId: creep.id || creep.name, assetId: asset.id, status: 'UNKNOWN', travelTicks: null,
+  const base = { actorId: creep.id || creep.name, assetId: asset.id,
+    attackMode: attack ? attack.mode : 'COMBINED', attackRange, status: 'UNKNOWN', travelTicks: null,
     barrierHits, breachTicks: damage > 0 ? Math.ceil(barrierHits / damage) : null,
     routeBreachTicks: 0, routeBarrierCount: 0, routeBarrierHits: 0, reason: null };
   if (distance <= attackRange) return Object.assign(base, { status: 'REACHABLE', travelTicks: 0 });
@@ -234,13 +238,24 @@ function evaluate(state, game, options) {
     }, 0);
     actors.push({ id: creep.id || creep.name, strength, friendlyTowerDps: round(incoming), nearbyHealPerTick: supportHeal });
     if (!offensive) continue;
+    // At range 2–3 only RANGED_ATTACK deals damage. Melee and WORK dismantle
+    // require range 1. Never credit them at the ranged weapon's arrival tick.
+    // The same actor may contribute both channels; focusedLoss deduplicates it.
+    // Ranged access runs first under the shared four-search room budget.
+    const attacks = [
+      { mode: 'RANGED', range: 3, damage: strength.rangedDps },
+      { mode: 'CLOSE', range: 1, damage: Math.max(strength.meleeDps, strength.dismantlePerTick) }
+    ].filter(attack => attack.damage > 0);
     for (const asset of assets.slice(0, MAX_ASSETS)) {
-      const access = accessTo(creep, asset, strength, state, budget, options);
-      paths.push(access);
-      if (access.status !== 'REACHABLE' && access.status !== 'REACHABLE_WITH_BREACH') continue;
-      const damage = Math.max(strength.meleeDps, strength.dismantlePerTick) + strength.rangedDps;
-      if (!contributions[asset.id]) contributions[asset.id] = [];
-      contributions[asset.id].push({ arrivalTicks: access.travelTicks + access.routeBreachTicks, dps: damage, barrierHits: access.barrierHits });
+      for (const attack of attacks) {
+        const access = accessTo(creep, asset, strength, state, budget, options, attack);
+        paths.push(access);
+        if (access.status !== 'REACHABLE' && access.status !== 'REACHABLE_WITH_BREACH') continue;
+        if (!contributions[asset.id]) contributions[asset.id] = [];
+        contributions[asset.id].push({ actorId: creep.id || creep.name,
+          arrivalTicks: access.travelTicks + access.routeBreachTicks,
+          dps: attack.damage, barrierHits: access.barrierHits });
+      }
     }
   }
   for (const asset of assets.slice(0, MAX_ASSETS)) {
@@ -262,7 +277,7 @@ function evaluate(state, game, options) {
       hostileCoverage: towers.filter(t => !t.my && t.owner).map(t => ({ id: t.id, damageAtCore: assets.length ? round(towerDamage(t, assets[0].pos)) : 0 })) },
     risk: { state: riskState, coreLossProbability: null, recommendedSafeMode: urgentLoss && !!controller.my && !controller.safeMode && !controller.safeModeCooldown && number(controller.safeModeAvailable, 0) > 0,
       basis: 'BOUNDED_FOCUSED_DAMAGE_SCENARIO', safetyAuthority: 'LEGACY_UNCHANGED' },
-    pathSearches: budget.searches, assumptions: ['NO_FUTURE_TOWER_ENERGY_ASSUMED', 'INCOMPLETE_PATH_IS_UNKNOWN', 'INDEPENDENT_ROUTE_BREACH_ESTIMATES', 'BOUNDED_NONOPTIMAL_BREACH_ROUTE', 'NO_COMBAT_INTENTS']
+    pathSearches: budget.searches, assumptions: ['NO_FUTURE_TOWER_ENERGY_ASSUMED', 'INCOMPLETE_PATH_IS_UNKNOWN', 'SEPARATE_RANGED_AND_CLOSE_ACCESS', 'INDEPENDENT_ROUTE_BREACH_ESTIMATES', 'BOUNDED_NONOPTIMAL_BREACH_ROUTE', 'NO_COMBAT_INTENTS']
   };
 }
 
