@@ -1956,3 +1956,47 @@ with receipt and marker, complete new 25-tick smoke and 100-tick
 general-live and D0/P2/P3/I2 verifiers. Previous `shadow.11` live
 evidence cannot clear this gate. Until the new evidence is reviewed,
 keep PR draft and D1 blocked.
+
+
+## 2026-10-09 — D0.4 shadow.12 partial live verification (five gates)
+
+User-supplied read-only console transcript for `0.3.0-shadow.12-node24`,
+Node `24.21.0`, room E8N1, covers **five** subsystem/general verifiers
+only (not the 25-tick smoke result and not the deployment console output):
+
+- General live `3810501–3810600`: 13 PASS / 6 WATCH / 0 FAIL.
+- D0 `3810466–3810565`: 6 PASS / 1 WATCH / 0 FAIL.
+- P2 same D0 interval: 7 PASS / 0 WATCH / 0 FAIL.
+- P3 same D0 interval: 8 PASS / 0 WATCH / 0 FAIL.
+- I2 same D0 interval: 9 PASS / 0 WATCH / 0 FAIL.
+
+**Observed subtotal: 43 PASS / 7 WATCH / 0 FAIL (five gates only);
+full release gate INCOMPLETE, overall WATCH for the supplied results.**
+General live 100-tick version/Node, no runtime/collector errors,
+CPU/bucket, mining, no hard stall, journal continuity, EFFICIENT
+classification and SHADOW authority PASS. Six general WATCH:
+productive cadence mismatch; consumer self-supply fallback occurred;
+controller/construction/throughput exact-window metrics unavailable;
+E4 matching evidence incomplete.
+
+D0 threat-model snapshot, schema-3 model contract, SHADOW/NONE authority,
+scheduler isolation and isolated CPU <=5 PASS; combat-observation WATCH
+because no armed hostile was observed. No nonzero shared-barrier
+cooperation was demonstrated in live combat.
+
+P2 isolated CPU latest 15.506, EMA 6.247 merits monitoring despite
+verifier PASS. P3 isolated CPU 7.568 and I2 1.408 both passed their
+verifier checks. P3 constructionAuthority NONE and I2 remote activation
+NONE unchanged.
+
+Original candidate GitHub CI passed: run `37971174451`, source head
+`6e939d185b2f65f6ba812de045ecf4aa31729978`.
+Detailed append-only report:
+`docs/verification/d0-4-shadow-live-partial-0.3.0-2026-10-09.md`.
+
+Unresolved release evidence: missing `verify:smoke` console output,
+missing `npm run deploy` output and deployment receipt ID; last
+local module comparison exposed an unexpected `sw.js` prior to
+recommended backup/removal. Do not infer actual deployed module tree
+from that diagnostic. **No D0.4 merge based on this incomplete record.
+D0 remains SHADOW and D1 blocked.**
