@@ -191,6 +191,65 @@ function stableCreepKey(creep) {
   return creep.name || creep.id || '';
 }
 
+
+const MIN_RESCUE_ENERGY = 25;
+const MIN_RESCUE_WAIT = 3;
+
+// A partially loaded hauler may interrupt collection only when the room has
+// full spawn/extension energy and towers are at least half charged.
+function rescueInfrastructureSafe(room) {
+  if (!room || !room.find || !Number.isFinite(room.energyAvailable) ||
+      !Number.isFinite(room.energyCapacityAvailable) ||
+      room.energyCapacityAvailable <= 0 ||
+      room.energyAvailable < room.energyCapacityAvailable) return false;
+  const structures = room.find(FIND_MY_STRUCTURES);
+  if (!Array.isArray(structures)) return false;
+  return !structures.some(s => {
+    if (s.structureType === STRUCTURE_SPAWN ||
+        s.structureType === STRUCTURE_EXTENSION) return freeEnergyCapacity(s) > 0;
+    if (s.structureType !== STRUCTURE_TOWER) return false;
+    const capacity = s.store && s.store.getCapacity
+      ? Number(s.store.getCapacity(RESOURCE_ENERGY)) : Number(s.energyCapacity);
+    return !Number.isFinite(capacity) || capacity <= 0 ||
+      energyAmount(s) < capacity * 0.5;
+  });
+}
+
+function selectConsumerRescueHauler(room, haulers, ready, critical) {
+  // Keep the sole normally ready hauler for infrastructure. No rescue with
+  // one hauler, no ready infrastructure hauler, or uncertain room supply.
+  if (haulers.length < 2 || ready.length !== 1 ||
+      !rescueInfrastructureSafe(room)) return null;
+  const urgent = critical.filter(c => c.memory &&
+    (c.memory.logisticsFallback ||
+      (Number(c.memory.waitingEnergyTicks) || 0) >= MIN_RESCUE_WAIT));
+  if (!urgent.length) return null;
+  const candidates = haulers.filter(h => {
+    if (!h.memory || h.memory.delivering || h.spawning ||
+        !h.store || typeof h.store.getCapacity !== 'function') return false;
+    const cap = Number(h.store.getCapacity(RESOURCE_ENERGY));
+    const carried = energyAmount(h);
+    return Number.isFinite(cap) && cap > 0 &&
+      carried >= MIN_RESCUE_ENERGY &&
+      carried < Math.max(50, Math.floor(cap * 0.5));
+  });
+  const viable = candidates.map(h => ({
+    h,
+    requests: urgent.filter(c => !haulers.some(other =>
+      other.id !== h.id && other.memory &&
+      other.memory.consumerTargetId === c.id))
+  })).filter(x => x.requests.length);
+  viable.sort((a, b) => {
+    const sticky = x => x.requests.some(c => c.id === x.h.memory.consumerTargetId) ? 1 : 0;
+    if (sticky(a) !== sticky(b)) return sticky(b) - sticky(a);
+    const distance = x => Math.min(...x.requests.map(c =>
+      x.h.pos && x.h.pos.getRangeTo ? x.h.pos.getRangeTo(c) : 999));
+    return distance(a) - distance(b) ||
+      stableCreepKey(a.h).localeCompare(stableCreepKey(b.h));
+  });
+  return viable.length ? viable[0].h : null;
+}
+
 function selectConsumerGuardHaulers(room) {
   // Preserve at least one live hauler for hard infrastructure. With two
   // haulers this remains the historical single starvation guard. A third
@@ -210,6 +269,10 @@ function selectConsumerGuardHaulers(room) {
 
   const ready = haulers.filter(haulerReadyToDeliver);
   if (!ready.length) return [];
+  // Unlike the normal guard, rescue assigns the underfilled hauler to the
+  // consumer and leaves the one ready hauler outside consumer service.
+  const rescuer = selectConsumerRescueHauler(room, haulers, ready, critical);
+  if (rescuer) return [rescuer];
 
   const maxGuards = Math.min(
     critical.length,
@@ -253,6 +316,13 @@ function shouldPrioritizeConsumer(creep) {
   if (!creep || !creep.room) return false;
   const guards = selectConsumerGuardHaulers(creep.room);
   return guards.some(guard => guard.id === creep.id);
+}
+
+function shouldRescueConsumer(creep) {
+  if (!creep || !creep.memory || creep.memory.role !== 'hauler' ||
+      creep.memory.delivering || !creep.room) return false;
+  return selectConsumerGuardHaulers(creep.room)
+    .some(guard => guard.id === creep.id);
 }
 
 function consumerEnergyRatio(creep) {
@@ -388,6 +458,7 @@ module.exports = {
   consumerNeedsDelivery,
   isCriticalConsumerRequest,
   shouldPrioritizeConsumer,
+  shouldRescueConsumer,
   clearConsumerTarget,
   _test: {
     consumerPriority,
@@ -396,6 +467,8 @@ module.exports = {
     currentConsumerTarget,
     haulerReadyToDeliver,
     selectConsumerGuardHauler,
-    selectConsumerGuardHaulers
+    selectConsumerGuardHaulers,
+    rescueInfrastructureSafe,
+    selectConsumerRescueHauler
   }
 };
