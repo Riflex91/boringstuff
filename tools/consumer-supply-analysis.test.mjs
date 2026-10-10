@@ -89,9 +89,10 @@ assert.equal(analyzeSupplyEvidence({ events: [
   ...input, event(1126, 'DEPLOYMENT_MARKER', { deploymentId: 'next', version }, 8)
 ], receipt }).state, 'BLOCKED', 'a later deployment invalidates previous receipt');
 const retained = analyzeSupplyEvidence({ events: [...input,
-  { tick: 1050, code: 'TELEMETRY_RETENTION_GAP', ctx: { droppedThroughSeq: 42 } }
+  { code: 'TELEMETRY_RETENTION_GAP', ctx: { droppedThroughSeq: 42 } }
 ], receipt });
-assert.equal(retained.integrity.retentionGap, true);
+assert.equal(retained.integrity.retentionGap, true,
+  'collector-generated retention warnings can have no game tick');
 const beforeReceipt = analyzeSupplyEvidence({ events: [
   diag(975, 7), marker, heartbeat
 ], receipt });
