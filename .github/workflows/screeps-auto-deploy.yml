@@ -27,6 +27,8 @@ jobs:
       SCREEPS_BRANCH: chatgpt
       SCREEPS_ROOM: E8N1
       SCREEPS_TOKEN_NEWBIELAND: ${{ secrets.SCREEPS_TOKEN_NEWBIELAND }}
+      SCREEPS_USERNAME_NEWBIELAND: ${{ secrets.SCREEPS_USERNAME_NEWBIELAND }}
+      SCREEPS_PASSWORD_NEWBIELAND: ${{ secrets.SCREEPS_PASSWORD_NEWBIELAND }}
     steps:
       - name: Set ephemeral API paths
         working-directory: .
@@ -42,9 +44,15 @@ jobs:
         run: |
           if [ -n "$SCREEPS_TOKEN_NEWBIELAND" ]; then
             echo 'present=true' >> "$GITHUB_OUTPUT"
+            echo 'Auth method: Screeps API token'
+          elif [ -n "$SCREEPS_USERNAME_NEWBIELAND" ] && [ -n "$SCREEPS_PASSWORD_NEWBIELAND" ]; then
+            echo 'present=true' >> "$GITHUB_OUTPUT"
+            echo 'Auth method: Steam-linked private-server API password'
           else
             echo 'present=false' >> "$GITHUB_OUTPUT"
-            echo 'SKIP: configure repository Actions secret SCREEPS_TOKEN_NEWBIELAND to enable deployment.'
+            echo 'DEPLOYMENT_SKIPPED: Add SCREEPS_TOKEN_NEWBIELAND, or SCREEPS_USERNAME_NEWBIELAND together with SCREEPS_PASSWORD_NEWBIELAND.'
+            echo '### Screeps deployment NOT performed' >> "$GITHUB_STEP_SUMMARY"
+            echo 'No usable GitHub Actions authentication secrets were present. Live upload and validation were skipped.' >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Checkout exact CI-tested commit
@@ -77,23 +85,9 @@ jobs:
         if: steps.credentials.outputs.present == 'true'
         run: npm install --no-package-lock --ignore-scripts --no-audit --no-fund
 
-      - name: Create short-lived Screeps API config
+      - name: Create short-lived HTTPS Screeps API config
         if: steps.credentials.outputs.present == 'true'
-        shell: bash
-        run: |
-          node --input-type=module -e '
-            import fs from "node:fs";
-            const file = process.env.SCREEPS_CONFIG;
-            const token = process.env.SCREEPS_TOKEN_NEWBIELAND;
-            if (!token || token.length < 10) throw new Error("Screeps token unavailable");
-            fs.writeFileSync(file, JSON.stringify({
-              newbieland: {
-                url: "http://screeps.newbieland.net:21025/",
-                branch: "chatgpt",
-                token
-              }
-            }), { mode: 0o600 });
-          '
+        run: node ci-deployment-credentials.mjs
 
       - name: Validate active target, credentials and backup accessibility
         if: steps.credentials.outputs.present == 'true'
