@@ -48,7 +48,14 @@ assert.deepEqual(ok.roomEvidence, {
   sampledReservationSnapshots: 0, invalidReservationSnapshots: 0,
   maximumObservedReservedHaulers: null, snapshotsWithDuplicateReservations: 0,
   maximumObservedDuplicateReservations: null, snapshotsWithEmptyReservedHaulers: 0,
-  reservationListMayBeCapped: false
+  reservationListMayBeCapped: false,
+  sampledCriticalReservationLinkSnapshots: 0,
+  invalidOrMissingCriticalReservationLinkSnapshots: 1,
+  maximumObservedCriticalWithoutStickyReservation: null,
+  maximumObservedCriticalWithStickyReservation: null,
+  maximumObservedCriticalWithLoadedStickyReservation: null,
+  snapshotsWithCriticalWithoutStickyReservation: 0,
+  criticalReservationLinkMayBePartial: false
 });
 // Existing game snapshot fields provide passive reservation/fallback evidence,
 // without additional game code, extra events or settled-transfer claims.
@@ -76,6 +83,36 @@ assert.deepEqual(ok.roomEvidence, {
   assert.equal(withMetrics.roomEvidence.snapshotsWithDuplicateReservations, 1);
   assert.equal(withMetrics.roomEvidence.maximumObservedDuplicateReservations, 1);
   assert.equal(withMetrics.roomEvidence.snapshotsWithEmptyReservedHaulers, 1);
+  assert.equal(withMetrics.roomEvidence.sampledCriticalReservationLinkSnapshots, 1);
+  assert.equal(withMetrics.roomEvidence.maximumObservedCriticalWithStickyReservation, 2);
+  assert.equal(withMetrics.roomEvidence.maximumObservedCriticalWithLoadedStickyReservation, 2);
+  assert.equal(withMetrics.roomEvidence.maximumObservedCriticalWithoutStickyReservation, 0);
+  assert.equal(withMetrics.roomEvidence.snapshotsWithCriticalWithoutStickyReservation, 0);
+
+  const lackingTarget = structuredClone(withReservations);
+  lackingTarget.telemetryJournal.snapshots[0].x.rooms.E8N1.consumerSupply.consumerReservations
+    .splice(2, 1);
+  const uncovered = inspectDeployment(lackingTarget, id, 100).roomEvidence;
+  assert.equal(uncovered.sampledCriticalReservationLinkSnapshots, 1);
+  assert.equal(uncovered.maximumObservedCriticalWithoutStickyReservation, 1);
+  assert.equal(uncovered.maximumObservedCriticalWithStickyReservation, 1);
+  assert.equal(uncovered.maximumObservedCriticalWithLoadedStickyReservation, 1);
+  assert.equal(uncovered.snapshotsWithCriticalWithoutStickyReservation, 1);
+
+  const missingIdentity = structuredClone(lackingTarget);
+  delete missingIdentity.telemetryJournal.snapshots[0].x.rooms.E8N1.consumerSupply
+    .criticalConsumers[1].id;
+  const unknownLink = inspectDeployment(missingIdentity, id, 100).roomEvidence;
+  assert.equal(unknownLink.sampledCriticalReservationLinkSnapshots, 0);
+  assert.equal(unknownLink.invalidOrMissingCriticalReservationLinkSnapshots, 1);
+  assert.equal(unknownLink.maximumObservedCriticalWithoutStickyReservation, null);
+
+  const duplicateIdentity = structuredClone(lackingTarget);
+  duplicateIdentity.telemetryJournal.snapshots[0].x.rooms.E8N1.consumerSupply
+    .criticalConsumers[1].id = 'w1';
+  assert.equal(inspectDeployment(duplicateIdentity, id, 100)
+    .roomEvidence.sampledCriticalReservationLinkSnapshots, 0);
+
   // No identities or IDs leak into the compact evidence object.
   assert.equal(JSON.stringify(withMetrics.roomEvidence).includes('w1'), false);
 
@@ -104,6 +141,17 @@ assert.deepEqual(ok.roomEvidence, {
     targetId: 'target-' + index, carried: 5, delivering: false
   }));
   assert.equal(inspectDeployment(capped, id, 100).roomEvidence.reservationListMayBeCapped, true);
+  assert.equal(inspectDeployment(capped, id, 100)
+    .roomEvidence.criticalReservationLinkMayBePartial, true);
+
+  // An empty critical-consumer list with a present empty reservation list is
+  // a genuine zero, unlike a missing array or missing consumer identifier.
+  const zero = structuredClone(withReservations);
+  zero.telemetryJournal.snapshots[0].x.rooms.E8N1.consumerSupply.criticalConsumers = [];
+  zero.telemetryJournal.snapshots[0].x.rooms.E8N1.consumerSupply.consumerReservations = [];
+  const zeroLinks = inspectDeployment(zero, id, 100).roomEvidence;
+  assert.equal(zeroLinks.sampledCriticalReservationLinkSnapshots, 1);
+  assert.equal(zeroLinks.maximumObservedCriticalWithoutStickyReservation, 0);
 }
 
 // A low-energy intermediate snapshot with waiting consumers is reportable
