@@ -91,4 +91,73 @@ assert.equal(stale.economyWindows.length, 0);
 assert.equal(stale.e4Windows.length, 0);
 assert.equal(stale.p2Runs.length, 0);
 assert.equal(stale.i2Runs.length, 0);
+
+// Surface observed room capacity and spawn decisions without fabricating
+// a job shortage from a 0%-busy window. Historical logs can be incomplete.
+const observedRoom = snapshot(1125);
+const observed = observedRoom.ctx.rooms.E8N1;
+observed.rcl = 3;
+observed.energyAvailable = 500;
+observed.energyCapacity = 550;
+observed.energyStored = 1500;
+observed.spawnBusy = false;
+observed.constructionSites = 3;
+observed.creeps = { harvester: 2, hauler: 2, worker: 1, upgrader: 1 };
+observed.economy.last100.spawnUtilization = 0;
+observed.economy.last100.energyCappedRatio = 0.35;
+observed.economyModel = {
+  productiveDemandPerTick: 18,
+  dedicatedHarvestCapacityPerTick: 18,
+  harvesterWorkDeficit: 0,
+  haulerCarryDeficit: 0,
+  consumerCriticalCount: 0,
+  consumerWaitingCount: 0,
+  consumerFallbackCount: 0,
+  recommendedHarvesterCount: 2,
+  recommendedHaulerCount: 2
+};
+const spawnEvents = [
+  { tick: 1100, v: receipt.version, code: 'SPAWN_IDLE_SURPLUS',
+    ctx: { room: 'E8N1', energy: 550, capacity: 550,
+      energyCappedStreak: 25, spawnIdleStreak: 35,
+      desired: { harvester: 2, upgrader: 1 },
+      actual: { harvester: 2, upgrader: 1 } } },
+  { tick: 1110, v: receipt.version, code: 'SPAWN_OK',
+    ctx: { room: 'E8N1', role: 'worker', cost: 300 } },
+  { tick: 1111, v: receipt.version, code: 'SPAWN_RC',
+    ctx: { room: 'E8N1', role: 'builder', rc: -6 } },
+  { tick: 1111, v: 'other-version', code: 'SPAWN_OK',
+    ctx: { room: 'E8N1', role: 'other', cost: 100 } },
+  { tick: 1101, v: receipt.version, code: 'SPAWN_OK',
+    ctx: { room: 'E9N1', role: 'other', cost: 200 } }
+];
+const spawnDiagnostic = evalRows([marker, observedRoom, events.at(-1), ...spawnEvents]);
+assert.equal(spawnDiagnostic.latestProductiveContext.energyAvailable, 500);
+assert.equal(spawnDiagnostic.latestProductiveContext.spawnBusy, false);
+assert.equal(spawnDiagnostic.latestProductiveContext.economyWindow.spawnUtilization, 0);
+assert.equal(spawnDiagnostic.latestProductiveContext.economyWindow.energyCappedRatio, 0.35);
+assert.equal(spawnDiagnostic.latestProductiveContext.economyModel.haulerCarryDeficit, 0);
+assert.equal(spawnDiagnostic.latestProductiveContext.creepsByRole.upgrader, 1);
+assert.deepEqual(spawnDiagnostic.recentSpawnEvents.counts, {
+  SPAWN_IDLE_SURPLUS: 1, SPAWN_OK: 1, SPAWN_RC: 1
+});
+assert.deepEqual(spawnDiagnostic.recentSpawnEvents.latestIdleSurplus.desired,
+  { harvester: 2, upgrader: 1 });
+assert.deepEqual(spawnDiagnostic.recentSpawnEvents.latestSpawnOk,
+  [{ tick: 1110, role: 'worker', cost: 300 }]);
+assert.deepEqual(spawnDiagnostic.recentSpawnEvents.latestSpawnRc,
+  [{ tick: 1111, role: 'builder', rc: -6 }]);
+const missing = evalRows(events);
+assert.equal(missing.latestProductiveContext.spawnBusy, null);
+assert.equal(missing.latestProductiveContext.economyWindow.spawnUtilization, null);
+assert.equal(missing.latestProductiveContext.economyModel.harvesterWorkDeficit, null);
+assert.equal(missing.recentSpawnEvents.latestIdleSurplus, null,
+  'missing logged event does not become observed absence of surplus');
+const staleSpawn = evalRows([marker, snapshot(2025), {
+  tick: 1002, v: receipt.version, code: 'SPAWN_IDLE_SURPLUS',
+  ctx: { room: 'E8N1', desired: { harvester: 9 } }
+}]);
+assert.equal(staleSpawn.recentSpawnEvents.counts.SPAWN_IDLE_SURPLUS, 0,
+  'log evidence older than 500 ticks is not included');
+
 console.log('Exact-release live cadence discovery tests passed');
