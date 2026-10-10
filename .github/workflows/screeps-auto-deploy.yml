@@ -26,10 +26,14 @@ jobs:
       SCREEPS_SERVER: newbieland
       SCREEPS_BRANCH: chatgpt
       SCREEPS_ROOM: E8N1
-      SCREEPS_CONFIG: ${{ runner.temp }}/screeps-newbieland.json
-      SCREEPS_LOG_DIR: ${{ runner.temp }}/screeps-verification
       SCREEPS_TOKEN_NEWBIELAND: ${{ secrets.SCREEPS_TOKEN_NEWBIELAND }}
     steps:
+      - name: Set ephemeral API paths
+        shell: bash
+        run: |
+          echo "SCREEPS_CONFIG=$RUNNER_TEMP/screeps-newbieland.json" >> "$GITHUB_ENV"
+          echo "SCREEPS_LOG_DIR=$RUNNER_TEMP/screeps-verification" >> "$GITHUB_ENV"
+
       - name: Determine whether deployment credentials are configured
         id: credentials
         shell: bash
