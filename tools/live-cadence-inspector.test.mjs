@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { discoverLiveWindows, analyzeE4SlotEvidence } from './live-cadence-inspector-core.mjs';
+import { discoverLiveWindows, analyzeE4SlotEvidence, summarizeRealConsumerPressure } from './live-cadence-inspector-core.mjs';
 
 const receipt = { server: 'newbieland', branch: 'chatgpt',
   version: '0.3.0-shadow.15-node24', deploymentId: 'real-123' };
@@ -329,5 +329,44 @@ assert.equal(malformedBody.e4Windows[0].spawnStarts[0].projectedReadyTick, null,
 const noHeartbeat = evalRows([marker, surgeCarrier,
   { tick: 1300, v: receipt.version, code: 'BOT_HEARTBEAT' }]);
 assert.deepEqual(noHeartbeat.e4Windows[0].roomHeartbeatHints, []);
+
+
+// Two distinct real fallback situations can coexist: an infrastructure
+// energy emergency, and fallback despite sufficient room energy and 3 haulers.
+// Neither condition is proof of a specific hauler's current CARRY inventory.
+const pressure = summarizeRealConsumerPressure([
+  { tick: 3826400, observedFallbackConsumers: 3,
+    belowInfrastructureReserve: false, energyAvailable: 1050,
+    energyCapacity: 1050, observedRealHaulers: 3,
+    observedHaulerCarryDeficit: 0 },
+  { tick: 3826750, observedFallbackConsumers: 2,
+    belowInfrastructureReserve: true, energyAvailable: 12,
+    energyCapacity: 1050, observedRealHaulers: 2,
+    observedHaulerCarryDeficit: 0 },
+  { tick: 3826800, observedFallbackConsumers: 0,
+    belowInfrastructureReserve: false, energyAvailable: 500,
+    energyCapacity: 1050, observedRealHaulers: 2,
+    observedHaulerCarryDeficit: 0 },
+  { tick: 3826825, observedFallbackConsumers: null,
+    belowInfrastructureReserve: null }
+]);
+assert.equal(pressure.heartbeatSamples, 4);
+assert.equal(pressure.knownFallbackSamples, 3);
+assert.equal(pressure.samplesWithFallback, 2);
+assert.deepEqual(pressure.withFallbackAboveReserve.map(x => x.tick), [3826400]);
+assert.deepEqual(pressure.withFallbackBelowReserve.map(x => x.tick), [3826750]);
+assert.equal(pressure.unknownEnergyOrReserve, 0);
+assert.equal(summarizeRealConsumerPressure([
+  { tick: 17, observedFallbackConsumers: 1,
+    belowInfrastructureReserve: null }
+]).unknownEnergyOrReserve, 1);
+assert.deepEqual(summarizeRealConsumerPressure([]).withFallbackAboveReserve, []);
+assert.equal(summarizeRealConsumerPressure([
+  { tick: 18, observedFallbackConsumers: null,
+    belowInfrastructureReserve: false }
+]).knownFallbackSamples, 0);
+assert.equal(economyPulse.economyWindows[0].sampledRealConsumerPressure.samplesWithFallback, 1);
+assert.deepEqual(economyPulse.economyWindows[0].sampledRealConsumerPressure
+  .withFallbackBelowReserve.map(x => x.tick), [1150]);
 
 console.log('Exact-release live cadence discovery tests passed');
