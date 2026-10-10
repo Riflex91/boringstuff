@@ -3,6 +3,7 @@
 const body = require('body.builder');
 const logger = require('logger');
 const config = require('config');
+const workPriority = require('work.priority');
 
 function desired(state) {
   const constructionHeavy = state.sites.length > 5;
@@ -210,13 +211,27 @@ function spawnOne(state) {
     const builders = countRoleAvailable(state, 'builder');
     const upgraders = countRoleForDesired(state, 'upgrader', want.upgrader);
     const haulers = countRole(state.room, 'hauler');
+    const emergencyRepairNeeded = !state.emergency &&
+      workPriority.hasEmergencyRepair(state.structures) &&
+      countRole(state.room, 'repairer') < want.repairer;
+
+    // Preserve essential colony functions before scaling throughput. If a
+    // spawn/tower/storage is critically damaged, protect the transport floor
+    // and then mobilize one repairer before optional work or controller gains.
+    // This never interrupts bootstrap emergency recovery or defender priority.
+    if (emergencyRepairNeeded &&
+        harvesters >= baseHarvesters &&
+        workers >= want.worker &&
+        haulers >= Math.min(1, want.hauler)) role = 'repairer';
 
     // Preserve essential colony functions before scaling throughput.
-    if (harvesters < baseHarvesters) role = 'harvester';
-    else if (workers < want.worker) role = 'worker';
-    else if (upgraders < want.upgrader) role = 'upgrader';
-    else if (builders < want.builder) role = 'builder';
-    else if (haulers < Math.min(1, want.hauler)) role = 'hauler';
+    if (!role && harvesters < baseHarvesters) role = 'harvester';
+    else if (!role && workers < want.worker) role = 'worker';
+    else if (!role && haulers < Math.min(1, want.hauler) &&
+             emergencyRepairNeeded) role = 'hauler';
+    else if (!role && upgraders < want.upgrader) role = 'upgrader';
+    else if (!role && builders < want.builder) role = 'builder';
+    else if (!role && haulers < Math.min(1, want.hauler)) role = 'hauler';
 
     if (!role && state.economyModel) {
       const workNow = state.economyModel.harvesterWorkParts || 0;
