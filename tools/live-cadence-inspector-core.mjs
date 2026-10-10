@@ -58,7 +58,11 @@ export function discoverLiveWindows({ events, receipt, roomName = 'E8N1', limit 
       ...eco,
       controllerProgress: number(state.economy.last100.controllerProgress),
       constructionProgress: number(state.economy.last100.constructionProgress),
-      productiveThroughput: number(state.economy.last100.productiveFlow?.actualProductiveThroughputPerTick)
+      productiveThroughput: number(state.economy.last100.productiveFlow?.actualProductiveThroughputPerTick),
+      consumerTicks: number(state.economy.last100.productiveFlow?.consumerTicks),
+      waitingConsumerTicks: number(state.economy.last100.productiveFlow?.waitingConsumerTicks),
+      criticalConsumerTicks: number(state.economy.last100.productiveFlow?.criticalConsumerTicks),
+      fallbackConsumerTicks: number(state.economy.last100.productiveFlow?.fallbackConsumerTicks)
     });
     const e4Window = state?.logisticsMatchingEvidence?.lastWindow ||
       state?.colonyState?.logisticsMatching?.evidence?.lastWindow;
@@ -67,7 +71,21 @@ export function discoverLiveWindows({ events, receipt, roomName = 'E8N1', limit 
       ...matched,
       duplicateReservationTicks: number(e4Window.duplicateReservationTicks),
       criticalRequestTicks: number(e4Window.criticalRequestTicks),
-      criticalCoverageRatio: number(e4Window.criticalCoverageRatio)
+      criticalMatchedTicks: number(e4Window.criticalMatchedTicks),
+      unmatchedCriticalTicks: number(e4Window.unmatchedCriticalTicks),
+      criticalNoCandidateTicks: number(e4Window.criticalNoCandidateTicks),
+      criticalCandidateRequestTicks: number(e4Window.criticalCandidateRequestTicks),
+      criticalCandidateUnmatchedTicks: number(e4Window.criticalCandidateUnmatchedTicks),
+      criticalSlotCapacityTicks: number(e4Window.criticalSlotCapacityTicks),
+      criticalCoverageRatio: number(e4Window.criticalCoverageRatio),
+      criticalCandidateRatio: number(e4Window.criticalCandidateRatio),
+      criticalCandidateCoverageRatio: number(e4Window.criticalCandidateCoverageRatio),
+      criticalSlotCoverageRatio: number(e4Window.criticalSlotCoverageRatio),
+      averageHaulers: number(e4Window.averageHaulers),
+      averageMatchedHaulers: number(e4Window.averageMatchedHaulers),
+      averageConsumerWaiting: number(e4Window.averageConsumerWaiting),
+      averageConsumerFallback: number(e4Window.averageConsumerFallback),
+      averageConsumerCritical: number(e4Window.averageConsumerCritical)
     });
 
     const p2run = tick(e.ctx?.scheduler?.processes?.['planner-vnext-shadow']?.lastRunTick);
