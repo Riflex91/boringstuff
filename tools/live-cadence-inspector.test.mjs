@@ -248,7 +248,8 @@ assert.equal(overload.e4Windows[0].roomHeartbeatHints[1].emergencyDeliverSpecs, 
 const expensiveHaulerStart = {
   tick: 1151, v: receipt.version, code: 'SPAWN_OK',
   ctx: { room: 'E8N1', role: 'hauler', cost: 1050,
-    body: Array.from({ length: 21 }, (_, i) => i % 3 === 2 ? 'move' : 'carry') }
+    // Mirror logger.slim(): true 21-part body is serialized as only 20.
+    body: Array.from({ length: 20 }, (_, i) => i % 3 === 2 ? 'move' : 'carry') }
 };
 const wrongVersionHaulerStart = {
   ...expensiveHaulerStart, tick: 1155, v: 'other-version'
@@ -266,9 +267,12 @@ const spawnAligned = evalRows([marker, surgeCarrier, ...sampled,
   { tick: 1300, v: receipt.version, code: 'BOT_HEARTBEAT' }]);
 assert.deepEqual(spawnAligned.e4Windows[0].spawnStarts, [{
   startTick: 1151, role: 'hauler', cost: 1050,
-  bodyParts: 21, projectedReadyTick: 1214,
-  note: 'SPAWN_OK logs the accepted spawn start, not completion.'
+  serializedBodyParts: 20, bodyMayBeTruncated: true,
+  bodyParts: null, projectedReadyTick: null,
+  note: 'Serialized body hits logger array cap 20: exact length and ready tick UNKNOWN.'
 }]);
+assert.equal(spawnAligned.e4Windows[0].spawnStarts[0].projectedReadyTick, null,
+  'do not fabricate readyTick=1211 from 20 logger-truncated parts');
 assert.deepEqual(overload.e4Windows[0].spawnStarts, [],
   'no matching event remains unknown, not a zero-cost spawn');
 const noBodyStart = {
@@ -280,6 +284,26 @@ const noBody = evalRows([marker, surgeCarrier, noBodyStart,
 assert.equal(noBody.e4Windows[0].spawnStarts[0].bodyParts, null);
 assert.equal(noBody.e4Windows[0].spawnStarts[0].projectedReadyTick, null,
   'cannot estimate spawn completion without verified body part count');
+
+const exactUpgraderStart = {
+  tick: 1153, v: receipt.version, code: 'SPAWN_OK',
+  ctx: { room: 'E8N1', role: 'upgrader', cost: 900,
+    body: Array.from({ length: 12 }, (_, i) => i % 4 === 3 ? 'move' : 'work') }
+};
+const upgraded = evalRows([marker, surgeCarrier, exactUpgraderStart,
+  { tick: 1300, v: receipt.version, code: 'BOT_HEARTBEAT' }]);
+assert.deepEqual(upgraded.e4Windows[0].spawnStarts[0], {
+  startTick: 1153, role: 'upgrader', cost: 900,
+  serializedBodyParts: 12, bodyMayBeTruncated: false,
+  bodyParts: 12, projectedReadyTick: 1189,
+  note: 'SPAWN_OK logs a spawn start; ready tick is projected, not observed.'
+});
+const malformedBody = evalRows([marker, surgeCarrier, {
+  ...exactUpgraderStart,
+  ctx: { ...exactUpgraderStart.ctx, body: ['work', { notA: 'part' }] }
+}, { tick: 1300, v: receipt.version, code: 'BOT_HEARTBEAT' }]);
+assert.equal(malformedBody.e4Windows[0].spawnStarts[0].projectedReadyTick, null,
+  'truncated/invalid body data is never an exact duration');
 
 const noHeartbeat = evalRows([marker, surgeCarrier,
   { tick: 1300, v: receipt.version, code: 'BOT_HEARTBEAT' }]);
