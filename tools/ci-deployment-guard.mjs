@@ -175,6 +175,29 @@ export function inspectDeployment(bot, deploymentId, minTicks = 25) {
     };
   });
   const validLinks = linkSamples.filter(s => s !== null);
+  // Correlate fallback and infrastructure supply ONLY within one identical
+  // post-deploy room snapshot. Do not join extrema from different ticks or
+  // infer how long a consumer was waiting. Missing/invalid evidence is UNKNOWN.
+  const pressureSamples = roomSamples.map(sample => {
+    const r = sample.x.rooms[room];
+    const consumers = r.consumerSupply?.criticalConsumers;
+    const available = r.energyAvailable;
+    const capacity = r.energyCapacity;
+    if (!Array.isArray(consumers) || !Number.isFinite(available) ||
+        !Number.isFinite(capacity) || capacity <= 0 ||
+        available < 0 || available > capacity ||
+        !consumers.every(c => c && typeof c === 'object' &&
+          typeof c.waiting === 'number' && Number.isFinite(c.waiting) &&
+          c.waiting >= 0 && typeof c.fallback === 'boolean')) {
+      return null;
+    }
+    return {
+      fullInfrastructure: available === capacity,
+      fallback: consumers.some(c => c.fallback),
+      critical: consumers.some(c => c.waiting > 0 || c.fallback)
+    };
+  });
+  const validPressure = pressureSamples.filter(s => s !== null);
   // Read existing *complete* 100-tick runtime economy blocks. A snapshot
   // after deploy may still carry a pre-deployment block; exclude those.
   // Multiple snapshots can repeat the same immutable last100 block, so do not
@@ -239,6 +262,17 @@ export function inspectDeployment(bot, deploymentId, minTicks = 25) {
       items.filter(c => c.waiting > 0).length)),
     maximumObservedFallbackConsumers: maxObserved(validDetails.map(items =>
       items.filter(c => c.fallback).length)),
+    // Same-tick co-occurrence is observational only. Room energy measures
+    // spawn/extensions, not storage, containers or in-transit hauler energy.
+    sampledConsumerInfrastructureOverlapSnapshots: validPressure.length,
+    invalidOrMissingConsumerInfrastructureOverlapSnapshots:
+      pressureSamples.length - validPressure.length,
+    snapshotsWithFallbackAtFullInfrastructure: validPressure.filter(s =>
+      s.fallback && s.fullInfrastructure).length,
+    snapshotsWithFallbackBelowFullInfrastructure: validPressure.filter(s =>
+      s.fallback && !s.fullInfrastructure).length,
+    snapshotsWithCriticalBelowFullInfrastructure: validPressure.filter(s =>
+      s.critical && !s.fullInfrastructure).length,
     sampledReservationSnapshots: validReservations.length,
     invalidReservationSnapshots: reservationSamples.length - validReservations.length,
     maximumObservedReservedHaulers: maxObserved(reservationMetrics.map(x => x.count)),
