@@ -85,6 +85,15 @@ else {
             ' consumerFallback(avg)=' + (w.averageConsumerFallback ?? 'UNKNOWN'));
           console.log('    SLOT ACCOUNTING (SHADOW, not physical throughput):',
             JSON.stringify(w.slotAccounting));
+          if (!w.spawnStarts?.length) {
+            console.log('    SPAWN_OK: no matching recorded starts in this E4 window (absence is inconclusive)');
+          } else for (const spawn of w.spawnStarts) {
+            console.log('    SPAWN START (logged, not completion): ' +
+              'tick=' + spawn.startTick + ' role=' + (spawn.role ?? 'UNKNOWN') +
+              ' cost=' + (spawn.cost ?? 'UNKNOWN') +
+              ' bodyParts=' + (spawn.bodyParts ?? 'UNKNOWN') +
+              ' projectedReadyTick=' + (spawn.projectedReadyTick ?? 'UNKNOWN'));
+          }
           if (!w.roomHeartbeatHints?.length) {
             console.log('    ROOM_HEARTBEAT: no matching logged samples; source of critical surge UNKNOWN');
           } else for (const hint of w.roomHeartbeatHints) {
