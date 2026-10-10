@@ -55,7 +55,12 @@ assert.deepEqual(ok.roomEvidence, {
   maximumObservedCriticalWithStickyReservation: null,
   maximumObservedCriticalWithLoadedStickyReservation: null,
   snapshotsWithCriticalWithoutStickyReservation: 0,
-  criticalReservationLinkMayBePartial: false
+  criticalReservationLinkMayBePartial: false,
+  sampledCompleteEconomyWindows: 0, invalidPostDeployEconomyWindows: 0,
+  observedCompleteEconomyTicks: 0, observedEconomyConsumerTicks: null,
+  observedEconomyWaitingConsumerTicks: null,
+  observedEconomyCriticalConsumerTicks: null,
+  observedEconomyFallbackConsumerTicks: null
 });
 // Existing game snapshot fields provide passive reservation/fallback evidence,
 // without additional game code, extra events or settled-transfer claims.
@@ -154,6 +159,71 @@ assert.deepEqual(ok.roomEvidence, {
   assert.equal(zeroLinks.maximumObservedCriticalWithoutStickyReservation, 0);
 }
 
+// Full 100-tick economy windows give continuous consumer-creep-tick counts
+// inside their window, unlike two 100-tick cadence snapshots. No overlap
+// with a prior deployment, no duplicates, and malformed windows stay UNKNOWN.
+{
+  const withWindow = structuredClone(state);
+  const room = withWindow.telemetryJournal.snapshots[0].x.rooms.E8N1;
+  room.economy = { last100: {
+    startTick: 1001, endTick: 1100, ticks: 100,
+    productiveFlow: { consumerTicks: 300, waitingConsumerTicks: 40,
+      criticalConsumerTicks: 50, fallbackConsumerTicks: 25 }
+  } };
+  const good = inspectDeployment(withWindow, id, 100).roomEvidence;
+  assert.equal(good.sampledCompleteEconomyWindows, 1);
+  assert.equal(good.observedCompleteEconomyTicks, 100);
+  assert.equal(good.observedEconomyConsumerTicks, 300);
+  assert.equal(good.observedEconomyWaitingConsumerTicks, 40);
+  assert.equal(good.observedEconomyCriticalConsumerTicks, 50);
+  assert.equal(good.observedEconomyFallbackConsumerTicks, 25);
+  assert.equal(good.invalidPostDeployEconomyWindows, 0);
+
+  const oldWindow = structuredClone(withWindow);
+  oldWindow.telemetryJournal.snapshots[0].x.rooms.E8N1.economy.last100.startTick = 901;
+  oldWindow.telemetryJournal.snapshots[0].x.rooms.E8N1.economy.last100.endTick = 1000;
+  const old = inspectDeployment(oldWindow, id, 100).roomEvidence;
+  assert.equal(old.sampledCompleteEconomyWindows, 0);
+  assert.equal(old.observedEconomyFallbackConsumerTicks, null,
+    'a window crossing the deployment boundary is not release evidence');
+
+  const repeated = structuredClone(withWindow);
+  const repeatedSample = structuredClone(repeated.telemetryJournal.snapshots[0]);
+  repeatedSample.t = 1150;
+  repeated.telemetryJournal.snapshots.push(repeatedSample);
+  const oneWindow = inspectDeployment(repeated, id, 100).roomEvidence;
+  assert.equal(oneWindow.sampledCompleteEconomyWindows, 1,
+    'the same immutable window must never be added twice');
+  assert.equal(oneWindow.observedEconomyFallbackConsumerTicks, 25);
+
+  const conflicted = structuredClone(repeated);
+  conflicted.telemetryJournal.snapshots[1].x.rooms.E8N1.economy
+    .last100.productiveFlow.fallbackConsumerTicks = 20;
+  const mismatch = inspectDeployment(conflicted, id, 100).roomEvidence;
+  assert.equal(mismatch.sampledCompleteEconomyWindows, 0);
+  assert.equal(mismatch.invalidPostDeployEconomyWindows, 1);
+  assert.equal(mismatch.observedEconomyFallbackConsumerTicks, null);
+
+  const invalidCounter = structuredClone(withWindow);
+  invalidCounter.telemetryJournal.snapshots[0].x.rooms.E8N1.economy
+    .last100.productiveFlow.fallbackConsumerTicks = '25';
+  const corrupted = inspectDeployment(invalidCounter, id, 100).roomEvidence;
+  assert.equal(corrupted.sampledCompleteEconomyWindows, 0);
+  assert.equal(corrupted.invalidPostDeployEconomyWindows, 1);
+  assert.equal(corrupted.observedEconomyFallbackConsumerTicks, null);
+
+  const overcount = structuredClone(withWindow);
+  overcount.telemetryJournal.snapshots[0].x.rooms.E8N1.economy
+    .last100.productiveFlow.waitingConsumerTicks = 301;
+  assert.equal(inspectDeployment(overcount, id, 100)
+    .roomEvidence.sampledCompleteEconomyWindows, 0);
+
+  const outsideCarrier = structuredClone(withWindow);
+  outsideCarrier.telemetryJournal.snapshots[0].x.rooms.E8N1.economy
+    .last100.endTick = 1099;
+  assert.equal(inspectDeployment(outsideCarrier, id, 100)
+    .roomEvidence.sampledCompleteEconomyWindows, 0);
+}
 // A low-energy intermediate snapshot with waiting consumers is reportable
 // evidence even if the final post-window snapshot has recovered.
 const pressured = structuredClone(state);
