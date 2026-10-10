@@ -44,8 +44,12 @@ export function inspectDeployment(bot, deploymentId, minTicks = 25) {
       codes: fatal.slice(0, 10).map(e => e.c) };
   }
   const snapshots = Array.isArray(journal.snapshots) ? journal.snapshots : [];
+  // A newer journal event can prove elapsed ticks but cannot prove room state
+  // at the end of that window. Require the status snapshot itself to be fresh.
+  const minimumSnapshotTick = tick + minTicks;
   const last = snapshots.filter(s => s && s.c === 'STATUS_SNAPSHOT' &&
-    Number(s.t) >= tick).sort((a, b) => b.t - a.t)[0] || null;
+    Number.isFinite(Number(s.t)) && Number(s.t) >= minimumSnapshotTick)
+    .sort((a, b) => Number(b.t) - Number(a.t))[0] || null;
   const currentTick = Math.max(tick,
     ...snapshots.map(s => Number(s?.t) || 0),
     ...events.map(e => Number(e?.t) || 0));
@@ -53,7 +57,13 @@ export function inspectDeployment(bot, deploymentId, minTicks = 25) {
     return { status: 'WAIT', reason: 'OBSERVATION_WINDOW_INCOMPLETE',
       tick, observedTicks: currentTick - tick };
   }
-  if (!last || !last.x || !last.x.rooms || !last.x.rooms[room]) {
+  if (!last) {
+    // Snapshots are on a fixed 100-tick cadence; do not turn normal
+    // post-window cadence lag into a false pass or a premature failure.
+    return { status: 'WAIT', reason: 'POST_WINDOW_STATUS_SNAPSHOT_PENDING',
+      tick, observedTicks: currentTick - tick, minimumSnapshotTick };
+  }
+  if (!last.x || !last.x.rooms || !last.x.rooms[room]) {
     return { status: 'FAIL', reason: 'NO_ROOM_STATUS_AFTER_DEPLOYMENT', tick,
       observedTicks: currentTick - tick };
   }
