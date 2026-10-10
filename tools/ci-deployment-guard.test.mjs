@@ -34,6 +34,33 @@ assert.equal(ok.status, 'PASS');
 assert.equal(ok.observedTicks, 100);
 assert.equal(ok.snapshotTick, 1100);
 assert.equal(ok.roles.hauler, 2);
+assert.equal(ok.checkedCpuSnapshots, 1);
+assert.equal(ok.minimumSnapshotBucket, 9000);
+assert.equal(ok.maximumSnapshotCpu, 12);
+// A healthy final bucket must not conceal a critical post-deploy snapshot.
+const dipped = structuredClone(state);
+dipped.telemetryJournal.snapshots.unshift(record('STATUS_SNAPSHOT', 1050, {
+  cpu: 17, bucket: 800, rooms: { E8N1: { rcl: 3, creeps: {} } }
+}));
+const dip = inspectDeployment(dipped, id, 100);
+assert.equal(dip.status, 'FAIL');
+assert.equal(dip.reason, 'INTERMEDIATE_CPU_BUCKET_CRITICAL');
+assert.deepEqual(dip.criticalSnapshotTicks, [1050]);
+assert.equal(dip.minimumSnapshotBucket, 800);
+// Intermediate healthy samples are reported, not incorrectly treated as pass
+// for every unsampled game tick.
+dipped.telemetryJournal.snapshots[0].x.bucket = 1200;
+const healthy = inspectDeployment(dipped, id, 100);
+assert.equal(healthy.status, 'PASS');
+assert.equal(healthy.checkedCpuSnapshots, 2);
+assert.equal(healthy.minimumSnapshotBucket, 1200);
+assert.equal(healthy.maximumSnapshotCpu, 17);
+// Samples from before the exact deployment boundary must not contaminate it.
+dipped.telemetryJournal.snapshots.unshift(record('STATUS_SNAPSHOT', 990, {
+  cpu: 999, bucket: 100, rooms: { E8N1: { rcl: 3, creeps: {} } }
+}));
+assert.equal(inspectDeployment(dipped, id, 100).status, 'PASS');
+assert.equal(inspectDeployment(dipped, id, 100).checkedCpuSnapshots, 2);
 assert.equal(inspectDeployment(state, 'old', 100).status, 'WAIT');
 assert.equal(inspectDeployment(state, id, 101).status, 'WAIT');
 assert.equal(inspectDeployment(null, id).status, 'WAIT');
