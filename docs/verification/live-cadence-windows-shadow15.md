@@ -357,3 +357,58 @@ spawn decisions, but it must first be assessed against
 replacement timing, hauler CARRY needs, colony recovery and
 repeated exact-release live samples; reducing a 1050 hauler
 body may trade away throughput. No automatic deployment.
+
+
+## Spawn energy reset repeats; correct logger array truncation
+
+Operator read-only evidence at tick 3827050 observed two energy
+resets after costly successful spawn-start events:
+
+| E4 SHADOW window | Spawn start | Cost | Sampled low energy / E3 emergency count | Critical coverage |
+|---|---|---:|---|---:|
+| 3826693–3826792 | 3826738 hauler | 1050 | 3826750: 12/1050, 19 emergencies | 125/1017 = 12.3% |
+| 3826793–3826892 | none recorded | — | 3826875: 800/1050, 1 emergency | 126/132 = 95.5% |
+| 3826893–3826992 | 3826947 upgrader | 900 | 3826950: 153/1050, 14 emergencies | 142/653 = 21.7% |
+
+At 3826925 room energy was 1050/1050, and at 3826975
+178/1050 with 13 E3 emergency requests. All three E4
+windows had zero duplicate-reservation ticks, and all
+requests had at least one matching candidate. This is a
+repeated, strongly correlated temporary infrastructure refill
+problem, NOT proof of sole causality for real consumer fallback.
+
+Real economy window 3826702–3826801: throughput 4.04/12,
+consumer fallback-ticks 101. The next economy window
+3826802–3826901: throughput 3.50/12, fallback-ticks 93.
+Their starts are independently fixed and cannot be treated
+as exactly matching E4 windows. The original General Live
+verifier outputs were 16 PASS/3 WATCH/0 FAIL for productive
+window 3826702–3826801 and 13 PASS/6 WATCH/0 FAIL for E4
+window 3826793–3826892. E4 still WATCH at 95.5% coverage.
+
+### Correct interpretation of spawn body arrays
+
+The pinned game logger serializes arrays using
+`value.slice(0, 20)`. Consequently `bodyParts=20` in the
+hauler SPAWN_OK output is only the length of the truncated
+serialized array, not an actual 20-part hauler. The pinned
+`body.hauler(1050)` creates seven [CARRY,CARRY,MOVE] cycles,
+i.e. **21 parts**, costing exactly 1050 and normally taking
+63 spawn ticks. The prior inspector's `projectedReadyTick=3826798`
+was therefore unsupported; the pinned body builder predicts
+roughly tick 3826801 instead, without observed completion.
+For the 900-energy upgrader, 12 parts were serialized below the
+logger limit, permitting an estimated 36-tick duration.
+
+The new read-only inspector marks any serialized body list
+of exactly **20** parts as POSSIBLY TRUNCATED, reports 20
+serialized parts but UNKNOWN exact body length and UNKNOWN
+projected ready tick. Shorter complete body lists retain
+only a projected, never verified, completion. CI includes
+regressions for this misattribution.
+
+No runtime, spawn role target, spawn timing, energy use,
+hauler allocation, gameplay authority, merge or deployment
+was changed. A candidate energy-reserve policy must first
+be tested against reduced CARRY/WORK capability and any
+late productive prespawn replacements.
