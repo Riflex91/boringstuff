@@ -17,6 +17,12 @@ function run(creep) {
   }
 
   if (!creep.memory.delivering) {
+    // New active behavior: when hard infrastructure is healthy and another
+    // ready hauler is reserved for it, deliver partial loads to genuinely
+    // starved consumers rather than waiting to fill CARRY to 50%.
+    // Do not flip delivering: the guard is reevaluated each tick and will
+    // immediately relinquish the reservation if infrastructure deteriorates.
+    if (energy.shouldRescueConsumer(creep) && energy.deliverToConsumer(creep)) return;
     energy.clearConsumerTarget(creep);
     if (!energy.acquireForHauler(creep)) {
       const sourceContainers = creep.room.find(FIND_STRUCTURES, {
