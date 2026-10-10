@@ -270,9 +270,19 @@ module.exports.loop = function() {
     // room.heartbeat (which is captured BEFORE creep actions). Sample every
     // 25 ticks only; skip entirely under CPU/bucket headroom pressure.
     if (Game.time % 25 === 0) {
-      measureMainDetail('main.consumer-supply-observer', function() {
-        consumerSupplyObserver.flush(roomStates, logger, Game);
-      });
+      try {
+        measureMainDetail('main.consumer-supply-observer', function() {
+          consumerSupplyObserver.flush(roomStates, logger, Game);
+        });
+      } catch (err) {
+        // Optional diagnosis must not abort later scheduler work or gameplay.
+        // Even an unhealthy logger must not turn observer failure into MAIN_FATAL.
+        try {
+          logger.warn('CONSUMER_SUPPLY_DIAG_ERROR', 'Optional supply observation failed', {
+            phase: 'AFTER_CREEP_INTENTS_BEFORE_RESOLUTION'
+          }, { dedupeTicks: 100 });
+        } catch (_) { /* fail closed: missing sample is UNKNOWN */ }
+      }
     }
 
     processScheduler.run({
