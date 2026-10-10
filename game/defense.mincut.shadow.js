@@ -7,6 +7,7 @@ const DEFAULT_MAX_GRID_TILES = 900;
 const DEFAULT_MAX_AUGMENTATIONS = 10000;
 const DEFAULT_MEMORY_RETENTION = 5000;
 const CAPACITY_SCALE = 100;
+const ROOM_SIZE = 50;
 const INF = 1000000000;
 const DIRS = Object.freeze([
   [-1, -1], [0, -1], [1, -1],
@@ -39,9 +40,11 @@ function key(x, y) {
   return x + ',' + y;
 }
 
-function terrainAt(room, x, y) {
+function terrainAt(room, x, y, cachedTerrain) {
   if (!room) return 0;
-  const terrain = typeof room.getTerrain === 'function' ? room.getTerrain() : room.terrain;
+  const terrain = cachedTerrain === undefined
+    ? (typeof room.getTerrain === 'function' ? room.getTerrain() : room.terrain)
+    : cachedTerrain;
   if (!terrain || typeof terrain.get !== 'function') return 0;
   try { return terrain.get(x, y); } catch (err) { return 1; }
 }
@@ -54,8 +57,8 @@ function swampMask() {
   return typeof TERRAIN_MASK_SWAMP !== 'undefined' ? TERRAIN_MASK_SWAMP : 2;
 }
 
-function isWall(room, x, y) {
-  return (terrainAt(room, x, y) & wallMask()) !== 0;
+function isWall(room, x, y, terrain) {
+  return (terrainAt(room, x, y, terrain) & wallMask()) !== 0;
 }
 
 function isSwamp(room, x, y) {
@@ -105,7 +108,7 @@ function plannedBlockedSet(plan) {
   return set;
 }
 
-function protectedAssets(state, plan) {
+function protectedAssets(state, plan, terrain) {
   const roomName = roomNameOf(state);
   const blocked = plannedBlockedSet(plan);
   const natural = naturalObstacleSet(state);
@@ -120,7 +123,7 @@ function protectedAssets(state, plan) {
     const x = Math.round(slot.x);
     const y = Math.round(slot.y);
     const k = key(x, y);
-    if (seen.has(k) || blocked.has(k) || natural.has(k) || isWall(state.room, x, y)) continue;
+    if (seen.has(k) || blocked.has(k) || natural.has(k) || isWall(state.room, x, y, terrain)) continue;
     if (x <= 1 || y <= 1 || x >= 48 || y >= 48) continue;
     seen.add(k);
     rows.push({
@@ -136,7 +139,7 @@ function protectedAssets(state, plan) {
   const spawn = positionOf(state && state.spawn, roomName);
   if (spawn) {
     const k = key(spawn.x, spawn.y);
-    if (!seen.has(k) && !isWall(state.room, spawn.x, spawn.y)) {
+    if (!seen.has(k) && !isWall(state.room, spawn.x, spawn.y, terrain)) {
       seen.add(k);
       rows.push({
         type: 'legacy-spawn',
@@ -218,19 +221,22 @@ function boundaryOf(bounds, x, y) {
   return x === bounds.minX || x === bounds.maxX || y === bounds.minY || y === bounds.maxY;
 }
 
-function cutCapacity(room, x, y, context) {
+function cutCapacity(room, x, y, context, knownSwamp) {
   const k = key(x, y);
   if (context.protectedSet.has(k)) return INF;
   if (context.naturalSet.has(k)) return INF;
 
-  let capacity = isSwamp(room, x, y) ? 115 : 100;
+  let capacity = (knownSwamp === undefined ? isSwamp(room, x, y) : knownSwamp) ? 115 : 100;
   if (context.trafficSet.has(k)) capacity += 250;
   if (context.existingRamparts.has(k)) capacity = Math.min(capacity, 20);
   return capacity;
 }
 
 function buildGrid(state, plan, options) {
-  const assets = protectedAssets(state, plan);
+  // The view is static for one tick; avoid repeated getTerrain() calls.
+  const terrain = typeof state.room.getTerrain === 'function'
+    ? state.room.getTerrain() : state.room.terrain;
+  const assets = protectedAssets(state, plan, terrain);
   const bounds = defenseBounds(assets, options && options.margin);
   if (!assets.length || !bounds) {
     return { ok: false, reason: 'NO_PROTECTED_ASSETS', assets, bounds: null };
@@ -254,23 +260,30 @@ function buildGrid(state, plan, options) {
   const existingRamparts = existingRampartTiles(state);
   const tiles = [];
   const indexByKey = new Map();
+  // Coordinate array avoids temporary strings in eight-neighbor expansion.
+  const indexByCoord = new Int16Array(ROOM_SIZE * ROOM_SIZE);
+  indexByCoord.fill(-1);
 
   for (let y = bounds.minY; y <= bounds.maxY; y++) {
     for (let x = bounds.minX; x <= bounds.maxX; x++) {
-      if (isWall(state.room, x, y)) continue;
-      if (naturalSet.has(key(x, y))) continue;
+      const terrainMask = terrainAt(state.room, x, y, terrain);
+      if ((terrainMask & wallMask()) !== 0) continue;
+      const coordKey = key(x, y);
+      if (naturalSet.has(coordKey)) continue;
       const id = tiles.length;
       const tile = {
         id,
         x,
         y,
+        swamp: (terrainMask & swampMask()) !== 0,
         boundary: boundaryOf(bounds, x, y),
-        protected: protectedSet.has(key(x, y)),
-        traffic: trafficSet.has(key(x, y)),
-        existingRampart: existingRamparts.has(key(x, y))
+        protected: protectedSet.has(coordKey),
+        traffic: trafficSet.has(coordKey),
+        existingRampart: existingRamparts.has(coordKey)
       };
       tiles.push(tile);
-      indexByKey.set(key(x, y), id);
+      indexByKey.set(coordKey, id);
+      indexByCoord[y * ROOM_SIZE + x] = id;
     }
   }
 
@@ -291,6 +304,7 @@ function buildGrid(state, plan, options) {
     bounds,
     tiles,
     indexByKey,
+    indexByCoord,
     naturalSet,
     protectedSet,
     trafficSet,
@@ -304,6 +318,7 @@ class Dinic {
     this.graph = Array.from({ length: size }, () => []);
     this.level = new Int32Array(size);
     this.work = new Int32Array(size);
+    this.queue = new Int32Array(size);
     this.edgeCount = 0;
     this.augmentations = 0;
     this.maxAugmentations = Number.isFinite(maxAugmentations)
@@ -312,9 +327,10 @@ class Dinic {
     this.aborted = false;
   }
 
-  addEdge(from, to, capacity, meta) {
-    const forward = { to, rev: this.graph[to].length, cap: capacity, originalCap: capacity, meta: meta || null };
-    const reverse = { to: from, rev: this.graph[from].length, cap: 0, originalCap: 0, meta: null };
+  addEdge(from, to, capacity) {
+    // Solver consumes residual capacity and reverse links, not edge metadata.
+    const forward = { to, rev: this.graph[to].length, cap: capacity };
+    const reverse = { to: from, rev: this.graph[from].length, cap: 0 };
     this.graph[from].push(forward);
     this.graph[to].push(reverse);
     this.edgeCount += 1;
@@ -322,7 +338,7 @@ class Dinic {
 
   bfs(source, sink) {
     this.level.fill(-1);
-    const queue = new Int32Array(this.size);
+    const queue = this.queue;
     let head = 0;
     let tail = 0;
     this.level[source] = 0;
@@ -373,7 +389,7 @@ class Dinic {
 
   reachable(source) {
     const seen = new Uint8Array(this.size);
-    const queue = new Int32Array(this.size);
+    const queue = this.queue;
     let head = 0;
     let tail = 0;
     seen[source] = 1;
@@ -410,18 +426,18 @@ function buildFlowGraph(state, grid, options) {
   for (const tile of grid.tiles) {
     const inNode = tile.id * 2;
     const outNode = inNode + 1;
-    dinic.addEdge(inNode, outNode, cutCapacity(state.room, tile.x, tile.y, context), {
-      kind: 'tile',
-      tileId: tile.id
-    });
+    dinic.addEdge(inNode, outNode, cutCapacity(state.room, tile.x, tile.y, context, tile.swamp));
 
-    if (tile.protected) dinic.addEdge(source, inNode, INF, { kind: 'protected', tileId: tile.id });
-    if (tile.boundary) dinic.addEdge(outNode, sink, INF, { kind: 'boundary', tileId: tile.id });
+    if (tile.protected) dinic.addEdge(source, inNode, INF);
+    if (tile.boundary) dinic.addEdge(outNode, sink, INF);
 
     for (const [dx, dy] of DIRS) {
-      const neighborId = grid.indexByKey.get(key(tile.x + dx, tile.y + dy));
-      if (neighborId === undefined) continue;
-      dinic.addEdge(outNode, neighborId * 2, INF, { kind: 'adjacency' });
+      const nx = tile.x + dx;
+      const ny = tile.y + dy;
+      const neighborId = nx >= 0 && nx < ROOM_SIZE && ny >= 0 && ny < ROOM_SIZE
+        ? grid.indexByCoord[ny * ROOM_SIZE + nx] : -1;
+      if (neighborId < 0) continue;
+      dinic.addEdge(outNode, neighborId * 2, INF);
     }
   }
 

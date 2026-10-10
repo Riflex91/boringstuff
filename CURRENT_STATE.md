@@ -1,5 +1,30 @@
 # CURRENT STATE — Screeps: World Autonomous Bot
 
+## 2026-10-09 — P3.1 CPU-headroom candidate (unmerged, not deployed)
+
+From verified D0.6 merge `15f0de955167ea052b2ff65a74f04207fedc7ce0`
+(PR #116 already merged once). Candidate `0.3.0-shadow.15-node24`
+on branch `feature/p3-mincut-cpu-headroom-d0-7` changes P3 graph
+construction and Dinic transient allocations only. Includes deterministic
+regression and paired multi-run Node benchmarking against exact D0.6.
+Benchmark runtimes are NOT in-game CPU readings; performance and final CI
+outcomes must be recorded from actual executions.
+
+User-confirmed D0.6 P3 post-release tick 3811915: scheduler CPU 9.978,
+MINCUT phase CPU 4.701, P3 8/0/0. Do not misattribute earlier stale
+tick 3811415 CPU 24.19. General-live 6 WATCH (misaligned productive
+attribution; consumer wait/critical pressure; unmatched controller,
+construction and throughput windows; unmatched E4 evidence) and D0 1
+WATCH (no armed combat) remain open. Distinguish missing evidence from
+economic failure. See `docs/verification/p3-1-cpu-headroom-shadow-15.md`
+for the prioritized A/B/C investigation.
+
+Keep D0 SHADOW/NONE and <=5 CPU, <=4 PathFinder searches at <=200 maxOps;
+P2/P3 SHADOW and P3 construction NONE; I2 SHADOW/remote disabled;
+D1 blocked; legacy action authority unchanged; <=3 owned rooms.
+**No merge/deploy without user authorization and new live verification.**
+
+
 Canonical repository: `Riflex91/boringstuff`
 
 ## 2026-10-09 — D0.6 first post-deployment verifier review / provenance correction
