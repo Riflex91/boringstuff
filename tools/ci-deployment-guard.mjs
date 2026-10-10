@@ -120,6 +120,32 @@ export function inspectDeployment(bot, deploymentId, minTicks = 25) {
     tick: s.t, count: Array.isArray(s.x.rooms[room].consumerSupply?.criticalConsumers)
       ? s.x.rooms[room].consumerSupply.criticalConsumers.length : null
   })).filter(s => s.count !== null);
+  // The existing STATUS_SNAPSHOT already contains bounded consumer wait and
+  // hauler reservation details. Analyze them here, not in the game loop:
+  // these are sampled pre-resolution states, never settled deliveries.
+  const detailSamples = roomSamples.map(s =>
+    s.x.rooms[room].consumerSupply?.criticalConsumers).filter(Array.isArray);
+  const validDetails = detailSamples.filter(items => items.every(item =>
+    item && typeof item === 'object' &&
+    typeof item.waiting === 'number' && Number.isFinite(item.waiting) && item.waiting >= 0 &&
+    typeof item.fallback === 'boolean'));
+  const reservationSamples = roomSamples.map(s =>
+    s.x.rooms[room].consumerSupply?.consumerReservations).filter(Array.isArray);
+  const validReservations = reservationSamples.filter(items => items.every(item =>
+    item && typeof item === 'object' &&
+    typeof item.targetId === 'string' && item.targetId.length > 0 &&
+    typeof item.carried === 'number' && Number.isFinite(item.carried) && item.carried >= 0));
+  const reservationMetrics = validReservations.map(items => {
+    const seen = new Set();
+    let duplicates = 0, empty = 0;
+    for (const item of items) {
+      if (seen.has(item.targetId)) duplicates++;
+      else seen.add(item.targetId);
+      if (item.carried === 0) empty++;
+    }
+    return { count: items.length, duplicates, empty };
+  });
+  const maxObserved = (items) => items.length ? Math.max(...items) : null;
   const roomEvidence = {
     sampledRoomSnapshots: roomSamples.length,
     sampledEnergySnapshots: energySamples.length,
@@ -132,7 +158,29 @@ export function inspectDeployment(bot, deploymentId, minTicks = 25) {
     maximumObservedCriticalConsumers: consumerSamples.length
       ? Math.max(...consumerSamples.map(s => s.count)) : null,
     // Game telemetry caps this list at eight consumers per snapshot.
-    criticalConsumerCountMayBeCapped: consumerSamples.some(s => s.count === 8)
+    criticalConsumerCountMayBeCapped: consumerSamples.some(s => s.count === 8),
+    // Each array is capped to eight by the existing in-game snapshot.
+    // Missing/invalid entries remain UNKNOWN and never imply no demand.
+    sampledConsumerDetailSnapshots: validDetails.length,
+    invalidConsumerDetailSnapshots: detailSamples.length - validDetails.length,
+    snapshotsWithWaitingConsumers: validDetails.filter(items =>
+      items.some(c => c.waiting > 0)).length,
+    snapshotsWithFallbackConsumers: validDetails.filter(items =>
+      items.some(c => c.fallback)).length,
+    maximumObservedWaitingConsumers: maxObserved(validDetails.map(items =>
+      items.filter(c => c.waiting > 0).length)),
+    maximumObservedFallbackConsumers: maxObserved(validDetails.map(items =>
+      items.filter(c => c.fallback).length)),
+    sampledReservationSnapshots: validReservations.length,
+    invalidReservationSnapshots: reservationSamples.length - validReservations.length,
+    maximumObservedReservedHaulers: maxObserved(reservationMetrics.map(x => x.count)),
+    snapshotsWithDuplicateReservations: reservationMetrics.filter(x =>
+      x.duplicates > 0).length,
+    maximumObservedDuplicateReservations: maxObserved(reservationMetrics.map(x =>
+      x.duplicates)),
+    snapshotsWithEmptyReservedHaulers: reservationMetrics.filter(x =>
+      x.empty > 0).length,
+    reservationListMayBeCapped: reservationSamples.some(items => items.length === 8)
   };
   if (!Number.isFinite(Number(roomStatus.rcl)) ||
       Number(roomStatus.rcl) <= 0 ||
