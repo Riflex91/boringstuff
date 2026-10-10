@@ -239,3 +239,62 @@ Record the E4 `criticalNoCandidateTicks`,
 alongside critical request/matched totals. An E4 scheduling or
 capacity fix requires that evidence plus deterministic adversarial
 parity tests. Retain SHADOW and all original thresholds.
+
+
+## Shadow E4 critical-demand spike: exact operator data
+
+The operator next supplied the read-only inspector at latestEvidenceTick
+`3826801`. Four consecutive completed **100-tick E4 SHADOW** windows:
+
+| E4 window | Critical request-ticks | Matched | Unmatched | Shadow slot cap | No-candidate | Candidate-unmatched | Duplicate-reservation ticks |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| 3826393–3826492 | 232 | 213 | 19 | 215 | 0 | 19 | 0 |
+| 3826493–3826592 | 101 | 81 | 20 | 81 | 0 | 20 | 0 |
+| 3826593–3826692 | 96 | 83 | 13 | 83 | 0 | 13 | 0 |
+| 3826693–3826792 | **1017** | **125** | **892** | **129** | **0** | **892** | **0** |
+
+Latest critical coverage **125/1017 = 12.3%** versus 83/96 =
+86.5% in the preceding E4 window. The arithmetic shows **888**
+request-ticks in excess of the model's total one-job-per-hauler
+slot ceiling; the remaining **4** slots were unfilled (125/129 =
+96.9% realized shadow-slot coverage). Every critical request
+had at least one pre-revalidation candidate (`criticalNoCandidateTicks=0`).
+This is a **shadow matching slot bottleneck**, **not proof of actual
+hauler CARRY capacity or actual failure to deliver energy**. E4
+does not issue physical intents, and the counters count demand
+repeated over ticks rather than 1017 separate structures/creeps.
+Earlier live consumer fallback is a separate, real observation but
+does not by itself prove shadow and legacy prioritization are identical.
+
+The independent economy window `3826602–3826701` observed
+productive throughput **3.58** vs modeled capacity **12.0**,
+consumer waiting-ticks **31**, critical-ticks **79**, fallback-ticks
+**48**, controller progress **358**. That economy interval overlaps
+the E4 surge window `3826693–3826792` for only **nine ticks**.
+Do not attribute the productive decline to the full later E4
+surge on these nonaligned aggregates.
+
+### Candidate source hypothesis (not established)
+
+`game/request.logistics.shadow.js` creates an
+`EMERGENCY_DELIVER` request for **each** unfilled spawn,
+extension or tower when `energyAvailable < min(300,
+energyCapacityAvailable)`. Waiting/fallback consumers can also
+create emergency delivery requests. Hence many critical E4
+requests could arise simultaneously from depleted infrastructure
+without a comparable rise in distinct consumers. The current
+100-tick E4 evidence does **not** distinguish those origins.
+
+The read-only inspector now correlates any logged
+`ROOM_HEARTBEAT` samples **inside each exact E4 window**
+with `energy`, `logisticsRequests.byKind.EMERGENCY_DELIVER`,
+and `logisticsMatching` critical/hauler counts. Missing or
+serializer-truncated fields remain UNKNOWN; absent logs never
+prove that no infrastructure emergency occurred. The output also
+prints the model's request-vs-slot arithmetic, explicitly
+labeled SHADOW, not measured physical throughput.
+
+A gameplay fix to spawn counts, consumer fallback, matching
+priority or infrastructure reserve needs confirmed causal
+evidence and deterministic parity tests. No such modification
+has been authorized or deployed.
