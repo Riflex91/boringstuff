@@ -52,6 +52,40 @@ function roomHeartbeatHint(event) {
   };
 }
 
+// Compare only actually sampled same-window heartbeats. A Fallback
+// flag counts a state at a sampled tick, NOT a new fallback transition.
+export function summarizeRealConsumerPressure(samples) {
+  const rows = Array.isArray(samples) ? samples : [];
+  const observed = rows.filter(s => s && Number.isFinite(s.observedFallbackConsumers));
+  const fallbackRows = observed.filter(s => s.observedFallbackConsumers > 0);
+  const highEnergy = fallbackRows.filter(s =>
+    s.belowInfrastructureReserve === false);
+  const lowEnergy = fallbackRows.filter(s =>
+    s.belowInfrastructureReserve === true);
+  return {
+    heartbeatSamples: rows.length,
+    knownFallbackSamples: observed.length,
+    samplesWithFallback: fallbackRows.length,
+    withFallbackAboveReserve: highEnergy.map(s => ({
+      tick: s.tick, energy: s.energyAvailable,
+      capacity: s.energyCapacity,
+      realHaulers: s.observedRealHaulers,
+      modeledCarryDeficit: s.observedHaulerCarryDeficit,
+      fallbackConsumers: s.observedFallbackConsumers
+    })),
+    withFallbackBelowReserve: lowEnergy.map(s => ({
+      tick: s.tick, energy: s.energyAvailable,
+      capacity: s.energyCapacity,
+      realHaulers: s.observedRealHaulers,
+      modeledCarryDeficit: s.observedHaulerCarryDeficit,
+      fallbackConsumers: s.observedFallbackConsumers
+    })),
+    unknownEnergyOrReserve: fallbackRows.filter(s =>
+      s.belowInfrastructureReserve === null).length,
+    note: 'Sparse fallback-state samples, not hauler inventory, hauler delivery, or count of new fallback transitions.'
+  };
+}
+
 export function spawnStartHint(event) {
   const ctx = event?.ctx || {};
   const serialized = Array.isArray(ctx.body) && ctx.body.length > 0 &&
@@ -258,14 +292,15 @@ export function discoverLiveWindows({ events, receipt, roomName = 'E8N1', limit 
   const observedRoomHeartbeats = ordered.filter(e => e.code === 'ROOM_HEARTBEAT' &&
     e.v === receipt.version && e.tick >= marker.tick &&
     String(e.ctx?.room || '').toUpperCase() === room);
-  const economyWindows = latestUnique(economy, 'startTick', limit).map(window => ({
-    ...window,
+  const economyWindows = latestUnique(economy, 'startTick', limit).map(window => {
     // Sampling only. A quiet heartbeat or missing samples never proves
     // the whole 100-tick economy window was free of fallback.
-    roomHeartbeatHints: observedRoomHeartbeats.filter(e =>
+    const hints = observedRoomHeartbeats.filter(e =>
       e.tick >= window.startTick && e.tick <= window.endTick)
-      .slice(-10).map(roomHeartbeatHint)
-  }));
+      .slice(-10).map(roomHeartbeatHint);
+    return { ...window, roomHeartbeatHints: hints,
+      sampledRealConsumerPressure: summarizeRealConsumerPressure(hints) };
+  });
   const observedSpawnStarts = ordered.filter(e => e.code === 'SPAWN_OK' &&
     e.v === receipt.version && e.tick >= marker.tick &&
     String(e.ctx?.room || '').toUpperCase() === room);
