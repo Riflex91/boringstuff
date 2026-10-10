@@ -83,6 +83,20 @@ else {
           console.log('    haulers(avg)=' + (w.averageHaulers ?? 'UNKNOWN') +
             ' matchedHaulers(avg)=' + (w.averageMatchedHaulers ?? 'UNKNOWN') +
             ' consumerFallback(avg)=' + (w.averageConsumerFallback ?? 'UNKNOWN'));
+          console.log('    SLOT ACCOUNTING (SHADOW, not physical throughput):',
+            JSON.stringify(w.slotAccounting));
+          if (!w.roomHeartbeatHints?.length) {
+            console.log('    ROOM_HEARTBEAT: no matching logged samples; source of critical surge UNKNOWN');
+          } else for (const hint of w.roomHeartbeatHints) {
+            console.log('    ROOM_HEARTBEAT (sampled): ' +
+              'tick=' + hint.tick +
+              ' energy=' + (hint.energyAvailable ?? 'UNKNOWN') +
+              '/' + (hint.energyCapacity ?? 'UNKNOWN') +
+              ' below300reserve=' + (hint.belowInfrastructureReserve ?? 'UNKNOWN') +
+              ' E3-emergency=' + (hint.emergencyDeliverSpecs ?? 'UNKNOWN') +
+              ' E4-critical=' + (hint.shadowCriticalRequestCount ?? 'UNKNOWN') +
+              ' haulers=' + (hint.shadowHaulerCount ?? 'UNKNOWN'));
+          }
         }
         if (name.startsWith('Productive')) {
           console.log('    consumerTicks=' + (w.consumerTicks ?? 'UNKNOWN') +
