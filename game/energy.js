@@ -1,6 +1,7 @@
 'use strict';
 
 const config = require('config');
+const consumerSupplyObserver = require('consumer.supply.observer');
 
 const CONSUMER_ROLES = {
   builder: true,
@@ -79,6 +80,7 @@ function acquireForHauler(creep) {
   });
   if (dropped) {
     const rc = creep.pickup(dropped);
+    consumerSupplyObserver.recordResult(creep, 'haulerAcquisition', rc);
     if (rc === ERR_NOT_IN_RANGE) creep.moveTo(dropped, { reusePath: 8, maxOps: config.PATH_MAX_OPS, visualizePathStyle: { stroke: '#ffaa00' } });
     return true;
   }
@@ -89,6 +91,7 @@ function acquireForHauler(creep) {
   const container = creep.pos.findClosestByPath(containers, { maxOps: config.PATH_MAX_OPS });
   if (container) {
     const rc = creep.withdraw(container, RESOURCE_ENERGY);
+    consumerSupplyObserver.recordResult(creep, 'haulerAcquisition', rc);
     if (rc === ERR_NOT_IN_RANGE) creep.moveTo(container, { reusePath: 8, maxOps: config.PATH_MAX_OPS, visualizePathStyle: { stroke: '#ffaa00' } });
     return true;
   }
@@ -96,6 +99,7 @@ function acquireForHauler(creep) {
   const tomb = creep.pos.findClosestByPath(FIND_TOMBSTONES, { maxOps: config.PATH_MAX_OPS, filter: t => (t.store[RESOURCE_ENERGY] || 0) > 0 });
   if (tomb) {
     const rc = creep.withdraw(tomb, RESOURCE_ENERGY);
+    consumerSupplyObserver.recordResult(creep, 'haulerAcquisition', rc);
     if (rc === ERR_NOT_IN_RANGE) creep.moveTo(tomb, { reusePath: 8, maxOps: config.PATH_MAX_OPS });
     return true;
   }
@@ -151,6 +155,7 @@ function deliver(creep) {
   const target = targets[0];
   if (!target) return false;
   const rc = creep.transfer(target, RESOURCE_ENERGY);
+  consumerSupplyObserver.recordResult(creep, 'infrastructure', rc);
   if (rc === ERR_NOT_IN_RANGE) creep.moveTo(target, { reusePath: 10, maxOps: config.PATH_MAX_OPS, visualizePathStyle: { stroke: '#ffffff' } });
   return true;
 }
@@ -252,7 +257,9 @@ function selectConsumerGuardHauler(room) {
 function shouldPrioritizeConsumer(creep) {
   if (!creep || !creep.room) return false;
   const guards = selectConsumerGuardHaulers(creep.room);
-  return guards.some(guard => guard.id === creep.id);
+  const selected = guards.some(guard => guard.id === creep.id);
+  consumerSupplyObserver.recordGuard(creep, selected);
+  return selected;
 }
 
 function consumerEnergyRatio(creep) {
@@ -330,6 +337,7 @@ function deliverToConsumer(creep) {
   }
 
   const rc = creep.transfer(target, RESOURCE_ENERGY);
+  consumerSupplyObserver.recordResult(creep, 'consumer', rc);
   if (rc === ERR_NOT_IN_RANGE) {
     creep.moveTo(target, { reusePath: 5, maxOps: config.PATH_MAX_OPS, visualizePathStyle: { stroke: '#ffffff' } });
     return true;
