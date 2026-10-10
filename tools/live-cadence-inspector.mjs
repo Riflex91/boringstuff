@@ -119,6 +119,8 @@ else {
             ' controllerProgress=' + (w.controllerProgress ?? 'UNKNOWN') +
             ' constructionProgress=' + (w.constructionProgress ?? 'UNKNOWN'));
           console.log('    REAL CONSUMER PRESSURE: ROOM_HEARTBEAT samples (not full-tick proof)');
+          console.log('    SAMPLED FALLBACK ABOVE/BELOW 300-ENERGY RESERVE:',
+            JSON.stringify(w.sampledRealConsumerPressure));
           if (!w.roomHeartbeatHints?.length)
             console.log('    No matching logged heartbeat samples; real guard/readiness UNKNOWN.');
           else for (const hint of w.roomHeartbeatHints)
