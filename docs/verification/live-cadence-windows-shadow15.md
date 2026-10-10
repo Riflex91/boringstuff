@@ -158,3 +158,84 @@ node .\live-cadence-inspector.mjs
 No old WATCH is reclassified without rerunning the underlying gate;
 no live gameplay module, body/role target, threshold, deployment or
 merge is changed by this diagnostic.
+
+
+## Follow-up: exact I2 PASS, temporary fallback, and E4 undercoverage
+
+The operator installed the local exact shadow.15 verification fixes, then
+reported the following direct original-verifier results:
+
+| Window | Verifier | PASS | WATCH | FAIL | Evidence |
+|---|---|---:|---:|---:|---|
+| 3826266–3826365 | I2 | **9** | **0** | **0** | independent ROI/scheduler, 1.771 CPU |
+| 3826302–3826401 | General Live | 16 | 3 | 0 | productive attribution/controller/build/throughput PASS; consumer-supply, efficiency, E4 WATCH |
+| 3826393–3826492 | General Live | 12 | 7 | 0 | exact E4 is WATCH due to **incomplete critical-request coverage**, not merely cadence |
+
+The exact E4 window had `duplicateReservationTicks=0`.
+The coverage WATCH is **not** safe to erase by alignment or by
+changing a threshold; the matching algorithm can leave critical
+requests unmatched despite no duplicate reservation IDs.
+
+The inspector at latest evidence tick `3826701` reported recent
+completed E4 windows 3826293–3826392, 3826393–3826492,
+3826493–3826592 and 3826593–3826692, each with 0 observed
+duplicate-reservation ticks. These are not individually all-PASS
+until their critical-request coverage is checked.
+
+Economy/efficiency snapshot at tick `3826700`:
+
+- RCL **5**, `constructionSites=0`, stored energy **4634**,
+  energy available **902/1050**, no spawn currently busy.
+- Last complete economy window `3826502–3826601`:
+  controller progress **1464**, construction progress **0**,
+  productive throughput **14.64** versus observed modeled productive
+  capacity **15.9**; productive utilization about **92%**.
+- `UNDERUTILIZED` score **65** is now mostly driven by
+  `ENERGY_SURPLUS_UNCONSUMED` and `SPAWN_IDLE_WITH_SURPLUS`:
+  capped-energy ratio **0.9**, spawn utilization **0.1**,
+  productive-use component **92**, energy-use component **10**,
+  spawn-use component **40**, flow component **100**.
+- Latest economic model reports no harvester, hauler, fallback or
+  consumer-critical deficit. A separate **earlier** General Live
+  window nevertheless observed consumer self-supply fallback.
+  Those facts concern different ticks and are not contradictory.
+- Recent spawn logs contain **6 SPAWN_OK**, **4 SPAWN_IDLE_SURPLUS**,
+  **0 SPAWN_RC** within the last 500 collector ticks. The latest
+  idle-surplus event had desired upgrader **3** and actual **3**.
+  The most recent snapshot had 2 upgraders; the data alone cannot
+  establish a persistently missing role or justify spawning more
+  Creeps. No live spawn policy changed.
+
+### Exact E4 diagnostic counts
+
+The E4 model exposes these raw, independently collected 100-tick
+counters: `criticalRequestTicks`, `criticalMatchedTicks`,
+`unmatchedCriticalTicks`, `criticalNoCandidateTicks`,
+`criticalCandidateRequestTicks`,
+`criticalCandidateUnmatchedTicks`, and
+`criticalSlotCapacityTicks`. They distinguish:
+
+1. Requests with **no feasible pre-revalidation candidate**.
+2. Requests with feasible candidates that **remained unmatched**.
+3. The independent **hauler slot capacity** bound, which can
+   explain structural undercoverage but is not itself a causal proof.
+
+They must not be inferred from a missing or truncated field.
+The new `live-cadence-inspector.mjs` displays these counters per
+exact E4 window and counts waiting/critical/fallback consumer-ticks
+per exact economy window. It prints UNKNOWN on absent numbers. It
+does not modify `game/logistics.matching.shadow.js`, E4 authority,
+hauler targeting, or the original verifier's PASS/WATCH/FAIL.
+
+**Next read-only operator command**, after explicitly updating
+the two inspector files from this PR's tested commit:
+
+```powershell
+node .\live-cadence-inspector.mjs
+```
+
+Record the E4 `criticalNoCandidateTicks`,
+`criticalCandidateUnmatchedTicks` and `criticalSlotCapacityTicks`
+alongside critical request/matched totals. An E4 scheduling or
+capacity fix requires that evidence plus deterministic adversarial
+parity tests. Retain SHADOW and all original thresholds.
