@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { gzipSync } from 'node:zlib';
 import { parseBotMemory, inspectDeployment } from './ci-deployment-guard.mjs';
 
 const id = '20261010-verified';
@@ -19,7 +20,15 @@ const state = {
 };
 assert.deepEqual(parseBotMemory({ data: JSON.stringify(state) }), state);
 assert.deepEqual(parseBotMemory({ data: { data: JSON.stringify(state) } }), state);
+const compressed = 'gz:' + gzipSync(Buffer.from(JSON.stringify(state))).toString('base64');
+assert.deepEqual(parseBotMemory({ ok: 1, data: compressed }), state);
+assert.deepEqual(parseBotMemory({ data: { data: compressed } }), state);
+assert.deepEqual(parseBotMemory({ data: JSON.stringify({ data: compressed }) }), state);
+assert.equal(parseBotMemory({ data: 'gz:not-gzip' }), null);
+assert.equal(parseBotMemory({ data: 'gz:' }), null);
 assert.equal(parseBotMemory({ data: 'garbage' }), null);
+assert.equal(parseBotMemory({ data: null }), null);
+assert.equal(parseBotMemory({ data: 'gz:' + gzipSync(Buffer.alloc(4_500_000)).toString('base64') }), null);
 const ok = inspectDeployment(state, id, 100);
 assert.equal(ok.status, 'PASS');
 assert.equal(ok.observedTicks, 100);
