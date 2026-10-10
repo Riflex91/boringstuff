@@ -5,6 +5,7 @@ const logger = require('logger');
 const profiler = require('profiler');
 const roomManager = require('room.manager');
 const creepManager = require('creep.manager');
+const consumerSupplyObserver = require('consumer.supply.observer');
 const stats = require('stats');
 const visuals = require('visuals');
 const commands = require('commands');
@@ -264,6 +265,15 @@ module.exports.loop = function() {
     }, function() {
       profiler.section('creeps', function() { creepManager.runAll(); });
     }, schedulerContext);
+
+    // Observations happen AFTER creep handlers issued intents, never inside
+    // room.heartbeat (which is captured BEFORE creep actions). Sample every
+    // 25 ticks only; skip entirely under CPU/bucket headroom pressure.
+    if (Game.time % 25 === 0) {
+      measureMainDetail('main.consumer-supply-observer', function() {
+        consumerSupplyObserver.flush(roomStates, logger, Game);
+      });
+    }
 
     processScheduler.run({
       id: 'world-intel',
