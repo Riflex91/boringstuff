@@ -63,6 +63,7 @@ function diff(before, after) {
 
 const haulerFull = plan('hauler', 1050, 1050, 'current-full-room-capacity');
 const haulerFloor = plan('hauler', 1050, 750, 'hypothetical-300-reserve');
+const haulerAt850 = plan('hauler', 850, 750, 'observed-budget-750-at-850-available');
 const upgraderFull = plan('upgrader', 1050, 1050, 'current-full-room-capacity');
 const upgraderFloor = plan('upgrader', 1050, 750, 'naive-300-reserve-budget');
 const upgraderThreshold = plan('upgrader', 1050, 800, 'alternative-800-body-budget');
@@ -92,6 +93,13 @@ assert.deepEqual(
     upgraderThreshold.energySpent, upgraderThreshold.energyImmediatelyLeft,
     upgraderThreshold.nominalSpawnDurationTicks],
   [8, 4, 2, 600, 450, 24]);
+// A fixed 750-body-cost cap only leaves 300 reserve when at least
+// 1050 energy is ACTUALLY available. At 850 energy it leaves only 100.
+assert.deepEqual([
+  haulerAt850.energySpent, haulerAt850.energyImmediatelyLeft,
+  haulerAt850.reserveAtLeast300, haulerAt850.carry
+], [750, 100, false, 10]);
+assert.equal(haulerAt850.nominalSpawnDurationTicks, 45);
 assert.equal(upgraderFull.reserveAtLeast300, false);
 assert.equal(haulerFull.reserveAtLeast300, false);
 assert.ok(haulerFloor.reserveAtLeast300);
@@ -112,11 +120,15 @@ console.log(JSON.stringify({
       e3EmergencyCount: 19, E4CriticalCoverage: 0.123 },
     { spawnStartTick: 3826947, role: 'upgrader', energyCost: 900,
       nextHeartbeatTick: 3826950, nextEnergy: 153,
-      e3EmergencyCount: 14, E4CriticalCoverage: 0.217 }
+      e3EmergencyCount: 14, E4CriticalCoverage: 0.217 },
+    { spawnStartTick: 3827175, role: 'hauler', energyCost: 750,
+      lastSampledBefore: 850, nextHeartbeatTick: 3827200,
+      nextEnergy: 131, e3EmergencyCount: 16,
+      note: '850 minus 750 leaves only 100 immediate energy; later 131 is sampled after refills.' }
   ],
-  scenarios: [haulerFull, haulerFloor, upgraderFull, upgraderFloor, upgraderThreshold],
+  scenarios: [haulerFull, haulerFloor, haulerAt850, upgraderFull, upgraderFloor, upgraderThreshold],
   comparisons: [diff(haulerFull, haulerFloor),
     diff(upgraderFull, upgraderFloor),
     diff(upgraderFull, upgraderThreshold)],
-  decision: 'No production policy recommendation. Verify role urgency, prespawn TTL, actual pickup/delivery throughput, refill time, and next complete 100-tick work window first.'
+  decision: 'A nominal 750 energy body cap does not ensure 300 reserve at 850 available. No policy recommendation before role urgency, prespawn TTL, hauler readiness, delivery latency, refill and real productive verification.'
 }, null, 2));
