@@ -1,3 +1,4 @@
+import { gunzipSync } from 'node:zlib';
 import { ScreepsHttpClient } from './screeps-client.mjs';
 import { pathToFileURL } from 'node:url';
 import { readDeploymentReceipt, DEFAULT_VERIFICATION_LOG_DIR } from './deployment-receipt.mjs';
@@ -9,17 +10,29 @@ const mode = process.argv[2];
 
 export function parseBotMemory(reply) {
   let value = reply;
-  for (let n = 0; n < 4; n++) {
+  for (let n = 0; n < 6; n++) {
     if (typeof value === 'string') {
-      try { value = JSON.parse(value); } catch { return null; }
+      try {
+        // Screeps /api/user/memory sends gz: + base64(gzip(JSON)) on
+        // official and compatible private servers, not always raw JSON.
+        // Bound inflation so malformed/untrusted responses fail closed.
+        value = value.startsWith('gz:')
+          ? JSON.parse(gunzipSync(Buffer.from(value.slice(3), 'base64'),
+              { maxOutputLength: 4_000_000 }).toString('utf8'))
+          : JSON.parse(value);
+      } catch { return null; }
       continue;
     }
-    if (!value || typeof value !== 'object') return null;
-    if (value.deploymentId !== undefined) return value;
-    if (value.data !== undefined) { value = value.data; continue; }
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    if (typeof value.deploymentId === 'string') return value;
+    if (Object.prototype.hasOwnProperty.call(value, 'data')) {
+      value = value.data;
+      continue;
+    }
     return null;
   }
-  return value && typeof value === 'object' && value.deploymentId ? value : null;
+  return value && typeof value === 'object' && !Array.isArray(value) &&
+    typeof value.deploymentId === 'string' ? value : null;
 }
 
 export function inspectDeployment(bot, deploymentId, minTicks = 25) {
