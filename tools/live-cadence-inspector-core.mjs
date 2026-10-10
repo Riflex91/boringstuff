@@ -47,21 +47,27 @@ function roomHeartbeatHint(event) {
   };
 }
 
-function spawnStartHint(event) {
+export function spawnStartHint(event) {
   const ctx = event?.ctx || {};
-  const parts = Array.isArray(ctx.body) && ctx.body.length > 0 &&
-    ctx.body.length <= 50 && ctx.body.every(p => typeof p === 'string')
-    ? ctx.body.length : null;
-  // Screeps normally needs three ticks per body part. This is a projected
-  // completion from a successful spawn-start event, not observed completion.
+  const serialized = Array.isArray(ctx.body) && ctx.body.length > 0 &&
+    ctx.body.every(p => typeof p === 'string') ? ctx.body.length : null;
+  // logger.slim() serializes only the FIRST 20 items of EVERY array.
+  // Thus 20 serialized parts may represent 20, 21, ... up to 50 parts;
+  // it is not an exact body length. Never promote it to a ready tick.
+  const bodyMayBeTruncated = serialized === 20;
+  const parts = serialized !== null && serialized < 20 ? serialized : null;
   const projectedReadyTick = parts === null ? null : event.tick + 3 * parts;
   return {
     startTick: event.tick,
     role: typeof ctx.role === 'string' ? ctx.role : null,
     cost: number(ctx.cost),
+    serializedBodyParts: serialized,
+    bodyMayBeTruncated,
     bodyParts: parts,
     projectedReadyTick,
-    note: 'SPAWN_OK logs the accepted spawn start, not completion.'
+    note: serialized === 20
+      ? 'Serialized body hits logger array cap 20: exact length and ready tick UNKNOWN.'
+      : 'SPAWN_OK logs a spawn start; ready tick is projected, not observed.'
   };
 }
 
