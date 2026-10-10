@@ -66,6 +66,35 @@ export function compareP3ReleaseSamples(first, second) {
   };
 }
 
+// Fail-closed release classification: enough PASS windows establish
+// repeated good CPU evidence, but do not erase an earlier WATCH in the
+// same deployment. Observation and acceptance are distinct.
+export function classifyP3ReleaseWindows(results, options = {}) {
+  const minRuns = Number.isInteger(options.minRuns) && options.minRuns > 0
+    ? options.minRuns : 1;
+  const observeRuns = Number.isInteger(options.observeRuns) && options.observeRuns > 0
+    ? options.observeRuns : null;
+  const complete = (Array.isArray(results) ? results : []).filter(r => r && r.complete === true);
+  const passCount = complete.filter(r => r.outcome === 'PASS').length;
+  const watchCount = complete.filter(r => r.outcome === 'WATCH').length;
+  const failCount = complete.filter(r => r.outcome === 'FAIL').length;
+  const enoughPass = passCount >= minRuns;
+  const enoughObserved = observeRuns !== null && complete.length >= observeRuns;
+  let state = 'WAIT';
+  let reason = 'INSUFFICIENT_COMPLETE_RUNS';
+  if (failCount) { state = 'FAIL'; reason = 'HARD_FAILURE'; }
+  else if (enoughPass && !watchCount) { state = 'PASS'; reason = 'ALL_OBSERVED_WINDOWS_PASS'; }
+  else if (enoughPass && watchCount) {
+    state = 'WATCH'; reason = 'PASS_QUORUM_WITH_HISTORICAL_WATCH';
+  } else if (enoughObserved) {
+    state = 'WATCH'; reason = 'OBSERVATION_QUORUM_NOT_ALL_PASS';
+  }
+  return {
+    state, reason, minRuns, observeRuns,
+    completeCount: complete.length, passCount, watchCount, failCount
+  };
+}
+
 export function assessP3Release({ events, receipt, roomName = 'E8N1' } = {}) {
   if (!receipt || !receipt.version || !receipt.deploymentId ||
       !receipt.server || !receipt.branch) {
