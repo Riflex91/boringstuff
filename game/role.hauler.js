@@ -22,7 +22,7 @@ function run(creep) {
     // starved consumers rather than waiting to fill CARRY to 50%.
     // Do not flip delivering: the guard is reevaluated each tick and will
     // immediately relinquish the reservation if infrastructure deteriorates.
-    if (energy.shouldRescueConsumer(creep) && energy.deliverToConsumer(creep)) return;
+    if (energy.shouldRescueConsumer(creep) && energy.deliverToConsumer(creep, true)) return;
     energy.clearConsumerTarget(creep);
     if (!energy.acquireForHauler(creep)) {
       const sourceContainers = creep.room.find(FIND_STRUCTURES, {
@@ -45,7 +45,7 @@ function run(creep) {
   // hauler outside the guard set for hard infrastructure, preserving recovery
   // safety while a third hauler can service a second critical consumer.
   const consumerGuard = energy.shouldPrioritizeConsumer(creep);
-  if (consumerGuard && energy.deliverToConsumer(creep)) return;
+  if (consumerGuard && energy.deliverToConsumer(creep, true)) return;
 
   if (energy.deliver(creep)) {
     energy.clearConsumerTarget(creep);

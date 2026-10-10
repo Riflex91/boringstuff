@@ -352,7 +352,7 @@ function consumerReservations(creep) {
   return reserved;
 }
 
-function selectConsumerTarget(creep) {
+function selectConsumerTarget(creep, criticalOnly = false) {
   // v0.2.14 could have enough aggregate CARRY while consumers still entered
   // self-supply fallback. Two causes were visible in the implementation:
   // haulers topped off any partially used consumer, and several haulers could
@@ -361,7 +361,9 @@ function selectConsumerTarget(creep) {
   // hauler's reservation excludes that target from this selection.
   const reserved = consumerReservations(creep);
   const consumers = creep.room.find(FIND_MY_CREEPS, {
-    filter: c => c.id !== creep.id && consumerNeedsDelivery(c) && !reserved[c.id]
+    filter: c => c.id !== creep.id &&
+      (criticalOnly ? isCriticalConsumerRequest(c) : consumerNeedsDelivery(c)) &&
+      !reserved[c.id]
   });
   consumers.sort((a, b) => {
     const fallbackA = a.memory.logisticsFallback ? 1 : 0;
@@ -384,11 +386,12 @@ function selectConsumerTarget(creep) {
   return consumers[0] || null;
 }
 
-function currentConsumerTarget(creep) {
+function currentConsumerTarget(creep, criticalOnly = false) {
   const id = creep.memory.consumerTargetId;
   if (!id || typeof Game === 'undefined' || !Game.getObjectById) return null;
   const target = Game.getObjectById(id);
-  if (!target || target.room !== creep.room || !consumerNeedsDelivery(target)) {
+  if (!target || target.room !== creep.room || !consumerNeedsDelivery(target) ||
+      (criticalOnly && !isCriticalConsumerRequest(target))) {
     delete creep.memory.consumerTargetId;
     return null;
   }
@@ -399,10 +402,13 @@ function clearConsumerTarget(creep) {
   if (creep && creep.memory) delete creep.memory.consumerTargetId;
 }
 
-function deliverToConsumer(creep) {
-  let target = currentConsumerTarget(creep);
+function deliverToConsumer(creep, criticalOnly = false) {
+  // Emergency guards are authorized to bypass infrastructure only to serve
+  // an actually waiting/fallbacking consumer. Revalidate the prior sticky
+  // target because it can remain merely empty after its critical state clears.
+  let target = currentConsumerTarget(creep, criticalOnly);
   if (!target) {
-    target = selectConsumerTarget(creep);
+    target = selectConsumerTarget(creep, criticalOnly);
     if (!target) {
       clearConsumerTarget(creep);
       return false;
