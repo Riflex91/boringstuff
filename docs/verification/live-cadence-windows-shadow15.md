@@ -63,25 +63,20 @@ Both are suggestions grounded in the supplied tick references, not
 pre-validated outcome claims. CPU failure/watch thresholds remain
 unchanged. No artificial scheduler run, reset or upload is permitted.
 
-## Exact later E4 carrier fix
+## Exact later E4 carrier limitation
 
-A 100-tick E4 result may complete between fixed STATUS_SNAPSHOT
-ticks. The existing verifier previously restricted E4 evidence
-selection to the last snapshot **inside** the requested window,
-making its immutable exact metrics unavailable even when a later
-snapshot carried them. The analogous productive-flow code already
-used exact immutable later carriers.
+A 100-tick E4 result can complete between fixed STATUS_SNAPSHOT
+ticks. The deployed shadow.15 verifier currently selects E4 evidence
+from a snapshot inside the requested window. Even an immutable exact
+E4 block carried later can therefore remain WATCH.
 
-This change permits only a later \`STATUS_SNAPSHOT\` in the same
-version, no later than 100 ticks after window end, with the **exact**
-\`startTick\`, \`endTick\`, and at least 100 \`ticks\`. An intervening
-\`DEPLOYMENT_MARKER\` prevents borrowing the carrier. Only E4 evidence
-is recovered; in-window CPU, health, mining, supply, safety authority,
-errors and telemetry checks are untouched. Missing duplicate IDs
-remain WATCH; observed duplicates remain FAIL; critical matching
-coverage is still checked as before. The fix does NOT automatically
-align an arbitrarily chosen verification start with either evidence
-cadence.
+The new inspector locates exact E4 blocks without modifying any
+verifier verdict. A release-version-specific verifier correction is
+tracked separately and must preserve the deployed shadow.15 version,
+all original safety checks, immutable exact boundaries, no
+cross-deployment snapshots, and fail-closed duplicate evidence.
+Do not substitute the shadow.14 verifier file from this PR for the
+locally installed shadow.15 version.
 
 ## Remaining hold points
 
