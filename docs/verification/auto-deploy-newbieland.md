@@ -3,19 +3,48 @@
 **Target:** private server `newbieland`, code branch `chatgpt`,
 room `E8N1`. Never changes active branch or launches a second collector.
 
-## One-time credential setup (manual)
+## One-time browser setup (no local scripts)
 
-Create a **GitHub Actions repository secret** named
-`SCREEPS_TOKEN_NEWBIELAND`, containing an API token permitted to read
-branches/code/memory and write code on the private server. Do not commit
-the token or `tools/screeps.json`. Do not paste it into a chat or log.
+The private server exposes a Steam-linked API password form over HTTPS,
+at https://screeps.newbieland.net/authmod/password/ .
+Use **Sign in with Steam** there, and choose a **new password specifically
+for the private server API**. It is not your Steam account password.
 
-[Repository Actions secrets settings](https://github.com/Riflex91/boringstuff/settings/secrets/actions)
+In https://github.com/Riflex91/boringstuff/settings/secrets/actions
+create the following **two repository Actions secrets**:
 
-The secret is not exposed to ChatGPT. The repo does not contain this
-token, and the CI test workflow intentionally does not use it.
-If the secret does not exist, the deployment workflow reports
-`SKIP`, and **there is no deployment**.
+- `SCREEPS_USERNAME_NEWBIELAND`: your Screeps player username on
+  newbieland (not your Steam password or necessarily your Steam email).
+- `SCREEPS_PASSWORD_NEWBIELAND`: the new private-server API password
+  you set with the Steam-linked form.
+
+Alternatively, the already-supported single secret
+`SCREEPS_TOKEN_NEWBIELAND` can contain a persistent Screeps API token.
+The token takes precedence if both methods are configured.
+
+Do **not** commit credentials, save them in the public repository,
+send them through ChatGPT, or copy your actual Steam account password
+into any API-secret field. Neither method requires installing a local
+script or providing ChatGPT with a password.
+
+**Verified public endpoints (without logging in):**
+
+- `https://screeps.newbieland.net/authmod/password/` responds with the
+  Steam-linked password form.
+- `https://screeps.newbieland.net/api/game/world-size` responds with a
+  valid Screeps API JSON world-size object.
+
+The deployment workflow uses **only**
+`https://screeps.newbieland.net/` (TLS, default port 443), never the
+original plaintext `http://screeps.newbieland.net:21025/` endpoint.
+The private-server authentication flow is `POST /api/auth/signin`
+with username in the `email` parameter and the separately set
+API password, followed by token headers on authenticated API calls.
+
+Credentials are made into a temporary per-run config file on the
+GitHub runner with permissions 0600, and are not printed or included
+in artifacts. If neither credential method is configured, the workflow
+marks `DEPLOYMENT_SKIPPED`; no upload or live verification is performed.
 
 ## Automatic flow
 
@@ -48,23 +77,15 @@ from multiple Git commits. Therefore all tracking is based on the
 unique deployment marker, exact uploaded module bytes and workflow-run
 commit, not the VERSION field alone.
 
-## Manual local fallback
+## Live proof and operational boundaries
 
-The previously configured Windows workstation can still use:
+GitHub CI success is not a game deployment. Only a completed upload and
+matching 100-tick runtime receipt establish basic live activation.
+The GitHub Actions job intentionally skips without secrets and explains
+this in its job summary. Steam does not need to remain running for the
+HTTPS API deployment flow after browser-based password setup.
 
-```powershell
-cd <repository-path>\tools
-npm test
-npm run bench:p3
-npm run doctor
-npm run deploy
-npm run verify:smoke
-npm run verify:live
-```
-
-Do not launch an additional collector if one is already running.
-Use Node 24.21.0. The local Screeps API configuration is stored at
-`tools/screeps.json` (ignored from the repository). The verification
-commands read the existing Windows collector logs; they do not mutate
-the game. GitHub deployment receipts are archived on the runner, not
-copied into Windows automatically.
+No local PowerShell script, downloadable ZIP, or direct ChatGPT access
+to the user's Windows machine is required. The Windows collector is
+separate from the GitHub-hosted smoke check, and this workflow never
+reconfigures or restarts it.
