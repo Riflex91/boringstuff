@@ -153,7 +153,10 @@ export function analyzeSupplyEvidence({ events, receipt, roomName = 'E8N1' } = {
         .filter(s => s.tick >= w.startTick && s.tick <= w.endTick).map(s => s.tick),
       note: 'Full 100-tick fallback counter; optional samples do not supply a causal explanation.'
     }));
-  const retentionGap = unique.some(e => e.code === 'TELEMETRY_RETENTION_GAP');
+  // Collector-generated retention warnings may have no game tick at all.
+  // Conservatively flag them rather than silently discard their provenance.
+  const retentionGap = events.some(e => e?.code === 'TELEMETRY_RETENTION_GAP' &&
+    (!nonnegative(e.tick) || e.tick >= marker.tick));
   return {
     state: invalidTicks.length ? 'REVIEW_REQUIRED' :
       samples.length ? 'OBSERVATIONS_AVAILABLE' : 'WAIT',
