@@ -87,6 +87,24 @@ export function inspectDeployment(bot, deploymentId, minTicks = 25) {
     return { status: 'FAIL', reason: 'INVALID_CPU_OR_LOW_BUCKET', tick,
       observedTicks: currentTick - tick };
   }
+  // The final healthy bucket cannot erase a critical dip at a prior
+  // post-deployment STATUS_SNAPSHOT. This is snapshot evidence only:
+  // events already cover logged CPU_BUCKET_CRITICAL between samples.
+  const sampled = snapshots.filter(s => s && s.c === 'STATUS_SNAPSHOT' &&
+    Number.isInteger(s.t) && s.t >= tick && s.t <= Number(last.t) &&
+    s.x && typeof s.x.bucket === 'number' && Number.isFinite(s.x.bucket));
+  const critical = sampled.filter(s => s.x.bucket < 1000);
+  if (critical.length) {
+    return { status: 'FAIL', reason: 'INTERMEDIATE_CPU_BUCKET_CRITICAL', tick,
+      observedTicks: currentTick - tick,
+      criticalSnapshotTicks: critical.slice(0, 8).map(s => s.t),
+      minimumSnapshotBucket: Math.min(...sampled.map(s => s.x.bucket)) };
+  }
+  const cpuSamples = sampled.filter(s => typeof s.x.cpu === 'number' &&
+    Number.isFinite(s.x.cpu));
+  const minimumSnapshotBucket = Math.min(...sampled.map(s => s.x.bucket));
+  const maximumSnapshotCpu = cpuSamples.length
+    ? Math.max(...cpuSamples.map(s => s.x.cpu)) : cpu;
   if (!Number.isFinite(Number(roomStatus.rcl)) ||
       Number(roomStatus.rcl) <= 0 ||
       !roomStatus.creeps || typeof roomStatus.creeps !== 'object') {
@@ -94,6 +112,7 @@ export function inspectDeployment(bot, deploymentId, minTicks = 25) {
   }
   return { status: 'PASS', deploymentTick: tick, observedTicks: currentTick - tick,
     snapshotTick: last.t, rcl: roomStatus.rcl, cpu, bucket,
+    checkedCpuSnapshots: sampled.length, minimumSnapshotBucket, maximumSnapshotCpu,
     roles: roomStatus.creeps,
     constructionSites: roomStatus.constructionSites,
     energyAvailable: roomStatus.energyAvailable,
