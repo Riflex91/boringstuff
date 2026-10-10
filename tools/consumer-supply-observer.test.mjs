@@ -43,6 +43,17 @@ assert.equal(observer._test.eligible(g), true);
 assert.deepEqual(observer._test.haulerReadiness(loaded),
   { carried: 300, capacity: 300, ready: true });
 assert.equal(observer._test.haulerReadiness(collecting).ready, false);
+assert.equal(observer._test.haulerReadiness(
+  creep('unknown-delivering', 'hauler', 10, undefined, { delivering: true })).ready,
+  true, 'legacy guard accepts delivering hauler even when capacity is unknown');
+assert.equal(observer._test.haulerReadiness(
+  creep('unknown-loaded', 'hauler', 99, undefined)).ready,
+  true, 'legacy guard applies the 50-unit floor when capacity is unknown');
+assert.equal(observer._test.haulerReadiness(
+  creep('unknown-low', 'hauler', 20, undefined)).ready, false);
+assert.equal(observer._test.haulerReadiness(
+  { ...collecting, store: { energy: 99 } }).ready, false,
+  'missing capacity reader must remain ineligible as in legacy guard');
 observer.recordGuard(loaded, true);
 observer.recordGuard(loaded, true);
 observer.recordGuard(collecting, false);
@@ -108,7 +119,8 @@ unknownCapacity.store.getCapacity = () => undefined;
 g.creeps = { unknownCapacity };
 assert.equal(observer.flush([state], logger, g), 1);
 assert.equal(eventRows[2].ctx.haulers.capacityUnknown, 1);
-assert.equal(eventRows[2].ctx.haulers.readyByGuardRule, 0);
+assert.equal(eventRows[2].ctx.haulers.readyByGuardRule, 1,
+  'unknown capacity is distinct from actual legacy guard readiness');
 g.time = 1075;
 g.creeps = Object.fromEntries(Array.from({ length: 121 }, (_, i) =>
   ['c' + i, creep('c' + i, 'hauler', 0, 100)]));
