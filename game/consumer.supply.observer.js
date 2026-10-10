@@ -134,7 +134,10 @@ function flush(states, logger, game) {
   reset(g.time);
   if (!Array.isArray(states)) return 0;
   const rooms = [...new Set(states.filter(s => s && s.room && s.room.name)
-    .map(s => s.room.name))].sort().slice(0, MAX_ROOMS);
+    .map(s => s.room.name))].sort();
+  // In a growing colony don't imply that the first three rooms form a
+  // complete room census. Stop and surface no optional diagnostics.
+  if (rooms.length > MAX_ROOMS) return 0;
   let emitted = 0;
   for (const room of rooms) {
     if (!eligible(g)) break;
