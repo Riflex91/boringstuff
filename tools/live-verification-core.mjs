@@ -356,7 +356,7 @@ export function evaluateLive(input) {
     // immutable exact-window evidence, never for current-state/safety data.
     const e4Carrier = (input.events || [])
       .filter(e => e?.code === 'STATUS_SNAPSHOT' &&
-        (!e.v || e.v === requestedBotVersion) &&
+        e.v === requestedBotVersion &&
         finite(e.tick, -1) >= selected.endTick &&
         finite(e.tick, Infinity) <= selected.endTick + 100 &&
         !(input.events || []).some(marker => marker?.code === 'DEPLOYMENT_MARKER' &&
@@ -371,7 +371,7 @@ export function evaluateLive(input) {
       .filter(item => item.last &&
         finite(item.last.startTick, null) === selected.startTick &&
         finite(item.last.endTick, null) === selected.endTick &&
-        finite(item.last.ticks, null) >= 100)
+        finite(item.last.ticks, null) === 100)
       .sort((a, b) => finite(a.e.tick, 0) - finite(b.e.tick, 0) ||
         finite(a.e.jseq, 0) - finite(b.e.jseq, 0))
       .at(0) || null;
