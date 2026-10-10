@@ -175,6 +175,45 @@ export function inspectDeployment(bot, deploymentId, minTicks = 25) {
     };
   });
   const validLinks = linkSamples.filter(s => s !== null);
+  // Read existing *complete* 100-tick runtime economy blocks. A snapshot
+  // after deploy may still carry a pre-deployment block; exclude those.
+  // Multiple snapshots can repeat the same immutable last100 block, so do not
+  // count it twice or add distinct non-overlapping windows by mistake.
+  const economyWindows = new Map();
+  let invalidPostDeployEconomyWindows = 0;
+  for (const sample of roomSamples) {
+    const w = sample.x.rooms[room].economy?.last100;
+    if (!w || typeof w !== 'object') continue;
+    if (!Number.isInteger(w.startTick) || w.startTick < tick) continue;
+    if (!Number.isInteger(w.endTick) || w.endTick > sample.t ||
+        w.endTick > Number(last.t) || w.endTick - w.startTick !== 99 ||
+        w.ticks !== 100 || sample.t > w.endTick + 100) {
+      invalidPostDeployEconomyWindows++;
+      continue;
+    }
+    const flow = w.productiveFlow;
+    const counters = ['consumerTicks', 'waitingConsumerTicks',
+      'criticalConsumerTicks', 'fallbackConsumerTicks'];
+    if (!flow || counters.some(k => !Number.isSafeInteger(flow[k]) ||
+        flow[k] < 0 || (k !== 'consumerTicks' && flow[k] > flow.consumerTicks))) {
+      invalidPostDeployEconomyWindows++;
+      continue;
+    }
+    const key = w.startTick + ':' + w.endTick;
+    const values = counters.map(k => flow[k]);
+    const prior = economyWindows.get(key);
+    if (prior && prior.some((v, i) => v !== values[i])) {
+      // Conflicting copies cannot be used as exact economy evidence.
+      economyWindows.set(key, null);
+      invalidPostDeployEconomyWindows++;
+    } else if (prior === undefined) {
+      economyWindows.set(key, values);
+    }
+  }
+  const completeEconomyWindows = [...economyWindows.values()].filter(Boolean);
+  const economyTotals = completeEconomyWindows.length
+    ? completeEconomyWindows.reduce((sum, values) =>
+      sum.map((v, i) => v + values[i]), [0, 0, 0, 0]) : null;
   const roomEvidence = {
     sampledRoomSnapshots: roomSamples.length,
     sampledEnergySnapshots: energySamples.length,
@@ -223,7 +262,17 @@ export function inspectDeployment(bot, deploymentId, minTicks = 25) {
     snapshotsWithCriticalWithoutStickyReservation:
       validLinks.filter(x => x.withoutSticky > 0).length,
     criticalReservationLinkMayBePartial:
-      validLinks.some(x => x.possiblyTruncated)
+      validLinks.some(x => x.possiblyTruncated),
+    // Exactly completed, distinct, fully post-deploy economy windows only.
+    // Count *consumer-creep-ticks*, not ticks with at least one consumer.
+    // Null means no complete trustworthy window was observed.
+    sampledCompleteEconomyWindows: completeEconomyWindows.length,
+    invalidPostDeployEconomyWindows,
+    observedCompleteEconomyTicks: completeEconomyWindows.length * 100,
+    observedEconomyConsumerTicks: economyTotals?.[0] ?? null,
+    observedEconomyWaitingConsumerTicks: economyTotals?.[1] ?? null,
+    observedEconomyCriticalConsumerTicks: economyTotals?.[2] ?? null,
+    observedEconomyFallbackConsumerTicks: economyTotals?.[3] ?? null
   };
   if (!Number.isFinite(Number(roomStatus.rcl)) ||
       Number(roomStatus.rcl) <= 0 ||
