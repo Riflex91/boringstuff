@@ -41,8 +41,71 @@ assert.deepEqual(ok.roomEvidence, {
   sampledRoomSnapshots: 1, sampledEnergySnapshots: 1,
   minimumEnergyAvailable: 800, maximumEnergyAvailable: 800,
   sampledCriticalConsumerSnapshots: 1, snapshotsWithCriticalConsumers: 0,
-  maximumObservedCriticalConsumers: 0, criticalConsumerCountMayBeCapped: false
+  maximumObservedCriticalConsumers: 0, criticalConsumerCountMayBeCapped: false,
+  sampledConsumerDetailSnapshots: 1, invalidConsumerDetailSnapshots: 0,
+  snapshotsWithWaitingConsumers: 0, snapshotsWithFallbackConsumers: 0,
+  maximumObservedWaitingConsumers: 0, maximumObservedFallbackConsumers: 0,
+  sampledReservationSnapshots: 0, invalidReservationSnapshots: 0,
+  maximumObservedReservedHaulers: null, snapshotsWithDuplicateReservations: 0,
+  maximumObservedDuplicateReservations: null, snapshotsWithEmptyReservedHaulers: 0,
+  reservationListMayBeCapped: false
 });
+// Existing game snapshot fields provide passive reservation/fallback evidence,
+// without additional game code, extra events or settled-transfer claims.
+{
+  const withReservations = structuredClone(state);
+  const room = withReservations.telemetryJournal.snapshots[0].x.rooms.E8N1;
+  room.consumerSupply.criticalConsumers = [
+    { id: 'w1', waiting: 7, fallback: true },
+    { id: 'w2', waiting: 2, fallback: false }
+  ];
+  room.consumerSupply.consumerReservations = [
+    { hauler: 'h1', targetId: 'w1', carried: 150, delivering: true },
+    { hauler: 'h2', targetId: 'w1', carried: 0, delivering: false },
+    { hauler: 'h3', targetId: 'w2', carried: 75, delivering: false }
+  ];
+  const withMetrics = inspectDeployment(withReservations, id, 100);
+  assert.equal(withMetrics.status, 'PASS');
+  assert.equal(withMetrics.roomEvidence.sampledConsumerDetailSnapshots, 1);
+  assert.equal(withMetrics.roomEvidence.snapshotsWithWaitingConsumers, 1);
+  assert.equal(withMetrics.roomEvidence.snapshotsWithFallbackConsumers, 1);
+  assert.equal(withMetrics.roomEvidence.maximumObservedWaitingConsumers, 2);
+  assert.equal(withMetrics.roomEvidence.maximumObservedFallbackConsumers, 1);
+  assert.equal(withMetrics.roomEvidence.sampledReservationSnapshots, 1);
+  assert.equal(withMetrics.roomEvidence.maximumObservedReservedHaulers, 3);
+  assert.equal(withMetrics.roomEvidence.snapshotsWithDuplicateReservations, 1);
+  assert.equal(withMetrics.roomEvidence.maximumObservedDuplicateReservations, 1);
+  assert.equal(withMetrics.roomEvidence.snapshotsWithEmptyReservedHaulers, 1);
+  // No identities or IDs leak into the compact evidence object.
+  assert.equal(JSON.stringify(withMetrics.roomEvidence).includes('w1'), false);
+
+  const missing = structuredClone(withReservations);
+  delete missing.telemetryJournal.snapshots[0].x.rooms.E8N1.consumerSupply.consumerReservations;
+  delete missing.telemetryJournal.snapshots[0].x.rooms.E8N1.consumerSupply.criticalConsumers;
+  const missingMetrics = inspectDeployment(missing, id, 100);
+  assert.equal(missingMetrics.roomEvidence.sampledConsumerDetailSnapshots, 0);
+  assert.equal(missingMetrics.roomEvidence.maximumObservedWaitingConsumers, null);
+  assert.equal(missingMetrics.roomEvidence.sampledReservationSnapshots, 0);
+  assert.equal(missingMetrics.roomEvidence.maximumObservedDuplicateReservations, null);
+
+  const corrupt = structuredClone(withReservations);
+  corrupt.telemetryJournal.snapshots[0].x.rooms.E8N1.consumerSupply.consumerReservations[1].carried = 'unknown';
+  corrupt.telemetryJournal.snapshots[0].x.rooms.E8N1.consumerSupply.criticalConsumers[1].waiting = 'unknown';
+  const badMetrics = inspectDeployment(corrupt, id, 100);
+  assert.equal(badMetrics.roomEvidence.sampledReservationSnapshots, 0);
+  assert.equal(badMetrics.roomEvidence.invalidReservationSnapshots, 1);
+  assert.equal(badMetrics.roomEvidence.maximumObservedDuplicateReservations, null);
+  assert.equal(badMetrics.roomEvidence.sampledConsumerDetailSnapshots, 0);
+  assert.equal(badMetrics.roomEvidence.invalidConsumerDetailSnapshots, 1);
+
+  const capped = structuredClone(withReservations);
+  const snapshot = capped.telemetryJournal.snapshots[0].x.rooms.E8N1.consumerSupply;
+  snapshot.consumerReservations = Array.from({ length: 8 }, (_, index) => ({
+    targetId: 'target-' + index, carried: 5, delivering: false
+  }));
+  assert.equal(inspectDeployment(capped, id, 100).roomEvidence.reservationListMayBeCapped, true);
+}
+
 // A low-energy intermediate snapshot with waiting consumers is reportable
 // evidence even if the final post-window snapshot has recovered.
 const pressured = structuredClone(state);
