@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { assessP3Release, compareP3ReleaseSamples } from './p3-release-evidence-core.mjs';
+import { assessP3Release, compareP3ReleaseSamples, classifyP3ReleaseWindows } from './p3-release-evidence-core.mjs';
 import { evaluateP3Shadow } from './p3-live-verification-core.mjs';
 import { deploymentReceiptPath } from './deployment-receipt.mjs';
 
@@ -172,6 +172,9 @@ for (;;) {
     break;
   }
   const accepted = final.filter(r => r.outcome === 'PASS');
+  const classification = classifyP3ReleaseWindows(results, {
+    minRuns: args.minRuns, observeRuns: args.observeRuns
+  });
   if (accepted.length >= args.minRuns) {
     for (const r of accepted) {
       console.log('PASS: runTick=' + r.sample.runTick +
@@ -183,9 +186,18 @@ for (;;) {
         ' outsidePhasesCPU=' + (r.sample.cpuOutsidePhases ?? 'UNKNOWN') +
         ' checks=' + r.counts.pass + ' PASS/' + r.counts.watch + ' WATCH/' + r.counts.fail + ' FAIL');
     }
-    console.log('RELEASE CPU OBSERVED: ' + accepted.length + ' distinct post-deploy P3 execution(s).');
+    console.log('CPU PASS QUORUM OBSERVED: ' + accepted.length +
+      ' distinct post-deploy P3 execution(s) with all eight checks PASS.');
+    if (classification.state === 'WATCH') {
+      console.log('RELEASE RESULT: WATCH — ' + classification.watchCount +
+        ' other complete window(s) remain WATCH in this deployment.');
+      console.log('CPU PASS quota met, but a historical WATCH has not become a PASS.');
+      process.exitCode = 3;
+    } else {
+      console.log('RELEASE RESULT: PASS — all observed complete windows PASS.');
+      process.exitCode = 0;
+    }
     console.log('NOTE: A reduction vs D0.6 requires comparisons across representative workloads, not one sample.');
-    process.exitCode = 0;
     break;
   }
   // Diagnostics can finish once enough distinct verified release executions
