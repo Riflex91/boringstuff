@@ -21,6 +21,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # P3 benchmark compares exact D0.6 main commit
       - name: Setup Node 24.21.0
         uses: actions/setup-node@v4
         with:
@@ -29,3 +31,5 @@ jobs:
         run: npm install --no-package-lock --ignore-scripts --no-audit --no-fund
       - name: Run canonical test suite
         run: npm test
+      - name: P3 paired benchmark and exact baseline equivalence
+        run: npm run bench:p3
