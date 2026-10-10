@@ -123,6 +123,17 @@ if (missing.length) {
   throw new Error('Verification failed: missing uploaded modules: ' + missing.join(', '));
 }
 
+// Identical VERSION strings can span multiple development commits. Checking
+// module names is insufficient: verify the *exact bytes* of each uploaded
+// module (including the unique injected deployment ID).
+const mismatches = Object.keys(modules).filter(name =>
+  after.modules[name] !== modules[name]
+);
+if (mismatches.length) {
+  throw new Error('Verification failed: uploaded module content differs for: ' +
+    mismatches.join(', '));
+}
+
 if (activeWorld === false) {
   console.warn(
     "WARNING: branch '" + branch +
