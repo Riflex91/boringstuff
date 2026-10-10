@@ -29,6 +29,7 @@ jobs:
       SCREEPS_TOKEN_NEWBIELAND: ${{ secrets.SCREEPS_TOKEN_NEWBIELAND }}
     steps:
       - name: Set ephemeral API paths
+        working-directory: .
         shell: bash
         run: |
           echo "SCREEPS_CONFIG=$RUNNER_TEMP/screeps-newbieland.json" >> "$GITHUB_ENV"
@@ -36,6 +37,7 @@ jobs:
 
       - name: Determine whether deployment credentials are configured
         id: credentials
+        working-directory: .
         shell: bash
         run: |
           if [ -n "$SCREEPS_TOKEN_NEWBIELAND" ]; then
