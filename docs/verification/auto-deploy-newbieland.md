@@ -13,10 +13,13 @@ for the private server API**. It is not your Steam account password.
 In https://github.com/Riflex91/boringstuff/settings/secrets/actions
 create the following **two repository Actions secrets**:
 
-- `SCREEPS_USERNAME_NEWBIELAND`: your Screeps player username on
-  newbieland (not your Steam password or necessarily your Steam email).
 - `SCREEPS_PASSWORD_NEWBIELAND`: the new private-server API password
   you set with the Steam-linked form.
+
+The public Screeps in-game username is confirmed as `Riflex91` and is
+pinned as `SCREEPS_USERNAME_NEWBIELAND` in the workflow, independent of
+any old repository username secret. Do not set the Steam display name or
+Steam login name in its place.
 
 Alternatively, the already-supported single secret
 `SCREEPS_TOKEN_NEWBIELAND` can contain a persistent Screeps API token.
