@@ -91,3 +91,70 @@ locally installed shadow.15 version.
    natural real encounters provide appropriate evidence. Never induce
    an attack or enable any gameplay authority for validation.
 5. No merge and no deployment without separate user approval.
+
+## Subsequent exact-aligned P2/I2 and efficiency evidence
+
+The operator executed the cadence-inspector at collector evidence tick
+`3826550`, then original read-only verifiers. This confirmed:
+
+- **P2** `3825979–3826078`: **7 PASS / 0 WATCH / 0 FAIL**,
+  READY planner, independent scheduler execution, isolated **6.149 CPU**.
+- **I2** `3825766–3825865`: **8 PASS / 1 WATCH / 0 FAIL**,
+  READY ROI, independent scheduler, isolated **5.522 CPU** above
+  existing diagnostic WATCH 5 (below hard FAIL 10). Activation remains
+  NONE and remote mining disabled.
+- Newer I2 ROI/scheduler candidate at `3826266` records **1.771 CPU**
+  (unverified until its `3826266–3826365` 100-tick gate runs).
+  Another candidate at `3826016`: 1.626 CPU.
+- Exact productive window `3826302–3826401`, recorded at snapshot
+  `3826500`. E4's distinct exact window `3826393–3826492`,
+  also carried at snapshot `3826500`. These 100-tick schedules
+  **do not overlap exactly**; both need separately aligned tests.
+  Four recent E4 windows each report **0 observed duplicate reservation
+  ticks**, but their critical-coverage ratio still requires gating.
+
+Latest efficiency snapshot tick `3826500`:
+
+| Metric | Value |
+|---|---:|
+| `status` / `overallScore` | UNDERUTILIZED / 58 |
+| `productiveUse` / `energyUse` | 60 / 65 |
+| `spawnUse` / `flow` | 0 / 100 |
+| productive throughput / capacity | 10.88 / 18 work units per tick |
+| spawn utilization / capped-energy ratio | 0 / 0.35 |
+| pressure | SURPLUS, 35; demand score 0 |
+| reasons | MODELED_DEMAND_NOT_REALIZED |
+
+The observed productivity ratio is **10.88/18 = 60.4%**. The
+score 58 comes from weighted components (45% productivity,
+25% energy use, 15% spawn, 15% flow), not solely hauling failure:
+consumer supply had PASS and flow component was 100. A 0% busy
+spawn amid some surplus does **not** establish a missing-role
+problem: `spawn.manager.desired` deliberately declines to spawn
+once its bounded role targets are met. No role-target bypass is
+authorized based on this score alone.
+
+The follow-up read-only inspector now surfaces, from one actual
+STATUS_SNAPSHOT, current creep counts, energy available/capacity/stored,
+construction sites, economic need/deficit counters, and last
+100-tick productive work breakdown. It separately reports logged
+`SPAWN_IDLE_SURPLUS`, `SPAWN_OK` and `SPAWN_RC` events in a
+bounded recent 500-tick slice, explicitly noting that an *absence*
+of events does not prove that no spawning or idle event occurred.
+Missing serialized fields are null, never invented as zero. CI
+regressions enforce exact version, room, window bounds and
+provenance. This tool remains purely diagnostic.
+
+### Next safe proofs
+
+```powershell
+node .\i2-live-verification.mjs --start-tick 3826266
+node .\live-verification.mjs live --start-tick 3826302
+# After installing only the exact shadow.15 read-only verifier fix #121:
+node .\live-verification.mjs live --start-tick 3826393
+node .\live-cadence-inspector.mjs
+```
+
+No old WATCH is reclassified without rerunning the underlying gate;
+no live gameplay module, body/role target, threshold, deployment or
+merge is changed by this diagnostic.
