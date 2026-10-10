@@ -84,6 +84,21 @@ assert.equal(energy.shouldRescueConsumer(ready), false);
 assert.equal(energy.shouldPrioritizeConsumer(ready), false,
   'infrastructure-ready hauler must remain outside consumer guards');
 
+const regularDeliver = energy.deliver;
+const regularConsumer = energy.deliverToConsumer;
+const readyCalls = [];
+try {
+  energy.deliver = () => { readyCalls.push('infrastructure'); return true; };
+  energy.deliverToConsumer = () => { readyCalls.push('consumer'); return true; };
+  role.run(ready);
+  assert.deepEqual(readyCalls, ['infrastructure'],
+    'protected ready hauler must actually run infrastructure-first');
+} finally {
+  energy.deliver = regularDeliver;
+  energy.deliverToConsumer = regularConsumer;
+}
+
+
 let target = null, moves = [];
 partial.transfer = c => { target = c; return ERR_NOT_IN_RANGE; };
 partial.moveTo = (c, options) => { moves.push({ c, options }); };
@@ -120,6 +135,10 @@ try {
   assert.equal(energy.shouldRescueConsumer(partial), false,
     'tower below 50% forbids new diversion');
   r.structures[2].store.energy = 600;
+  r.structures[2].store.getCapacity = () => undefined;
+  assert.equal(energy.shouldRescueConsumer(partial), false,
+    'unknown tower capacity must fail closed');
+  r.structures[2].store = store(1000, 600);
   r.structures[0].store.energy = 200;
   assert.equal(energy.shouldRescueConsumer(partial), false,
     'spawn underfilled forbids new diversion');
