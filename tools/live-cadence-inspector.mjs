@@ -91,7 +91,9 @@ else {
             console.log('    SPAWN START (logged, not completion): ' +
               'tick=' + spawn.startTick + ' role=' + (spawn.role ?? 'UNKNOWN') +
               ' cost=' + (spawn.cost ?? 'UNKNOWN') +
-              ' bodyParts=' + (spawn.bodyParts ?? 'UNKNOWN') +
+              ' serializedBodyParts=' + (spawn.serializedBodyParts ?? 'UNKNOWN') +
+              ' bodyMayBeTruncated=' + spawn.bodyMayBeTruncated +
+              ' exactBodyParts=' + (spawn.bodyParts ?? 'UNKNOWN') +
               ' projectedReadyTick=' + (spawn.projectedReadyTick ?? 'UNKNOWN'));
           }
           if (!w.roomHeartbeatHints?.length) {
