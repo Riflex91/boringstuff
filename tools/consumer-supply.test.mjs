@@ -196,6 +196,32 @@ const energy = require('../game/energy.js');
   assert.equal(guard.memory.consumerTargetId, fresh.id);
 }
 
+// Partial-load rescue is also an emergency override. When its guard is
+// authorized, it must not keep pursuing a normal, freshly empty target.
+// The real room/infrastructure rescue eligibility remains separately guarded.
+{
+  const fresh = makeConsumer('worker-rescue-fresh', 'worker', 0, 0, false, 1);
+  const starved = makeConsumer('upgrader-rescue-critical', 'upgrader', 0, 6, true, 5);
+  const rescuer = makeHauler('hauler-partial-rescue', { [starved.id]: 2 });
+  rescuer.store.energy = 30;
+  rescuer.memory.delivering = false;
+  rescuer.memory.consumerTargetId = fresh.id;
+  room.creeps = [fresh, starved, rescuer];
+  const transfers = [];
+  rescuer.transfer = target => { transfers.push(target.id); return ERR_NOT_IN_RANGE; };
+  const savedRescueRule = energy.shouldRescueConsumer;
+  try {
+    energy.shouldRescueConsumer = () => true;
+    require('../game/role.hauler.js').run(rescuer);
+  } finally {
+    energy.shouldRescueConsumer = savedRescueRule;
+  }
+  assert.deepEqual(transfers, [starved.id]);
+  assert.equal(rescuer.memory.consumerTargetId, starved.id);
+  assert.equal(rescuer.memory.delivering, false,
+    'rescue should not force an underfilled hauler into normal delivery mode');
+}
+
 // Once a reserved target is fully supplied, the reservation and fallback state
 // are cleared immediately so the hauler can take a different request next tick.
 {
