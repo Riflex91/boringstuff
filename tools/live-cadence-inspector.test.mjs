@@ -243,6 +243,44 @@ assert.equal(overload.e4Windows[0].roomHeartbeatHints[0].emergencyDeliverSpecs, 
 assert.equal(overload.e4Windows[0].roomHeartbeatHints[1].belowInfrastructureReserve, false);
 assert.equal(overload.e4Windows[0].roomHeartbeatHints[1].emergencyDeliverSpecs, null,
   'absence of a serialized E3 kind counter is not zero critical demand');
+// The shadow demand spike can temporally coincide with a costly hauler
+// spawn. A recorded spawn START is not proof of final creep availability.
+const expensiveHaulerStart = {
+  tick: 1151, v: receipt.version, code: 'SPAWN_OK',
+  ctx: { room: 'E8N1', role: 'hauler', cost: 1050,
+    body: Array.from({ length: 21 }, (_, i) => i % 3 === 2 ? 'move' : 'carry') }
+};
+const wrongVersionHaulerStart = {
+  ...expensiveHaulerStart, tick: 1155, v: 'other-version'
+};
+const outsideHaulerStart = {
+  ...expensiveHaulerStart, tick: 1099
+};
+const otherRoomHaulerStart = {
+  ...expensiveHaulerStart, tick: 1152,
+  ctx: { ...expensiveHaulerStart.ctx, room: 'E9N1' }
+};
+const spawnAligned = evalRows([marker, surgeCarrier, ...sampled,
+  expensiveHaulerStart, wrongVersionHaulerStart, outsideHaulerStart,
+  otherRoomHaulerStart,
+  { tick: 1300, v: receipt.version, code: 'BOT_HEARTBEAT' }]);
+assert.deepEqual(spawnAligned.e4Windows[0].spawnStarts, [{
+  startTick: 1151, role: 'hauler', cost: 1050,
+  bodyParts: 21, projectedReadyTick: 1214,
+  note: 'SPAWN_OK logs the accepted spawn start, not completion.'
+}]);
+assert.deepEqual(overload.e4Windows[0].spawnStarts, [],
+  'no matching event remains unknown, not a zero-cost spawn');
+const noBodyStart = {
+  tick: 1152, v: receipt.version, code: 'SPAWN_OK',
+  ctx: { room: 'E8N1', role: 'hauler', cost: 1050 }
+};
+const noBody = evalRows([marker, surgeCarrier, noBodyStart,
+  { tick: 1300, v: receipt.version, code: 'BOT_HEARTBEAT' }]);
+assert.equal(noBody.e4Windows[0].spawnStarts[0].bodyParts, null);
+assert.equal(noBody.e4Windows[0].spawnStarts[0].projectedReadyTick, null,
+  'cannot estimate spawn completion without verified body part count');
+
 const noHeartbeat = evalRows([marker, surgeCarrier,
   { tick: 1300, v: receipt.version, code: 'BOT_HEARTBEAT' }]);
 assert.deepEqual(noHeartbeat.e4Windows[0].roomHeartbeatHints, []);
