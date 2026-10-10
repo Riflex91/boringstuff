@@ -412,3 +412,72 @@ hauler allocation, gameplay authority, merge or deployment
 was changed. A candidate energy-reserve policy must first
 be tested against reduced CARRY/WORK capability and any
 late productive prespawn replacements.
+
+
+## Two further verifier windows: recurrent real consumer fallback
+
+The operator ran the exact deployed shadow.15 verifier:
+
+| Window | PASS | WATCH | FAIL | Most pertinent verdict |
+|---|---:|---:|---:|---|
+| Economy 3826802–3826901 | 15 | 4 | 0 | real consumer self-supply fallback WATCH; exact productive throughput WATCH; efficiency WATCH; E4 window nonaligned |
+| E4 3826893–3826992 | 12 | 7 | 0 | real consumer fallback WATCH; E4 critical coverage WATCH; productive exact window nonaligned |
+
+Both windows pass Node/runtime version, runtime errors, collector
+health, CPU bucket, mining active, hard stall, telemetry continuity,
+modeled hauler capacity, and SHADOW authority checks. No FAIL was
+observed. Neither WATCH should be suppressed merely because the
+other clock's evidence was unavailable.
+
+Real economy 3826802–3826901 is complete: 93 fallback
+consumer-ticks, controller progress 350, productive throughput
+3.50/12 work units per tick. Earlier real economy
+3826702–3826801 recorded 101 fallback consumer-ticks,
+controller progress 404 and throughput 4.04/12.
+
+**Critical chronology:** the subsequent big upgrader spawn began
+at tick **3826947**, AFTER the complete real economy interval
+3826802–3826901 ended. It therefore **cannot cause those
+93 previously recorded fallback consumer-ticks**. Big spawns
+correlate with E4 infrastructure-energy emergency bursts, but
+a persistent real consumer service issue remains independently
+plausible.
+
+Review of pinned live dispatch:
+
+- The E4 matching planner has **SHADOW** authority; neither
+  its jobs nor its slot counts command physical hauler delivery.
+- `role.hauler.run` uses existing infrastructure-first delivery
+  unless `energy.shouldPrioritizeConsumer` selects it as a
+  critical-consumer guard.
+- `selectConsumerGuardHaulers` requires at least **two** live
+  haulers, a real waiting/fallback consumer, and a hauler that
+  is **ready to deliver** (has energy and a delivery-state/at
+  least half-full CARRY threshold). It leaves at least one
+  hauler for infrastructure. Therefore aggregate CARRY or
+  modeled hauler coverage alone does not prove the presence of
+  a charged, available consumer guard.
+- `economy.model` conditionally proposes a third hauler when
+  fallback coexists with at least two critical consumers.
+  The live fleet reached three after the earlier hauler
+  spawn, but subsequent real fallback persisted in independent
+  windows. **Do not blindly increase fleet targets**.
+
+Read-only follow-up: the inspector now prints the actual
+`ROOM_HEARTBEAT` `economyModel.consumerWaitingCount`,
+`consumerFallbackCount`, `consumerCriticalCount`,
+`haulerCarryDeficit`, and `creeps.hauler` for sampled ticks
+inside each **exact economy window** and exact E4 window,
+alongside the independently completed 100-tick fallback-tick
+sum. Version, room and marker provenance remain enforced.
+Missing serialized counters remain UNKNOWN. It cannot tell
+whether a specific hauler is loaded, currently collecting,
+or path-blocked because those dynamic values were not present
+in the retained heartbeat logs.
+
+**Decision:** Avoid changing spawn policies, hauler priority,
+guard reservation thresholds or E4 matching semantics on
+the basis of these aggregate results. First compare sampled
+real fallback conditions and inventory/readiness when actual
+evidence permits; offline fixtures must preserve the
+infrastructure service floor and safe worker fallback.
