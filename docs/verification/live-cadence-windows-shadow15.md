@@ -481,3 +481,90 @@ the basis of these aggregate results. First compare sampled
 real fallback conditions and inventory/readiness when actual
 evidence permits; offline fixtures must preserve the
 infrastructure service floor and safe worker fallback.
+
+
+## Ten consecutive real economy windows: high-energy fallback persists
+
+Operator supplied an exact-receipt, read-only cadence-inspector
+report with collector tick **3827325**, release
+`0.3.0-shadow.15-node24`, deployment
+`20261009200957502-9092` and marker tick `3812491`.
+Ten **non-overlapping, complete** 100-tick economy windows
+from **3826202–3827201** contain a total of **727**
+`fallbackConsumerTicks` among **4538**
+`consumerTicks` (approximately **16.0%** of consumer
+creep-ticks). These count a memory fallback state per
+consumer/tick, NOT 727 unique fallback transitions or
+measured failed physical deliveries. Controller progress
+remained positive in every completed window.
+
+Selected same-release `ROOM_HEARTBEAT` observations prove
+two distinct situations:
+
+| Tick | Room energy | Real haulers | Consumers in fallback | Waiting consumers | Modeled CARRY deficit |
+|---|---:|---:|---:|---:|---:|
+| 3826400 | 1050/1050 | 3 | 3 | 0 | 0 |
+| 3826850 | 800/1050 | 3 | 3 | 0 | 0 |
+| 3827175 | 850/1050 | 2 | 2 | 0 | 0 |
+| 3827200 | 131/1050 | 2 | 0 | 2 | 0 |
+
+Thus the explanation cannot be only the crossing of
+300 room energy after a large spawn. **Real consumer
+fallback can coexist with a full room energy budget and
+three haulers**, while no modeled CARRY deficit is detected.
+Room `energyAvailable` excludes stored/hauler-carried
+energy and does not establish that a specific hauler
+has any deliverable energy near a specific consumer.
+
+The legacy `energy.shouldPrioritizeConsumer` guard
+requires a **ready-to-deliver** hauler, which in turn
+requires `memory.delivering` or at least half-full
+CARRY plus positive carried energy. Its selection keeps
+at least one hauler working on hard infrastructure.
+Therefore a three-hauler fleet can still have zero
+consumer guards if none is loaded/ready; the current
+`ROOM_HEARTBEAT` does **not** contain per-hauler inventory
+or guard selection events, so this explanation is a
+code-grounded hypothesis and **not an observed cause**.
+
+A later spawn at tick **3827175**, hauler cost **750**
+with reported room energy **850/1050**, is followed by
+tick **3827200** room energy **131/1050** and **16**
+E3 infrastructure emergencies. Even a body limited to
+750 energy **cannot guarantee a 300-energy immediate
+reserve** when only 850 energy was available at start:
+850 - 750 = 100. The 131 energy at the next heartbeat
+is a later observed sample (replenishment may occur),
+not exactly the immediately remaining 100.
+
+The E4 SHADOW window **3826993–3827092** shows
+critical requests **928**, matched **193**,
+unmatched **735**, slot bound **207**, no-candidate **0**
+(20.8% coverage), despite only a 200-energy repairer
+spawn at tick **3827044**. Windows
+**3827093–3827192** (169/407, 41.5%) and
+**3827193–3827292** (140/482, 29.0%) also WATCH.
+This cautions against blaming all E4 surges on a
+single simultaneous giant spawn.
+
+### Exact read-only diagnostic addition
+
+The inspector now summarizes separately, for each exact
+economy 100-tick window, heartbeat samples with real
+consumer fallback while infrastructure energy is
+above its `min(300, energyCapacity)` reserve and
+samples with fallback below that threshold. It
+retains unknowns, actual sampled fallback counts,
+real hauler headcount and modeled CARRY deficit.
+The result does not extrapolate sparse heartbeats to
+100-tick severity, does not count fallback transitions,
+and cannot infer per-hauler readiness, actual transfers
+or isolated causal effects.
+
+**Release decision:** no role/body changes, no threshold
+relaxation, no SHADOW authority changes and no
+merge/deploy. A future direct state observation of loaded
+haulers, their delivery status, guard selection, actual
+hauler transfer outcomes and consumer acquisition routes
+would be needed before a safe runtime service-policy
+experiment can be specified.
