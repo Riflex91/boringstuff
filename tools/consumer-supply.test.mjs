@@ -150,6 +150,52 @@ const energy = require('../game/energy.js');
   assert.equal(energy._test.selectConsumerTarget(hauler2).id, builder.id);
 }
 
+// A selected emergency guard can have a sticky reservation for a *fresh*
+// empty (noncritical) consumer. It must drop that stale priority and deliver
+// to a genuinely waiting/fallbacking consumer instead of spending the limited
+// infrastructure-override slot on normal top-off. Normal deliveries may still
+// serve the noncritical consumer when infrastructure priorities allow.
+{
+  const fresh = makeConsumer('worker-stale-guard-fresh', 'worker', 0, 0, false, 1);
+  const starved = makeConsumer('upgrader-stale-guard-critical', 'upgrader', 0, 9, true, 7);
+  const guard = makeHauler('hauler-stale-guard', { [starved.id]: 1 });
+  const backup = makeHauler('hauler-stale-backup', { [starved.id]: 8 });
+  guard.memory.consumerTargetId = fresh.id;
+  guard.memory.delivering = true;
+  backup.memory.delivering = true;
+  room.creeps = [fresh, starved, guard, backup];
+
+  const transfers = [];
+  guard.transfer = target => { transfers.push(target.id); return ERR_NOT_IN_RANGE; };
+  assert.equal(energy.consumerNeedsDelivery(fresh), true);
+  assert.equal(energy.isCriticalConsumerRequest(fresh), false);
+  assert.equal(energy.isCriticalConsumerRequest(starved), true);
+  assert.equal(energy.shouldPrioritizeConsumer(guard), true);
+  assert.equal(energy.shouldPrioritizeConsumer(backup), false);
+  assert.equal(require('../game/role.hauler.js').run(guard), undefined);
+  assert.deepEqual(transfers, [starved.id]);
+  assert.equal(guard.memory.consumerTargetId, starved.id);
+  assert.equal(fresh.memory.waitingEnergyTicks, 0);
+
+  // Once a target is genuinely critical, its existing sticky reservation
+  // remains valid; no needless emergency retargeting or guard oscillation.
+  transfers.length = 0;
+  assert.equal(energy.deliverToConsumer(guard, true), true);
+  assert.deepEqual(transfers, [starved.id]);
+  assert.equal(guard.memory.consumerTargetId, starved.id);
+
+  // With no critical requests, a plain delivery still honors the old sticky
+  // empty target; the change is restricted to explicit emergency calls.
+  starved.memory.waitingEnergyTicks = 0;
+  starved.memory.logisticsFallback = false;
+  guard.memory.consumerTargetId = fresh.id;
+  transfers.length = 0;
+  assert.equal(energy.shouldPrioritizeConsumer(guard), false);
+  assert.equal(energy.deliverToConsumer(guard), true);
+  assert.deepEqual(transfers, [fresh.id]);
+  assert.equal(guard.memory.consumerTargetId, fresh.id);
+}
+
 // Once a reserved target is fully supplied, the reservation and fallback state
 // are cleared immediately so the hauler can take a different request next tick.
 {
