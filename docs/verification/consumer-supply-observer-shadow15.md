@@ -159,3 +159,12 @@ The inspector in separate Draft PR #119 is NOT overwritten. If both
 changes are approved in the future, it may call the standalone
 analysis core to present supply evidence alongside the existing
 economy/E4 windows. No future live data can be inferred now.
+
+### CI base-branch limitation
+
+The repository workflow `.github/workflows/npm-test.yml` triggers on
+`pull_request` to `main` (and `push` to `main`) only. A directly
+stacked feature-branch PR does not automatically trigger it. CI evidence
+must therefore be linked to the **exact candidate commit SHA** from a
+main-targeted PR event; the final review PR remains stacked on #123.
+A passing run is offline evidence, never permission to merge or deploy.
