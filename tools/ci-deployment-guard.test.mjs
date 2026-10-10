@@ -37,6 +37,51 @@ assert.equal(ok.roles.hauler, 2);
 assert.equal(ok.checkedCpuSnapshots, 1);
 assert.equal(ok.minimumSnapshotBucket, 9000);
 assert.equal(ok.maximumSnapshotCpu, 12);
+assert.deepEqual(ok.roomEvidence, {
+  sampledRoomSnapshots: 1, sampledEnergySnapshots: 1,
+  minimumEnergyAvailable: 800, maximumEnergyAvailable: 800,
+  sampledCriticalConsumerSnapshots: 1, snapshotsWithCriticalConsumers: 0,
+  maximumObservedCriticalConsumers: 0, criticalConsumerCountMayBeCapped: false
+});
+// A low-energy intermediate snapshot with waiting consumers is reportable
+// evidence even if the final post-window snapshot has recovered.
+const pressured = structuredClone(state);
+pressured.telemetryJournal.snapshots.unshift(record('STATUS_SNAPSHOT', 1050, {
+  cpu: 11, bucket: 8500,
+  rooms: { E8N1: { rcl: 3, creeps: { hauler: 2 },
+    energyAvailable: 120, energyCapacity: 800,
+    consumerSupply: { criticalConsumers: [{ role: 'worker' }, { role: 'upgrader' }] }
+  } }
+}));
+const pressure = inspectDeployment(pressured, id, 100);
+assert.equal(pressure.status, 'PASS');
+assert.equal(pressure.roomEvidence.sampledRoomSnapshots, 2);
+assert.equal(pressure.roomEvidence.sampledEnergySnapshots, 2);
+assert.equal(pressure.roomEvidence.minimumEnergyAvailable, 120);
+assert.equal(pressure.roomEvidence.maximumEnergyAvailable, 800);
+assert.equal(pressure.roomEvidence.sampledCriticalConsumerSnapshots, 2);
+assert.equal(pressure.roomEvidence.snapshotsWithCriticalConsumers, 1);
+assert.equal(pressure.roomEvidence.maximumObservedCriticalConsumers, 2);
+assert.equal(pressure.criticalConsumers, 0); // Final snapshot, not peak.
+// Missing telemetry fields are UNKNOWN, never represented as zero.
+const absent = structuredClone(state);
+delete absent.telemetryJournal.snapshots[0].x.rooms.E8N1.consumerSupply;
+delete absent.telemetryJournal.snapshots[0].x.rooms.E8N1.energyAvailable;
+const unknown = inspectDeployment(absent, id, 100);
+assert.equal(unknown.status, 'PASS');
+assert.equal(unknown.criticalConsumers, null);
+assert.equal(unknown.roomEvidence.sampledEnergySnapshots, 0);
+assert.equal(unknown.roomEvidence.minimumEnergyAvailable, null);
+assert.equal(unknown.roomEvidence.maximumEnergyAvailable, null);
+assert.equal(unknown.roomEvidence.sampledCriticalConsumerSnapshots, 0);
+assert.equal(unknown.roomEvidence.maximumObservedCriticalConsumers, null);
+assert.equal(unknown.roomEvidence.snapshotsWithCriticalConsumers, 0); // zero sampled positives only
+// Snapshot may list at most eight critical consumers: do not equate the
+// list length with an uncapped population count.
+const capped = structuredClone(state);
+capped.telemetryJournal.snapshots[0].x.rooms.E8N1.consumerSupply.criticalConsumers =
+  Array.from({length: 8}, () => ({ role: 'worker' }));
+assert.equal(inspectDeployment(capped, id, 100).roomEvidence.criticalConsumerCountMayBeCapped, true);
 // A healthy final bucket must not conceal a critical post-deploy snapshot.
 const dipped = structuredClone(state);
 dipped.telemetryJournal.snapshots.unshift(record('STATUS_SNAPSHOT', 1050, {
