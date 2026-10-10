@@ -47,6 +47,24 @@ function roomHeartbeatHint(event) {
   };
 }
 
+function spawnStartHint(event) {
+  const ctx = event?.ctx || {};
+  const parts = Array.isArray(ctx.body) && ctx.body.length > 0 &&
+    ctx.body.length <= 50 && ctx.body.every(p => typeof p === 'string')
+    ? ctx.body.length : null;
+  // Screeps normally needs three ticks per body part. This is a projected
+  // completion from a successful spawn-start event, not observed completion.
+  const projectedReadyTick = parts === null ? null : event.tick + 3 * parts;
+  return {
+    startTick: event.tick,
+    role: typeof ctx.role === 'string' ? ctx.role : null,
+    cost: number(ctx.cost),
+    bodyParts: parts,
+    projectedReadyTick,
+    note: 'SPAWN_OK logs the accepted spawn start, not completion.'
+  };
+}
+
 export function analyzeE4SlotEvidence(window) {
   const requests = number(window?.criticalRequestTicks);
   const matched = number(window?.criticalMatchedTicks);
@@ -230,12 +248,18 @@ export function discoverLiveWindows({ events, receipt, roomName = 'E8N1', limit 
   const observedRoomHeartbeats = ordered.filter(e => e.code === 'ROOM_HEARTBEAT' &&
     e.v === receipt.version && e.tick >= marker.tick &&
     String(e.ctx?.room || '').toUpperCase() === room);
+  const observedSpawnStarts = ordered.filter(e => e.code === 'SPAWN_OK' &&
+    e.v === receipt.version && e.tick >= marker.tick &&
+    String(e.ctx?.room || '').toUpperCase() === room);
   const e4Windows = latestUnique(e4, 'startTick', limit).map(window => ({
     ...window,
     slotAccounting: analyzeE4SlotEvidence(window),
     roomHeartbeatHints: observedRoomHeartbeats.filter(e =>
       e.tick >= window.startTick && e.tick <= window.endTick)
-      .slice(-10).map(roomHeartbeatHint)
+      .slice(-10).map(roomHeartbeatHint),
+    spawnStarts: observedSpawnStarts.filter(e =>
+      e.tick >= window.startTick && e.tick <= window.endTick)
+      .slice(-10).map(spawnStartHint)
   }));
   const e4Starts = new Set(e4Windows.map(x => x.startTick));
   const shared = economyWindows.filter(x => e4Starts.has(x.startTick));
