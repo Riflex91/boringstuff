@@ -1,13 +1,11 @@
 import { ScreepsHttpClient } from './screeps-client.mjs';
+import { pathToFileURL } from 'node:url';
 import { readDeploymentReceipt, DEFAULT_VERIFICATION_LOG_DIR } from './deployment-receipt.mjs';
 
 const server = process.env.SCREEPS_SERVER || 'newbieland';
 const branch = process.env.SCREEPS_BRANCH || 'chatgpt';
 const room = process.env.SCREEPS_ROOM || 'E8N1';
 const mode = process.argv[2];
-if (mode !== 'preflight' && mode !== 'verify') {
-  throw new Error('Usage: node ci-deployment-guard.mjs preflight|verify');
-}
 
 export function parseBotMemory(reply) {
   let value = reply;
@@ -126,7 +124,10 @@ async function verify(api) {
   throw new Error('LIVE_100T_INCOMPLETE ' + JSON.stringify(last));
 }
 
-if (import.meta.url === new URL('file://' + process.argv[1]).href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  if (mode !== 'preflight' && mode !== 'verify') {
+    throw new Error('Usage: node ci-deployment-guard.mjs preflight|verify');
+  }
   const api = await ScreepsHttpClient.fromConfig(server);
   if (mode === 'preflight') await preflight(api);
   else await verify(api);
