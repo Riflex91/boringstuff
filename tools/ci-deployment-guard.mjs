@@ -105,6 +105,35 @@ export function inspectDeployment(bot, deploymentId, minTicks = 25) {
   const minimumSnapshotBucket = Math.min(...sampled.map(s => s.x.bucket));
   const maximumSnapshotCpu = cpuSamples.length
     ? Math.max(...cpuSamples.map(s => s.x.cpu)) : cpu;
+  // Evidence-only economy trend. Include only actual post-deploy room
+  // snapshots through the verified window; absent telemetry is UNKNOWN,
+  // never an inferred zero or a per-tick delivery measurement.
+  const roomSamples = snapshots.filter(s => s && s.c === 'STATUS_SNAPSHOT' &&
+    Number.isInteger(s.t) && s.t >= tick && s.t <= Number(last.t) &&
+    s.x?.rooms?.[room] && typeof s.x.rooms[room] === 'object');
+  const energySamples = roomSamples.map(s => ({
+    tick: s.t, value: s.x.rooms[room].energyAvailable,
+    capacity: s.x.rooms[room].energyCapacity
+  })).filter(s => Number.isFinite(s.value) && Number.isFinite(s.capacity) &&
+    s.capacity > 0 && s.value >= 0 && s.value <= s.capacity);
+  const consumerSamples = roomSamples.map(s => ({
+    tick: s.t, count: Array.isArray(s.x.rooms[room].consumerSupply?.criticalConsumers)
+      ? s.x.rooms[room].consumerSupply.criticalConsumers.length : null
+  })).filter(s => s.count !== null);
+  const roomEvidence = {
+    sampledRoomSnapshots: roomSamples.length,
+    sampledEnergySnapshots: energySamples.length,
+    minimumEnergyAvailable: energySamples.length
+      ? Math.min(...energySamples.map(s => s.value)) : null,
+    maximumEnergyAvailable: energySamples.length
+      ? Math.max(...energySamples.map(s => s.value)) : null,
+    sampledCriticalConsumerSnapshots: consumerSamples.length,
+    snapshotsWithCriticalConsumers: consumerSamples.filter(s => s.count > 0).length,
+    maximumObservedCriticalConsumers: consumerSamples.length
+      ? Math.max(...consumerSamples.map(s => s.count)) : null,
+    // Game telemetry caps this list at eight consumers per snapshot.
+    criticalConsumerCountMayBeCapped: consumerSamples.some(s => s.count === 8)
+  };
   if (!Number.isFinite(Number(roomStatus.rcl)) ||
       Number(roomStatus.rcl) <= 0 ||
       !roomStatus.creeps || typeof roomStatus.creeps !== 'object') {
@@ -113,11 +142,13 @@ export function inspectDeployment(bot, deploymentId, minTicks = 25) {
   return { status: 'PASS', deploymentTick: tick, observedTicks: currentTick - tick,
     snapshotTick: last.t, rcl: roomStatus.rcl, cpu, bucket,
     checkedCpuSnapshots: sampled.length, minimumSnapshotBucket, maximumSnapshotCpu,
+    roomEvidence,
     roles: roomStatus.creeps,
     constructionSites: roomStatus.constructionSites,
     energyAvailable: roomStatus.energyAvailable,
     energyCapacity: roomStatus.energyCapacity,
-    criticalConsumers: roomStatus.consumerSupply?.criticalConsumers?.length || 0 };
+    criticalConsumers: Array.isArray(roomStatus.consumerSupply?.criticalConsumers)
+      ? roomStatus.consumerSupply.criticalConsumers.length : null };
 }
 
 async function preflight(api) {
