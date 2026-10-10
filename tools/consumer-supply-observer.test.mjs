@@ -115,4 +115,18 @@ g.creeps = Object.fromEntries(Array.from({ length: 121 }, (_, i) =>
 assert.equal(observer.flush([state], logger, g), 0,
   'oversized creep enumeration must skip, not report partial counts');
 
+// Strict multi-room sampling bound: do not report an arbitrary partial
+// three-room census if runtime ever grows to four owned rooms.
+g.time = 1100;
+g.creeps = { loaded };
+const fourRooms = ['E8N1', 'E8N2', 'E9N1', 'E9N2']
+  .map(name => ({ room: { name } }));
+const priorCount = eventRows.length;
+assert.equal(observer.flush(fourRooms, logger, g), 0);
+assert.equal(eventRows.length, priorCount,
+  'more than three owned rooms must skip optional telemetry altogether');
+assert.equal(observer.flush(fourRooms.slice(0, 3), logger, g), 3,
+  'three rooms remain inside supported optional sample bound');
+assert.equal(eventRows.length, priorCount + 3);
+
 console.log('post-creep observer: read-only guard and intent diagnostics PASS');
