@@ -52,7 +52,8 @@ jobs:
             echo 'present=false' >> "$GITHUB_OUTPUT"
             echo 'DEPLOYMENT_SKIPPED: Add SCREEPS_TOKEN_NEWBIELAND, or SCREEPS_USERNAME_NEWBIELAND together with SCREEPS_PASSWORD_NEWBIELAND.'
             echo '### Screeps deployment NOT performed' >> "$GITHUB_STEP_SUMMARY"
-            echo 'No usable GitHub Actions authentication secrets were present. Live upload and validation were skipped.' >> "$GITHUB_STEP_SUMMARY"
+            echo 'No usable GitHub Actions authentication secrets were present. Live upload and validation were skipped. This job intentionally fails, so green CI cannot be mistaken for a successful live deployment.' >> "$GITHUB_STEP_SUMMARY"
+            exit 1
           fi
 
       - name: Checkout exact CI-tested commit
