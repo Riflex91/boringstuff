@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { assessP3Release, compareP3ReleaseSamples } from './p3-release-evidence-core.mjs';
+import { assessP3Release, compareP3ReleaseSamples, classifyP3ReleaseWindows } from './p3-release-evidence-core.mjs';
 
 const receipt = { server: 'newbieland', branch: 'chatgpt',
   version: '0.3.0-shadow.15-node24', deploymentId: '20261009200957502-9092' };
@@ -149,5 +149,36 @@ assert.equal(unknownDimensions.geometryCountersMatch, null);
 assert.equal(unknownDimensions.knownGeometryFields, 0);
 assert.equal(unknownDimensions.cpuDeltaSecondMinusFirst.topology, null);
 assert.equal(unknownDimensions.comparableEndToEndSpeedup, false);
+
+// Five real release windows may satisfy four distinct PASS measurements
+// without erasing the first WATCH. The CLI must report exit 3, not exit 0.
+const verifiedWindow = (outcome, complete = true) => ({ outcome, complete });
+const fiveReleaseWindows = [
+  verifiedWindow('WATCH'),
+  verifiedWindow('PASS'),
+  verifiedWindow('PASS'),
+  verifiedWindow('PASS'),
+  verifiedWindow('PASS')
+];
+const historicallyWatched = classifyP3ReleaseWindows(fiveReleaseWindows,
+  { minRuns: 4, observeRuns: 4 });
+assert.deepEqual(historicallyWatched, {
+  state: 'WATCH',
+  reason: 'PASS_QUORUM_WITH_HISTORICAL_WATCH',
+  minRuns: 4, observeRuns: 4,
+  completeCount: 5, passCount: 4, watchCount: 1, failCount: 0
+});
+assert.equal(classifyP3ReleaseWindows(fiveReleaseWindows.slice(1),
+  { minRuns: 4, observeRuns: 4 }).state, 'PASS',
+  'a genuinely all-PASS selection can pass');
+assert.equal(classifyP3ReleaseWindows(fiveReleaseWindows.slice(0, 2),
+  { minRuns: 4, observeRuns: 4 }).state, 'WAIT');
+assert.equal(classifyP3ReleaseWindows(fiveReleaseWindows.slice(0, 4),
+  { minRuns: 4, observeRuns: 4 }).reason, 'OBSERVATION_QUORUM_NOT_ALL_PASS');
+assert.equal(classifyP3ReleaseWindows([...fiveReleaseWindows,
+  verifiedWindow('FAIL')], { minRuns: 4, observeRuns: 4 }).state, 'FAIL');
+assert.equal(classifyP3ReleaseWindows([...fiveReleaseWindows,
+  verifiedWindow('PASS', false)], { minRuns: 5, observeRuns: 6 }).state, 'WAIT',
+  'incomplete windows do not satisfy either quorum');
 
 console.log('P3 exact-release evidence selection tests passed');
