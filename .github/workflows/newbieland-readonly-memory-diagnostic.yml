@@ -1,0 +1,36 @@
+name: Read-only newbieland memory diagnostic
+
+on:
+  push:
+    branches:
+      - diag/newbieland-memory-shape-20261010
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: tools
+    env:
+      SCREEPS_CONFIG: ${{ runner.temp }}/screeps-readonly-diagnostic.json
+      SCREEPS_TOKEN_NEWBIELAND: ${{ secrets.SCREEPS_TOKEN_NEWBIELAND }}
+      SCREEPS_USERNAME_NEWBIELAND: Riflex91
+      SCREEPS_PASSWORD_NEWBIELAND: ${{ secrets.SCREEPS_PASSWORD_NEWBIELAND }}
+    steps:
+      - name: Checkout diagnostic branch
+        uses: actions/checkout@v4
+      - name: Setup Node 24.21.0
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.21.0
+      - name: Generate short-lived API config
+        run: node ci-deployment-credentials.mjs
+      - name: Read-only memory shape and runtime summary
+        run: node memory-readonly-diagnostic.mjs
+      - name: Remove ephemeral API config
+        if: always()
+        run: rm -f "$SCREEPS_CONFIG"
