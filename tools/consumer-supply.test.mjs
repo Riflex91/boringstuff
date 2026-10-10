@@ -281,6 +281,45 @@ const energy = require('../game/energy.js');
   assert.equal(energy.shouldPrioritizeConsumer(hauler3), false);
 }
 
+// Two old sticky reservations for the same critical consumer must not
+// consume both emergency guard slots and starve another distinct request.
+// The duplicate hauler remains available to the ordinary infrastructure
+// delivery path; no creep Memory is mutated by guard selection.
+{
+  const firstConsumer = makeConsumer('worker-duplicate-reservation', 'worker', 0, 8, true, 3);
+  const secondConsumer = makeConsumer('upgrader-unreserved-critical', 'upgrader', 0, 9, false, 5);
+  const reserved = makeHauler('hauler-dup-a', {
+    [firstConsumer.id]: 2, [secondConsumer.id]: 9
+  });
+  const duplicate = makeHauler('hauler-dup-b', {
+    [firstConsumer.id]: 1, [secondConsumer.id]: 5
+  });
+  const unreserved = makeHauler('hauler-dup-c', {
+    [firstConsumer.id]: 7, [secondConsumer.id]: 1
+  });
+  reserved.memory.consumerTargetId = firstConsumer.id;
+  duplicate.memory.consumerTargetId = firstConsumer.id;
+  room.creeps = [firstConsumer, secondConsumer, reserved, duplicate, unreserved];
+
+  const guards = energy._test.selectConsumerGuardHaulers(room);
+  assert.deepEqual(guards.map(c => c.id), [reserved.id, unreserved.id]);
+  assert.equal(energy.shouldPrioritizeConsumer(reserved), true);
+  assert.equal(energy.shouldPrioritizeConsumer(duplicate), false);
+  assert.equal(energy.shouldPrioritizeConsumer(unreserved), true);
+  assert.equal(energy._test.selectConsumerTarget(unreserved).id, secondConsumer.id);
+  assert.equal(duplicate.memory.consumerTargetId, firstConsumer.id,
+    'guard calculation may not rewrite live creep reservations');
+
+  // If every ready hauler carries the same sticky reservation, use only
+  // one emergency guard rather than duplicate a consumer transfer.
+  unreserved.memory.consumerTargetId = firstConsumer.id;
+  assert.deepEqual(energy._test.selectConsumerGuardHaulers(room).map(c => c.id),
+    [reserved.id]);
+  assert.equal(energy.shouldPrioritizeConsumer(duplicate), false);
+  assert.equal(energy.shouldPrioritizeConsumer(unreserved), false);
+  delete unreserved.memory.consumerTargetId;
+}
+
 // An existing reservation to a critical consumer stays sticky even if another
 // ready hauler is geometrically closer. This prevents guard oscillation while
 // the reserved hauler is already travelling to the consumer.
