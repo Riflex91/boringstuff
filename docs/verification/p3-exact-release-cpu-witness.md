@@ -166,3 +166,54 @@ was above the 10-CPU warning threshold. The operator's requested
 four-distinct-run diagnostic quorum has not yet been established by
 the excerpts available here. Do not change threshold or run identity
 to manufacture a PASS.
+
+
+## Five confirmed post-deployment P3 executions
+
+The operator ran the exact-receipt witness at collector evidence tick
+`3826125` and supplied **five** distinct, completed 100-tick P3 release
+windows for `shadow.15` / deployment
+`20261009200957502-9092`. Every run matched the deployed
+`defenseMinCut.planTick` and scheduler `lastRunTick`, and consecutive
+comparisons reported 10/10 matching visible geometry counters.
+
+| Run tick | Snapshot tick | Scheduler CPU | Topology CPU | MINCUT CPU | Scoring CPU | Outside phase CPU | P3 checks |
+|---|---:|---:|---:|---:|---:|---:|---|
+| 3812915 | 3813000 | 11.190 | 4.821 | 4.434 | 1.364 | 0.571 | 7 PASS / 1 WATCH / 0 FAIL |
+| 3813415 | 3813500 | 4.796 | 0.674 | 2.719 | 0.856 | 0.547 | 8 PASS / 0 WATCH / 0 FAIL |
+| 3813915 | 3814000 | 3.770 | 0.542 | 1.786 | 0.847 | 0.595 | 8 PASS / 0 WATCH / 0 FAIL |
+| 3825415 | 3825500 | 4.532 | 0.492 | 2.492 | 1.108 | 0.440 | 8 PASS / 0 WATCH / 0 FAIL |
+| 3825915 | 3826000 | 3.429 | 0.686 | 1.420 | 0.615 | 0.708 | 8 PASS / 0 WATCH / 0 FAIL |
+
+The four full-PASS CPU windows have scheduler CPU **3.429–4.796**,
+arithmetic mean **4.132**, median **4.151**, all below the
+10-CPU diagnostic WATCH threshold; the complete first window
+remains an 11.190-CPU **WATCH**. These observations establish a
+four-PASS CPU quorum, not an all-PASS release history. They provide
+no direct evidence of a causal improvement over D0.6, and they do
+not clear General Live, I2, D0 combat, or other unrelated WATCHs.
+
+The large distance between ticks `3813915` and `3825415`
+(11,500 ticks) cannot, from the available witness summary, determine
+whether intervening P3 runs were scheduler-deferred or not captured
+by the collector. No inference about scheduler starvation is made.
+
+### Gate behavior regression
+
+The earlier CLI exited 0 when `--observe-runs 4` found four PASS
+windows even if there were additional historical WATCH windows in
+the same exact release. This condition was too permissive for an
+**overall release acceptance** conclusion.
+
+`classifyP3ReleaseWindows` now preserves both distinctions:
+four distinct CPU-PASS measurements are reported as achieved, while
+one other completed release window still WATCH means
+`RELEASE RESULT: WATCH` and exit code **3**. Only if **all observed
+complete windows** PASS and the requested PASS quorum is met does
+the stricter release gate report exit code 0.
+
+This is a read-only verifier semantic correction. It does not change
+the game runtime, telemetry, deployment receipt, threshold,
+scheduler, or the already-observed measurements. The historical
+CLI text claiming `RELEASE CPU OBSERVED: 4 distinct...` is retained
+as user evidence but is not treated as blanket release approval.
