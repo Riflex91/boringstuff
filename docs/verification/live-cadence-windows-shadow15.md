@@ -298,3 +298,62 @@ A gameplay fix to spawn counts, consumer fallback, matching
 priority or infrastructure reserve needs confirmed causal
 evidence and deterministic parity tests. No such modification
 has been authorized or deployed.
+
+## Critical E4 burst coincident with full-capacity hauler spawn
+
+Operator supplied the next inspector output (latestEvidenceTick 3826950).
+The direct sampled event chronology in room E8N1 is:
+
+| Tick | Observed event | Energy | E3 emergency specs | E4 critical count | Live hauler count |
+|---|---|---:|---:|---:|---:|
+| 3826725 | ROOM_HEARTBEAT | 1050/1050 | UNKNOWN | 0 | 2 |
+| **3826738** | **SPAWN_OK hauler cost 1050** | unknown | unknown | unknown | not confirmed |
+| 3826750 | ROOM_HEARTBEAT | **12/1050** | **19** | **19** | 2 |
+| 3826775 | ROOM_HEARTBEAT | **37/1050** | **18** | **18** | 2 |
+| 3826800 | ROOM_HEARTBEAT | 500/1050 | UNKNOWN | 0 | 2 |
+| 3826825 | ROOM_HEARTBEAT | 800/1050 | 1 | 1 | 3 |
+
+The exact deployed `body.hauler(1050)` constructs seven
+`[CARRY, CARRY, MOVE]` blocks, 21 body parts; standard
+`CREEP_SPAWN_TIME=3` gives approximately 63 ticks from an
+accepted start at 3826738, predicting a completion near 3826801.
+Observed hauler count grew from two to three between snapshot ticks
+3826800 and 3826825, consistent with this projection, but not a
+directly measured completion timestamp.
+
+The immediately following E4 window 3826793–3826892 recovered
+to **126/132 = 95.5%** matching coverage, with just **6**
+unmatched critical request-ticks, against **125/1017 = 12.3%**
+during 3826693–3826792; all observed duplicate-reservation counts
+remained 0. These observations strongly support a **transient
+infrastructure energy reset and model demand amplification**
+around the full-capacity spawn, rather than broken critical
+candidate generation. They do not prove that this one spawn was
+the sole cause, nor that E4 SHADOW matching caused real consumer
+starvation.
+
+The completed real economy window 3826702–3826801 overlaps
+**91 ticks** with the expensive E4 window, so their simultaneous
+patterns merit investigation: 101 consumer fallback-ticks
+(vs 48 prior), 404 controller progress, 4.04 actual work
+units/tick versus 12 modeled capacity, 156 critical consumer
+ticks. The subsequent latest live economy snapshot at 3826900
+still reports an active fallback consumer and low productive
+throughput, so do not claim full productive recovery based
+solely on E4 shadow coverage.
+
+The exact same-version inspector now lists individual `SPAWN_OK`
+starts inside each completed E4 window with their role, energy
+cost, serialized body part count, and a **projected**, not
+observed, ready tick when the body is available. Missing body
+fields remain UNKNOWN; foreign room/version events are excluded.
+The read-only tool is deliberately not allowed to alter
+spawn-manager policy, emergency energy threshold, hauler count,
+consumer fallback or E4 allocation.
+
+A future runtime candidate might consider preserving an
+infrastructure energy reserve during nonessential large
+spawn decisions, but it must first be assessed against
+replacement timing, hauler CARRY needs, colony recovery and
+repeated exact-release live samples; reducing a 1050 hauler
+body may trade away throughput. No automatic deployment.
