@@ -219,6 +219,11 @@ Object.assign(surgeE4, {
 const sampled = [
   { tick: 1150, v: receipt.version, code: 'ROOM_HEARTBEAT',
     ctx: { room: 'E8N1', energy: '150/1050',
+      economyModel: {
+        consumerWaitingCount: 2, consumerFallbackCount: 1,
+        consumerCriticalCount: 2, haulerCarryDeficit: 0
+      },
+      creeps: { hauler: 2 },
       logisticsRequests: { byKind: { EMERGENCY_DELIVER: 11 } },
       logisticsMatching: { criticalRequestCount: 11,
         criticalMatchedCount: 2, haulerCount: 2 } } },
@@ -240,6 +245,22 @@ assert.deepEqual(overload.e4Windows[0].roomHeartbeatHints.map(x => x.tick), [115
 assert.equal(overload.e4Windows[0].roomHeartbeatHints[0].energyAvailable, 150);
 assert.equal(overload.e4Windows[0].roomHeartbeatHints[0].belowInfrastructureReserve, true);
 assert.equal(overload.e4Windows[0].roomHeartbeatHints[0].emergencyDeliverSpecs, 11);
+assert.equal(overload.e4Windows[0].roomHeartbeatHints[0].observedFallbackConsumers, 1);
+assert.equal(overload.e4Windows[0].roomHeartbeatHints[0].observedWaitingConsumers, 2);
+assert.equal(overload.e4Windows[0].roomHeartbeatHints[0].observedCriticalConsumers, 2);
+assert.equal(overload.e4Windows[0].roomHeartbeatHints[0].observedRealHaulers, 2);
+assert.equal(overload.e4Windows[0].roomHeartbeatHints[0].observedHaulerCarryDeficit, 0);
+assert.equal(overload.e4Windows[0].roomHeartbeatHints[1].observedFallbackConsumers, null,
+  'missing current consumer state must remain UNKNOWN');
+const economyCarrier = snapshot(1220, { economyStart: 1111, e4Start: 1111 });
+const economyPulse = evalRows([marker, economyCarrier, ...sampled,
+  { tick: 1300, v: receipt.version, code: 'BOT_HEARTBEAT' }]);
+assert.deepEqual(economyPulse.economyWindows[0].roomHeartbeatHints.map(x => x.tick), [1150, 1175]);
+assert.equal(economyPulse.economyWindows[0].roomHeartbeatHints[0].observedFallbackConsumers, 1);
+assert.equal(economyPulse.economyWindows[0].roomHeartbeatHints[1].observedFallbackConsumers, null,
+  'missing sampled real pressure is not a zero-fallback claim');
+assert.equal(economyPulse.economyWindows[0].fallbackConsumerTicks, 2,
+  'whole-window fallback accumulation is independent of sparse samples');
 assert.equal(overload.e4Windows[0].roomHeartbeatHints[1].belowInfrastructureReserve, false);
 assert.equal(overload.e4Windows[0].roomHeartbeatHints[1].emergencyDeliverSpecs, null,
   'absence of a serialized E3 kind counter is not zero critical demand');
