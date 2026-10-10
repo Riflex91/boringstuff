@@ -106,7 +106,9 @@ else {
               ' below300reserve=' + (hint.belowInfrastructureReserve ?? 'UNKNOWN') +
               ' E3-emergency=' + (hint.emergencyDeliverSpecs ?? 'UNKNOWN') +
               ' E4-critical=' + (hint.shadowCriticalRequestCount ?? 'UNKNOWN') +
-              ' haulers=' + (hint.shadowHaulerCount ?? 'UNKNOWN'));
+              ' shadowHaulers=' + (hint.shadowHaulerCount ?? 'UNKNOWN') +
+              ' realFallback=' + (hint.observedFallbackConsumers ?? 'UNKNOWN') +
+              ' realWaiting=' + (hint.observedWaitingConsumers ?? 'UNKNOWN'));
           }
         }
         if (name.startsWith('Productive')) {
@@ -116,6 +118,19 @@ else {
             ' fallbackConsumerTicks=' + (w.fallbackConsumerTicks ?? 'UNKNOWN') +
             ' controllerProgress=' + (w.controllerProgress ?? 'UNKNOWN') +
             ' constructionProgress=' + (w.constructionProgress ?? 'UNKNOWN'));
+          console.log('    REAL CONSUMER PRESSURE: ROOM_HEARTBEAT samples (not full-tick proof)');
+          if (!w.roomHeartbeatHints?.length)
+            console.log('    No matching logged heartbeat samples; real guard/readiness UNKNOWN.');
+          else for (const hint of w.roomHeartbeatHints)
+            console.log('    tick=' + hint.tick +
+              ' energy=' + (hint.energyAvailable ?? 'UNKNOWN') +
+              '/' + (hint.energyCapacity ?? 'UNKNOWN') +
+              ' waiting=' + (hint.observedWaitingConsumers ?? 'UNKNOWN') +
+              ' fallback=' + (hint.observedFallbackConsumers ?? 'UNKNOWN') +
+              ' critical=' + (hint.observedCriticalConsumers ?? 'UNKNOWN') +
+              ' haulers=' + (hint.observedRealHaulers ?? 'UNKNOWN') +
+              ' modeledCarryDeficit=' + (hint.observedHaulerCarryDeficit ?? 'UNKNOWN') +
+              ' infrastructureEmergency=' + (hint.emergencyDeliverSpecs ?? 'UNKNOWN'));
         }
       }
       if (windows.length) console.log('  Probe: node .\\' + cmd + ' --start-tick ' + windows[0].startTick);
