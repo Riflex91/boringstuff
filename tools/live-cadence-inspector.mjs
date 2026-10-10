@@ -77,6 +77,10 @@ else {
     console.log('\nEconomy+E4 shared window starts:',
       result.overlappingEconomyE4Windows.map(x => x.startTick).join(', ') || '(none observed)');
     console.log('Latest efficiency:', JSON.stringify(result.latestEfficiency));
+    console.log('Latest productive/spawn context:',
+      JSON.stringify(result.latestProductiveContext));
+    console.log('Recent spawn events (500 ticks, logged only):',
+      JSON.stringify(result.recentSpawnEvents));
     console.log('CANDIDATES ONLY: run the original verifier. No WATCH is promoted to PASS.');
     console.log('E4 may require an exact later snapshot carrier; the original verifier can still WATCH.');
   }
