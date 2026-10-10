@@ -6,7 +6,7 @@
 const EMERGENCY_HEALTH_RATIO = 0.35;
 
 function emergencyPriority(structure) {
-  if (!structure || structure.my === false) return -1;
+  if (!structure || structure.my !== true) return -1;
   if (structure.structureType === STRUCTURE_SPAWN) return 0;
   if (structure.structureType === STRUCTURE_TOWER) return 1;
   if (structure.structureType === STRUCTURE_STORAGE) return 2;
