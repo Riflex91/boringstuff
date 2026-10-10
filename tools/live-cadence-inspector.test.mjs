@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { discoverLiveWindows } from './live-cadence-inspector-core.mjs';
+import { discoverLiveWindows, analyzeE4SlotEvidence } from './live-cadence-inspector-core.mjs';
 
 const receipt = { server: 'newbieland', branch: 'chatgpt',
   version: '0.3.0-shadow.15-node24', deploymentId: 'real-123' };
@@ -192,5 +192,59 @@ assert.equal(partialResult.e4Windows[0].criticalMatchedTicks, null);
 assert.equal(partialResult.e4Windows[0].criticalCoverageRatio, 0.6);
 assert.equal(partialResult.e4Windows[0].duplicateReservationTicks, 0,
   'known duplicate evidence should remain independent of missing cause counters');
+
+
+// E4 slot accounting reports shadow assignment slots, not actual hauling
+// throughput. This reproduces the user's 1017/125/129 critical overload.
+const observedSurge = analyzeE4SlotEvidence({
+  criticalRequestTicks: 1017, criticalMatchedTicks: 125,
+  criticalSlotCapacityTicks: 129, criticalNoCandidateTicks: 0
+});
+assert.equal(observedSurge.state, 'READY');
+assert.equal(observedSurge.requestExcessOverSlots, 888);
+assert.equal(observedSurge.slotHeadroomUnmatched, 4);
+assert.equal(observedSurge.candidateGap, 0);
+assert.equal(analyzeE4SlotEvidence({ criticalRequestTicks: 4,
+  criticalMatchedTicks: 5, criticalSlotCapacityTicks: 6 }).state, 'UNKNOWN');
+assert.equal(analyzeE4SlotEvidence({ criticalRequestTicks: null,
+  criticalMatchedTicks: 0, criticalSlotCapacityTicks: 0 }).state, 'UNKNOWN');
+
+const surgeCarrier = snapshot(1200, { e4Start: 1101 });
+const surgeE4 = surgeCarrier.ctx.rooms.E8N1.logisticsMatchingEvidence.lastWindow;
+Object.assign(surgeE4, {
+  criticalRequestTicks: 1017, criticalMatchedTicks: 125,
+  unmatchedCriticalTicks: 892, criticalNoCandidateTicks: 0,
+  criticalSlotCapacityTicks: 129, criticalCandidateUnmatchedTicks: 892
+});
+const sampled = [
+  { tick: 1150, v: receipt.version, code: 'ROOM_HEARTBEAT',
+    ctx: { room: 'E8N1', energy: '150/1050',
+      logisticsRequests: { byKind: { EMERGENCY_DELIVER: 11 } },
+      logisticsMatching: { criticalRequestCount: 11,
+        criticalMatchedCount: 2, haulerCount: 2 } } },
+  { tick: 1175, v: receipt.version, code: 'ROOM_HEARTBEAT',
+    ctx: { room: 'E8N1', energy: '500/1050',
+      logisticsMatching: { criticalRequestCount: 0, haulerCount: 3 } } },
+  { tick: 1160, v: 'other-version', code: 'ROOM_HEARTBEAT',
+    ctx: { room: 'E8N1', energy: '100/1050' } },
+  { tick: 1160, v: receipt.version, code: 'ROOM_HEARTBEAT',
+    ctx: { room: 'E9N1', energy: '100/1050' } },
+  { tick: 1020, v: receipt.version, code: 'ROOM_HEARTBEAT',
+    ctx: { room: 'E8N1', energy: '100/1050' } }
+];
+const overload = evalRows([marker, surgeCarrier, ...sampled,
+  { tick: 1300, v: receipt.version, code: 'BOT_HEARTBEAT' }]);
+assert.equal(overload.e4Windows[0].slotAccounting.requestExcessOverSlots, 888);
+assert.equal(overload.e4Windows[0].slotAccounting.slotHeadroomUnmatched, 4);
+assert.deepEqual(overload.e4Windows[0].roomHeartbeatHints.map(x => x.tick), [1150, 1175]);
+assert.equal(overload.e4Windows[0].roomHeartbeatHints[0].energyAvailable, 150);
+assert.equal(overload.e4Windows[0].roomHeartbeatHints[0].belowInfrastructureReserve, true);
+assert.equal(overload.e4Windows[0].roomHeartbeatHints[0].emergencyDeliverSpecs, 11);
+assert.equal(overload.e4Windows[0].roomHeartbeatHints[1].belowInfrastructureReserve, false);
+assert.equal(overload.e4Windows[0].roomHeartbeatHints[1].emergencyDeliverSpecs, null,
+  'absence of a serialized E3 kind counter is not zero critical demand');
+const noHeartbeat = evalRows([marker, surgeCarrier,
+  { tick: 1300, v: receipt.version, code: 'BOT_HEARTBEAT' }]);
+assert.deepEqual(noHeartbeat.e4Windows[0].roomHeartbeatHints, []);
 
 console.log('Exact-release live cadence discovery tests passed');
