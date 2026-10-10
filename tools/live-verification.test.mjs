@@ -792,6 +792,20 @@ console.log('live-verification tests passed');
   }).checks.find(c => c.id === 'e4-matching-evidence').status, 'WATCH',
   'later carriers across deployment marker must not be reused');
 
+  const unversioned = structuredClone(late);
+  delete unversioned.v;
+  assert.equal(evaluateLive({ events: [...inside, unversioned],
+    startTick: 1000, nodeVersion: '24.21.0'
+  }).checks.find(c => c.id === 'e4-matching-evidence').status, 'WATCH',
+  'a later snapshot without an exact bot version cannot prove release identity');
+
+  const inconsistentTicks = structuredClone(late);
+  inconsistentTicks.ctx.rooms.E8N1.logisticsMatchingEvidence.lastWindow.ticks = 101;
+  assert.equal(evaluateLive({ events: [...inside, inconsistentTicks],
+    startTick: 1000, nodeVersion: '24.21.0'
+  }).checks.find(c => c.id === 'e4-matching-evidence').status, 'WATCH',
+  'exact start/end for 100 ticks cannot accept a 101-tick payload');
+
   const farLate = structuredClone(late);
   farLate.tick = 1225;
   assert.equal(evaluateLive({ events: [...inside, farLate],
