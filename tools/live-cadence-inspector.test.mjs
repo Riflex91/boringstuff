@@ -20,11 +20,20 @@ function snapshot(t, { economyStart = 1010, e4Start = 1011,
       rooms: { E8N1: {
         economy: { last100: block(economyStart, {
           controllerProgress: 42, constructionProgress: 3,
-          productiveFlow: { actualProductiveThroughputPerTick: 8.5 }
+          productiveFlow: { actualProductiveThroughputPerTick: 8.5,
+            consumerTicks: 100, waitingConsumerTicks: 7,
+            criticalConsumerTicks: 5, fallbackConsumerTicks: 2 }
         }) },
         logisticsMatchingEvidence: { lastWindow: block(e4Start, {
           duplicateReservationTicks: 0, criticalRequestTicks: 42,
-          criticalCoverageRatio: 0.9
+          criticalMatchedTicks: 38, unmatchedCriticalTicks: 4,
+          criticalCandidateRequestTicks: 40, criticalNoCandidateTicks: 2,
+          criticalCandidateUnmatchedTicks: 2, criticalSlotCapacityTicks: 38,
+          criticalCandidateRatio: 0.952, criticalCandidateCoverageRatio: 0.95,
+          criticalSlotCoverageRatio: 1, criticalCoverageRatio: 0.905,
+          averageHaulers: 3, averageMatchedHaulers: 2,
+          averageConsumerWaiting: 0.07, averageConsumerFallback: 0.02,
+          averageConsumerCritical: 0.05
         }) },
         plannerVNext: { planTick: p2Plan, status: 'READY' },
         remoteRoi: { evaluatedTick: i2Plan, status: 'READY' },
@@ -53,6 +62,15 @@ assert.equal(outcome.economyWindows[0].productiveThroughput, 8.5);
 assert.equal(outcome.e4Windows.length, 1);
 assert.equal(outcome.e4Windows[0].startTick, 1011);
 assert.equal(outcome.e4Windows[0].duplicateReservationTicks, 0);
+assert.equal(outcome.e4Windows[0].criticalMatchedTicks, 38);
+assert.equal(outcome.e4Windows[0].unmatchedCriticalTicks, 4);
+assert.equal(outcome.e4Windows[0].criticalNoCandidateTicks, 2);
+assert.equal(outcome.e4Windows[0].criticalCandidateUnmatchedTicks, 2);
+assert.equal(outcome.e4Windows[0].criticalSlotCapacityTicks, 38);
+assert.equal(outcome.e4Windows[0].criticalCoverageRatio, 0.905);
+assert.equal(outcome.e4Windows[0].averageConsumerFallback, 0.02);
+assert.equal(outcome.economyWindows[0].fallbackConsumerTicks, 2);
+assert.equal(outcome.economyWindows[0].waitingConsumerTicks, 7);
 assert.equal(outcome.overlappingEconomyE4Windows.length, 0,
   'different cadence windows do not secretly align');
 assert.deepEqual(outcome.p2Runs.map(x => x.runTick), [1080]);
@@ -148,6 +166,8 @@ assert.deepEqual(spawnDiagnostic.recentSpawnEvents.latestSpawnOk,
 assert.deepEqual(spawnDiagnostic.recentSpawnEvents.latestSpawnRc,
   [{ tick: 1111, role: 'builder', rc: -6 }]);
 const missing = evalRows(events);
+assert.equal(missing.economyWindows[0].fallbackConsumerTicks, 2);
+assert.equal(missing.e4Windows[0].criticalCandidateUnmatchedTicks, 2);
 assert.equal(missing.latestProductiveContext.spawnBusy, null);
 assert.equal(missing.latestProductiveContext.economyWindow.spawnUtilization, null);
 assert.equal(missing.latestProductiveContext.economyModel.harvesterWorkDeficit, null);
@@ -159,5 +179,18 @@ const staleSpawn = evalRows([marker, snapshot(2025), {
 }]);
 assert.equal(staleSpawn.recentSpawnEvents.counts.SPAWN_IDLE_SURPLUS, 0,
   'log evidence older than 500 ticks is not included');
+
+const partialE4 = snapshot(1125);
+partialE4.ctx.rooms.E8N1.logisticsMatchingEvidence.lastWindow = block(1011, {
+  duplicateReservationTicks: 0, criticalRequestTicks: 5,
+  criticalCoverageRatio: 0.6
+});
+const partialResult = evalRows([marker, partialE4, events.at(-1)]);
+assert.equal(partialResult.e4Windows[0].criticalNoCandidateTicks, null);
+assert.equal(partialResult.e4Windows[0].criticalCandidateUnmatchedTicks, null);
+assert.equal(partialResult.e4Windows[0].criticalMatchedTicks, null);
+assert.equal(partialResult.e4Windows[0].criticalCoverageRatio, 0.6);
+assert.equal(partialResult.e4Windows[0].duplicateReservationTicks, 0,
+  'known duplicate evidence should remain independent of missing cause counters');
 
 console.log('Exact-release live cadence discovery tests passed');
