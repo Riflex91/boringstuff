@@ -29,9 +29,10 @@ function latestUnique(rows, key, max = 4) {
 function roomHeartbeatHint(event) {
   const ctx = event?.ctx || {};
   const energyText = typeof ctx.energy === 'string' ? ctx.energy : '';
-  const match = /^(\\d+)\\/(\\d+)$/.exec(energyText);
-  const energy = match ? Number(match[1]) : null;
-  const capacity = match ? Number(match[2]) : null;
+  const parts = energyText.split('/');
+  const parsed = parts.length === 2 && parts.every(p => p.length > 0 && Number.isInteger(Number(p)) && Number(p) >= 0);
+  const energy = parsed ? Number(parts[0]) : null;
+  const capacity = parsed ? Number(parts[1]) : null;
   const reserveFloor = capacity === null ? null : Math.min(300, capacity);
   return {
     tick: event.tick,
