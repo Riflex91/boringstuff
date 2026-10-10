@@ -123,6 +123,22 @@ const energy = require('../game/energy.js');
   assert.equal(worker.memory.logisticsFallback, false);
   assert.equal(movement.length, 0, 'failed intent is not a move target');
 
+  // Previously each failed local pickup reset waiting to zero forever,
+  // preventing the configured fallback threshold from ever being reached.
+  const originalAcquire = energy.acquire;
+  try {
+    energy.acquire = () => true;
+    worker.memory.waitingEnergyTicks = config.CONSUMER_HAULER_WAIT_TICKS;
+    assert.equal(roleWorker._test.acquireWorkEnergy(worker), true);
+    assert.equal(worker.memory.waitingEnergyTicks, 0);
+    assert.equal(worker.memory.logisticsFallback, true,
+      'repeated failed pickup must reach the real fallback path');
+  } finally {
+    energy.acquire = originalAcquire;
+  }
+  worker.memory.logisticsFallback = false;
+  worker.memory.waitingEnergyTicks = 3;
+
   pickupResult = OK;
   assert.equal(roleWorker._test.acquireWorkEnergy(worker), true);
   assert.equal(worker.memory.waitingEnergyTicks, 0,
