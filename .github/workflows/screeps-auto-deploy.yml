@@ -1,0 +1,118 @@
+name: Screeps auto-deploy (after main CI)
+
+on:
+  workflow_run:
+    workflows:
+      - npm test
+    types:
+      - completed
+
+permissions:
+  contents: read
+
+concurrency:
+  group: screeps-newbieland-chatgpt
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 23
+    defaults:
+      run:
+        working-directory: tools
+    env:
+      SCREEPS_SERVER: newbieland
+      SCREEPS_BRANCH: chatgpt
+      SCREEPS_ROOM: E8N1
+      SCREEPS_CONFIG: ${{ runner.temp }}/screeps-newbieland.json
+      SCREEPS_LOG_DIR: ${{ runner.temp }}/screeps-verification
+      SCREEPS_TOKEN_NEWBIELAND: ${{ secrets.SCREEPS_TOKEN_NEWBIELAND }}
+    steps:
+      - name: Determine whether deployment credentials are configured
+        id: credentials
+        shell: bash
+        run: |
+          if [ -n "$SCREEPS_TOKEN_NEWBIELAND" ]; then
+            echo 'present=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'present=false' >> "$GITHUB_OUTPUT"
+            echo 'SKIP: configure repository Actions secret SCREEPS_TOKEN_NEWBIELAND to enable deployment.'
+          fi
+
+      - name: Checkout exact CI-tested commit
+        if: steps.credentials.outputs.present == 'true'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+
+      - name: Prevent deploying stale commits over newer main
+        if: steps.credentials.outputs.present == 'true'
+        shell: bash
+        run: |
+          git fetch origin main --quiet
+          tested="${{ github.event.workflow_run.head_sha }}"
+          current="$(git rev-parse origin/main)"
+          if [ "$tested" != "$current" ]; then
+            echo 'Stale run: current main differs from successful CI SHA. Aborting.'
+            exit 1
+          fi
+          echo "Exact main SHA confirmed: $tested"
+
+      - name: Setup Node 24.21.0
+        if: steps.credentials.outputs.present == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.21.0
+
+      - name: Install tool dependencies
+        if: steps.credentials.outputs.present == 'true'
+        run: npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+
+      - name: Create short-lived Screeps API config
+        if: steps.credentials.outputs.present == 'true'
+        shell: bash
+        run: |
+          node --input-type=module -e '
+            import fs from "node:fs";
+            const file = process.env.SCREEPS_CONFIG;
+            const token = process.env.SCREEPS_TOKEN_NEWBIELAND;
+            if (!token || token.length < 10) throw new Error("Screeps token unavailable");
+            fs.writeFileSync(file, JSON.stringify({
+              newbieland: {
+                url: "http://screeps.newbieland.net:21025/",
+                branch: "chatgpt",
+                token
+              }
+            }), { mode: 0o600 });
+          '
+
+      - name: Validate active target, credentials and backup accessibility
+        if: steps.credentials.outputs.present == 'true'
+        run: node ci-deployment-guard.mjs preflight
+
+      - name: Upload exact tested game code and verify every module
+        if: steps.credentials.outputs.present == 'true'
+        run: node deploy-live.mjs
+
+      - name: Verify active 100-tick release and fatal/CPU guards
+        if: steps.credentials.outputs.present == 'true'
+        run: node ci-deployment-guard.mjs verify
+
+      - name: Retain pre-deploy rollback copy and receipt
+        if: always() && steps.credentials.outputs.present == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: screeps-deployment-evidence-${{ github.event.workflow_run.head_sha }}
+          path: |
+            logs/deploy-backup-*.json
+            ${{ runner.temp }}/screeps-verification/deployment-receipt-*.json
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Remove ephemeral API credentials
+        if: always() && steps.credentials.outputs.present == 'true'
+        shell: bash
+        run: rm -f "$SCREEPS_CONFIG"
