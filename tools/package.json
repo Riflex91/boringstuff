@@ -22,7 +22,8 @@
     "verify:i2": "node i2-live-verification.mjs",
     "verify:p2": "node p2-live-verification.mjs",
     "verify:d0": "node d0-live-verification.mjs",
-    "verify:p3": "node p3-live-verification.mjs"
+    "verify:p3": "node p3-live-verification.mjs",
+    "bench:p3:topology": "node defense-mincut-topology.bench.mjs"
   },
   "dependencies": {
     "ws": "8.22.0"
