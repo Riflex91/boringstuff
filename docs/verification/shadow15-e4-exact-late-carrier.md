@@ -19,10 +19,10 @@ version 0.3.0-shadow.15-node24.
 
 A later E4 lastWindow is accepted only if all constraints hold:
 
-- Carrier is a STATUS_SNAPSHOT of the requested bot version.
+- Carrier is a STATUS_SNAPSHOT with the explicitly declared exact requested bot version; missing version is rejected.
 - Carrier tick is at or after window end, no more than 100 ticks later.
 - E4 startTick/endTick exactly match the requested 100-tick window,
-  and its ticks field is at least 100.
+  and its ticks field equals exactly 100; contradictory 101-tick payloads are rejected.
 - No intervening DEPLOYMENT_MARKER after the window end and through
   the carrier snapshot.
 - The original in-window state shows E4 SHADOW available.
