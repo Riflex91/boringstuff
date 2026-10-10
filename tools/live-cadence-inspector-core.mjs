@@ -24,6 +24,49 @@ function latestUnique(rows, key, max = 4) {
   return [...unique.values()].sort((a, b) => b[key] - a[key]).slice(0, max);
 }
 
+// ROOM_HEARTBEAT is a sampled operational hint, not a complete E4 window.
+// Missing logger data is UNKNOWN, never evidence that no emergency existed.
+function roomHeartbeatHint(event) {
+  const ctx = event?.ctx || {};
+  const energyText = typeof ctx.energy === 'string' ? ctx.energy : '';
+  const match = /^(\\d+)\\/(\\d+)$/.exec(energyText);
+  const energy = match ? Number(match[1]) : null;
+  const capacity = match ? Number(match[2]) : null;
+  const reserveFloor = capacity === null ? null : Math.min(300, capacity);
+  return {
+    tick: event.tick,
+    energyAvailable: energy,
+    energyCapacity: capacity,
+    belowInfrastructureReserve: energy === null || reserveFloor === null ? null : energy < reserveFloor,
+    emergencyDeliverSpecs: number(ctx.logisticsRequests?.byKind?.EMERGENCY_DELIVER),
+    consumerEnergyDemandSpecs: null,
+    shadowCriticalRequestCount: number(ctx.logisticsMatching?.criticalRequestCount),
+    shadowMatchedCriticalCount: number(ctx.logisticsMatching?.criticalMatchedCount),
+    shadowHaulerCount: number(ctx.logisticsMatching?.haulerCount)
+  };
+}
+
+export function analyzeE4SlotEvidence(window) {
+  const requests = number(window?.criticalRequestTicks);
+  const matched = number(window?.criticalMatchedTicks);
+  const slot = number(window?.criticalSlotCapacityTicks);
+  const noCandidate = number(window?.criticalNoCandidateTicks);
+  if (requests === null || matched === null || slot === null ||
+      requests < 0 || matched < 0 || slot < 0 ||
+      matched > requests || matched > slot || slot > requests) {
+    return { state: 'UNKNOWN', requestExcessOverSlots: null,
+      slotHeadroomUnmatched: null, candidateGap: noCandidate,
+      note: 'Missing or inconsistent E4 totals; do not infer slot attribution.' };
+  }
+  return {
+    state: 'READY',
+    requestExcessOverSlots: requests - slot,
+    slotHeadroomUnmatched: slot - matched,
+    candidateGap: noCandidate,
+    note: 'Shadow matching one-job-per-hauler slot arithmetic only; NOT proof of real hauler throughput, request origin or causal starvation.'
+  };
+}
+
 export function discoverLiveWindows({ events, receipt, roomName = 'E8N1', limit = 4 } = {}) {
   if (!Array.isArray(events)) throw new Error('events array required');
   if (!receipt?.deploymentId || !receipt?.version || !receipt?.server || !receipt?.branch)
@@ -183,7 +226,16 @@ export function discoverLiveWindows({ events, receipt, roomName = 'E8N1', limit 
         rc: number(e.ctx?.rc) }))
   };
   const economyWindows = latestUnique(economy, 'startTick', limit);
-  const e4Windows = latestUnique(e4, 'startTick', limit);
+  const observedRoomHeartbeats = ordered.filter(e => e.code === 'ROOM_HEARTBEAT' &&
+    e.v === receipt.version && e.tick >= marker.tick &&
+    String(e.ctx?.room || '').toUpperCase() === room);
+  const e4Windows = latestUnique(e4, 'startTick', limit).map(window => ({
+    ...window,
+    slotAccounting: analyzeE4SlotEvidence(window),
+    roomHeartbeatHints: observedRoomHeartbeats.filter(e =>
+      e.tick >= window.startTick && e.tick <= window.endTick)
+      .slice(-10).map(roomHeartbeatHint)
+  }));
   const e4Starts = new Set(e4Windows.map(x => x.startTick));
   const shared = economyWindows.filter(x => e4Starts.has(x.startTick));
   return {
