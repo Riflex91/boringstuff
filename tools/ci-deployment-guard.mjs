@@ -146,6 +146,35 @@ export function inspectDeployment(bot, deploymentId, minTicks = 25) {
     return { count: items.length, duplicates, empty };
   });
   const maxObserved = (items) => items.length ? Math.max(...items) : null;
+  // Join only the two bounded arrays from the SAME room snapshot. Consumer
+  // identifiers are needed to test sticky-reservation overlap, but neither
+  // names nor target IDs leave this function. A sticky target is an intent,
+  // not proof of live guard assignment or delivered energy.
+  const linkSamples = roomSamples.map(s => {
+    const consumerSupply = s.x.rooms[room].consumerSupply;
+    const consumers = consumerSupply?.criticalConsumers;
+    const reservations = consumerSupply?.consumerReservations;
+    if (!Array.isArray(consumers) || !Array.isArray(reservations) ||
+        !consumers.every(c => c && typeof c === 'object' &&
+          typeof c.id === 'string' && c.id.length > 0) ||
+        !reservations.every(r => r && typeof r === 'object' &&
+          typeof r.targetId === 'string' && r.targetId.length > 0 &&
+          typeof r.carried === 'number' && Number.isFinite(r.carried) && r.carried >= 0)) {
+      return null;
+    }
+    const ids = new Set(consumers.map(c => c.id));
+    if (ids.size !== consumers.length) return null;
+    const stickyTargets = new Set(reservations.map(r => r.targetId));
+    const loadedTargets = new Set(reservations.filter(r => r.carried > 0).map(r => r.targetId));
+    return {
+      critical: ids.size,
+      withoutSticky: consumers.filter(c => !stickyTargets.has(c.id)).length,
+      withSticky: consumers.filter(c => stickyTargets.has(c.id)).length,
+      withLoadedSticky: consumers.filter(c => loadedTargets.has(c.id)).length,
+      possiblyTruncated: consumers.length === 8 || reservations.length === 8
+    };
+  });
+  const validLinks = linkSamples.filter(s => s !== null);
   const roomEvidence = {
     sampledRoomSnapshots: roomSamples.length,
     sampledEnergySnapshots: energySamples.length,
@@ -180,7 +209,21 @@ export function inspectDeployment(bot, deploymentId, minTicks = 25) {
       x.duplicates)),
     snapshotsWithEmptyReservedHaulers: reservationMetrics.filter(x =>
       x.empty > 0).length,
-    reservationListMayBeCapped: reservationSamples.some(items => items.length === 8)
+    reservationListMayBeCapped: reservationSamples.some(items => items.length === 8),
+    // These are counts of sticky target IDs among listed critical consumers,
+    // not settled transfers or guarantees of actual consumer service.
+    sampledCriticalReservationLinkSnapshots: validLinks.length,
+    invalidOrMissingCriticalReservationLinkSnapshots: linkSamples.length - validLinks.length,
+    maximumObservedCriticalWithoutStickyReservation:
+      maxObserved(validLinks.map(x => x.withoutSticky)),
+    maximumObservedCriticalWithStickyReservation:
+      maxObserved(validLinks.map(x => x.withSticky)),
+    maximumObservedCriticalWithLoadedStickyReservation:
+      maxObserved(validLinks.map(x => x.withLoadedSticky)),
+    snapshotsWithCriticalWithoutStickyReservation:
+      validLinks.filter(x => x.withoutSticky > 0).length,
+    criticalReservationLinkMayBePartial:
+      validLinks.some(x => x.possiblyTruncated)
   };
   if (!Number.isFinite(Number(roomStatus.rcl)) ||
       Number(roomStatus.rcl) <= 0 ||
