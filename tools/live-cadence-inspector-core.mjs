@@ -41,6 +41,11 @@ function roomHeartbeatHint(event) {
     belowInfrastructureReserve: energy === null || reserveFloor === null ? null : energy < reserveFloor,
     emergencyDeliverSpecs: number(ctx.logisticsRequests?.byKind?.EMERGENCY_DELIVER),
     consumerEnergyDemandSpecs: null,
+    observedWaitingConsumers: number(ctx.economyModel?.consumerWaitingCount),
+    observedFallbackConsumers: number(ctx.economyModel?.consumerFallbackCount),
+    observedCriticalConsumers: number(ctx.economyModel?.consumerCriticalCount),
+    observedRealHaulers: number(ctx.creeps?.hauler),
+    observedHaulerCarryDeficit: number(ctx.economyModel?.haulerCarryDeficit),
     shadowCriticalRequestCount: number(ctx.logisticsMatching?.criticalRequestCount),
     shadowMatchedCriticalCount: number(ctx.logisticsMatching?.criticalMatchedCount),
     shadowHaulerCount: number(ctx.logisticsMatching?.haulerCount)
@@ -250,10 +255,17 @@ export function discoverLiveWindows({ events, receipt, roomName = 'E8N1', limit 
       .slice(-5).map(e => ({ tick: e.tick, role: e.ctx?.role || null,
         rc: number(e.ctx?.rc) }))
   };
-  const economyWindows = latestUnique(economy, 'startTick', limit);
   const observedRoomHeartbeats = ordered.filter(e => e.code === 'ROOM_HEARTBEAT' &&
     e.v === receipt.version && e.tick >= marker.tick &&
     String(e.ctx?.room || '').toUpperCase() === room);
+  const economyWindows = latestUnique(economy, 'startTick', limit).map(window => ({
+    ...window,
+    // Sampling only. A quiet heartbeat or missing samples never proves
+    // the whole 100-tick economy window was free of fallback.
+    roomHeartbeatHints: observedRoomHeartbeats.filter(e =>
+      e.tick >= window.startTick && e.tick <= window.endTick)
+      .slice(-10).map(roomHeartbeatHint)
+  }));
   const observedSpawnStarts = ordered.filter(e => e.code === 'SPAWN_OK' &&
     e.v === receipt.version && e.tick >= marker.tick &&
     String(e.ctx?.room || '').toUpperCase() === room);
