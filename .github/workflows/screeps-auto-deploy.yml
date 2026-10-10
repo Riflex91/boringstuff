@@ -27,7 +27,8 @@ jobs:
       SCREEPS_BRANCH: chatgpt
       SCREEPS_ROOM: E8N1
       SCREEPS_TOKEN_NEWBIELAND: ${{ secrets.SCREEPS_TOKEN_NEWBIELAND }}
-      SCREEPS_USERNAME_NEWBIELAND: ${{ secrets.SCREEPS_USERNAME_NEWBIELAND }}
+      # Public Screeps in-game username confirmed by the player (not the Steam display name).
+      SCREEPS_USERNAME_NEWBIELAND: Riflex91
       SCREEPS_PASSWORD_NEWBIELAND: ${{ secrets.SCREEPS_PASSWORD_NEWBIELAND }}
     steps:
       - name: Set ephemeral API paths
