@@ -43,4 +43,18 @@ assert.equal(inspectDeployment(noRoom, id).reason, 'NO_ROOM_STATUS_AFTER_DEPLOYM
 const incomplete = structuredClone(state);
 incomplete.telemetryJournal.snapshots[0].t = 1099;
 assert.equal(inspectDeployment(incomplete, id, 100).status, 'WAIT');
+// Newer journal records alone cannot validate the room snapshot for 100 ticks.
+const staleSnapshot = structuredClone(incomplete);
+staleSnapshot.telemetryJournal.events.push(record('HEARTBEAT', 1101));
+const stale = inspectDeployment(staleSnapshot, id, 100);
+assert.equal(stale.status, 'WAIT');
+assert.equal(stale.reason, 'POST_WINDOW_STATUS_SNAPSHOT_PENDING');
+assert.equal(stale.minimumSnapshotTick, 1100);
+// A qualifying 100+ tick snapshot unlocks a pass even with earlier snapshots.
+staleSnapshot.telemetryJournal.snapshots.push(structuredClone(state.telemetryJournal.snapshots[0]));
+assert.equal(inspectDeployment(staleSnapshot, id, 100).status, 'PASS');
+// Invalid room data in a qualifying snapshot still fails closed.
+const badFresh = structuredClone(staleSnapshot);
+delete badFresh.telemetryJournal.snapshots[1].x.rooms.E8N1;
+assert.equal(inspectDeployment(badFresh, id, 100).reason, 'NO_ROOM_STATUS_AFTER_DEPLOYMENT');
 console.log('CI deployment guard and 100-tick provenance checks passed');
