@@ -757,6 +757,12 @@ console.log('live-verification tests passed');
     }
   };
   const late = event(1125, 'STATUS_SNAPSHOT', nextContext, { jseq: 45 });
+  // This carrier deliberately contains alarming CURRENT-state values from
+  // outside the selected window. Only its exact E4 lastWindow is eligible:
+  // late CPU/bucket and authority must not taint the earlier safety verdict.
+  late.ctx.cpu = 9000;
+  late.ctx.bucket = 100;
+  late.ctx.rooms.E8N1.colonyState.authority = 'ACTIVE';
   const before = evaluateLive({ events: inside,
     startTick: 1000, nodeVersion: '24.21.0' });
   assert.equal(before.checks.find(c => c.id === 'e4-matching-evidence').status, 'WATCH');
@@ -766,6 +772,9 @@ console.log('live-verification tests passed');
   assert.equal(checkE4.status, 'PASS');
   assert.equal(checkE4.data.duplicateReservationTicks, 0);
   assert.equal(after.checks.find(c => c.id === 'vnext-shadow-authority').status, 'PASS');
+  assert.equal(after.checks.find(c => c.id === 'cpu-bucket').status,
+    before.checks.find(c => c.id === 'cpu-bucket').status,
+    'a late low bucket must not rewrite the exact-window safety verdict');
   assert.equal(after.counts.fail, before.counts.fail,
     'a later evidence carrier cannot change original-window safety checks');
 
