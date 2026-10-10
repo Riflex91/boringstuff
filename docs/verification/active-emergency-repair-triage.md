@@ -10,8 +10,8 @@ room structures for **owned spawns, towers and storage** under 35% health
 (`hits / hitsMax < 0.35`). These are emergency repairs, in descending
 importance: spawn, tower, storage. Roads, ramparts, walls, containers,
 neutral/foreign structures, and invalid health reports are never promoted.
-Within the highest priority tier, lowest health ratio takes precedence.
-The active worker path selects a reachable target with the normal bounded
+Within the highest priority tier, candidates are sorted by health ratio,
+while the active worker path selects the closest reachable target using bounded
 `PATH_MAX_OPS`; a `repair === ERR_NOT_IN_RANGE` result causes movement
 with the existing bounded budget.
 
