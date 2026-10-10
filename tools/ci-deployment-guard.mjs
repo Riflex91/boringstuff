@@ -1,3 +1,4 @@
+import { gunzipSync } from 'node:zlib';
 import { ScreepsHttpClient } from './screeps-client.mjs';
 import { pathToFileURL } from 'node:url';
 import { readDeploymentReceipt, DEFAULT_VERIFICATION_LOG_DIR } from './deployment-receipt.mjs';
@@ -9,17 +10,29 @@ const mode = process.argv[2];
 
 export function parseBotMemory(reply) {
   let value = reply;
-  for (let n = 0; n < 4; n++) {
+  for (let n = 0; n < 6; n++) {
     if (typeof value === 'string') {
-      try { value = JSON.parse(value); } catch { return null; }
+      try {
+        // Screeps /api/user/memory sends gz: + base64(gzip(JSON)) on
+        // official and compatible private servers, not always raw JSON.
+        // Bound inflation so malformed/untrusted responses fail closed.
+        value = value.startsWith('gz:')
+          ? JSON.parse(gunzipSync(Buffer.from(value.slice(3), 'base64'),
+              { maxOutputLength: 4_000_000 }).toString('utf8'))
+          : JSON.parse(value);
+      } catch { return null; }
       continue;
     }
-    if (!value || typeof value !== 'object') return null;
-    if (value.deploymentId !== undefined) return value;
-    if (value.data !== undefined) { value = value.data; continue; }
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    if (typeof value.deploymentId === 'string') return value;
+    if (Object.prototype.hasOwnProperty.call(value, 'data')) {
+      value = value.data;
+      continue;
+    }
     return null;
   }
-  return value && typeof value === 'object' && value.deploymentId ? value : null;
+  return value && typeof value === 'object' && !Array.isArray(value) &&
+    typeof value.deploymentId === 'string' ? value : null;
 }
 
 export function inspectDeployment(bot, deploymentId, minTicks = 25) {
@@ -44,8 +57,12 @@ export function inspectDeployment(bot, deploymentId, minTicks = 25) {
       codes: fatal.slice(0, 10).map(e => e.c) };
   }
   const snapshots = Array.isArray(journal.snapshots) ? journal.snapshots : [];
+  // A newer journal event can prove elapsed ticks but cannot prove room state
+  // at the end of that window. Require the status snapshot itself to be fresh.
+  const minimumSnapshotTick = tick + minTicks;
   const last = snapshots.filter(s => s && s.c === 'STATUS_SNAPSHOT' &&
-    Number(s.t) >= tick).sort((a, b) => b.t - a.t)[0] || null;
+    Number.isFinite(Number(s.t)) && Number(s.t) >= minimumSnapshotTick)
+    .sort((a, b) => Number(b.t) - Number(a.t))[0] || null;
   const currentTick = Math.max(tick,
     ...snapshots.map(s => Number(s?.t) || 0),
     ...events.map(e => Number(e?.t) || 0));
@@ -53,7 +70,13 @@ export function inspectDeployment(bot, deploymentId, minTicks = 25) {
     return { status: 'WAIT', reason: 'OBSERVATION_WINDOW_INCOMPLETE',
       tick, observedTicks: currentTick - tick };
   }
-  if (!last || !last.x || !last.x.rooms || !last.x.rooms[room]) {
+  if (!last) {
+    // Snapshots are on a fixed 100-tick cadence; do not turn normal
+    // post-window cadence lag into a false pass or a premature failure.
+    return { status: 'WAIT', reason: 'POST_WINDOW_STATUS_SNAPSHOT_PENDING',
+      tick, observedTicks: currentTick - tick, minimumSnapshotTick };
+  }
+  if (!last.x || !last.x.rooms || !last.x.rooms[room]) {
     return { status: 'FAIL', reason: 'NO_ROOM_STATUS_AFTER_DEPLOYMENT', tick,
       observedTicks: currentTick - tick };
   }
