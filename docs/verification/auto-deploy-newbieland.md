@@ -44,7 +44,7 @@ API password, followed by token headers on authenticated API calls.
 Credentials are made into a temporary per-run config file on the
 GitHub runner with permissions 0600, and are not printed or included
 in artifacts. If neither credential method is configured, the workflow
-marks `DEPLOYMENT_SKIPPED`; no upload or live verification is performed.
+marks `DEPLOYMENT_SKIPPED` and **fails the deployment job** rather than showing a misleading green result; no upload or live verification is performed.
 
 ## Automatic flow
 
