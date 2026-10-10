@@ -141,4 +141,48 @@ assert.equal(observer.flush(fourRooms.slice(0, 3), logger, g), 3,
   'three rooms remain inside supported optional sample bound');
 assert.equal(eventRows.length, priorCount + 3);
 
+// Cross-check the actual legacy selector instead of relying on a duplicated
+// interpretation of its capacity rule.
+const legacyEnergy = require('../game/energy.js');
+for (const candidate of [loaded, collecting,
+  creep('parity-unknown-loaded', 'hauler', 99, undefined),
+  creep('parity-unknown-low', 'hauler', 20, undefined),
+  creep('parity-delivering', 'hauler', 10, undefined, { delivering: true }),
+  { ...collecting, store: { energy: 99 } }]) {
+  assert.equal(observer._test.haulerReadiness(candidate).ready,
+    legacyEnergy._test.haulerReadyToDeliver(candidate),
+    'observation readiness must equal unchanged production guard');
+}
+
+// Exercise the real logger -> slim() -> durable journal serialization path.
+// Diagnostic counts must remain actual numbers, without identifiers.
+g.time = 1125;
+g.creeps = { loaded, collecting, fallback, waiting };
+global.Memory = { bot: { version: config.VERSION, sessionId: 'synthetic-test' } };
+const actualLogger = require('../game/logger.js');
+const telemetryJournal = require('../game/telemetry.journal.js');
+const originalLog = console.log;
+const consoleLines = [];
+try {
+  console.log = line => { consoleLines.push(line); };
+  observer.recordResult(loaded, 'consumer', OK);
+  assert.equal(observer.flush([state], actualLogger, g), 1);
+} finally {
+  console.log = originalLog;
+}
+assert.equal(consoleLines.length, 1);
+const parsed = JSON.parse(consoleLines[0].replace(/^\\[BOTLOG\\]/, ''));
+assert.equal(parsed.code, 'CONSUMER_SUPPLY_DIAG');
+assert.equal(parsed.ctx.consumerTransfers.accepted, 1);
+assert.equal(parsed.ctx.haulers.readyByGuardRule, 1);
+assert.equal(parsed.ctx.acceptedIsIntentNotSettled, true);
+assert.equal(parsed.jseq, 1);
+assert.equal(parsed.ctx.consumers.fallback, 1);
+assert.equal(JSON.stringify(parsed.ctx).includes('loaded'), false,
+  'no hauler identity may leave the logger/journal as an aggregate diagnostic');
+const stored = telemetryJournal.recent(1)[0];
+assert.equal(stored.c, 'CONSUMER_SUPPLY_DIAG');
+assert.equal(stored.x.consumerTransfers.accepted, 1);
+assert.equal(stored.x.haulers.readyByGuardRule, 1);
+
 console.log('post-creep observer: read-only guard and intent diagnostics PASS');
