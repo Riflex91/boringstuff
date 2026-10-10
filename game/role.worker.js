@@ -2,6 +2,7 @@
 
 const energy = require('energy');
 const config = require('config');
+const workPriority = require('work.priority');
 
 function needsEnergy(creep) {
   if (creep.memory.working && creep.store[RESOURCE_ENERGY] === 0) {
@@ -114,6 +115,27 @@ function build(creep) {
   return rc === OK || rc === ERR_NOT_IN_RANGE;
 }
 
+function emergencyRepair(creep) {
+  const targets = workPriority.emergencyRepairTargets(creep.room.find(FIND_STRUCTURES));
+  if (!targets.length) return false;
+
+  // Never skip a threatened spawn just because a road is closer. Within
+  // the highest-priority category, try the most damaged reachable object.
+  const target = creep.pos.findClosestByPath(targets, {
+    maxOps: config.PATH_MAX_OPS
+  });
+  if (!target) return false;
+  const rc = creep.repair(target);
+  if (rc === ERR_NOT_IN_RANGE) {
+    creep.moveTo(target, {
+      reusePath: 10,
+      maxOps: config.PATH_MAX_OPS,
+      visualizePathStyle: { stroke: '#ff5533' }
+    });
+  }
+  return rc === OK || rc === ERR_NOT_IN_RANGE;
+}
+
 function repair(creep) {
   const rcl = creep.room.controller ? creep.room.controller.level : 1;
   const wallCap = Math.max(10000, rcl * config.REPAIR_WALL_TARGET_RCL_MULTIPLIER);
@@ -172,6 +194,11 @@ function run(creep) {
 
   if (shouldAssistInfrastructure(creep) && refill(creep)) return;
 
+  // Preserve infrastructure refill for recovery rooms, then immediately
+  // repair critically damaged owned spawns/towers/storage before construction
+  // or routine maintenance. Upgraders retain their controller assignment.
+  if (emergencyRepair(creep)) return;
+
   if (role === 'builder') {
     if (build(creep)) return;
     if (repair(creep)) return;
@@ -190,4 +217,4 @@ function run(creep) {
   upgrade(creep);
 }
 
-module.exports = { run, _test: { acquireWorkEnergy, needsEnergy, liveHaulerCount, shouldAssistInfrastructure } };
+module.exports = { run, _test: { acquireWorkEnergy, needsEnergy, liveHaulerCount, shouldAssistInfrastructure, emergencyRepair } };
