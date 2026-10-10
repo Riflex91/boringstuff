@@ -71,6 +71,27 @@ else {
           ' runTick=' + (w.runTick ?? 'N/A') +
           ' cpu=' + (w.cpu ?? 'N/A') +
           ' duplicateReservationTicks=' + (w.duplicateReservationTicks ?? 'UNKNOWN'));
+        if (name.startsWith('E4')) {
+          console.log('    criticalRequestTicks=' + (w.criticalRequestTicks ?? 'UNKNOWN') +
+            ' matched=' + (w.criticalMatchedTicks ?? 'UNKNOWN') +
+            ' unmatched=' + (w.unmatchedCriticalTicks ?? 'UNKNOWN') +
+            ' coverage=' + (w.criticalCoverageRatio ?? 'UNKNOWN') +
+            ' noCandidate=' + (w.criticalNoCandidateTicks ?? 'UNKNOWN') +
+            ' candidateUnmatched=' + (w.criticalCandidateUnmatchedTicks ?? 'UNKNOWN') +
+            ' candidateRequest=' + (w.criticalCandidateRequestTicks ?? 'UNKNOWN') +
+            ' slotCapacity=' + (w.criticalSlotCapacityTicks ?? 'UNKNOWN'));
+          console.log('    haulers(avg)=' + (w.averageHaulers ?? 'UNKNOWN') +
+            ' matchedHaulers(avg)=' + (w.averageMatchedHaulers ?? 'UNKNOWN') +
+            ' consumerFallback(avg)=' + (w.averageConsumerFallback ?? 'UNKNOWN'));
+        }
+        if (name.startsWith('Productive')) {
+          console.log('    consumerTicks=' + (w.consumerTicks ?? 'UNKNOWN') +
+            ' waitingConsumerTicks=' + (w.waitingConsumerTicks ?? 'UNKNOWN') +
+            ' criticalConsumerTicks=' + (w.criticalConsumerTicks ?? 'UNKNOWN') +
+            ' fallbackConsumerTicks=' + (w.fallbackConsumerTicks ?? 'UNKNOWN') +
+            ' controllerProgress=' + (w.controllerProgress ?? 'UNKNOWN') +
+            ' constructionProgress=' + (w.constructionProgress ?? 'UNKNOWN'));
+        }
       }
       if (windows.length) console.log('  Probe: node .\\' + cmd + ' --start-tick ' + windows[0].startTick);
     }
