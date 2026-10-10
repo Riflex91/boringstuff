@@ -350,10 +350,36 @@ export function evaluateLive(input) {
     : check('vnext-shadow-authority', 'PASS', 'VNext authority remains shadow/evidence-only in live telemetry.'));
 
   if (colony?.logisticsMatching?.available) {
+    // E4 is a fixed 100-tick runtime window. Like productive-flow, its
+    // exact completed block may first appear in a STATUS_SNAPSHOT AFTER
+    // the verifier's end tick. A later carrier is allowed only for the
+    // immutable exact-window evidence, never for current-state/safety data.
+    const e4Carrier = (input.events || [])
+      .filter(e => e?.code === 'STATUS_SNAPSHOT' &&
+        e.v === requestedBotVersion &&
+        finite(e.tick, -1) >= selected.endTick &&
+        finite(e.tick, Infinity) <= selected.endTick + 100 &&
+        !(input.events || []).some(marker => marker?.code === 'DEPLOYMENT_MARKER' &&
+          finite(marker.tick, -1) > selected.endTick &&
+          finite(marker.tick, -1) <= finite(e.tick, -1)))
+      .map(e => {
+        const room = roomFromEvent(e, roomName);
+        const evidence = room?.logisticsMatchingEvidence ||
+          room?.colonyState?.logisticsMatching?.evidence || null;
+        return { e, evidence, last: evidence?.lastWindow || null };
+      })
+      .filter(item => item.last &&
+        finite(item.last.startTick, null) === selected.startTick &&
+        finite(item.last.endTick, null) === selected.endTick &&
+        finite(item.last.ticks, null) === 100)
+      .sort((a, b) => finite(a.e.tick, 0) - finite(b.e.tick, 0) ||
+        finite(a.e.jseq, 0) - finite(b.e.jseq, 0))
+      .at(0) || null;
     // Prefer the shallow STATUS_SNAPSHOT mirror because logger serialization
     // depth can truncate the deeper colonyState.logisticsMatching.evidence
     // window fields to "[depth-limit]".
-    const e4Evidence = latest?.logisticsMatchingEvidence || colony.logisticsMatching.evidence || null;
+    const e4Evidence = e4Carrier?.evidence ||
+      latest?.logisticsMatchingEvidence || colony.logisticsMatching.evidence || null;
     const e4Last = e4Evidence?.lastWindow || null;
     const e4Current = e4Evidence?.current || null;
     const e4StartTick = finite(e4Last?.startTick, null);

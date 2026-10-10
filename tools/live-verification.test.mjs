@@ -735,3 +735,81 @@ console.log('live-verification tests passed');
   assert.equal(throughput.data.productiveCapacity, 6);
   assert.ok(Math.abs(throughput.data.utilization - (3.76 / 6)) < 1e-12);
 }
+
+
+{
+  // E4's immutable exact 100-tick block may only become visible in the
+  // next STATUS_SNAPSHOT, after the window end. That later carrier must
+  // not influence current safety checks or hide duplicate reservations.
+  const inside = evidence(1000);
+  const baseStatus = inside.at(-1);
+  baseStatus.ctx.rooms.E8N1.colonyState.logisticsMatching = {
+    available: true, authority: 'SHADOW',
+    evidence: { authority: 'SHADOW_EVIDENCE', lastWindow: null }
+  };
+  const newContext = structuredClone(baseStatus.ctx);
+  newContext.rooms.E8N1.logisticsMatchingEvidence = {
+    authority: 'SHADOW_EVIDENCE',
+    lastWindow: {
+      authority: 'SHADOW_EVIDENCE',
+      startTick: 1000, endTick: 1099, ticks: 100,
+      criticalRequestTicks: 12, criticalCoverageRatio: 1,
+      duplicateReservationTicks: 0
+    }
+  };
+  const late = event(1125, 'STATUS_SNAPSHOT', newContext, { jseq: 45 });
+  const before = evaluateLive({ events: inside,
+    startTick: 1000, nodeVersion: '24.21.0' });
+  assert.equal(before.checks.find(c => c.id === 'e4-matching-evidence').status, 'WATCH');
+  const after = evaluateLive({ events: [...inside, late],
+    startTick: 1000, nodeVersion: '24.21.0' });
+  const e4 = after.checks.find(c => c.id === 'e4-matching-evidence');
+  assert.equal(e4.status, 'PASS', 'accept immutable E4 evidence from bounded later snapshot');
+  assert.equal(e4.data.duplicateReservationTicks, 0);
+  assert.equal(after.checks.find(c => c.id === 'vnext-shadow-authority').status, 'PASS');
+  assert.equal(after.counts.fail, before.counts.fail,
+    'late E4 snapshot must not alter original window safety checks');
+
+  const missingDup = structuredClone(late);
+  delete missingDup.ctx.rooms.E8N1.logisticsMatchingEvidence.lastWindow.duplicateReservationTicks;
+  assert.equal(evaluateLive({ events: [...inside, missingDup],
+    startTick: 1000, nodeVersion: '24.21.0'
+  }).checks.find(c => c.id === 'e4-matching-evidence').status, 'WATCH',
+  'late evidence cannot coerce missing duplicate count into a PASS');
+
+  const badDup = structuredClone(late);
+  badDup.ctx.rooms.E8N1.logisticsMatchingEvidence.lastWindow.duplicateReservationTicks = 1;
+  assert.equal(evaluateLive({ events: [...inside, badDup],
+    startTick: 1000, nodeVersion: '24.21.0'
+  }).checks.find(c => c.id === 'e4-matching-evidence').status, 'FAIL',
+  'real duplicates in exact later snapshot must remain FAIL');
+
+  const newDeployment = event(1110, 'DEPLOYMENT_MARKER', {
+    version: '0.3.0-shadow.15-node24', deploymentId: 'different-release'
+  });
+  assert.equal(evaluateLive({ events: [...inside, newDeployment, late],
+    startTick: 1000, nodeVersion: '24.21.0'
+  }).checks.find(c => c.id === 'e4-matching-evidence').status, 'WATCH',
+  'later carriers across deployment marker must not be reused');
+
+  const unversioned = structuredClone(late);
+  delete unversioned.v;
+  assert.equal(evaluateLive({ events: [...inside, unversioned],
+    startTick: 1000, nodeVersion: '24.21.0'
+  }).checks.find(c => c.id === 'e4-matching-evidence').status, 'WATCH',
+  'a later snapshot without an exact bot version cannot prove release identity');
+
+  const inconsistentTicks = structuredClone(late);
+  inconsistentTicks.ctx.rooms.E8N1.logisticsMatchingEvidence.lastWindow.ticks = 101;
+  assert.equal(evaluateLive({ events: [...inside, inconsistentTicks],
+    startTick: 1000, nodeVersion: '24.21.0'
+  }).checks.find(c => c.id === 'e4-matching-evidence').status, 'WATCH',
+  'exact start/end for 100 ticks cannot accept a 101-tick payload');
+
+  const farLate = structuredClone(late);
+  farLate.tick = 1225;
+  assert.equal(evaluateLive({ events: [...inside, farLate],
+    startTick: 1000, nodeVersion: '24.21.0'
+  }).checks.find(c => c.id === 'e4-matching-evidence').status, 'WATCH',
+  'snapshot too far after requested window must not be trusted');
+}
