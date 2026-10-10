@@ -91,7 +91,79 @@ export function discoverLiveWindows({ events, receipt, roomName = 'E8N1', limit 
     });
   }
   const last = snapshots.at(-1);
-  const status = inRoom(last, room)?.efficiency || null;
+  const latestRoom = inRoom(last, room);
+  const status = latestRoom?.efficiency || null;
+  const model = latestRoom?.economyModel || {};
+  const last100 = latestRoom?.economy?.last100 || {};
+  const flow = last100?.productiveFlow || {};
+  // All inputs below originate in the SAME most recent STATUS_SNAPSHOT.
+  // Missing serializer fields remain null, never inferred as zero.
+  const latestProductiveContext = {
+    snapshotTick: last?.tick ?? null,
+    rcl: number(latestRoom?.rcl),
+    energyAvailable: number(latestRoom?.energyAvailable),
+    energyCapacity: number(latestRoom?.energyCapacity),
+    energyStored: number(latestRoom?.energyStored),
+    constructionSites: number(latestRoom?.constructionSites),
+    spawnBusy: typeof latestRoom?.spawnBusy === 'boolean' ? latestRoom.spawnBusy : null,
+    creepsByRole: latestRoom?.creeps || null,
+    economyWindow: {
+      startTick: tick(last100?.startTick),
+      endTick: tick(last100?.endTick),
+      ticks: tick(last100?.ticks),
+      controllerProgress: number(last100?.controllerProgress),
+      constructionProgress: number(last100?.constructionProgress),
+      spawnUtilization: number(last100?.spawnUtilization),
+      energyCappedRatio: number(last100?.energyCappedRatio),
+      actualProductiveThroughputPerTick: number(flow?.actualProductiveThroughputPerTick),
+      averageConstructionCapacityPerTick: number(flow?.averageConstructionCapacityPerTick),
+      averageDedicatedControllerCapacityPerTick: number(flow?.averageDedicatedControllerCapacityPerTick)
+    },
+    economyModel: {
+      productiveDemandPerTick: number(model.productiveDemandPerTick),
+      dedicatedHarvestCapacityPerTick: number(model.dedicatedHarvestCapacityPerTick),
+      harvesterWorkDeficit: number(model.harvesterWorkDeficit),
+      haulerCarryDeficit: number(model.haulerCarryDeficit),
+      consumerWaitingCount: number(model.consumerWaitingCount),
+      consumerFallbackCount: number(model.consumerFallbackCount),
+      consumerCriticalCount: number(model.consumerCriticalCount),
+      recommendedHarvesterCount: number(model.recommendedHarvesterCount),
+      recommendedHaulerCount: number(model.recommendedHaulerCount)
+    }
+  };
+  // SPAN: Last 500 ticks for the same deployed version and room. Logs may
+  // be sampled/deduplicated; event ABSENCE never proves absence of surplus.
+  const recentFromTick = last ? Math.max(marker.tick, last.tick - 499) : null;
+  const spawnCodes = new Set(['SPAWN_IDLE_SURPLUS', 'SPAWN_OK', 'SPAWN_RC']);
+  const recentSpawnRows = ordered.filter(e => recentFromTick !== null &&
+    e.tick >= recentFromTick && e.tick <= last.tick &&
+    e.v === receipt.version && spawnCodes.has(e.code) &&
+    String(e.ctx?.room || '').toUpperCase() === room);
+  const recentSpawnEvents = {
+    observedFromTick: recentFromTick,
+    observedThroughTick: last?.tick ?? null,
+    note: 'Logged events only; absence is not proof of no idle or spawn attempt.',
+    counts: Object.fromEntries([...spawnCodes].map(k => [
+      k, recentSpawnRows.filter(e => e.code === k).length
+    ])),
+    latestIdleSurplus: (() => {
+      const row = recentSpawnRows.filter(e => e.code === 'SPAWN_IDLE_SURPLUS').at(-1);
+      return row ? {
+        tick: row.tick, energy: number(row.ctx?.energy),
+        capacity: number(row.ctx?.capacity),
+        energyCappedStreak: number(row.ctx?.energyCappedStreak),
+        spawnIdleStreak: number(row.ctx?.spawnIdleStreak),
+        desired: row.ctx?.desired || null,
+        actual: row.ctx?.actual || null
+      } : null;
+    })(),
+    latestSpawnOk: recentSpawnRows.filter(e => e.code === 'SPAWN_OK')
+      .slice(-5).map(e => ({ tick: e.tick, role: e.ctx?.role || null,
+        cost: number(e.ctx?.cost) })),
+    latestSpawnRc: recentSpawnRows.filter(e => e.code === 'SPAWN_RC')
+      .slice(-5).map(e => ({ tick: e.tick, role: e.ctx?.role || null,
+        rc: number(e.ctx?.rc) }))
+  };
   const economyWindows = latestUnique(economy, 'startTick', limit);
   const e4Windows = latestUnique(e4, 'startTick', limit);
   const e4Starts = new Set(e4Windows.map(x => x.startTick));
@@ -103,6 +175,7 @@ export function discoverLiveWindows({ events, receipt, roomName = 'E8N1', limit 
     room, markerTick: marker.tick, latestTick,
     economyWindows, e4Windows,
     overlappingEconomyE4Windows: shared,
+    latestProductiveContext, recentSpawnEvents,
     p2Runs: latestUnique(p2, 'runTick', limit),
     i2Runs: latestUnique(i2, 'runTick', limit),
     latestEfficiency: {
