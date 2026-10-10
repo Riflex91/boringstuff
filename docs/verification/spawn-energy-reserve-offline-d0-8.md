@@ -85,3 +85,37 @@ files or production config.
 
 This PR contains **only offline test/doc/package script** changes
 relative to P3.1. No runtime file changes and no deployment.
+
+
+## Follow-up observed 750-energy hauler at 850 available
+
+At tick `3827175`, the same deployed release logged
+`SPAWN_OK` for a **750-energy hauler**, with 15
+complete serialized body parts, projecting a nominal
+45-tick spawn. The sampled room energy was
+`850/1050` at tick `3827175`; the later tick
+`3827200` sample reports `131/1050` and **16**
+E3 emergency infrastructure requests. The number
+`131` is a later sample and may include refills.
+
+The new pure offline test demonstrates the distinction
+between nominal **body budget 750** and a guaranteed
+**300-energy immediate reserve**:
+
+| Actual energy at spawn | Budget and cost | Immediate energy left | At least 300 reserved? |
+|---:|---:|---:|---|
+| 1050 | 750 | 300 | Yes |
+| 850 | 750 | 100 | **No** |
+
+It would be incorrect to propose a fixed 750-body budget
+as a universal cure. A conditional reserve rule could
+instead delay an important replacement creep or
+reduce its body, and would need explicit role-urgency/
+TTL safeguards as well as a full economic comparison.
+No such runtime rule is implemented in this PR.
+
+The separate real consumer-supply evidence also includes
+fallback at **1050/1050 energy with three live haulers**,
+demonstrating that an energy floor alone cannot solve
+the observed delivery/service problem. Read-only
+classification is tracked in draft PR #119.
