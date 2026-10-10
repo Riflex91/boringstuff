@@ -48,7 +48,7 @@ function baseRoom(overrides = {}) {
 }
 
 function event(tick, code, ctx, extra = {}) {
-  return { tick, v: '0.3.0-shadow.14-node24', level: 'INFO', code, ctx, ...extra };
+  return { tick, v: '0.3.0-shadow.15-node24', level: 'INFO', code, ctx, ...extra };
 }
 
 function evidence(start = 1000) {
@@ -56,7 +56,7 @@ function evidence(start = 1000) {
   room.economy.last100.startTick = start;
   room.economy.last100.endTick = start + 99;
   return [
-    event(start, 'VERSION_CHANGE', { from: '0.2.19-node18', to: '0.3.0-shadow.14-node24' }, { jseq: 20 }),
+    event(start, 'VERSION_CHANGE', { from: '0.2.19-node18', to: '0.3.0-shadow.15-node24' }, { jseq: 20 }),
     event(start, 'ROOM_HEARTBEAT', { room: 'E8N1', economyModel: room.economyModel, health: room.health }),
     event(start, 'BOT_HEARTBEAT', { cpu: 3.8, bucket: 10000 }),
     event(start + 24, 'ROOM_HEARTBEAT', { room: 'E8N1', economyModel: room.economyModel, health: room.health }),
@@ -785,7 +785,7 @@ console.log('live-verification tests passed');
   'real duplicates in exact later snapshot must remain FAIL');
 
   const newDeployment = event(1110, 'DEPLOYMENT_MARKER', {
-    version: '0.3.0-shadow.14-node24', deploymentId: 'different-release'
+    version: '0.3.0-shadow.15-node24', deploymentId: 'different-release'
   });
   assert.equal(evaluateLive({ events: [...inside, newDeployment, late],
     startTick: 1000, nodeVersion: '24.21.0'
