@@ -45,6 +45,11 @@ assert.deepEqual(ok.roomEvidence, {
   sampledConsumerDetailSnapshots: 1, invalidConsumerDetailSnapshots: 0,
   snapshotsWithWaitingConsumers: 0, snapshotsWithFallbackConsumers: 0,
   maximumObservedWaitingConsumers: 0, maximumObservedFallbackConsumers: 0,
+  sampledConsumerInfrastructureOverlapSnapshots: 1,
+  invalidOrMissingConsumerInfrastructureOverlapSnapshots: 0,
+  snapshotsWithFallbackAtFullInfrastructure: 0,
+  snapshotsWithFallbackBelowFullInfrastructure: 0,
+  snapshotsWithCriticalBelowFullInfrastructure: 0,
   sampledReservationSnapshots: 0, invalidReservationSnapshots: 0,
   maximumObservedReservedHaulers: null, snapshotsWithDuplicateReservations: 0,
   maximumObservedDuplicateReservations: null, snapshotsWithEmptyReservedHaulers: 0,
@@ -157,6 +162,57 @@ assert.deepEqual(ok.roomEvidence, {
   const zeroLinks = inspectDeployment(zero, id, 100).roomEvidence;
   assert.equal(zeroLinks.sampledCriticalReservationLinkSnapshots, 1);
   assert.equal(zeroLinks.maximumObservedCriticalWithoutStickyReservation, 0);
+}
+
+// Fallback at full infrastructure is different from co-occurring refill
+// pressure, but neither snapshot state proves what caused the fallback.
+{
+  const filled = structuredClone(state);
+  const status = filled.telemetryJournal.snapshots[0].x.rooms.E8N1;
+  status.consumerSupply.criticalConsumers = [
+    { id: 'waiting', waiting: 3, fallback: true }
+  ];
+  const full = inspectDeployment(filled, id, 100).roomEvidence;
+  assert.equal(full.sampledConsumerInfrastructureOverlapSnapshots, 1);
+  assert.equal(full.snapshotsWithFallbackAtFullInfrastructure, 1);
+  assert.equal(full.snapshotsWithFallbackBelowFullInfrastructure, 0);
+
+  const low = structuredClone(filled);
+  low.telemetryJournal.snapshots[0].x.rooms.E8N1.energyAvailable = 80;
+  const below = inspectDeployment(low, id, 100).roomEvidence;
+  assert.equal(below.snapshotsWithFallbackAtFullInfrastructure, 0);
+  assert.equal(below.snapshotsWithFallbackBelowFullInfrastructure, 1);
+  assert.equal(below.snapshotsWithCriticalBelowFullInfrastructure, 1);
+
+  const twoSnapshots = structuredClone(filled);
+  twoSnapshots.telemetryJournal.snapshots.unshift(record('STATUS_SNAPSHOT', 1050, {
+    cpu: 10, bucket: 9000, rooms: { E8N1: {
+      rcl: 3, creeps: { hauler: 2 }, energyAvailable: 100,
+      energyCapacity: 800, consumerSupply: { criticalConsumers: [
+        { id: 'wait', waiting: 0, fallback: true }
+      ] }
+    } }
+  }));
+  const both = inspectDeployment(twoSnapshots, id, 100).roomEvidence;
+  assert.equal(both.sampledConsumerInfrastructureOverlapSnapshots, 2);
+  assert.equal(both.snapshotsWithFallbackAtFullInfrastructure, 1);
+  assert.equal(both.snapshotsWithFallbackBelowFullInfrastructure, 1);
+
+  const unknown = structuredClone(filled);
+  delete unknown.telemetryJournal.snapshots[0].x.rooms.E8N1.energyCapacity;
+  const absent = inspectDeployment(unknown, id, 100).roomEvidence;
+  assert.equal(absent.sampledConsumerInfrastructureOverlapSnapshots, 0);
+  assert.equal(absent.invalidOrMissingConsumerInfrastructureOverlapSnapshots, 1);
+  assert.equal(absent.snapshotsWithFallbackAtFullInfrastructure, 0);
+  assert.equal(absent.snapshotsWithFallbackBelowFullInfrastructure, 0);
+
+  const malformed = structuredClone(low);
+  malformed.telemetryJournal.snapshots[0].x.rooms.E8N1.consumerSupply
+    .criticalConsumers[0].fallback = 'true';
+  const invalid = inspectDeployment(malformed, id, 100).roomEvidence;
+  assert.equal(invalid.sampledConsumerInfrastructureOverlapSnapshots, 0);
+  assert.equal(invalid.invalidOrMissingConsumerInfrastructureOverlapSnapshots, 1);
+  assert.equal(invalid.snapshotsWithFallbackBelowFullInfrastructure, 0);
 }
 
 // Full 100-tick economy windows give continuous consumer-creep-tick counts
