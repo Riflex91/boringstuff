@@ -284,15 +284,26 @@ function selectConsumerGuardHaulers(room) {
 
   const selected = [];
   const selectedIds = {};
+  const coveredReservedTargets = new Set();
   const reserved = ready.filter(h => h.memory.consumerTargetId && criticalIds[h.memory.consumerTargetId]);
   reserved.sort((a, b) => stableCreepKey(a).localeCompare(stableCreepKey(b)));
   for (const hauler of reserved) {
     if (selected.length >= maxGuards) break;
+    // Multiple persistent reservations for one critical consumer can survive
+    // from earlier assignments. Never spend two critical guard slots on the
+    // same target: deliverToConsumer honors its existing sticky target.
+    const targetId = hauler.memory.consumerTargetId;
+    if (coveredReservedTargets.has(targetId)) continue;
+    coveredReservedTargets.add(targetId);
     selected.push(hauler);
     selectedIds[hauler.id] = true;
   }
 
-  const remaining = ready.filter(h => !selectedIds[h.id]);
+  // Duplicated sticky reservations are deliberately kept outside the guard
+  // rather than forced into a second emergency consumer slot. Their normal
+  // infrastructure-first delivery path clears stale reservations.
+  const remaining = ready.filter(h => !selectedIds[h.id] &&
+    !(h.memory.consumerTargetId && coveredReservedTargets.has(h.memory.consumerTargetId)));
   remaining.sort((a, b) => {
     const rangeA = Math.min.apply(null, critical.map(c => a.pos && a.pos.getRangeTo ? a.pos.getRangeTo(c) : 999));
     const rangeB = Math.min.apply(null, critical.map(c => b.pos && b.pos.getRangeTo ? b.pos.getRangeTo(c) : 999));
