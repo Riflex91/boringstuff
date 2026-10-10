@@ -171,7 +171,7 @@ try {
   console.log = originalLog;
 }
 assert.equal(consoleLines.length, 1);
-const parsed = JSON.parse(consoleLines[0].replace(/^\\[BOTLOG\\]/, ''));
+const parsed = JSON.parse(consoleLines[0].replace(/^\[BOTLOG\]/, ''));
 assert.equal(parsed.code, 'CONSUMER_SUPPLY_DIAG');
 assert.equal(parsed.ctx.consumerTransfers.accepted, 1);
 assert.equal(parsed.ctx.haulers.readyByGuardRule, 1);
