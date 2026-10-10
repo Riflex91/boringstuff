@@ -104,3 +104,58 @@ Avoid deploying until the actual diagnostic overhead is assessed
 and a rollback path is ready.
 
 Do not merge or deploy without separate, explicit user approval.
+
+## Independent follow-up: offline supply evidence analysis (Draft, not deployed)
+
+This stacked change is based on PR #123; it is not a change to active
+consumer guard selection, spawn sizing, route priorities, E4 authority or
+fallback transitions. The actual production rule in
+`energy.haulerReadyToDeliver` accepts some haulers whose capacity
+reader returns zero/undefined (e.g. a delivering hauler with energy).
+The observer now uses the exact same rule; `capacityUnknown` remains a
+separate data-quality count, not a veto. Regression fixtures compare
+the observer directly against the unchanged legacy rule.
+
+`main.js` catches failures from optional 25-tick observation so that
+they cannot abort the later main-loop scheduler. It attempts to log
+`CONSUMER_SUPPLY_DIAG_ERROR` but also tolerates a failing logger.
+An absent diagnostic sample is UNKNOWN, not evidence of zero fallback.
+
+The read-only `tools/consumer-supply-analysis.mjs` uses the already
+running collector's `bot-events-*.ndjson` files and the exact local
+deployment receipt, with the matching `DEPLOYMENT_MARKER`. It does
+not connect to Screeps, start a collector, modify log files, or deploy.
+
+After a future separately authorized deployment, run from `tools`:
+
+```powershell
+node .\consumer-supply-analysis.mjs --room E8N1 --json
+```
+
+Optional: `--log-dir PATH`, `--server newbieland`,
+`--branch chatgpt`. The parser compares each valid post-handler,
+pre-resolution `CONSUMER_SUPPLY_DIAG` sample with an exact-tick
+pre-handler `ROOM_HEARTBEAT` when retained. It also associates
+diagnostics with independently complete and exactly bounded 100-tick
+`STATUS_SNAPSHOT` economy windows. Accepted transfer codes remain
+**intents**, never proven delivered energy. Heartbeat comparisons
+are two different within-tick phases; correlations do not prove causes.
+
+An unmatching deployment marker produces WAIT; an unexpected newer
+release marker or conflicting journal sequence produces BLOCKED;
+malformed or duplicate same-tick samples produce REVIEW_REQUIRED.
+Missing 25-tick samples, unparseable collector lines and retention
+gaps do not turn into zero-problem claims. Optional logger overhead
+is bounded by its 25-tick cadence, 120-Creep scan cap, three-room cap,
+and CPU/bucket gates, but the actual live CPU cost remains unverified.
+
+`consumer-supply-analysis.test.mjs` tests synthetic release
+provenance, dedupe/conflicts, invalid return-code totals, sparse
+samples, exact-window attribution and phase/settlement labels.
+`consumer-supply-observer.test.mjs` additionally exercises the real
+logger->slim->journal path without logging hauler identities.
+
+The inspector in separate Draft PR #119 is NOT overwritten. If both
+changes are approved in the future, it may call the standalone
+analysis core to present supply evidence alongside the existing
+economy/E4 windows. No future live data can be inferred now.
