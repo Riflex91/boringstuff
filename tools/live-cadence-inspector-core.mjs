@@ -1,0 +1,339 @@
+// Pure, read-only discovery of candidate 100-tick verifier windows.
+// Discovery NEVER represents a verifier PASS or gameplay authorization.
+const tick = x => Number.isInteger(x) && x >= 0 ? x : null;
+const number = x => Number.isFinite(x) ? x : null;
+const inRoom = (event, room) => event?.ctx?.rooms?.[room] || null;
+
+function completion(block, markerTick, snapshotTick) {
+  const startTick = tick(block?.startTick);
+  const endTick = tick(block?.endTick);
+  const ticks = tick(block?.ticks);
+  if (startTick === null || endTick === null || ticks !== 100 ||
+      endTick - startTick !== 99 || startTick < markerTick ||
+      endTick > snapshotTick) return null;
+  return { startTick, endTick, ticks, carrierTick: snapshotTick };
+}
+
+function latestUnique(rows, key, max = 4) {
+  const unique = new Map();
+  for (const row of rows) {
+    const id = row[key];
+    const old = unique.get(id);
+    if (!old || row.carrierTick < old.carrierTick) unique.set(id, row);
+  }
+  return [...unique.values()].sort((a, b) => b[key] - a[key]).slice(0, max);
+}
+
+// ROOM_HEARTBEAT is a sampled operational hint, not a complete E4 window.
+// Missing logger data is UNKNOWN, never evidence that no emergency existed.
+function roomHeartbeatHint(event) {
+  const ctx = event?.ctx || {};
+  const energyText = typeof ctx.energy === 'string' ? ctx.energy : '';
+  const parts = energyText.split('/');
+  const parsed = parts.length === 2 && parts.every(p => p.length > 0 && Number.isInteger(Number(p)) && Number(p) >= 0);
+  const energy = parsed ? Number(parts[0]) : null;
+  const capacity = parsed ? Number(parts[1]) : null;
+  const reserveFloor = capacity === null ? null : Math.min(300, capacity);
+  return {
+    tick: event.tick,
+    energyAvailable: energy,
+    energyCapacity: capacity,
+    belowInfrastructureReserve: energy === null || reserveFloor === null ? null : energy < reserveFloor,
+    emergencyDeliverSpecs: number(ctx.logisticsRequests?.byKind?.EMERGENCY_DELIVER),
+    consumerEnergyDemandSpecs: null,
+    observedWaitingConsumers: number(ctx.economyModel?.consumerWaitingCount),
+    observedFallbackConsumers: number(ctx.economyModel?.consumerFallbackCount),
+    observedCriticalConsumers: number(ctx.economyModel?.consumerCriticalCount),
+    observedRealHaulers: number(ctx.creeps?.hauler),
+    observedHaulerCarryDeficit: number(ctx.economyModel?.haulerCarryDeficit),
+    shadowCriticalRequestCount: number(ctx.logisticsMatching?.criticalRequestCount),
+    shadowMatchedCriticalCount: number(ctx.logisticsMatching?.criticalMatchedCount),
+    shadowHaulerCount: number(ctx.logisticsMatching?.haulerCount)
+  };
+}
+
+// Compare only actually sampled same-window heartbeats. A Fallback
+// flag counts a state at a sampled tick, NOT a new fallback transition.
+export function summarizeRealConsumerPressure(samples) {
+  const rows = Array.isArray(samples) ? samples : [];
+  const observed = rows.filter(s => s && Number.isFinite(s.observedFallbackConsumers));
+  const fallbackRows = observed.filter(s => s.observedFallbackConsumers > 0);
+  const highEnergy = fallbackRows.filter(s =>
+    s.belowInfrastructureReserve === false);
+  const lowEnergy = fallbackRows.filter(s =>
+    s.belowInfrastructureReserve === true);
+  return {
+    heartbeatSamples: rows.length,
+    knownFallbackSamples: observed.length,
+    samplesWithFallback: fallbackRows.length,
+    withFallbackAboveReserve: highEnergy.map(s => ({
+      tick: s.tick, energy: s.energyAvailable,
+      capacity: s.energyCapacity,
+      realHaulers: s.observedRealHaulers,
+      modeledCarryDeficit: s.observedHaulerCarryDeficit,
+      fallbackConsumers: s.observedFallbackConsumers
+    })),
+    withFallbackBelowReserve: lowEnergy.map(s => ({
+      tick: s.tick, energy: s.energyAvailable,
+      capacity: s.energyCapacity,
+      realHaulers: s.observedRealHaulers,
+      modeledCarryDeficit: s.observedHaulerCarryDeficit,
+      fallbackConsumers: s.observedFallbackConsumers
+    })),
+    unknownEnergyOrReserve: fallbackRows.filter(s =>
+      s.belowInfrastructureReserve === null).length,
+    note: 'Sparse fallback-state samples, not hauler inventory, hauler delivery, or count of new fallback transitions.'
+  };
+}
+
+export function spawnStartHint(event) {
+  const ctx = event?.ctx || {};
+  const serialized = Array.isArray(ctx.body) && ctx.body.length > 0 &&
+    ctx.body.every(p => typeof p === 'string') ? ctx.body.length : null;
+  // logger.slim() serializes only the FIRST 20 items of EVERY array.
+  // Thus 20 serialized parts may represent 20, 21, ... up to 50 parts;
+  // it is not an exact body length. Never promote it to a ready tick.
+  const bodyMayBeTruncated = serialized === 20;
+  const parts = serialized !== null && serialized < 20 ? serialized : null;
+  const projectedReadyTick = parts === null ? null : event.tick + 3 * parts;
+  return {
+    startTick: event.tick,
+    role: typeof ctx.role === 'string' ? ctx.role : null,
+    cost: number(ctx.cost),
+    serializedBodyParts: serialized,
+    bodyMayBeTruncated,
+    bodyParts: parts,
+    projectedReadyTick,
+    note: serialized === 20
+      ? 'Serialized body hits logger array cap 20: exact length and ready tick UNKNOWN.'
+      : 'SPAWN_OK logs a spawn start; ready tick is projected, not observed.'
+  };
+}
+
+export function analyzeE4SlotEvidence(window) {
+  const requests = number(window?.criticalRequestTicks);
+  const matched = number(window?.criticalMatchedTicks);
+  const slot = number(window?.criticalSlotCapacityTicks);
+  const noCandidate = number(window?.criticalNoCandidateTicks);
+  if (requests === null || matched === null || slot === null ||
+      requests < 0 || matched < 0 || slot < 0 ||
+      matched > requests || matched > slot || slot > requests) {
+    return { state: 'UNKNOWN', requestExcessOverSlots: null,
+      slotHeadroomUnmatched: null, candidateGap: noCandidate,
+      note: 'Missing or inconsistent E4 totals; do not infer slot attribution.' };
+  }
+  return {
+    state: 'READY',
+    requestExcessOverSlots: requests - slot,
+    slotHeadroomUnmatched: slot - matched,
+    candidateGap: noCandidate,
+    note: 'Shadow matching one-job-per-hauler slot arithmetic only; NOT proof of real hauler throughput, request origin or causal starvation.'
+  };
+}
+
+export function discoverLiveWindows({ events, receipt, roomName = 'E8N1', limit = 4 } = {}) {
+  if (!Array.isArray(events)) throw new Error('events array required');
+  if (!receipt?.deploymentId || !receipt?.version || !receipt?.server || !receipt?.branch)
+    throw new Error('exact deployment receipt required');
+  if (!Number.isInteger(limit) || limit < 1 || limit > 20)
+    throw new Error('limit must be an integer 1..20');
+  const room = String(roomName).toUpperCase();
+  const ordered = events.filter(e => tick(e?.tick) !== null)
+    .sort((a,b) => a.tick - b.tick || (number(a.jseq) ?? 0) - (number(b.jseq) ?? 0));
+  const latestTick = ordered.at(-1)?.tick ?? null;
+  const marker = ordered.findLast(e => e.code === 'DEPLOYMENT_MARKER' &&
+    e.v === receipt.version && e.ctx?.deploymentId === receipt.deploymentId &&
+    e.ctx?.version === receipt.version);
+  if (!marker) return { state: 'WAIT', reason: 'MATCHING_DEPLOYMENT_MARKER_MISSING',
+    latestTick, markerTick: null };
+  const after = ordered.find(e => e.code === 'DEPLOYMENT_MARKER' &&
+    e.tick > marker.tick &&
+    (e.ctx?.deploymentId !== receipt.deploymentId || e.v !== receipt.version));
+  if (after) return { state: 'BLOCKED', reason: 'SUBSEQUENT_DIFFERENT_DEPLOYMENT',
+    latestTick, markerTick: marker.tick, subsequentTick: after.tick };
+
+  const snapshots = ordered.filter(e => e.code === 'STATUS_SNAPSHOT' &&
+    e.v === receipt.version && e.tick >= marker.tick && inRoom(e, room));
+  const economy = [];
+  const e4 = [];
+  const p2 = [];
+  const i2 = [];
+  for (const e of snapshots) {
+    const state = inRoom(e, room);
+    const eco = completion(state?.economy?.last100, marker.tick, e.tick);
+    if (eco && latestTick >= eco.endTick) economy.push({
+      ...eco,
+      controllerProgress: number(state.economy.last100.controllerProgress),
+      constructionProgress: number(state.economy.last100.constructionProgress),
+      productiveThroughput: number(state.economy.last100.productiveFlow?.actualProductiveThroughputPerTick),
+      consumerTicks: number(state.economy.last100.productiveFlow?.consumerTicks),
+      waitingConsumerTicks: number(state.economy.last100.productiveFlow?.waitingConsumerTicks),
+      criticalConsumerTicks: number(state.economy.last100.productiveFlow?.criticalConsumerTicks),
+      fallbackConsumerTicks: number(state.economy.last100.productiveFlow?.fallbackConsumerTicks)
+    });
+    const e4Window = state?.logisticsMatchingEvidence?.lastWindow ||
+      state?.colonyState?.logisticsMatching?.evidence?.lastWindow;
+    const matched = completion(e4Window, marker.tick, e.tick);
+    if (matched && latestTick >= matched.endTick) e4.push({
+      ...matched,
+      duplicateReservationTicks: number(e4Window.duplicateReservationTicks),
+      criticalRequestTicks: number(e4Window.criticalRequestTicks),
+      criticalMatchedTicks: number(e4Window.criticalMatchedTicks),
+      unmatchedCriticalTicks: number(e4Window.unmatchedCriticalTicks),
+      criticalNoCandidateTicks: number(e4Window.criticalNoCandidateTicks),
+      criticalCandidateRequestTicks: number(e4Window.criticalCandidateRequestTicks),
+      criticalCandidateUnmatchedTicks: number(e4Window.criticalCandidateUnmatchedTicks),
+      criticalSlotCapacityTicks: number(e4Window.criticalSlotCapacityTicks),
+      criticalCoverageRatio: number(e4Window.criticalCoverageRatio),
+      criticalCandidateRatio: number(e4Window.criticalCandidateRatio),
+      criticalCandidateCoverageRatio: number(e4Window.criticalCandidateCoverageRatio),
+      criticalSlotCoverageRatio: number(e4Window.criticalSlotCoverageRatio),
+      averageHaulers: number(e4Window.averageHaulers),
+      averageMatchedHaulers: number(e4Window.averageMatchedHaulers),
+      averageConsumerWaiting: number(e4Window.averageConsumerWaiting),
+      averageConsumerFallback: number(e4Window.averageConsumerFallback),
+      averageConsumerCritical: number(e4Window.averageConsumerCritical)
+    });
+
+    const p2run = tick(e.ctx?.scheduler?.processes?.['planner-vnext-shadow']?.lastRunTick);
+    const p2plan = tick(state?.plannerVNext?.planTick);
+    if (p2run !== null && p2run === p2plan &&
+        p2run >= marker.tick && p2run <= e.tick && e.tick - p2run <= 99 &&
+        latestTick >= p2run + 99) p2.push({
+      startTick: p2run, endTick: p2run + 99, runTick: p2run, carrierTick: e.tick,
+      cpu: number(e.ctx.scheduler.processes['planner-vnext-shadow'].lastCpu),
+      planStatus: state.plannerVNext?.status
+    });
+
+    const i2run = tick(e.ctx?.scheduler?.processes?.['remote-roi-shadow']?.lastRunTick);
+    const i2plan = tick(state?.remoteRoi?.evaluatedTick);
+    if (i2run !== null && i2run === i2plan &&
+        i2run >= marker.tick && i2run <= e.tick && e.tick - i2run <= 99 &&
+        latestTick >= i2run + 99) i2.push({
+      startTick: i2run, endTick: i2run + 99, runTick: i2run, carrierTick: e.tick,
+      cpu: number(e.ctx.scheduler.processes['remote-roi-shadow'].lastCpu),
+      roiStatus: state.remoteRoi?.status
+    });
+  }
+  const last = snapshots.at(-1);
+  const latestRoom = inRoom(last, room);
+  const status = latestRoom?.efficiency || null;
+  const model = latestRoom?.economyModel || {};
+  const last100 = latestRoom?.economy?.last100 || {};
+  const flow = last100?.productiveFlow || {};
+  // All inputs below originate in the SAME most recent STATUS_SNAPSHOT.
+  // Missing serializer fields remain null, never inferred as zero.
+  const latestProductiveContext = {
+    snapshotTick: last?.tick ?? null,
+    rcl: number(latestRoom?.rcl),
+    energyAvailable: number(latestRoom?.energyAvailable),
+    energyCapacity: number(latestRoom?.energyCapacity),
+    energyStored: number(latestRoom?.energyStored),
+    constructionSites: number(latestRoom?.constructionSites),
+    spawnBusy: typeof latestRoom?.spawnBusy === 'boolean' ? latestRoom.spawnBusy : null,
+    creepsByRole: latestRoom?.creeps || null,
+    economyWindow: {
+      startTick: tick(last100?.startTick),
+      endTick: tick(last100?.endTick),
+      ticks: tick(last100?.ticks),
+      controllerProgress: number(last100?.controllerProgress),
+      constructionProgress: number(last100?.constructionProgress),
+      spawnUtilization: number(last100?.spawnUtilization),
+      energyCappedRatio: number(last100?.energyCappedRatio),
+      actualProductiveThroughputPerTick: number(flow?.actualProductiveThroughputPerTick),
+      averageConstructionCapacityPerTick: number(flow?.averageConstructionCapacityPerTick),
+      averageDedicatedControllerCapacityPerTick: number(flow?.averageDedicatedControllerCapacityPerTick)
+    },
+    economyModel: {
+      productiveDemandPerTick: number(model.productiveDemandPerTick),
+      dedicatedHarvestCapacityPerTick: number(model.dedicatedHarvestCapacityPerTick),
+      harvesterWorkDeficit: number(model.harvesterWorkDeficit),
+      haulerCarryDeficit: number(model.haulerCarryDeficit),
+      consumerWaitingCount: number(model.consumerWaitingCount),
+      consumerFallbackCount: number(model.consumerFallbackCount),
+      consumerCriticalCount: number(model.consumerCriticalCount),
+      recommendedHarvesterCount: number(model.recommendedHarvesterCount),
+      recommendedHaulerCount: number(model.recommendedHaulerCount)
+    }
+  };
+  // SPAN: Last 500 ticks for the same deployed version and room. Logs may
+  // be sampled/deduplicated; event ABSENCE never proves absence of surplus.
+  const recentFromTick = last ? Math.max(marker.tick, last.tick - 499) : null;
+  const spawnCodes = new Set(['SPAWN_IDLE_SURPLUS', 'SPAWN_OK', 'SPAWN_RC']);
+  const recentSpawnRows = ordered.filter(e => recentFromTick !== null &&
+    e.tick >= recentFromTick && e.tick <= last.tick &&
+    e.v === receipt.version && spawnCodes.has(e.code) &&
+    String(e.ctx?.room || '').toUpperCase() === room);
+  const recentSpawnEvents = {
+    observedFromTick: recentFromTick,
+    observedThroughTick: last?.tick ?? null,
+    note: 'Logged events only; absence is not proof of no idle or spawn attempt.',
+    counts: Object.fromEntries([...spawnCodes].map(k => [
+      k, recentSpawnRows.filter(e => e.code === k).length
+    ])),
+    latestIdleSurplus: (() => {
+      const row = recentSpawnRows.filter(e => e.code === 'SPAWN_IDLE_SURPLUS').at(-1);
+      return row ? {
+        tick: row.tick, energy: number(row.ctx?.energy),
+        capacity: number(row.ctx?.capacity),
+        energyCappedStreak: number(row.ctx?.energyCappedStreak),
+        spawnIdleStreak: number(row.ctx?.spawnIdleStreak),
+        desired: row.ctx?.desired || null,
+        actual: row.ctx?.actual || null
+      } : null;
+    })(),
+    latestSpawnOk: recentSpawnRows.filter(e => e.code === 'SPAWN_OK')
+      .slice(-5).map(e => ({ tick: e.tick, role: e.ctx?.role || null,
+        cost: number(e.ctx?.cost) })),
+    latestSpawnRc: recentSpawnRows.filter(e => e.code === 'SPAWN_RC')
+      .slice(-5).map(e => ({ tick: e.tick, role: e.ctx?.role || null,
+        rc: number(e.ctx?.rc) }))
+  };
+  const observedRoomHeartbeats = ordered.filter(e => e.code === 'ROOM_HEARTBEAT' &&
+    e.v === receipt.version && e.tick >= marker.tick &&
+    String(e.ctx?.room || '').toUpperCase() === room);
+  const economyWindows = latestUnique(economy, 'startTick', limit).map(window => {
+    // Sampling only. A quiet heartbeat or missing samples never proves
+    // the whole 100-tick economy window was free of fallback.
+    const hints = observedRoomHeartbeats.filter(e =>
+      e.tick >= window.startTick && e.tick <= window.endTick)
+      .slice(-10).map(roomHeartbeatHint);
+    return { ...window, roomHeartbeatHints: hints,
+      sampledRealConsumerPressure: summarizeRealConsumerPressure(hints) };
+  });
+  const observedSpawnStarts = ordered.filter(e => e.code === 'SPAWN_OK' &&
+    e.v === receipt.version && e.tick >= marker.tick &&
+    String(e.ctx?.room || '').toUpperCase() === room);
+  const e4Windows = latestUnique(e4, 'startTick', limit).map(window => ({
+    ...window,
+    slotAccounting: analyzeE4SlotEvidence(window),
+    roomHeartbeatHints: observedRoomHeartbeats.filter(e =>
+      e.tick >= window.startTick && e.tick <= window.endTick)
+      .slice(-10).map(roomHeartbeatHint),
+    spawnStarts: observedSpawnStarts.filter(e =>
+      e.tick >= window.startTick && e.tick <= window.endTick)
+      .slice(-10).map(spawnStartHint)
+  }));
+  const e4Starts = new Set(e4Windows.map(x => x.startTick));
+  const shared = economyWindows.filter(x => e4Starts.has(x.startTick));
+  return {
+    state: 'READY', reason: 'CANDIDATES_NOT_VERDICTS',
+    server: receipt.server, branch: receipt.branch,
+    version: receipt.version, deploymentId: receipt.deploymentId,
+    room, markerTick: marker.tick, latestTick,
+    economyWindows, e4Windows,
+    overlappingEconomyE4Windows: shared,
+    latestProductiveContext, recentSpawnEvents,
+    p2Runs: latestUnique(p2, 'runTick', limit),
+    i2Runs: latestUnique(i2, 'runTick', limit),
+    latestEfficiency: {
+      snapshotTick: last?.tick ?? null,
+      status: status?.status ?? null,
+      overallScore: number(status?.overallScore),
+      reasons: Array.isArray(status?.reasons) ? status.reasons : [],
+      components: status?.components || null,
+      pressure: status?.pressure || null,
+      metrics: status?.metrics || null
+    }
+  };
+}
