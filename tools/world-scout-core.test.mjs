@@ -41,6 +41,8 @@ for (const invalid of [null,{},routing(5,6,-1),routing(5,2,2),
 
 const deepRoom=(roomName,score,reachable=5,total=5)=>({
   roomName,eligible:true,controller:{owner:null,reservation:null},
+  neighborhood:{hostileOwned:0,hostileReserved:0,opponentStrengthPenalty:0,
+    keeperPressure:0,directHostileRooms:0,directReservedRooms:0,details:[]},
   best:{x:12,y:13,blueprint:{complete:true,structureRequired:86,structureFit:86,roadFitRatio:0.8},
     layout:{hubReady:true,labReady:true}},strategicScore:score,
   statusVerification:{status:'normal'},
@@ -63,7 +65,11 @@ assert.deepEqual(selectRouteClearCandidate(routeCandidates),{
     status:'clear',totalSources:5,reachableSources:5,inaccessibleSources:0,
     needsReview:false
   },buildability:{status:'clear',structureRequired:86,structureFit:86,
-    roadFitRatio:0.8,hubReady:true,labReady:true,needsReview:false}
+    roadFitRatio:0.8,hubReady:true,labReady:true,needsReview:false},
+  threatExposure:{status:'clear',hostileOwnedPressure:0,
+    hostileReservedPressure:0,opponentStrengthPenalty:0,keeperPressure:0,
+    directHostileRooms:0,directReservedRooms:0,nearestOwnedRival:null,
+    needsReview:false}
 },'Highest-scoring fully reachable candidate is an advisory, not the overall winner');
 assert.equal(selectRouteClearCandidate([
   {shard:'shardX',report:deepReport('shardX',[deepRoom('E3S3',99999)])},
@@ -99,6 +105,14 @@ assert.equal(selectRouteClearCandidate([{shard:'shard0',report:{
   options:{place:true,deep:true}
 }}]),null,'Placement-enabled reports must be rejected');
 assert.equal(selectRouteClearCandidate([]),null);
+assert.equal(selectRouteClearCandidate([{shard:'shard0',report:deepReport('shard0',[
+  {...deepRoom('W37N11',16154.5),neighborhood:{
+    hostileOwned:0.5,hostileReserved:1.4,opponentStrengthPenalty:769,
+    keeperPressure:0,directHostileRooms:0,directReservedRooms:0,
+    details:[{room:'W35N11',kind:'owned-by-other',distance:2,rcl:8}]}}
+])}]).threatExposure.status,'review',
+'Rival threat is retained as warning, not silently omitted or rescored');
+
 
 
 assert.deepEqual(summarizeWorldBuildability({
