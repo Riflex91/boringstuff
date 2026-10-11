@@ -148,10 +148,20 @@ function evaluate(states, routeEvidence, game) {
     s && s.room && s.room.controller && s.room.controller.my &&
     typeof roomName(s) === 'string').slice(0, MAX_PROVIDERS + 1);
   const targets = [];
-  for (const target of owned) {
-    if (!freshRequest(target, now)) continue;
-    if (!['DEFENSE', 'EMERGENCY'].includes(target.defenseRequestsShadow.summary.riskState))
-      continue;
+  // The cheapest donor is not allowed to promise the same field defenders to
+  // multiple endangered colonies in one shadow evaluation. Sort by the first
+  // provable deadline so urgent defense is considered before later demand.
+  // This is a function-local ledger, NOT an authoritative Reservation.
+  const shadowDonorLocks = new Set();
+  const threatened = owned.filter(s => freshRequest(s, now) &&
+    ['DEFENSE', 'EMERGENCY'].includes(s.defenseRequestsShadow.summary.riskState))
+    .sort((a, b) => {
+      const da = needed(a), db = needed(b);
+      const ta = da && da.deadline !== null ? da.deadline : Infinity;
+      const tb = db && db.deadline !== null ? db.deadline : Infinity;
+      return ta - tb || roomName(a).localeCompare(roomName(b));
+    });
+  for (const target of threatened) {
     const demand = needed(target);
     const room = roomName(target);
     const support = {
@@ -184,6 +194,10 @@ function evaluate(states, routeEvidence, game) {
         defenderCount: 0, donorSpawnAvailable: false,
         routeEvidence: null };
       support.candidateProviders.push(candidate);
+      if (shadowDonorLocks.has(from)) {
+        candidate.reason = 'SHADOW_DONOR_ALREADY_ALLOCATED';
+        continue;
+      }
       if (!freshRequest(donor, now) ||
           donor.defenseRegistryPreview.status !== 'NO_DEMAND' ||
           donor.defenseRequestsShadow.status !== 'CLEAR' ||
@@ -217,7 +231,14 @@ function evaluate(states, routeEvidence, game) {
       // Explicit conservative proxy; no strategic stock/boost budget inferred.
       candidate.spareEnergyBudget = Math.max(0,
         donor.energyStored - Math.max(300, 2 * donor.energyCapacityAvailable));
-      const all = donor.creeps.map(defender).filter(Boolean)
+      // Only defenders physically still at home and without a pre-existing
+      // defense support mission can be counted. A defender already committed
+      // elsewhere is NOT spare capacity, even when a route is verified.
+      const all = donor.creeps.filter(c => c && c.memory &&
+        c.memory.defenseSupportTarget == null &&
+        (c.memory.home == null || c.memory.home === from) &&
+        c.room && c.room.name === from)
+        .map(defender).filter(Boolean)
         .sort((a, b) => (b.damagePerTick + b.healPerTick * 3) -
           (a.damagePerTick + a.healPerTick * 3) ||
           a.id.localeCompare(b.id)).slice(0, MAX_DEFENDERS);
@@ -266,6 +287,7 @@ function evaluate(states, routeEvidence, game) {
       continue;
     }
     support.selectedProvider = ranked[0].roomName;
+    shadowDonorLocks.add(ranked[0].roomName);
     support.status = 'PROPOSED_SHADOW';
     support.reason = 'ONE_DONOR_COST_RANKING_ONLY';
     support.transportOrSpawnPlan = {
