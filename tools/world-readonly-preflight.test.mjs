@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import { inspectWorld } from './world-readonly-preflight.mjs';
+const calls=[];
+const api={authMe:async()=>{calls.push('authMe');return {ok:1};},userWorldStatus:async()=>{calls.push('userWorldStatus');return {ok:1,status:'empty'};},userBranches:async()=>{calls.push('userBranches');return {ok:1,list:[{branch:'default',activeWorld:true}]}},_request:async(method,path)=>{calls.push(method+' '+path);return {ok:1,shards:[{name:'shard3',rooms:100,users:2}]};}};
+const result=await inspectWorld(api);
+assert.equal(result.hasNoSpawn,true);
+assert.deepEqual(result.shards,[{name:'shard3',rooms:100,users:2}]);
+assert.deepEqual(result.branches,[{branch:'default',activeWorld:true}]);
+assert.deepEqual(calls.sort(),['authMe','userWorldStatus','userBranches','GET /api/game/shards/info'].sort());
+console.log('World read-only preflight: PASS');
