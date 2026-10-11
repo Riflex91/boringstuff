@@ -8,6 +8,7 @@ import { inspectWorld } from './world-readonly-preflight.mjs';
 import { inspectSpawnTile, normalizeRoomStatusResponse } from './spawn-safety.mjs';
 import { summarizeRoom } from './spawn-planner-core.mjs';
 import { WORLD_TARGET } from './world-target-selection.mjs';
+import { assessWorldCodeBootstrap } from './world-branch-bootstrap.mjs';
 
 // Read-only World target check. No POST, spawn placement, code-upload,
 // branch activation, manual gate token or game action anywhere in this module.
@@ -161,7 +162,35 @@ export async function inspectSelectedWorldTarget(api,target=WORLD_TARGET) {
       nearby.push({room:name,verified:false,kind:'UNVERIFIED'});
     }
   }
+  // GET-only proof of the exact inactive-branch staging prerequisites.
+  // The POST staging operation remains exclusively in the manually
+  // authorized STAGE_WORLD_CODE workflow.
+  let inactiveStageGate;
+  try {
+    const [worldStatus,branches,defaultCode]=await Promise.all([
+      api.userWorldStatus(),
+      api.userBranches(),
+      api._request('GET','/api/user/code',{branch:'default'})
+    ]);
+    inactiveStageGate=assessWorldCodeBootstrap({
+      account:identity,status:worldStatus,
+      branches,backup:defaultCode
+    });
+  } catch (_) {
+    inactiveStageGate={ok:false,
+      failures:['WORLD_DEFAULT_CODE_BACKUP_OR_GATE_UNVERIFIED'],
+      targetBranch:'chatgpt'};
+  }
   const decision=decideWorldTarget({preflight,room,nearby},target);
+  const stagePreconditionsPass=inactiveStageGate.ok &&
+    decision.siteChecksPass && decision.risk!=='UNVERIFIED';
+  const stageGateFailures=[
+    ...(Array.isArray(inactiveStageGate.failures)?inactiveStageGate.failures:
+      ['WORLD_DEFAULT_CODE_BACKUP_OR_GATE_UNVERIFIED']),
+    ...(!decision.siteChecksPass?['TARGET_SITE_GATE_NOT_PASSED']:[]),
+    ...(decision.risk==='UNVERIFIED'?['KNOWN_RIVAL_ROOMS_UNVERIFIED']:[])
+  ];
+
   return {
     generatedAt:new Date().toISOString(),
     evidenceSource:'LIVE_SCREEPS_WORLD_API',
@@ -172,7 +201,18 @@ export async function inspectSelectedWorldTarget(api,target=WORLD_TARGET) {
       targetShardPresent:preflight.shards.some(s=>s.name===target.shard),
       branchPresent:decision.worldBranchPresent
     },
-    room, ...decision
+    room, ...decision,
+    inactiveStageGate:{
+      preconditionsPass:stagePreconditionsPass,
+      failures:stageGateFailures,
+      targetBranch:'chatgpt',
+      manualApprovalRequired:true,
+      stagingAuthorized:false,
+      stagingAttempted:false,
+      defaultCodeContentsIncluded:false
+    },
+    nextAction:decision.stagingRequired && !stagePreconditionsPass
+      ? 'INVESTIGATE_INACTIVE_STAGE_GATE' : decision.nextAction
   };
 }
 
