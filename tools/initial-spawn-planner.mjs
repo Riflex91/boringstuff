@@ -881,7 +881,7 @@ async function main() {
     return;
   }
 
-  const finalSafety = await finalPlacementVerification(api, best.roomName, b.x, b.y, args.name, myUserId, args.branch);
+  const finalSafety = await finalPlacementVerification(api, best.roomName, b.x, b.y, args.name, myUserId, args.branch, args.server);
   for (const c of finalSafety.checks) {
     const marker = c.pass ? 'PASS' : c.severity === 'warning' ? 'WARN' : 'FAIL';
     if (!c.pass || c.name === 'world-status-empty' || c.name === 'room-status-normal' || c.name === 'spawn-tile-free-and-buildable' || c.name === 'spawn-name-available') {
