@@ -246,7 +246,11 @@ export class ScreepsHttpClient {
   }
 
   gamePlaceSpawn(room, x, y, name, shard) {
-    return this._request('POST', '/api/game/place-spawn', { room, x, y, name, shard: shard ?? this.defaultShard });
+    // The server may commit placement even if the response is lost. Avoid all
+    // automatic transport, 429/5xx or login retries of this irreversible POST.
+    return this._request('POST', '/api/game/place-spawn',
+      { room, x, y, name, shard: shard ?? this.defaultShard },
+      { max429Retries:0, max5xxRetries:0, retryAuth:false });
   }
 
   userBranches() {
@@ -254,7 +258,11 @@ export class ScreepsHttpClient {
   }
 
   userSetActiveBranch(branch, activeName = 'activeWorld') {
-    return this._request('POST', '/api/user/set-active-branch', { branch, activeName });
+    // An activation may have succeeded even if the HTTP result is uncertain.
+    // Require independent GET-only recovery rather than a hidden second POST.
+    return this._request('POST', '/api/user/set-active-branch',
+      { branch, activeName },
+      { max429Retries:0, max5xxRetries:0, retryAuth:false });
   }
 }
 
