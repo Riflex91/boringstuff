@@ -147,6 +147,14 @@ export async function inspectWorldLaunchDossier(api,target=WORLD_TARGET) {
   };
 }
 
+// Failure is intentionally visible to Actions even if evidence was collected.
+// A clean HTTP run with an incomplete opponent map is NOT a passed risk scan.
+export function threatRiskExitCode(report) {
+  return report?.fixedTargetSitePassed===true &&
+    report?.exactInactiveCode===true &&
+    report?.ring?.coverageComplete===true ? 0 : 2;
+}
+
 async function main(){
   const target=validateTarget(WORLD_TARGET);
   const temp=process.env.RUNNER_TEMP;
@@ -165,9 +173,8 @@ async function main(){
     fs.writeFileSync(path.join(evidenceDir,'W37N11-risk-ring.json'),
       JSON.stringify(report,null,2)+'\n',{mode:0o600});
     console.log('WORLD_W37N11_GET_ONLY_RISK '+JSON.stringify(report));
-    // Missing exact-code or target data is a blocking site gate.
-    if(!report.fixedTargetSitePassed || !report.exactInactiveCode)
-      process.exitCode=2;
+    // A partial ring is an incomplete audit, not a clean risk check.
+    process.exitCode=threatRiskExitCode(report);
   } finally {
     fs.rmSync(credentials,{force:true});
   }
