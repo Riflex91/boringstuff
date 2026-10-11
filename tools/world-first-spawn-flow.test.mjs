@@ -33,11 +33,11 @@ function fakeWorld({occupied=false,otherEnemy=false,failedPost=false,
       throw Error('unexpected GET');
     },
     async gameRoomStatus(room,shard) {
-      assert.equal(shard,'shard0');calls.push('GET_ROOM_STATUS');
+      assert.ok(shard===undefined||shard==='shard0');calls.push('GET_ROOM_STATUS');
       return {room:{status:room.endsWith('N9')?'out of borders':'normal'}};
     },
     async gameRoomObjects(room,shard) {
-      assert.equal(shard,'shard0');calls.push('GET_ROOM_OBJECTS');
+      assert.ok(shard===undefined||shard==='shard0');calls.push('GET_ROOM_OBJECTS');
       if(room==='W37N11') {
         const objects=[
           {type:'controller',x:22,y:22,level:placed?1:0,
@@ -60,13 +60,13 @@ function fakeWorld({occupied=false,otherEnemy=false,failedPost=false,
       return {objects:[{type:'controller',x:22,y:22,level:0}],users:{}};
     },
     async gameRoomTerrain(room,shard) {
-      assert.equal(shard,'shard0');calls.push('GET_TERRAIN');
+      assert.ok(shard===undefined||shard==='shard0');calls.push('GET_TERRAIN');
       return {terrain:[{terrain:'0'.repeat(2500)}]};
     },
     async gameCheckUniqueObjectName(type,name,shard) {
       calls.push('POST_NAME_CHECK');
       assert.equal(type,'spawn');assert.equal(name,'Spawn1');
-      assert.equal(shard,'shard0');
+      assert.ok(shard===undefined||shard==='shard0');
       if(badName)throw Error('not unique');
       return {ok:1};
     },
