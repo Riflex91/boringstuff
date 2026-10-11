@@ -3,10 +3,10 @@ on:
   workflow_dispatch:
     inputs:
       max_per_shard:
-        description: Read-only room probes per normal shard (24/48/96)
+        description: Read-only probes per shard (manual default 96; push default 24)
         required: true
         type: choice
-        default: '24'
+        default: '96'
         options: ['24', '48', '96']
   push:
     branches: [main]
