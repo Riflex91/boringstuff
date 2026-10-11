@@ -22,6 +22,7 @@ const defenseMinCutShadow = require('defense.mincut.shadow');
 const remoteRoiShadow = require('remote.roi.shadow');
 const threatModelShadow = require('threat.model.shadow');
 const defenseRequestsShadow = require('defense.requests.shadow');
+const defenseRegistryPreview = require('defense.registry.preview');
 
 function bootstrapMemory() {
   if (!Memory.bot) Memory.bot = { version: config.VERSION, born: Game.time };
@@ -180,7 +181,8 @@ function statusSnapshot(roomStates, tickCpu) {
       defenseMinCut: defenseMinCutShadow.telemetrySummary(state.defenseMinCutShadow),
       remoteRoi: remoteRoiShadow.telemetrySummary(state.remoteRoiShadow),
       threatModel: threatModelShadow.telemetrySummary(state.threatModelShadow),
-      defenseRequests: defenseRequestsShadow.telemetrySummary(state.defenseRequestsShadow)
+      defenseRequests: defenseRequestsShadow.telemetrySummary(state.defenseRequestsShadow),
+       defenseRegistryPreview: defenseRegistryPreview.telemetrySummary(state.defenseRegistryPreview)
     };
   }
   logger.info('STATUS_SNAPSHOT', 'Structured bot status snapshot', {
@@ -329,6 +331,24 @@ module.exports.loop = function() {
                 status: 'UNVERIFIED', reason: 'D1_DIAGNOSTIC_ERROR',
                 roomName: state.room.name, tick: Game.time,
                 requestCount: 0
+              }
+            };
+          }
+          // E0 is evaluated only inside a disposable shadow registry.
+          // D1 remains an advisory producer and never writes Memory or
+          // exposes executable defense requests to the real E0 queue.
+          try {
+            state.defenseRegistryPreview = defenseRegistryPreview.evaluate(
+              state.defenseRequestsShadow, Game);
+          } catch (_) {
+            state.defenseRegistryPreview = {
+              summary: {
+                schemaVersion: defenseRegistryPreview.SCHEMA_VERSION,
+                authority: 'SHADOW', actionAuthority: 'NONE',
+                status: 'UNVERIFIED', reason: 'E0_PREVIEW_DIAGNOSTIC_ERROR',
+                roomName: state.room.name, tick: Game.time,
+                requestCount: 0, reservationCount: 0,
+                executable: false, writesToGameMemory: false
               }
             };
           }
