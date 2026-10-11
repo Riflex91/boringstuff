@@ -663,7 +663,8 @@ async function finalPlacementVerification(api, roomName, x, y, spawnName, myUser
     branch,
     requireNormalStatus: true,
     requireUniqueName: true,
-    requireBranchPresent: server === 'world'
+    requireBranchPresent: server === 'world',
+    requireWorldCodeReady: server === 'world'
   });
 }
 
