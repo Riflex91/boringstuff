@@ -1,7 +1,8 @@
 'use strict';
 
 // Passive D2 travel telemetry. Only consecutive *actual own defender positions*
-// can become ETA evidence; no Game intents, no creep Memory or combat policy.
+// with an already-assigned defenseSupportTarget can become ETA evidence;
+// the observer never assigns this mission, issues intents or mutates creep Memory.
 const SCHEMA_VERSION = 1;
 const MAX_TRACKS = 24;
 const MAX_ROUTES = 48;
@@ -94,6 +95,9 @@ function validDefender(creep) {
   return !!creep && creep.my === true && !creep.spawning &&
     creep.memory && creep.memory.role === 'defender' &&
     typeof creep.memory.home === 'string' &&
+    typeof creep.memory.defenseSupportTarget === 'string' &&
+    !!coord(creep.memory.defenseSupportTarget) &&
+    creep.memory.defenseSupportTarget !== creep.memory.home &&
     !!coord(creep.memory.home) && validPos(creep.pos) &&
     validTick(creep.ticksToLive) && Array.isArray(creep.body) &&
     creep.body.some(p => (p.type || p) === 'move' && (p.hits === undefined || p.hits > 0)) &&
@@ -117,12 +121,13 @@ function roomSafe(room, game) {
   } catch (_) { return false; }
 }
 function newTrack(creep, now) {
-  return { from: creep.memory.home, startedTick: now, lastTick: now,
-    lastPos: position(creep.pos), enteredTarget: null, roomSafety: {} };
+  return { from: creep.memory.home, to: creep.memory.defenseSupportTarget,
+    startedTick: now, lastTick: now,
+    lastPos: position(creep.pos), roomSafety: {} };
 }
 function trim(s, now) {
   for (const [id, t] of Object.entries(s.tracks)) {
-    if (!t || !validTick(t.lastTick) || t.lastTick >= now ||
+    if (!t || !validTick(t.lastTick) || t.lastTick > now ||
         now - t.lastTick > 1 || !validTick(t.startedTick) ||
         now - t.startedTick > MAX_TRANSIT_TICKS) delete s.tracks[id];
   }
@@ -155,6 +160,7 @@ function observe(game, root) {
     const p = position(creep.pos);
     let t = s.tracks[id];
     if (!t || t.from !== creep.memory.home ||
+        t.to !== creep.memory.defenseSupportTarget ||
         t.lastTick !== now - 1 || !adjacent(t.lastPos, p) ||
         now - t.startedTick > MAX_TRANSIT_TICKS) {
       delete s.tracks[id];
@@ -172,28 +178,19 @@ function observe(game, root) {
     }
     t.lastTick = now;
     t.lastPos = p;
-    if (p.roomName === t.from) {
-      if (t.enteredTarget) { delete s.tracks[id]; continue; }
-      continue;
-    }
-    if (!t.enteredTarget) t.enteredTarget = p.roomName;
-    if (t.enteredTarget !== p.roomName) {
-      // Multi-room crossings are permitted, but every preceding transit
-      // room must be visibly safe. Keep track of the newest destination.
-      t.enteredTarget = p.roomName;
-    }
-    if (!interior(p)) continue;
+    if (p.roomName === t.from || p.roomName !== t.to ||
+        !interior(p)) continue;
     const corridorClear = Object.keys(t.roomSafety).every(r =>
-      r === p.roomName || t.roomSafety[r] === true);
+      r === t.to || t.roomSafety[r] === true);
     if (corridorClear && roomSafe(t.from, game)) {
-      const key = t.from + '>' + p.roomName;
+      const key = t.from + '>' + t.to;
       const travel = now - t.startedTick;
       if (travel > 0 && travel <= MAX_TRANSIT_TICKS) {
         const prior = s.routes[key];
         const ageValid = prior && validTick(prior.observedTick) &&
           now - prior.observedTick <= MAX_EVIDENCE_AGE;
         s.routes[key] = {
-          from: t.from, to: p.roomName,
+          from: t.from, to: t.to,
           travelTicks: ageValid ? Math.max(prior.travelTicks, travel) : travel,
           observations: ageValid ? Math.min(MAX_OBSERVATIONS, prior.observations + 1) : 1,
           observedTick: now, risk: 'CLEAR'
