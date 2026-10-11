@@ -1,0 +1,37 @@
+name: Screeps World strategic scouting (read-only)
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/screeps-world-scout.yml
+permissions:
+  contents: read
+concurrency:
+  group: screeps-world-scout-readonly
+  cancel-in-progress: false
+jobs:
+  scout:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    defaults:
+      run:
+        working-directory: tools
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Run GET-only per-shard strategic spawn planner
+        env:
+          SCREEPS_TOKEN_WORLD: ${{ secrets.SCREEPS_TOKEN_WORLD }}
+          WORLD_SCOUT_OUTPUT_DIR: ${{ runner.temp }}/world-scout-results
+        run: node world-scout.mjs
+      - name: Retain read-only scouting evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screeps-world-scout-${{ github.sha }}
+          path: ${{ runner.temp }}/world-scout-results
+          if-no-files-found: warn
+          retention-days: 14
