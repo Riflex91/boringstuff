@@ -1,0 +1,97 @@
+name: Screeps World first spawn W37N11 and post-verification activation (manual)
+on:
+  workflow_dispatch:
+    inputs:
+      expected_main_sha:
+        description: Exact current Node24-tested main SHA (40 hex)
+        required: true
+        type: string
+      newbieland_live_run_id:
+        description: Completed exact-main Newbieland LIVE_100T_PASS Actions run ID
+        required: true
+        type: string
+      placement_confirmation:
+        description: Type PLACE_W37N11_12_13 to approve the one-time World spawn
+        required: true
+        type: string
+      rival_confirmation:
+        description: Type ACCEPT_W35N11_RCL8 to accept the neighboring rival risk
+        required: true
+        type: string
+      activation_confirmation:
+        description: Type ACTIVATE_W37N11_AFTER_VERIFIED_SPAWN for automatic World bot activation after owned Spawn1 verification
+        required: true
+        type: string
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: screeps-world-chatgpt
+  cancel-in-progress: false
+jobs:
+  place-first-spawn:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: tools
+    env:
+      SCREEPS_SERVER: world
+      SCREEPS_SHARD: shard0
+      SCREEPS_BRANCH: chatgpt
+      SCREEPS_TOKEN_WORLD: ${{ secrets.SCREEPS_TOKEN_WORLD }}
+      WORLD_FIRST_SPAWN_CONFIRM: ${{ inputs.placement_confirmation }}
+      WORLD_RCL8_RISK_CONFIRM: ${{ inputs.rival_confirmation }}
+      WORLD_ACTIVATION_CONFIRM: ${{ inputs.activation_confirmation }}
+      WORLD_EXPECTED_MAIN_SHA: ${{ inputs.expected_main_sha }}
+      WORLD_NEWBIELAND_LIVE_RUN_ID: ${{ inputs.newbieland_live_run_id }}
+      GITHUB_TOKEN: ${{ github.token }}
+    steps:
+      - name: Keep World API config only in ephemeral runner storage
+        working-directory: .
+        run: echo "SCREEPS_CONFIG=$RUNNER_TEMP/world-first-spawn-config.json" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Enforce exact current main, fixed site and two explicit approvals
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${{ github.ref }}" = 'refs/heads/main'
+          test "$WORLD_FIRST_SPAWN_CONFIRM" = 'PLACE_W37N11_12_13'
+          test "$WORLD_RCL8_RISK_CONFIRM" = 'ACCEPT_W35N11_RCL8'
+          test "$WORLD_ACTIVATION_CONFIRM" = 'ACTIVATE_W37N11_AFTER_VERIFIED_SPAWN'
+          [[ "$WORLD_EXPECTED_MAIN_SHA" =~ ^[a-f0-9]{40}$ ]]
+          git fetch origin main --quiet
+          test "$(git rev-parse origin/main)" = "$WORLD_EXPECTED_MAIN_SHA"
+          test "$(git rev-parse HEAD)" = "$WORLD_EXPECTED_MAIN_SHA"
+          echo "World first spawn exact main commit verified."
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Install offline dependencies
+        run: npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+      - name: Validate all Node24 regressions and exact P3 baseline
+        run: |
+          npm test
+          npm run bench:p3
+      - name: Verify actual >=100 Newbieland live ticks on exact main
+        run: node world-first-spawn-live-gate.mjs
+      - name: Refresh complete World 5x5 opponent risk and staged code (GET only)
+        env:
+          WORLD_RISK_OUTPUT_DIR: ${{ runner.temp }}/world-first-spawn-evidence/risk
+        run: node world-threat-ring.mjs
+      - name: Place only Spawn1 at W37N11 (12,13), verify ownership, then activate exact chatgpt World code
+        run: node world-first-spawn.mjs
+      - name: Save sanitized exact World placement proof or fail-closed receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screeps-world-first-spawn-${{ github.sha }}
+          path: ${{ runner.temp }}/world-first-spawn-evidence
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Remove ephemeral World credentials
+        if: always()
+        run: rm -f "$SCREEPS_CONFIG"
