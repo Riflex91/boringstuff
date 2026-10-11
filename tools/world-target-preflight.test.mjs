@@ -4,7 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WORLD_TARGET } from './world-target-selection.mjs';
 import { validateTarget, decideWorldTarget,
-  inspectSelectedWorldTarget } from './world-target-preflight.mjs';
+  inspectSelectedWorldTarget,verifyStagedWorldCode } from './world-target-preflight.mjs';
 
 const here=path.dirname(fileURLToPath(import.meta.url));
 const target=WORLD_TARGET;
@@ -46,8 +46,9 @@ function mockWorld({
       if (endpoint==='/api/game/shards/info')
         return {shards:[{name:'shard0',rooms:6866,users:192}]};
       assert.equal(endpoint,'/api/user/code');
-      assert.deepEqual(params,{branch:'default'},
-        'No other World code branch should be read or mutated');
+      assert.ok(['default','chatgpt'].includes(params?.branch),
+        'Only read code of current default or isolated chatgpt branch');
+      if (params.branch==='chatgpt') return {modules:{}};
       if (backup instanceof Error) throw backup;
       return backup;
     },
@@ -111,6 +112,7 @@ function mockWorld({
     'Site and branch proof cannot automatically place World spawn');
   assert.equal(v.inactiveStageGate.preconditionsPass,false,
     'Existing World code branch must block an initial staging attempt');
+  assert.equal(v.stagedCodeReadback.status,'INCOMPLETE_OR_MISMATCHED_CODE');
   assert.ok(v.inactiveStageGate.failures.includes('WORLD_BRANCH_ALREADY_EXISTS'));
 }
 {
@@ -197,6 +199,38 @@ function mockWorld({
   const f=mockWorld({worldStatus:'normal'});
   const v=await inspectSelectedWorldTarget(f.api);
   assert.ok(v.inactiveStageGate.failures.includes('ACCOUNT_NOT_EMPTY'));
+}
+{
+  const expected={main:'main code',config:'config code'};
+  const api={_request:async(method,endpoint,query)=>{
+    assert.equal(method,'GET');assert.equal(endpoint,'/api/user/code');
+    assert.deepEqual(query,{branch:'chatgpt'});
+    return {modules:{main:'main code',config:'config code'}};
+  }};
+  const listed=[{branch:'default',activeWorld:true},
+    {branch:'chatgpt',activeWorld:false}];
+  const exact=await verifyStagedWorldCode(api,listed,expected);
+  assert.equal(exact.status,'EXACT_INACTIVE_CODE');
+  assert.equal(exact.exactSourceMatch,true);
+  assert.equal(exact.observedModuleCount,2);
+  const absent=await verifyStagedWorldCode(api,
+    [{branch:'default',activeWorld:true}],expected);
+  assert.equal(absent.status,'BRANCH_ABSENT');
+  const active=await verifyStagedWorldCode(api,
+    [{branch:'chatgpt',activeWorld:true}],expected);
+  assert.equal(active.status,'ACTIVE_OR_DUPLICATE_BRANCH_BLOCKED');
+  const duplicate=await verifyStagedWorldCode(api,
+    [{branch:'chatgpt',activeWorld:false},{branch:'chatgpt',activeWorld:false}],expected);
+  assert.equal(duplicate.status,'ACTIVE_OR_DUPLICATE_BRANCH_BLOCKED');
+  const changed=await verifyStagedWorldCode({
+    _request:async()=>({modules:{main:'tampered'}})},listed,expected);
+  assert.equal(changed.status,'INCOMPLETE_OR_MISMATCHED_CODE');
+  const failed=await verifyStagedWorldCode({
+    _request:async()=>{throw new Error('authorization failed')}},listed,expected);
+  assert.equal(failed.status,'BRANCH_CODE_GET_FAILED');
+  const raw=JSON.stringify(changed)+JSON.stringify(failed);
+  assert.equal(raw.includes('tampered'),false,'No source code in evidence');
+  assert.equal(raw.includes('authorization failed'),false,'No API error in evidence');
 }
 const source=fs.readFileSync(path.join(here,'world-target-preflight.mjs'),'utf8');
 for(const blocked of [

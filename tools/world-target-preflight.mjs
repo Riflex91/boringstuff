@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { ScreepsHttpClient } from './screeps-client.mjs';
 import { buildWorldConfig } from './world-deployment-profile.mjs';
@@ -126,6 +127,43 @@ export function decideWorldTarget({preflight, room, nearby},target=WORLD_TARGET)
   };
 }
 
+/**
+ * GET-only stage readback. A failed POST may leave an inactive branch behind;
+ * existence alone does not imply successful code staging. Never emit modules.
+ */
+export async function verifyStagedWorldCode(api,branches,expectedModules) {
+  const list=Array.isArray(branches)?branches:[];
+  const found=list.filter(x=>x?.branch==='chatgpt');
+  if (found.length===0) return {status:'BRANCH_ABSENT',branchExists:false,
+    exactSourceMatch:false,activeWorld:false,expectedModuleCount:Object.keys(expectedModules).length};
+  if (found.length!==1 || found[0]?.activeWorld===true)
+    return {status:'ACTIVE_OR_DUPLICATE_BRANCH_BLOCKED',branchExists:true,
+      exactSourceMatch:false,activeWorld:found.some(x=>x.activeWorld===true),
+      expectedModuleCount:Object.keys(expectedModules).length};
+  try {
+    const raw=await api._request('GET','/api/user/code',{branch:'chatgpt'});
+    if (raw?.ok===false || !raw?.modules || typeof raw.modules!=='object' ||
+        Array.isArray(raw.modules))
+      return {status:'BRANCH_CODE_UNVERIFIED',branchExists:true,
+        exactSourceMatch:false,activeWorld:false,
+        expectedModuleCount:Object.keys(expectedModules).length};
+    const actual=raw.modules, expectedNames=Object.keys(expectedModules).sort();
+    const actualNames=Object.keys(actual).sort();
+    const exact=actualNames.length===expectedNames.length &&
+      actualNames.every((name,i)=>name===expectedNames[i] &&
+        typeof actual[name]==='string' &&
+        crypto.createHash('sha256').update(actual[name]).digest('hex')===
+        crypto.createHash('sha256').update(expectedModules[name]).digest('hex'));
+    return {status:exact?'EXACT_INACTIVE_CODE':'INCOMPLETE_OR_MISMATCHED_CODE',
+      branchExists:true,exactSourceMatch:exact,activeWorld:false,
+      expectedModuleCount:expectedNames.length,observedModuleCount:actualNames.length};
+  } catch {
+    return {status:'BRANCH_CODE_GET_FAILED',branchExists:true,
+      exactSourceMatch:false,activeWorld:false,
+      expectedModuleCount:Object.keys(expectedModules).length};
+  }
+}
+
 export async function inspectSelectedWorldTarget(api,target=WORLD_TARGET) {
   validateTarget(target);
   if (!api || api.defaultShard !== target.shard)
@@ -181,6 +219,15 @@ export async function inspectSelectedWorldTarget(api,target=WORLD_TARGET) {
       failures:['WORLD_DEFAULT_CODE_BACKUP_OR_GATE_UNVERIFIED'],
       targetBranch:'chatgpt'};
   }
+  // On any stage error, distinguish absent, partial, exact, or inadvertently
+  // active branch using only authenticated GETs. No source bytes in receipt.
+  const worldBranchList=Array.isArray(preflight.branches)?preflight.branches:[];
+  const gamePath=path.join(path.dirname(fileURLToPath(import.meta.url)),'..','game');
+  const gameFiles=fs.readdirSync(gamePath).filter(n=>n.endsWith('.js')).sort();
+  const expectedModules=Object.fromEntries(gameFiles.map(name=>[
+    name.slice(0,-3),fs.readFileSync(path.join(gamePath,name),'utf8')
+  ]));
+  const stagedCode=await verifyStagedWorldCode(api,worldBranchList,expectedModules);
   const decision=decideWorldTarget({preflight,room,nearby},target);
   const stagePreconditionsPass=inactiveStageGate.ok &&
     decision.siteChecksPass && decision.risk!=='UNVERIFIED';
@@ -202,6 +249,7 @@ export async function inspectSelectedWorldTarget(api,target=WORLD_TARGET) {
       branchPresent:decision.worldBranchPresent
     },
     room, ...decision,
+    stagedCodeReadback:stagedCode,
     inactiveStageGate:{
       preconditionsPass:stagePreconditionsPass,
       failures:stageGateFailures,
