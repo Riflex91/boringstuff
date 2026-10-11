@@ -8,14 +8,8 @@ on:
         type: choice
         default: '96'
         options: ['24', '48', '96']
-  push:
-    branches: [main]
-    paths:
-      - .github/workflows/screeps-world-scout.yml
-      - tools/world-scout.mjs
-      - tools/world-scout-core.mjs
-      - tools/initial-spawn-planner.mjs
-      - tools/screeps-client.mjs
+  # Legacy first-spawn workflow: manual only after World activation.
+  # Do not misclassify a correctly occupied World colony as launch failure.
 permissions:
   contents: read
 concurrency:
