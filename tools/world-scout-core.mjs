@@ -123,6 +123,48 @@ export function summarizeWorldBuildability(candidate) {
     labReady:layout.labReady,needsReview};
 }
 
+
+/**
+ * Preserve read-only nearby-opponent pressure and the nearest observed owned
+ * rival room for operator review. These are existing planner observations,
+ * NOT a new threat estimate or an authorization to place a spawn.
+ */
+export function summarizeWorldThreatExposure(candidate) {
+  const n = candidate?.neighborhood;
+  const fields = [n?.hostileOwned,n?.hostileReserved,
+    n?.opponentStrengthPenalty,n?.keeperPressure];
+  const counts = [n?.directHostileRooms,n?.directReservedRooms];
+  if (!fields.every(v => Number.isFinite(v) && v >= 0) ||
+      !counts.every(v => Number.isSafeInteger(v) && v >= 0) ||
+      !Array.isArray(n?.details)) {
+    return {status:'unverified',hostileOwnedPressure:null,
+      hostileReservedPressure:null,opponentStrengthPenalty:null,
+      keeperPressure:null,directHostileRooms:null,directReservedRooms:null,
+      nearestOwnedRival:null,needsReview:true};
+  }
+  const rivals = n.details.filter(d => d?.kind === 'owned-by-other' &&
+      typeof d.room === 'string' && ROOM.test(d.room) &&
+      Number.isSafeInteger(d.distance) && d.distance >= 0 &&
+      Number.isSafeInteger(d.rcl) && d.rcl >= 0 && d.rcl <= 8);
+  rivals.sort((a,b) => a.distance - b.distance ||
+    b.rcl - a.rcl || a.room.localeCompare(b.room));
+  const nearest = rivals[0];
+  const nearestOwnedRival = nearest ? {
+    room:nearest.room,distance:nearest.distance,rcl:nearest.rcl,
+    activityObserved:nearest.activityObserved === true
+  } : null;
+  const needsReview = fields.some(v => v > 0) || counts.some(v => v > 0) ||
+    nearestOwnedRival !== null;
+  return {status:needsReview?'review':'clear',
+    hostileOwnedPressure:n.hostileOwned,
+    hostileReservedPressure:n.hostileReserved,
+    opponentStrengthPenalty:n.opponentStrengthPenalty,
+    keeperPressure:n.keeperPressure,
+    directHostileRooms:n.directHostileRooms,
+    directReservedRooms:n.directReservedRooms,
+    nearestOwnedRival,needsReview};
+}
+
 /**
  * Read-only advisory: highest-scoring deeply inspected room whose measured
  * remote sources are ALL reachable. Does not replace the strategic winner
@@ -153,7 +195,8 @@ export function selectRouteClearCandidate(entries) {
       if (remoteRouting.status !== 'clear' || buildability.status !== 'clear') continue;
       candidates.push({shard, room:room.roomName, x:tile.x, y:tile.y,
         strategicScore:room.strategicScore, scoreModel:report.scoreModel,
-        remoteRouting,buildability});
+        remoteRouting,buildability,
+        threatExposure:summarizeWorldThreatExposure(room)});
     }
   }
   candidates.sort((a,b) => b.strategicScore - a.strategicScore ||
