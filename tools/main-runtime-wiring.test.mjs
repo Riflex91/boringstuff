@@ -122,4 +122,18 @@ for (const forbidden of ['.claimController(', '.spawnCreep(',
     'Read-only expansion candidates must never issue gameplay intents');
 }
 
+assert.ok(mainSource.includes("require('expansion.operation.shadow')"),
+  'I4 main must import the fail-closed preflight');
+assert.ok(mainSource.includes('const expansionOperation = expansionOperationShadow.evaluate('),
+  'Status snapshots must advance I4 only at the existing 100-tick cadence');
+assert.ok(mainSource.includes('    expansionOperation,'),
+  'Status snapshots must expose I4 operation state');
+const operationSource=fs.readFileSync(path.resolve(here,
+  '../game/expansion.operation.shadow.js'),'utf8');
+for(const forbidden of ['.claimController(','.reserveController(',
+  '.spawnCreep(','.createConstructionSite(']) {
+  assert.equal(operationSource.includes(forbidden),false,
+    'I4 operation remains entirely observation-only');
+}
+
 console.log('main runtime wiring tests passed');

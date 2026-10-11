@@ -12,6 +12,7 @@ const commands = require('commands');
 const runtimeCapabilities = require('runtime.capabilities');
 const expansionReadinessShadow = require('expansion.readiness.shadow');
 const expansionCandidatesShadow = require('expansion.candidates.shadow');
+const expansionOperationShadow = require('expansion.operation.shadow');
 const serverProfile = require('server.profile');
 const processScheduler = require('process.scheduler');
 const worldIntel = require('world.intel');
@@ -139,6 +140,8 @@ function statusSnapshot(roomStates, tickCpu) {
   const expansionReadiness = expansionReadinessShadow.evaluate(capabilities,roomStates,tickCpu);
   const expansionCandidates = expansionCandidatesShadow.evaluate(
     expansionReadiness,roomStates,Game,Memory);
+  const expansionOperation = expansionOperationShadow.evaluate(
+    expansionReadiness,expansionCandidates,roomStates,Game,Memory);
   const schedulerState = processScheduler.snapshot();
   const worldIntelState = worldIntel.snapshot();
   for (const state of roomStates) {
@@ -186,6 +189,7 @@ function statusSnapshot(roomStates, tickCpu) {
     capabilities,
     expansionReadiness,
     expansionCandidates,
+    expansionOperation,
     serverProfile: profile,
     scheduler: schedulerState,
     worldIntel: worldIntelState,
