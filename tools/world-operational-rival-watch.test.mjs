@@ -4,16 +4,17 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {assessOperationalRivalRing,inspectOperationalRivalRisk}
   from './world-operational-rival-watch.mjs';
+import {threatRingRooms} from './world-threat-ring.mjs';
 
 const ring={
  target:{shard:'shard0',room:'W37N11'},mode:'GET_ONLY',
  requestedRooms:24,verifiedRooms:24,coverageComplete:true,
  unverifiedRooms:[],
- observations:Array.from({length:24},(_,i)=>({
-   room:i===0?'W35N11':i===1?'W35N13':'W36N'+(i+10),
-   distance:i===0||i===1?2:1,verified:true,
-   foreignOwner:i===0,foreignReservation:i===1,
-   controllerLevel:i===0?8:0
+ observations:threatRingRooms().map(({room,distance})=>({
+   room,distance,verified:true,
+   foreignOwner:room==='W35N11',
+   foreignReservation:room==='W35N13',
+   controllerLevel:room==='W35N11'?8:0
  }))
 };
 const input={
@@ -74,6 +75,24 @@ for(const transform of [
 ]){
  const v=structuredClone(input);transform(v);
  assert.equal(assessOperationalRivalRing(v).status,'FAIL');
+}
+{
+ const v=structuredClone(input);
+ v.ring.observations[3].distance=2;
+ assert.equal(assessOperationalRivalRing(v).status,'INCOMPLETE',
+   'A false neighbor radius must not pass');
+}
+{
+ const v=structuredClone(input);
+ v.ring.observations[3].room=v.ring.observations[4].room;
+ assert.equal(assessOperationalRivalRing(v).status,'INCOMPLETE',
+   'Duplicate neighbors must never count as 24 complete distinct GETs');
+}
+{
+ const v=structuredClone(input);
+ v.ring.foreignReservedRooms=0;
+ assert.equal(assessOperationalRivalRing(v).status,'INCOMPLETE',
+   'Ring aggregate must match actual observations');
 }
 const calls=[];
 const objectsFor=room=>room==='W37N11'?input.roomObjects:
