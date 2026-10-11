@@ -29,7 +29,7 @@ function fake({missingSpawn=false,codeChanged=false,alreadyActive=false,
    async userBranches() {
      calls.push('GET_BRANCHES');return {list:[
        {branch:'default',activeWorld:active==='default'},
-       {branch:'chatgpt',activeWorld:active==='chatgpt'}]};
+       {branch:'chatgpt',...(active==='chatgpt'?{activeWorld:true}:{})}]};
    },
    async _request(method,endpoint,payload) {
      calls.push('GET_CODE');

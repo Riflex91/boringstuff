@@ -89,15 +89,33 @@ async function finalPinnedCheck(api,id) {
   });
 }
 
+/**
+ * Screeps can omit "activeWorld" on an inactive branch instead of setting
+ * activeWorld:false. Only activeWorld:true counts as active. An absent branch,
+ * duplicate branch, no active branch or multiple actives still block writes.
+ */
+export function assessPreActivationWorldBranches(branches) {
+  const list=Array.isArray(branches?.list)?branches.list:[];
+  const defaults=list.filter(b=>b?.branch==='default');
+  const staged=list.filter(b=>b?.branch==='chatgpt');
+  const active=list.filter(b=>b?.activeWorld===true);
+  const defaultSoleActive=defaults.length===1 &&
+    defaults[0].activeWorld===true &&
+    active.length===1 && active[0].branch==='default' &&
+    (typeof branches?.activeWorld!=='string'||branches.activeWorld==='default');
+  const stagedUniqueInactive=staged.length===1 &&
+    staged[0]?.activeWorld!==true;
+  return {ok:defaultSoleActive&&stagedUniqueInactive,
+    defaultSoleActive,stagedUniqueInactive};
+}
+
 async function readBackSpawn(api,id) {
   const [objects,branches,status]=await Promise.all([
     api.gameRoomObjects(TARGET.room,TARGET.shard),
     api.userBranches(),api.userWorldStatus()
   ]);
-  const list=branches?.list||[];
-  const activeWorld=list.filter(x=>x?.activeWorld===true);
-  const activeDefault=activeWorld.length===1 && activeWorld[0]?.branch==='default';
-  const inactiveChatgpt=list.filter(x=>x?.branch==='chatgpt'&&x.activeWorld===false).length===1;
+  const {defaultSoleActive:activeDefault,
+    stagedUniqueInactive:inactiveChatgpt}=assessPreActivationWorldBranches(branches);
   const objectsList=Array.isArray(objects?.objects)?objects.objects:[];
   const spawn=objectsList.find(o=>
     (o?.type==='spawn'||o?.structureType==='spawn')&&
@@ -199,10 +217,7 @@ export async function placePinnedWorldSpawn(api,id) {
     phase:'LAST_GET_ONLY_GATE',failures:lastGate.failures});
   // The World startup must remain on default until separately authorized.
   const beforeBranches=await api.userBranches();
-  if(!Array.isArray(beforeBranches?.list) ||
-     beforeBranches.list.filter(x=>x?.activeWorld===true).length!==1 ||
-     beforeBranches.list.filter(x=>x?.branch==='default'&&x.activeWorld===true).length!==1 ||
-     beforeBranches.list.filter(x=>x?.branch==='chatgpt'&&x.activeWorld===false).length!==1)
+  if(!assessPreActivationWorldBranches(beforeBranches).ok)
     throw Object.assign(new Error('WORLD_ACTIVE_BRANCH_CHANGED'),{
       phase:'LAST_BRANCH_STATE_GATE',
       failures:['DEFAULT_MUST_BE_ACTIVE_AND_CHATGPT_MUST_BE_INACTIVE']});
