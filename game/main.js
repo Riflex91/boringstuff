@@ -24,6 +24,7 @@ const threatModelShadow = require('threat.model.shadow');
 const defenseRequestsShadow = require('defense.requests.shadow');
 const defenseRegistryPreview = require('defense.registry.preview');
 const regionalDefenseShadow = require('defense.reinforcement.shadow');
+const defenseTransitEvidence = require('defense.transit.evidence');
 
 function bootstrapMemory() {
   if (!Memory.bot) Memory.bot = { version: config.VERSION, born: Game.time };
@@ -147,12 +148,14 @@ function statusSnapshot(roomStates, tickCpu) {
     expansionReadiness,expansionCandidates,roomStates,Game,Memory);
   const schedulerState = processScheduler.snapshot();
   const worldIntelState = worldIntel.snapshot();
+  const transitEvidence = defenseTransitEvidence.snapshot(Game, Memory);
   // D2 is computed only for bounded snapshot evidence, never used by
   // legacy defense or spawn executors. No observed inter-room transit
-  // evidence is available yet: pass null, do not invent travel ETA.
+  // evidence is available by default. Only consecutive observed travel from
+  // a preexisting mission may populate the D2 route evidence map.
   let regionalDefense;
   try {
-    regionalDefense = regionalDefenseShadow.evaluate(roomStates, null, Game);
+    regionalDefense = regionalDefenseShadow.evaluate(roomStates, transitEvidence.routes, Game);
   } catch (_) {
     regionalDefense = { summary: {
       schemaVersion: regionalDefenseShadow.SCHEMA_VERSION,
@@ -214,6 +217,7 @@ function statusSnapshot(roomStates, tickCpu) {
     scheduler: schedulerState,
     worldIntel: worldIntelState,
     regionalDefense: regionalDefenseShadow.telemetrySummary(regionalDefense),
+    regionalTransit: transitEvidence.summary,
     memoryFootprint: memoryFootprintSnapshot(),
     rooms
   }, { force: true, persist: false, dedupeTicks: 0 });
@@ -296,6 +300,22 @@ module.exports.loop = function() {
       minimumInterval: 0
     }, function() {
       profiler.section('creeps', function() { creepManager.runAll(); });
+    }, schedulerContext);
+
+    // D2 observer is passive, bucket-gated and allowed to miss a tick.
+    // Missing ticks invalidate a route witness rather than lowering ETA.
+    processScheduler.run({
+      id: 'defense-transit-shadow',
+      priorityClass: processScheduler.PRIORITY.BACKGROUND,
+      minimumInterval: 0
+    }, function() {
+      try {
+        profiler.section('defense-transit-shadow', function() {
+          defenseTransitEvidence.observe(Game, Memory);
+        });
+      } catch (_) {
+        // An optional ETA observer must never block core gameplay.
+      }
     }, schedulerContext);
 
     // Observations happen AFTER creep handlers issued intents, never inside
