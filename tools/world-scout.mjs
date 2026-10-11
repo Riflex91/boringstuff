@@ -8,7 +8,7 @@ import { buildWorldConfig } from './world-deployment-profile.mjs';
 import { inspectWorld } from './world-readonly-preflight.mjs';
 import { summarizeRoom } from './spawn-planner-core.mjs';
 import { inspectSpawnTile, normalizeRoomStatusResponse } from './spawn-safety.mjs';
-import { extractWorldRooms, sampleWorldRooms, fallbackProbeRooms, selectStrategicWinner, summarizeWorldRemoteRouting, verifyShardName } from './world-scout-core.mjs';
+import { extractWorldRooms, sampleWorldRooms, fallbackProbeRooms, selectStrategicWinner, selectRouteClearCandidate, summarizeWorldRemoteRouting, verifyShardName } from './world-scout-core.mjs';
 
 const dir = path.dirname(fileURLToPath(import.meta.url));
 const output = process.env.WORLD_SCOUT_OUTPUT_DIR || path.join(os.tmpdir(), 'screeps-world-scout-results');
@@ -147,6 +147,22 @@ async function main() {
         evidence.freshTileVerification = {ok:false,error:String(err?.message||err)};
       }
     }
+    // The overall strategic winner is unchanged. Independently expose the
+    // highest-scoring fully routed alternative for human comparison, with its
+    // own fresh tile check; never use this advisory to place a spawn.
+    const routeClear = selectRouteClearCandidate(reports);
+    if (routeClear) {
+      evidence.provisionalRouteClearCandidate = routeClear;
+      try {
+        const me = await api.me();
+        evidence.routeClearTileVerification = await verifyReadOnlyTarget(api,
+          {shard:routeClear.shard,report:{selected:routeClear}},
+          me?._id || me?.id || null);
+      } catch (err) {
+        evidence.routeClearTileVerification = {
+          ok:false,error:String(err?.message || err).slice(0,160)};
+      }
+    }
     evidence.completeCoverage = evidence.scopes.every(s=>
       s.plannerCompleted && s.discovered === s.sampled);
     write('world-scout-summary.json',evidence);
@@ -156,6 +172,8 @@ async function main() {
         sampled:s.sampled,discoveryMode:s.discoveryMode || null,
         plannerCompleted:s.plannerCompleted,bestScored:s.bestScored || null,reason:s.reason})),
       selected:evidence.provisionalWinner||null,
+      routeClearCandidate:evidence.provisionalRouteClearCandidate||null,
+      routeClearTilePass:evidence.routeClearTileVerification?.ok===true,
       freshTilePass:evidence.freshTileVerification?.ok===true,
       completeCoverage:evidence.completeCoverage,readyForPlacement:false
     }));
