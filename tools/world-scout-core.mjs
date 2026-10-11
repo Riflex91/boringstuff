@@ -71,6 +71,28 @@ export function verifyShardName(name) {
   if (typeof name !== 'string' || !SHARD.test(name)) throw new Error('Invalid shard name from World API');
   return name;
 }
+
+/**
+ * Describe existing deep-planner routing evidence without rescoring candidates.
+ * Unknown or internally inconsistent measurements are flagged, never treated
+ * as zero inaccessible sources. The scout remains strictly read-only.
+ */
+export function summarizeWorldRemoteRouting(selected) {
+  const routes = selected?.deepAnalysis?.remoteRoutes;
+  const total = routes?.totalSources;
+  const reachable = routes?.reachableSources;
+  const inaccessible = routes?.inaccessibleSources;
+  if (![total, reachable, inaccessible].every(Number.isSafeInteger) ||
+      total < 0 || reachable < 0 || inaccessible < 0 ||
+      reachable + inaccessible !== total) {
+    return {status:'unverified',totalSources:null,reachableSources:null,
+      inaccessibleSources:null,needsReview:true};
+  }
+  const needsReview = total === 0 || inaccessible > 0;
+  return {status:needsReview?'review':'clear',totalSources:total,
+    reachableSources:reachable,inaccessibleSources:inaccessible,needsReview};
+}
+
 export function selectStrategicWinner(entries) {
   const valid = entries.filter(x => {
     const r = x?.report, s = r?.selected;
