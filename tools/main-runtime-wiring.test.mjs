@@ -96,13 +96,13 @@ assert.match(
 );
 
 assert.match(mainSource,
-  /const\\s+expansionReadinessShadow\\s*=\\s*require\\(['"]expansion\\.readiness\\.shadow['"]\\)/,
+  /const\s+expansionReadinessShadow\s*=\s*require\(['"]expansion\.readiness\.shadow['"]\)/,
   'main must load the passive expansion readiness observer');
 assert.match(mainSource,
-  /expansionReadiness:\\s*expansionReadinessShadow\\.evaluate\\(capabilities,\\s*roomStates,\\s*tickCpu\\)/,
+  /expansionReadiness:\s*expansionReadinessShadow\.evaluate\(capabilities,\s*roomStates,\s*tickCpu\)/,
   'STATUS_SNAPSHOT must expose per-server dynamic GCL/CPU shadow readiness');
 const expansionSource=fs.readFileSync(path.resolve(here,'../game/expansion.readiness.shadow.js'),'utf8');
-assert.doesNotMatch(expansionSource,/\\.claimController\\s*\\(|\\.spawnCreep\\s*\\(|\\.createConstructionSite\\s*\\(/,
+assert.doesNotMatch(expansionSource,/\.claimController\s*\(|\.spawnCreep\s*\(|\.createConstructionSite\s*\(/,
   'expansion readiness is strictly observational, without game actions');
 
 console.log('main runtime wiring tests passed');
