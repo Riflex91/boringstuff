@@ -32,7 +32,8 @@ const ordinaryRoom=(owner,kind='normal')=>({
 function mockWorld({
   worldStatus='empty',site=ordinaryRoom(null),
   rival=ordinaryRoom('rival'),reserve=ordinaryRoom(null),
-  branches=[{branch:'default',activeWorld:true}],missingSource=false
+  branches=[{branch:'default',activeWorld:true}],missingSource=false,
+  backup={modules:{main:'legacy',config:'old config'}}
 }={}) {
   const rooms={W37N11:site,W35N11:rival,W36N13:reserve};
   const calls=[];
@@ -40,10 +41,15 @@ function mockWorld({
     async authMe(){calls.push({method:'GET',endpoint:'authMe'});return {_id:'myId'};},
     async userWorldStatus(){calls.push({method:'GET',endpoint:'userWorldStatus'});return {status:worldStatus};},
     async userBranches(){calls.push({method:'GET',endpoint:'userBranches'});return {list:branches};},
-    async _request(method,endpoint){
-      calls.push({method,endpoint});assert.equal(method,'GET');
-      assert.equal(endpoint,'/api/game/shards/info');
-      return {shards:[{name:'shard0',rooms:6866,users:192}]};
+    async _request(method,endpoint,params){
+      calls.push({method,endpoint,params});assert.equal(method,'GET');
+      if (endpoint==='/api/game/shards/info')
+        return {shards:[{name:'shard0',rooms:6866,users:192}]};
+      assert.equal(endpoint,'/api/user/code');
+      assert.deepEqual(params,{branch:'default'},
+        'No other World code branch should be read or mutated');
+      if (backup instanceof Error) throw backup;
+      return backup;
     },
     async gameRoomStatus(room,shard){
       calls.push({method:'GET',endpoint:'roomStatus',room,shard});
@@ -78,6 +84,14 @@ function mockWorld({
   assert.equal(result.readyForPlacement,false);
   assert.equal(result.readyForDeployment,false);
   assert.equal(result.stagingRequired,true);
+  assert.equal(result.inactiveStageGate.preconditionsPass,true);
+  assert.deepEqual(result.inactiveStageGate.failures,[]);
+  assert.equal(result.inactiveStageGate.manualApprovalRequired,true);
+  assert.equal(result.inactiveStageGate.stagingAuthorized,false);
+  assert.equal(result.inactiveStageGate.stagingAttempted,false);
+  assert.equal(result.inactiveStageGate.defaultCodeContentsIncluded,false);
+  assert.equal(JSON.stringify(result).includes('legacy'),false,
+    'Default World branch source must not be printed in evidence');
   assert.equal(result.nextAction,'STAGE_ISOLATED_INACTIVE_WORLD_CODE');
   assert.equal(result.knownRivals[0].controllerLevel,8);
   assert.ok(f.calls.every(c=>c.method==='GET'),
@@ -95,6 +109,9 @@ function mockWorld({
   assert.equal(v.nextAction,'AWAIT_FINAL_EXPLICIT_PLACEMENT_APPROVAL');
   assert.equal(v.readyForPlacement,false,
     'Site and branch proof cannot automatically place World spawn');
+  assert.equal(v.inactiveStageGate.preconditionsPass,false,
+    'Existing World code branch must block an initial staging attempt');
+  assert.ok(v.inactiveStageGate.failures.includes('WORLD_BRANCH_ALREADY_EXISTS'));
 }
 {
   const site=ordinaryRoom(null);
@@ -150,6 +167,36 @@ function mockWorld({
   });
   assert.ok(decision.failures.includes('TARGET_RESERVED'));
   assert.equal(decision.risk,'UNVERIFIED');
+}
+{
+  const f=mockWorld({backup:{error:'no modules'}});
+  const v=await inspectSelectedWorldTarget(f.api);
+  assert.equal(v.inactiveStageGate.preconditionsPass,false);
+  assert.ok(v.inactiveStageGate.failures.includes('CURRENT_CODE_BACKUP_NOT_READABLE'));
+  assert.equal(v.nextAction,'INVESTIGATE_INACTIVE_STAGE_GATE');
+}
+{
+  const f=mockWorld({backup:new Error('permission denied')});
+  const v=await inspectSelectedWorldTarget(f.api);
+  assert.ok(v.inactiveStageGate.failures.includes(
+    'WORLD_DEFAULT_CODE_BACKUP_OR_GATE_UNVERIFIED'));
+}
+{
+  const f=mockWorld({branches:[{branch:'default',activeWorld:false}]});
+  const v=await inspectSelectedWorldTarget(f.api);
+  assert.ok(v.inactiveStageGate.failures.includes('DEFAULT_BRANCH_NOT_ACTIVE'));
+}
+{
+  const f=mockWorld({rival:{...ordinaryRoom('rival'),
+    objects:{objects:null}}});
+  const v=await inspectSelectedWorldTarget(f.api);
+  assert.ok(v.inactiveStageGate.failures.includes('KNOWN_RIVAL_ROOMS_UNVERIFIED'));
+  assert.equal(v.inactiveStageGate.preconditionsPass,false);
+}
+{
+  const f=mockWorld({worldStatus:'normal'});
+  const v=await inspectSelectedWorldTarget(f.api);
+  assert.ok(v.inactiveStageGate.failures.includes('ACCOUNT_NOT_EMPTY'));
 }
 const source=fs.readFileSync(path.join(here,'world-target-preflight.mjs'),'utf8');
 for(const blocked of [
