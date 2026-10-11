@@ -41,7 +41,7 @@ assert.equal(JSON.stringify(x).includes('my-account'),false,
  'Identifiers must not appear in exported reports');
 {
  const v=structuredClone(input);
- v.ring.observations[1].foreignReservation=false;
+ v.ring.observations.find(o=>o.room==='W35N13').foreignReservation=false;
  v.ring.foreignReservedRooms=0;
  const r=assessOperationalRivalRing(v);
  assert.equal(r.status,'WATCH','Known RCL8 must remain visible as a warning');
