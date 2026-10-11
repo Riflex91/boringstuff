@@ -20,7 +20,7 @@ function fakeWorld({occupied=false,otherEnemy=false,failedPost=false,
     async userBranches() {
       calls.push('GET_BRANCHES');return {list:[
         {branch:'default',activeWorld:true},
-        {branch:'chatgpt',activeWorld:false}
+        {branch:'chatgpt'}
       ]};
     },
     async _request(method,endpoint,params) {
