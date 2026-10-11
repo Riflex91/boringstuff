@@ -78,7 +78,7 @@ for(const transform of [
 }
 {
  const v=structuredClone(input);
- v.ring.observations[3].distance=2;
+ v.ring.observations[3].distance=1;
  assert.equal(assessOperationalRivalRing(v).status,'INCOMPLETE',
    'A false neighbor radius must not pass');
 }
