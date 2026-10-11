@@ -295,15 +295,17 @@ assert.ok(r.warnings.includes('GAMEPLAY_ERROR_EVENTS_PRESENT'));
   assert.equal(assessWorldStartup(noRecentSnapshot).status,'WAIT',
     'Contiguous journal without post-100 snapshot cannot pass');
   const fatal=structuredClone(x);
+  fatal.bot.telemetryJournal.snapshots[1].q=54;
   fatal.bot.telemetryJournal.events.push({
-    q:54,t:2330,c:'MAIN_FATAL',l:'FATAL'
+    q:53,t:2330,c:'MAIN_FATAL',l:'FATAL'
   });
   fatal.bot.telemetryJournal.nextSeq=55;
   assert.equal(assessWorldStartup(fatal).status,'FAIL',
     'Any retained real fatal within verified window must fail');
   const bucket=structuredClone(x);
+  bucket.bot.telemetryJournal.snapshots[1].q=54;
   bucket.bot.telemetryJournal.events.push({
-    q:54,t:2350,c:'CPU_BUCKET_CRITICAL',l:'WARN'
+    q:53,t:2350,c:'CPU_BUCKET_CRITICAL',l:'WARN'
   });
   bucket.bot.telemetryJournal.nextSeq=55;
   assert.equal(assessWorldStartup(bucket).status,'FAIL',
