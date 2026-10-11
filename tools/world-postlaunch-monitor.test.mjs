@@ -156,6 +156,40 @@ assert.ok(r.warnings.includes('GAMEPLAY_ERROR_EVENTS_PRESENT'));
  assert.equal(report.liveConstructionSites.status,'VERIFIED');
  assert.equal(report.liveConstructionSites.ownedCount,8);
  assert.equal(report.liveConstructionSites.byType.road,8);
+ assert.equal(report.liveConstructionSites.progressEvidence,'PARTIAL');
+ assert.equal(report.liveConstructionSites.unknownProgressSites,8);
+ assert.equal(report.liveConstructionSites.progressCompleted,null,
+   'Missing API progress fields are unknown, never reported as zero work');
+ const progressed=structuredClone(x);
+ for(let i=0;i<8;i++){
+   const site=progressed.roomObjects.objects.filter(o=>
+     o.type==='constructionSite')[i];
+   site.progress=100*i;
+   site.progressTotal=1000;
+ }
+ const progress=assessWorldStartup(progressed).liveConstructionSites;
+ assert.equal(progress.progressEvidence,'VERIFIED');
+ assert.equal(progress.knownProgressSites,8);
+ assert.equal(progress.unknownProgressSites,0);
+ assert.equal(progress.progressCompleted,2800);
+ assert.equal(progress.progressTotal,8000);
+ assert.equal(progress.progressRemaining,5200);
+ const invalid=structuredClone(progressed);
+ invalid.roomObjects.objects.at(-1).progress=1001;
+ assert.equal(assessWorldStartup(invalid).liveConstructionSites.progressEvidence,
+   'PARTIAL','A site beyond progressTotal invalidates aggregate sums');
+ assert.equal(assessWorldStartup(invalid).liveConstructionSites.progressTotal,
+   null);
+ const ownedAndForeign=structuredClone(progressed);
+ ownedAndForeign.roomObjects.objects.push({
+   type:'constructionSite',user:'foreign-account',structureType:'road',
+   progress:999,progressTotal:1000
+ });
+ const safe=assessWorldStartup(ownedAndForeign).liveConstructionSites;
+ assert.equal(safe.progressEvidence,'VERIFIED');
+ assert.equal(safe.progressCompleted,2800,
+   'Foreign construction work must never enter our totals');
+
  assert.ok(report.warnings.includes('RCL2_LIVE_ROAD_SITES_COMPETE_WITH_EXTENSIONS'),
   'Eight real own road sites block the RCL2 critical-build slots');
  assert.equal(JSON.stringify(report).includes('mine'),false,
