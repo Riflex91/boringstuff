@@ -186,6 +186,8 @@ for(const forbidden of [
   'No gameplay actions or persistence in D2');
 const main=fs.readFileSync(path.join(here,'../game/main.js'),'utf8');
 assert.ok(main.includes("const regionalDefenseShadow = require('defense.reinforcement.shadow');"));
-assert.ok(main.includes('regionalDefenseShadow.evaluate(roomStates, null, Game)'));
+assert.ok(main.includes('regionalDefenseShadow.evaluate(roomStates, transitEvidence.routes, Game)'));
+assert.ok(main.includes('const transitEvidence = defenseTransitEvidence.snapshot(Game, Memory);'),
+  'D2 must consume only passive, read-only route witness snapshot');
 assert.ok(main.includes('regionalDefense: regionalDefenseShadow.telemetrySummary('));
 console.log('U7/D2: deadline, evidence, donor reserve, budget and non-action tests PASS');
