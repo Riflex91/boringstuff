@@ -163,7 +163,7 @@ export async function verifyInitialSpawnTarget({
     evidence.branchList = list.map(v => v?.branch).filter(Boolean);
     checks.push(check('world-branch-present', exists, { branchName: branch }, requireBranchPresent ? 'error' : 'warning'));
   } catch (err) {
-    checks.push(check('world-branch-present', false, { branchName: branch, error: String(err?.message || err) }, 'warning'));
+    checks.push(check('world-branch-present', false, { branchName: branch, error: String(err?.message || err) }, requireBranchPresent ? 'error' : 'warning'));
   }
 
   const failures = checks.filter(c => c.severity === 'error' && !c.pass);
