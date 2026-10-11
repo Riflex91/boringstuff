@@ -23,6 +23,7 @@ const remoteRoiShadow = require('remote.roi.shadow');
 const threatModelShadow = require('threat.model.shadow');
 const defenseRequestsShadow = require('defense.requests.shadow');
 const defenseRegistryPreview = require('defense.registry.preview');
+const regionalDefenseShadow = require('defense.reinforcement.shadow');
 
 function bootstrapMemory() {
   if (!Memory.bot) Memory.bot = { version: config.VERSION, born: Game.time };
@@ -146,6 +147,21 @@ function statusSnapshot(roomStates, tickCpu) {
     expansionReadiness,expansionCandidates,roomStates,Game,Memory);
   const schedulerState = processScheduler.snapshot();
   const worldIntelState = worldIntel.snapshot();
+  // D2 is computed only for bounded snapshot evidence, never used by
+  // legacy defense or spawn executors. No observed inter-room transit
+  // evidence is available yet: pass null, do not invent travel ETA.
+  let regionalDefense;
+  try {
+    regionalDefense = regionalDefenseShadow.evaluate(roomStates, null, Game);
+  } catch (_) {
+    regionalDefense = { summary: {
+      schemaVersion: regionalDefenseShadow.SCHEMA_VERSION,
+      authority: 'SHADOW', actionAuthority: 'NONE', tick: Game.time,
+      targetCount: 0, selectedCount: 0, blockedCount: 0,
+      byTarget: {}, executable: false, writesToGameMemory: false,
+      status: 'UNVERIFIED', reason: 'D2_DIAGNOSTIC_ERROR'
+    } };
+  }
   for (const state of roomStates) {
     const controller = state.room.controller;
     rooms[state.room.name] = {
@@ -197,6 +213,7 @@ function statusSnapshot(roomStates, tickCpu) {
     serverProfile: profile,
     scheduler: schedulerState,
     worldIntel: worldIntelState,
+    regionalDefense: regionalDefenseShadow.telemetrySummary(regionalDefense),
     memoryFootprint: memoryFootprintSnapshot(),
     rooms
   }, { force: true, persist: false, dedupeTicks: 0 });
