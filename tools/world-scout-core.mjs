@@ -42,22 +42,29 @@ export function fallbackProbeRooms(sizeResponse = null, max = 24) {
     }
     return [...new Set(out)];
   };
-  // Keep roughly a 3:2 geographic aspect ratio at each probe budget.
-  // 24 => 6x4; 48 => 8x6; 96 => 12x8, without inventing a room score.
+  // Preserve all original 24 probe positions as the invariant baseline.
+  // Later 48/96-room searches must never silently omit previous candidates.
+  const grid = (columns, rows) => {
+    const rooms = [];
+    for (const y of axis(h, rows)) for (const x of axis(w, columns)) {
+      const hname = x >= 0 ? 'E' + x : 'W' + (-x - 1);
+      const vname = y >= 0 ? 'S' + y : 'N' + (-y - 1);
+      rooms.push(hname + vname);
+    }
+    return [...new Set(rooms)];
+  };
+  const baseline = grid(6,4);
+  if (max <= baseline.length) return baseline.slice(0,max);
+  // Add spatially distributed new candidates without rescoring rooms here.
   const columns = Math.max(1, Math.round(Math.sqrt(max * 1.5)));
   const rows = Math.max(1, Math.ceil(max / columns));
-  const xs = axis(w, columns), ys = axis(h, rows);
-  const rooms = [];
-  for (const y of ys) for (const x of xs) {
-    const hname = x >= 0 ? 'E' + x : 'W' + (-x - 1);
-    const vname = y >= 0 ? 'S' + y : 'N' + (-y - 1);
-    rooms.push(hname + vname);
-  }
-  // A grid is a sampling strategy, never a replacement for room scoring.
-  const unique = [...new Set(rooms)];
-  if (unique.length <= max) return unique;
-  // Sample across the entire grid instead of truncating its last row.
-  return Array.from({length:max}, (_,i) => unique[Math.floor((i + 0.5) * unique.length / max)]);
+  const baseSet = new Set(baseline);
+  const additional = grid(columns,rows).filter(room => !baseSet.has(room));
+  const capacity = max - baseline.length;
+  if (additional.length <= capacity) return [...baseline,...additional];
+  const distributed = Array.from({length:capacity}, (_,i) =>
+    additional[Math.floor((i + 0.5) * additional.length / capacity)]);
+  return [...baseline,...distributed];
 }
 
 export function verifyShardName(name) {
