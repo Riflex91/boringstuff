@@ -81,7 +81,7 @@ jobs:
         with:
           name: screeps-world-deployment-${{ github.sha }}
           path: |
-            logs/deploy-backup-*.json
+            tools/logs/deploy-backup-*.json
             ${{ runner.temp }}/screeps-world-verification/deployment-receipt-*.json
           if-no-files-found: warn
           retention-days: 14
