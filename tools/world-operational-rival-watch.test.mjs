@@ -9,6 +9,7 @@ import {threatRingRooms} from './world-threat-ring.mjs';
 const ring={
  target:{shard:'shard0',room:'W37N11'},mode:'GET_ONLY',
  requestedRooms:24,verifiedRooms:24,coverageComplete:true,
+ foreignOwnedRooms:1,foreignReservedRooms:1,
  unverifiedRooms:[],
  observations:threatRingRooms().map(({room,distance})=>({
    room,distance,verified:true,
@@ -41,6 +42,7 @@ assert.equal(JSON.stringify(x).includes('my-account'),false,
 {
  const v=structuredClone(input);
  v.ring.observations[1].foreignReservation=false;
+ v.ring.foreignReservedRooms=0;
  const r=assessOperationalRivalRing(v);
  assert.equal(r.status,'WATCH','Known RCL8 must remain visible as a warning');
  assert.equal(r.foreignReservedRooms,0);
@@ -48,6 +50,7 @@ assert.equal(JSON.stringify(x).includes('my-account'),false,
 {
  const v=structuredClone(input);
  v.ring.observations[2].foreignOwner=true;
+ v.ring.foreignOwnedRooms=2;
  assert.equal(assessOperationalRivalRing(v).status,'ALERT');
  assert.ok(assessOperationalRivalRing(v).alerts.includes(
    'FOREIGN_CONTROL_IN_IMMEDIATE_NEIGHBOR_RING'));
