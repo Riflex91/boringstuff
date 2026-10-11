@@ -110,18 +110,16 @@ function acquireForConsumer(creep) {
   })[0];
   if (localDrop) {
     const rc = creep.pickup(localDrop);
-    if (rc === ERR_NOT_IN_RANGE) creep.moveTo(localDrop, { reusePath: 5, maxOps: config.PATH_MAX_OPS });
-    // Only a successful intent or a dispatched movement is progress.
-    // A failed pickup/withdraw must not reset the consumer wait counter.
-    return rc === OK || rc === ERR_NOT_IN_RANGE;
+    if (rc === OK) return true;
+    if (rc === ERR_NOT_IN_RANGE) return creep.moveTo(localDrop, { reusePath: 5, maxOps: config.PATH_MAX_OPS }) === OK;
+    return false;
   }
 
   if (creep.room.storage && energyAmount(creep.room.storage) > 0) {
     const rc = creep.withdraw(creep.room.storage, RESOURCE_ENERGY);
-    if (rc === ERR_NOT_IN_RANGE) creep.moveTo(creep.room.storage, { reusePath: 8, maxOps: config.PATH_MAX_OPS });
-    // Only a successful intent or a dispatched movement is progress.
-    // A failed pickup/withdraw must not reset the consumer wait counter.
-    return rc === OK || rc === ERR_NOT_IN_RANGE;
+    if (rc === OK) return true;
+    if (rc === ERR_NOT_IN_RANGE) return creep.moveTo(creep.room.storage, { reusePath: 8, maxOps: config.PATH_MAX_OPS }) === OK;
+    return false;
   }
 
   if (creep.memory.role === 'upgrader' && creep.room.controller) {
@@ -131,10 +129,9 @@ function acquireForConsumer(creep) {
     const target = creep.pos.findClosestByPath(controllerContainers, { maxOps: config.PATH_MAX_OPS });
     if (target) {
       const rc = creep.withdraw(target, RESOURCE_ENERGY);
-      if (rc === ERR_NOT_IN_RANGE) creep.moveTo(target, { reusePath: 8, maxOps: config.PATH_MAX_OPS });
-      // Only a successful intent or a dispatched movement is progress.
-    // A failed pickup/withdraw must not reset the consumer wait counter.
-    return rc === OK || rc === ERR_NOT_IN_RANGE;
+      if (rc === OK) return true;
+      if (rc === ERR_NOT_IN_RANGE) return creep.moveTo(target, { reusePath: 8, maxOps: config.PATH_MAX_OPS }) === OK;
+      return false;
     }
   }
   return false;
