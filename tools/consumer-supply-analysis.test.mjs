@@ -70,6 +70,24 @@ const malformed = diag();
 malformed.ctx.consumerTransfers.accepted = 2;
 assert.equal(analyzeSupplyEvidence({ events: [marker, malformed], receipt }).state,
   'REVIEW_REQUIRED', 'return-code totals must reconcile');
+// Invalid or internally inconsistent supply counters must never become
+// authoritative evidence for energy/hauler policy decisions.
+for (const [section, field, invalid] of [
+  ['haulers', 'live', -1],
+  ['haulers', 'readyByGuardRule', 3],
+  ['haulers', 'energyPositive', 2],
+  ['consumers', 'waiting', 4],
+  ['consumerTransfers', 'attempted', -1],
+  ['consumerTransfers', 'accepted', 3],
+  ['infrastructureTransfers', 'notInRange', 2],
+  ['haulerAcquisitions', 'other', 1]
+]) {
+  const broken = diag();
+  broken.ctx[section][field] = invalid;
+  assert.equal(analyzeSupplyEvidence({ events: [marker, broken], receipt }).state,
+    'REVIEW_REQUIRED', `invalid ${section}.${field} must not pass validation`);
+}
+
 const unjournaled = diag();
 delete unjournaled.jseq;
 assert.equal(analyzeSupplyEvidence({ events: [marker, unjournaled], receipt }).state,
