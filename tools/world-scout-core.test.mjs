@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {extractWorldRooms,sampleWorldRooms,fallbackProbeRooms,verifyShardName,selectStrategicWinner} from './world-scout-core.mjs';
+import {extractWorldRooms,sampleWorldRooms,fallbackProbeRooms,verifyShardName,selectStrategicWinner,summarizeWorldRemoteRouting} from './world-scout-core.mjs';
 assert.deepEqual(extractWorldRooms({rooms:['W1N1','W1N1','E2S3','not-a-room']}),['E2S3','W1N1']);
 assert.deepEqual(extractWorldRooms({rooms:{W1N1:{}, E2S3:{}}}),['E2S3','W1N1']);
 assert.deepEqual(extractWorldRooms({rooms:[{room:'E2S3'}, {name:'W1N1'}]}),['E2S3','W1N1']);
@@ -20,6 +20,24 @@ assert.equal(selectStrategicWinner([{shard:'shard1',report:report('shard2',900)}
 assert.equal(selectStrategicWinner([{shard:'shardX',report:report('shardX',999)},
   {shard:'shard3',report:report('shard3',100)}]).shard,'shard3',
   'Restricted shardX must not win without verified access');
+
+const routing=(total,reachable,inaccessible)=>({deepAnalysis:{remoteRoutes:{
+  totalSources:total,reachableSources:reachable,inaccessibleSources:inaccessible}}});
+assert.deepEqual(summarizeWorldRemoteRouting(routing(5,2,3)),{
+  status:'review',totalSources:5,reachableSources:2,inaccessibleSources:3,needsReview:true},
+'Unreachable sources must trigger operator review without changing the score');
+assert.deepEqual(summarizeWorldRemoteRouting(routing(5,5,0)),{
+  status:'clear',totalSources:5,reachableSources:5,inaccessibleSources:0,needsReview:false});
+assert.deepEqual(summarizeWorldRemoteRouting(routing(0,0,0)),{
+  status:'review',totalSources:0,reachableSources:0,inaccessibleSources:0,needsReview:true},
+'Zero observed remote sources should not silently pass');
+for (const invalid of [null,{},routing(5,6,-1),routing(5,2,2),
+  routing(5,NaN,0),routing(2.5,2,0.5)]) {
+  assert.deepEqual(summarizeWorldRemoteRouting(invalid),{
+    status:'unverified',totalSources:null,reachableSources:null,
+    inaccessibleSources:null,needsReview:true}, 'Missing or malformed remote evidence must fail closed');
+}
+
 const fallback = fallbackProbeRooms(null,24);
 assert.equal(fallback.length,24,'unknown world size must yield bounded fallback');
 assert.equal(new Set(fallback).size,24,'no duplicate probe rooms');
