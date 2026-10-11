@@ -1,17 +1,8 @@
 name: Screeps World W37N11 targeted preflight (GET only)
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - .github/workflows/screeps-world-target-preflight.yml
-      - tools/world-target-selection.mjs
-      - tools/world-target-preflight.mjs
-      - tools/world-target-preflight.test.mjs
-      - tools/world-deployment-profile.mjs
-      - tools/world-readonly-preflight.mjs
-      - tools/spawn-safety.mjs
-      - tools/screeps-client.mjs
+  # Legacy first-spawn workflow: manual only after World activation.
+  # Do not misclassify a correctly occupied World colony as launch failure.
 permissions:
   contents: read
 concurrency:
