@@ -375,7 +375,12 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   if (mode !== 'preflight' && mode !== 'verify') {
     throw new Error('Usage: node ci-deployment-guard.mjs preflight|verify');
   }
-  const api = await ScreepsHttpClient.fromConfig(server);
+  if (server === 'world' && !/^shard(?:[0-9]+|X)$/i.test(process.env.SCREEPS_SHARD || '')) {
+    throw new Error('FAIL CLOSED: explicit World shard is required for live verification');
+  }
+  const api = await ScreepsHttpClient.fromConfig(server, {
+    shard: server === 'world' ? process.env.SCREEPS_SHARD : null
+  });
   if (mode === 'preflight') await preflight(api);
   else await verify(api);
 }

@@ -236,8 +236,9 @@ export class ScreepsHttpClient {
     return this._request('GET', '/api/user/stats', { id, interval });
   }
 
-  userMemory(pathName = '') {
-    return this._request('GET', '/api/user/memory', pathName ? { path: pathName } : {});
+  userMemory(pathName = '', shard = null) {
+    const params = pathName ? { path: pathName } : {};
+    return this._request('GET', '/api/user/memory', { ...params, shard: shard ?? this.defaultShard });
   }
 
   gameCheckUniqueObjectName(type, name, shard) {

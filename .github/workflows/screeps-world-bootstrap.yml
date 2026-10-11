@@ -1,0 +1,61 @@
+name: Screeps World code preparation (inactive branch only)
+on:
+  workflow_dispatch:
+    inputs:
+      expected_main_sha:
+        description: Exact tested main commit (40 hex characters)
+        required: true
+        type: string
+      approval:
+        description: Type STAGE_WORLD_CODE to create inactive chatgpt branch
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: screeps-world-chatgpt
+  cancel-in-progress: false
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    defaults:
+      run:
+        working-directory: tools
+    env:
+      WORLD_BOOTSTRAP_CONFIRM: ${{ inputs.approval }}
+      SCREEPS_TOKEN_WORLD: ${{ secrets.SCREEPS_TOKEN_WORLD }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Verify exact current main and operator-supplied staging gate
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ inputs.expected_main_sha }}
+        run: |
+          test "$WORLD_BOOTSTRAP_CONFIRM" = STAGE_WORLD_CODE
+          [[ "$EXPECTED_SHA" =~ ^[a-f0-9]{40}$ ]]
+          git fetch origin main --quiet
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          test "$(git rev-parse origin/main)" = "$EXPECTED_SHA"
+          echo "Exact tested main candidate: $EXPECTED_SHA"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Run full offline regression and P3 baseline
+        run: |
+          npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+          npm test
+          npm run bench:p3
+      - name: Stage exact World bot code into inactive chatgpt branch
+        run: node world-branch-bootstrap.mjs
+      - name: Retain sanitized World code-stage receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screeps-world-code-stage-${{ github.sha }}
+          path: ${{ runner.temp }}/world-bootstrap-evidence
+          if-no-files-found: warn
+          retention-days: 14
