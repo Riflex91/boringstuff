@@ -48,14 +48,20 @@ function visible(game, names) {
   if (!Array.isArray(names) || names.length < 1 || names.length > 3 ||
       new Set(names).size !== names.length || !game?.rooms)
     return false;
-  for (const name of names) {
-    const room = game.rooms[name];
+  for (let i=0;i<names.length;i++) {
+    const name=names[i], room=game.rooms[name];
     if (!ROOM.test(name) || !room || room.name !== name ||
         typeof room.find !== 'function' || typeof room.getTerrain !== 'function')
       return false;
-    if (typeof FIND_HOSTILE_CREEPS === 'undefined' ||
-        !Array.isArray(room.find(FIND_HOSTILE_CREEPS)) ||
-        room.find(FIND_HOSTILE_CREEPS).length) return false;
+    if (typeof FIND_HOSTILE_CREEPS === 'undefined') return false;
+    const hostiles = room.find(FIND_HOSTILE_CREEPS);
+    if (!Array.isArray(hostiles) || hostiles.length) return false;
+    // Intermediate rooms must still be neutral in *current vision*, not
+    // merely in a previously collected I0 snapshot.
+    if (i > 0 && i < names.length-1 &&
+        (!room.controller || room.controller.owner ||
+         room.controller.reservation || room.controller.my === true))
+      return false;
   }
   return true;
 }
