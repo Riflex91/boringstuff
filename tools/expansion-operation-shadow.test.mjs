@@ -69,7 +69,10 @@ const evaluate=(f,r=readiness,a=advisory,states=[owned()])=>
   const c=evaluate(f);
   assert.equal(c.phase,'AWAITING_TILE_VALIDATION');
   assert.equal(c.reason,'TILE_PATH_AND_SPAWN_SITE_NOT_VERIFIED');
-  assert.deepEqual(evaluate(f),c,'Restart-safe stable state');
+  const deferred=evaluate(f);
+  assert.equal(deferred.phase,'AWAITING_TILE_VALIDATION');
+  assert.equal(deferred.reason,'SPAWN_GEOMETRY_INTEL_MISSING');
+  assert.deepEqual(evaluate(f),deferred,'Missing tile intel never upgrades to claim readiness');
   for (const snapshot of [a,b,c]) {
     assert.equal(snapshot.authority,'SHADOW');
     assert.equal(snapshot.claimActionEnabled,false);

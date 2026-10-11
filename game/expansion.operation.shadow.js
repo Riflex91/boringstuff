@@ -4,6 +4,7 @@
 // a claim: a room-level route is NOT a creep path, and a candidate is NOT a
 // validated spawn tile. State is tiny, restart-safe and server independent.
 const candidates = require('expansion.candidates.shadow');
+const siteEvidence = require('expansion.site.shadow');
 const SCHEMA_VERSION = 1;
 const INTEL_MAX_AGE = 150;
 const MAX_ROUTE_HOPS = 3;
@@ -20,8 +21,11 @@ function result(state, reason) {
     constructionActionEnabled: false,
     readyForClaim: false,
     routeLevel: state.routeHops !== null ? 'ROOM_LEVEL_ONLY' : 'UNVERIFIED',
-    tilePathVerified: false,
-    spawnTileVerified: false,
+    tilePathVerified: state.phase === 'SITE_VERIFIED_ADVISORY',
+    spawnTileVerified: state.phase === 'SITE_VERIFIED_ADVISORY',
+    spawnSite: state.phase === 'SITE_VERIFIED_ADVISORY' ? state.verifiedSite : null,
+    pathCost: state.phase === 'SITE_VERIFIED_ADVISORY' ? state.pathCost : null,
+    siteCandidatesChecked: Number.isSafeInteger(state.siteCursor) ? state.siteCursor : 0,
     phase: state.phase,
     candidateRoom: state.candidateRoom,
     parentRoom: state.parentRoom,
@@ -34,7 +38,9 @@ function result(state, reason) {
 
 function initial(candidateRoom, parentRoom) {
   return { schemaVersion: SCHEMA_VERSION, phase: 'RECON',
-    candidateRoom, parentRoom, routeHops: null,
+    candidateRoom, parentRoom, routeHops: null, routeRooms: [],
+    verifiedSite: null, pathCost: null, siteCursor: 0,
+    siteVerifiedTick: null,
     failureCount: 0, blockedUntil: null, reason: null };
 }
 
@@ -42,6 +48,11 @@ function failure(state, now, reason) {
   state.failureCount = Math.min(16, state.failureCount + 1);
   state.phase = 'BACKOFF';
   state.routeHops = null;
+  state.routeRooms = [];
+  state.verifiedSite = null;
+  state.pathCost = null;
+  state.siteVerifiedTick = null;
+  state.siteCursor = 0;
   state.blockedUntil = now + Math.min(MAX_BACKOFF,
     BASE_BACKOFF * Math.pow(2, Math.min(4, state.failureCount - 1)));
   state.reason = reason;
@@ -101,7 +112,7 @@ function roomRoute(game, rooms, from, to, tick) {
     seen.add(name);
     previous = next;
   }
-  return route.length;
+  return {hops:route.length,rooms:route.map(x=>x.room)};
 }
 
 function supportBudget(states, parent) {
@@ -165,7 +176,10 @@ function evaluate(readiness, advisory, roomStates, game, memoryRoot) {
       state.parentRoom !== choice.parentRoom ||
       !Number.isSafeInteger(state.failureCount) ||
       !['RECON', 'ROUTE_CHECK', 'SUPPORT_CHECK', 'AWAITING_TILE_VALIDATION',
-        'BACKOFF', 'HOLD'].includes(state.phase)) {
+        'SITE_VERIFIED_ADVISORY', 'BACKOFF', 'HOLD'].includes(state.phase) ||
+      !Array.isArray(state.routeRooms) ||
+      !Number.isSafeInteger(state.siteCursor) ||
+      state.siteCursor < 0 || state.siteCursor > siteEvidence.MAX_CANDIDATES) {
     state = initial(choice.roomName, choice.parentRoom);
     memoryRoot.bot.expansionOperationShadow = state;
   }
@@ -205,10 +219,11 @@ function evaluate(readiness, advisory, roomStates, game, memoryRoot) {
       state.reason = 'CPU_HEADROOM_DEFERRED';
       return result(state);
     }
-    const hops = roomRoute(game, rooms, choice.parentRoom, choice.roomName, tick);
-    if (hops === null)
+    const route = roomRoute(game, rooms, choice.parentRoom, choice.roomName, tick);
+    if (route === null)
       return failure(state, tick, 'SAFE_ROOM_ROUTE_UNVERIFIED');
-    state.routeHops = hops;
+    state.routeHops = route.hops;
+    state.routeRooms = route.rooms;
     state.phase = 'SUPPORT_CHECK';
     state.reason = 'PARENT_SUPPORT_PENDING';
     return result(state);
@@ -222,9 +237,60 @@ function evaluate(readiness, advisory, roomStates, game, memoryRoot) {
     }
     state.phase = 'AWAITING_TILE_VALIDATION';
     state.reason = 'TILE_PATH_AND_SPAWN_SITE_NOT_VERIFIED';
+    return result(state);
   }
-  // Deliberately no transition to CLAIMING: room-level findRoute and a
-  // budget check do not prove a traversable creep path or buildable spawn.
+  if (state.phase === 'SITE_VERIFIED_ADVISORY' &&
+      (!Number.isSafeInteger(state.siteVerifiedTick) ||
+       tick - state.siteVerifiedTick > 150 ||
+       state.siteVerifiedTick > tick)) {
+    state.phase = 'ROUTE_CHECK';
+    state.routeHops = null;
+    state.routeRooms = [];
+    state.siteCursor = 0;
+    state.verifiedSite = null;
+    state.pathCost = null;
+    state.siteVerifiedTick = null;
+    state.reason = 'SITE_EVIDENCE_EXPIRED_RECHECK';
+    return result(state);
+  }
+  if (state.phase === 'AWAITING_TILE_VALIDATION') {
+    // The prior stage only proves a room-level route; this stage also requires
+    // actual simultaneous room vision, PathFinder and buildable tile geometry.
+    const cpu = game.cpu;
+    const left = cpu && Number.isFinite(cpu.limit) &&
+      typeof cpu.getUsed === 'function' ? cpu.limit - cpu.getUsed() : -Infinity;
+    const reserved = cpu && Number.isFinite(cpu.limit)
+      ? Math.max(8, Math.ceil(cpu.limit * 0.35)) + 4 : Infinity;
+    if (!Number.isFinite(left) || left < reserved ||
+        !Number.isFinite(cpu?.bucket) || cpu.bucket < 7000) {
+      state.reason = 'SITE_CPU_HEADROOM_DEFERRED';
+      return result(state);
+    }
+    const parent = roomStates.find(s => s && s.room &&
+      s.room.name === state.parentRoom);
+    const checked = siteEvidence.assess(game,parent,targetRecord,
+      state.routeRooms,state.siteCursor);
+    if (checked.status === 'DEFERRED') {
+      state.reason = checked.reason;
+      return result(state);
+    }
+    if (checked.status === 'REJECTED') {
+      state.siteCursor++;
+      state.reason = checked.reason;
+      if (state.siteCursor >= siteEvidence.MAX_CANDIDATES)
+        return failure(state,tick,'NO_VERIFIED_SPAWN_SITE');
+      return result(state);
+    }
+    if (checked.status !== 'PASS')
+      return failure(state,tick,'SPAWN_SITE_SEARCH_EXHAUSTED');
+    state.phase = 'SITE_VERIFIED_ADVISORY';
+    state.verifiedSite = checked.site;
+    state.siteVerifiedTick = tick;
+    state.pathCost = checked.pathCost;
+    state.reason = 'READY_FOR_FURTHER_CLAIM_SAFETY_GATES_ONLY';
+  }
+  // No transition to CLAIMING. Geometric/path evidence does not establish
+  // claim permission, economic run-rate or safety of a real expansion order.
   return result(state);
 }
 
