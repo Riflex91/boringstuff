@@ -40,6 +40,7 @@ function initial(candidateRoom, parentRoom) {
   return { schemaVersion: SCHEMA_VERSION, phase: 'RECON',
     candidateRoom, parentRoom, routeHops: null, routeRooms: [],
     verifiedSite: null, pathCost: null, siteCursor: 0,
+    siteVerifiedTick: null,
     failureCount: 0, blockedUntil: null, reason: null };
 }
 
@@ -50,6 +51,7 @@ function failure(state, now, reason) {
   state.routeRooms = [];
   state.verifiedSite = null;
   state.pathCost = null;
+  state.siteVerifiedTick = null;
   state.siteCursor = 0;
   state.blockedUntil = now + Math.min(MAX_BACKOFF,
     BASE_BACKOFF * Math.pow(2, Math.min(4, state.failureCount - 1)));
@@ -235,6 +237,21 @@ function evaluate(readiness, advisory, roomStates, game, memoryRoot) {
     }
     state.phase = 'AWAITING_TILE_VALIDATION';
     state.reason = 'TILE_PATH_AND_SPAWN_SITE_NOT_VERIFIED';
+    return result(state);
+  }
+  if (state.phase === 'SITE_VERIFIED_ADVISORY' &&
+      (!Number.isSafeInteger(state.siteVerifiedTick) ||
+       tick - state.siteVerifiedTick > 150 ||
+       state.siteVerifiedTick > tick)) {
+    state.phase = 'ROUTE_CHECK';
+    state.routeHops = null;
+    state.routeRooms = [];
+    state.siteCursor = 0;
+    state.verifiedSite = null;
+    state.pathCost = null;
+    state.siteVerifiedTick = null;
+    state.reason = 'SITE_EVIDENCE_EXPIRED_RECHECK';
+    return result(state);
   }
   if (state.phase === 'AWAITING_TILE_VALIDATION') {
     // The prior stage only proves a room-level route; this stage also requires
@@ -268,6 +285,7 @@ function evaluate(readiness, advisory, roomStates, game, memoryRoot) {
       return failure(state,tick,'SPAWN_SITE_SEARCH_EXHAUSTED');
     state.phase = 'SITE_VERIFIED_ADVISORY';
     state.verifiedSite = checked.site;
+    state.siteVerifiedTick = tick;
     state.pathCost = checked.pathCost;
     state.reason = 'READY_FOR_FURTHER_CLAIM_SAFETY_GATES_ONLY';
   }
