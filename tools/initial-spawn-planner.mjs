@@ -662,7 +662,8 @@ async function finalPlacementVerification(api, roomName, x, y, spawnName, myUser
     myUserId,
     branch,
     requireNormalStatus: true,
-    requireUniqueName: true
+    requireUniqueName: true,
+    requireBranchPresent: server === 'world'
   });
 }
 
