@@ -1,0 +1,26 @@
+name: Screeps World read-only preflight
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: screeps-world-readonly
+  cancel-in-progress: false
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    defaults:
+      run:
+        working-directory: tools
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Install dependencies
+        run: npm ci
+      - name: Read-only World API preflight (no uploads or spawn placement)
+        env:
+          SCREEPS_TOKEN_WORLD: ${{ secrets.SCREEPS_TOKEN_WORLD }}
+        run: node world-readonly-preflight.mjs
