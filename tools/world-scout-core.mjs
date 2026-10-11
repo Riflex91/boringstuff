@@ -94,6 +94,35 @@ export function summarizeWorldRemoteRouting(selected) {
 }
 
 
+
+/**
+ * Independent RCL8-layout evidence: scoring and strategic selection are
+ * intentionally unaffected. Missing or inconsistent blueprint data fail
+ * closed for the route-clear advisory, without affecting the raw winner.
+ */
+export function summarizeWorldBuildability(candidate) {
+  const tile = candidate?.best ?? candidate?.bestTile;
+  const blueprint = tile?.blueprint;
+  const layout = tile?.layout;
+  const required = blueprint?.structureRequired;
+  const fit = blueprint?.structureFit;
+  const roadFitRatio = blueprint?.roadFitRatio;
+  if (!Number.isSafeInteger(required) || required <= 0 ||
+      !Number.isSafeInteger(fit) || fit < 0 || fit > required ||
+      !Number.isFinite(roadFitRatio) || roadFitRatio < 0 || roadFitRatio > 1 ||
+      typeof blueprint?.complete !== 'boolean' ||
+      typeof layout?.hubReady !== 'boolean' ||
+      typeof layout?.labReady !== 'boolean') {
+    return {status:'unverified',structureRequired:null,structureFit:null,
+      roadFitRatio:null,hubReady:null,labReady:null,needsReview:true};
+  }
+  const needsReview = !blueprint.complete || fit !== required ||
+    !layout.hubReady || !layout.labReady;
+  return {status:needsReview?'review':'clear',structureRequired:required,
+    structureFit:fit,roadFitRatio,hubReady:layout.hubReady,
+    labReady:layout.labReady,needsReview};
+}
+
 /**
  * Read-only advisory: highest-scoring deeply inspected room whose measured
  * remote sources are ALL reachable. Does not replace the strategic winner
@@ -120,10 +149,11 @@ export function selectRouteClearCandidate(entries) {
           !Number.isInteger(tile?.x) || tile.x <= 0 || tile.x >= 49 ||
           !Number.isInteger(tile?.y) || tile.y <= 0 || tile.y >= 49) continue;
       const remoteRouting = summarizeWorldRemoteRouting(room);
-      if (remoteRouting.status !== 'clear') continue;
+      const buildability = summarizeWorldBuildability(room);
+      if (remoteRouting.status !== 'clear' || buildability.status !== 'clear') continue;
       candidates.push({shard, room:room.roomName, x:tile.x, y:tile.y,
         strategicScore:room.strategicScore, scoreModel:report.scoreModel,
-        remoteRouting});
+        remoteRouting,buildability});
     }
   }
   candidates.sort((a,b) => b.strategicScore - a.strategicScore ||
