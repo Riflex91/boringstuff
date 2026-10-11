@@ -57,8 +57,10 @@ assert.equal(JSON.stringify(x).includes('my-account'),false,
 }
 {
  const v=structuredClone(input);
- v.ring.observations[1].distance=1;
- assert.equal(assessOperationalRivalRing(v).status,'ALERT');
+ v.ring.observations.find(o=>o.room==='W35N13').foreignReservation=false;
+ v.ring.observations.find(o=>o.room==='W36N11').foreignReservation=true;
+ assert.equal(assessOperationalRivalRing(v).status,'ALERT',
+   'True foreign reservation inside radius one must alert');
 }
 for(const transform of [
   v=>{v.ring.verifiedRooms=23;v.ring.unverifiedRooms=['W36N11'];},
