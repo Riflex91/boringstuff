@@ -24,6 +24,10 @@ assert.equal(scoped.calls[4].params.encoded, 1);
 await scoped.api.gameRoomObjects('E1S2', 'shard2');
 assert.equal(scoped.calls.at(-1).params.shard, 'shard2', 'explicit shard overrides scoped default');
 
+const special = probe('shardX');
+await special.api.gameRoomStatus('E2S3');
+assert.equal(special.calls[0].params.shard,'shardX');
+
 const unscoped = probe(null);
 await unscoped.api.gameRoomObjects('E1S1');
 assert.equal(unscoped.calls[0].params.shard, null, 'Newbieland routing remains unchanged');
