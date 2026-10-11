@@ -8,7 +8,7 @@ import { buildWorldConfig } from './world-deployment-profile.mjs';
 import { inspectWorld } from './world-readonly-preflight.mjs';
 import { summarizeRoom } from './spawn-planner-core.mjs';
 import { inspectSpawnTile, normalizeRoomStatusResponse } from './spawn-safety.mjs';
-import { extractWorldRooms, sampleWorldRooms, selectStrategicWinner, verifyShardName } from './world-scout-core.mjs';
+import { extractWorldRooms, sampleWorldRooms, fallbackProbeRooms, selectStrategicWinner, verifyShardName } from './world-scout-core.mjs';
 
 const dir = path.dirname(fileURLToPath(import.meta.url));
 const output = process.env.WORLD_SCOUT_OUTPUT_DIR || path.join(os.tmpdir(), 'screeps-world-scout-results');
@@ -70,11 +70,35 @@ async function main() {
         continue;
       }
       try {
-        const all = extractWorldRooms(await api.gameRooms(shard));
-        const selected = sampleWorldRooms(all,maxPerShard);
-        scope.discovered = all.length;
+        let exactRooms = [];
+        try {
+          exactRooms = extractWorldRooms(await api.gameRooms(shard));
+        } catch (err) {
+          // Expected for the official World API. Never suppress authentication
+          // failures, throttling, or server failures as a missing endpoint.
+          if (err?.statusCode !== 404) throw err;
+          scope.roomListEndpoint = 'unavailable-404';
+        }
+        let selected;
+        if (exactRooms.length) {
+          scope.discoveryMode = 'exact-room-list';
+          scope.discovered = exactRooms.length;
+          selected = sampleWorldRooms(exactRooms,maxPerShard);
+        } else {
+          let size = null;
+          try {
+            size = await api.gameWorldSize(shard);
+          } catch (err) {
+            if (err?.statusCode !== 404) throw err;
+            scope.worldSizeEndpoint = 'unavailable-404';
+          }
+          selected = fallbackProbeRooms(size,maxPerShard);
+          scope.discoveryMode = 'spatial-grid-probe';
+          scope.discovered = null; // Do not misrepresent sampled probes as a complete room list.
+          scope.worldSizeKnown = Boolean(size && Number.isInteger(Number(size?.width ?? size?.size ?? size?.worldSize)));
+        }
         scope.sampled = selected.length;
-        if (!selected.length) { scope.reason = 'No recognizable rooms in API response'; continue; }
+        if (!selected.length) { scope.reason = 'No bounded room probes available'; continue; }
         const logDir = path.join(output,shard);
         fs.mkdirSync(logDir,{recursive:true});
         const fd = fs.openSync(path.join(logDir,'planner.log'),'w',0o600);
@@ -124,7 +148,7 @@ async function main() {
     console.log('WORLD_SCOUT_READONLY '+JSON.stringify({
       status:winner?'provisional-candidate':'no-verified-candidate',
       shards:evidence.scopes.map(s=>({shard:s.shard,discovered:s.discovered,
-        sampled:s.sampled,plannerCompleted:s.plannerCompleted,reason:s.reason})),
+        sampled:s.sampled,discoveryMode:s.discoveryMode || null,plannerCompleted:s.plannerCompleted,reason:s.reason})),
       selected:evidence.provisionalWinner||null,
       freshTilePass:evidence.freshTileVerification?.ok===true,
       completeCoverage:evidence.completeCoverage,readyForPlacement:false

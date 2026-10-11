@@ -15,6 +15,44 @@ export function sampleWorldRooms(names, max = 24) {
   if (unique.length <= max) return unique;
   return Array.from({ length: max }, (_, i) => unique[Math.floor((i + 0.5) * unique.length / max)]);
 }
+// Candidate discovery only. The EXISTING strategic planner determines the scores.
+// Public World may not expose /api/game/rooms or /api/game/world-size.
+// Sample a deterministic spatial grid when a reliable room list is unavailable.
+export function fallbackProbeRooms(sizeResponse = null, max = 24) {
+  if (!Number.isInteger(max) || max < 1 || max > 250)
+    throw new Error('Invalid candidate limit');
+  const value = sizeResponse && typeof sizeResponse === 'object' ? sizeResponse : {};
+  const width = Number(value.width ?? value.size ?? value.worldSize);
+  const height = Number(value.height ?? value.size ?? value.worldSize ?? value.width);
+  const dimensionsKnown = Number.isInteger(width) && Number.isInteger(height) &&
+    width > 0 && height > 0 && width <= 500 && height <= 500;
+  // Unknown bounds: deliberately probe only the conservative core of the map.
+  // Invalid / unavailable rooms will be rejected by the strategic planner.
+  const w = dimensionsKnown ? width : 64;
+  const h = dimensionsKnown ? height : 64;
+  const axis = (size, divisions) => {
+    const low = -Math.ceil(size / 2), high = Math.floor(size / 2) - 1;
+    const out = [];
+    for (let i = 0; i < divisions; i++) {
+      let n = Math.round(low + (high - low) * (i + 0.5) / divisions);
+      // Avoid the usual highway coordinates, where start-room controllers are absent.
+      if (n >= 0 && n % 10 === 0 && n < high) n++;
+      if (n < 0 && (-n - 1) % 10 === 0 && n > low) n--;
+      out.push(n);
+    }
+    return [...new Set(out)];
+  };
+  const xs = axis(w, 6), ys = axis(h, 4);
+  const rooms = [];
+  for (const y of ys) for (const x of xs) {
+    const hname = x >= 0 ? 'E' + x : 'W' + (-x - 1);
+    const vname = y >= 0 ? 'S' + y : 'N' + (-y - 1);
+    rooms.push(hname + vname);
+  }
+  // A grid is a sampling strategy, never a replacement for room scoring.
+  return [...new Set(rooms)].slice(0, max);
+}
+
 export function verifyShardName(name) {
   if (typeof name !== 'string' || !SHARD.test(name)) throw new Error('Invalid shard name from World API');
   return name;
