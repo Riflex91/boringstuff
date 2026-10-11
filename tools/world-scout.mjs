@@ -8,7 +8,7 @@ import { buildWorldConfig } from './world-deployment-profile.mjs';
 import { inspectWorld } from './world-readonly-preflight.mjs';
 import { summarizeRoom } from './spawn-planner-core.mjs';
 import { inspectSpawnTile, normalizeRoomStatusResponse } from './spawn-safety.mjs';
-import { extractWorldRooms, sampleWorldRooms, fallbackProbeRooms, selectStrategicWinner, selectRouteClearCandidate, summarizeWorldRemoteRouting, verifyShardName } from './world-scout-core.mjs';
+import { extractWorldRooms, sampleWorldRooms, fallbackProbeRooms, selectStrategicWinner, selectRouteClearCandidate, summarizeWorldRemoteRouting, summarizeWorldBuildability, verifyShardName } from './world-scout-core.mjs';
 
 const dir = path.dirname(fileURLToPath(import.meta.url));
 const output = process.env.WORLD_SCOUT_OUTPUT_DIR || path.join(os.tmpdir(), 'screeps-world-scout-results');
@@ -128,7 +128,8 @@ async function main() {
         scope.plannerCompleted = true;
         scope.bestScored = report.selected ? {room:report.selected.room,
           score:report.selected.strategicScore,x:report.selected.x,y:report.selected.y,
-          remoteRouting:summarizeWorldRemoteRouting(report.selected)} : null;
+          remoteRouting:summarizeWorldRemoteRouting(report.selected),
+          buildability:summarizeWorldBuildability(report.selected)} : null;
         reports.push({shard,report});
       } catch(err) {
         scope.reason = 'Read-only inspection failed: '+String(err?.message || err).slice(0,120);
@@ -139,7 +140,8 @@ async function main() {
       evidence.provisionalWinner = {shard:winner.shard,room:winner.report.selected.room,
         x:winner.report.selected.x,y:winner.report.selected.y,
         strategicScore:winner.report.selected.strategicScore,scoreModel:winner.report.scoreModel,
-        remoteRouting:summarizeWorldRemoteRouting(winner.report.selected)};
+        remoteRouting:summarizeWorldRemoteRouting(winner.report.selected),
+        buildability:summarizeWorldBuildability(winner.report.selected)};
       try {
         const me = await api.me();
         evidence.freshTileVerification = await verifyReadOnlyTarget(api,winner,me?._id||me?.id||null);

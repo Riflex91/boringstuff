@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {extractWorldRooms,sampleWorldRooms,fallbackProbeRooms,verifyShardName,selectStrategicWinner,summarizeWorldRemoteRouting,selectRouteClearCandidate} from './world-scout-core.mjs';
+import {extractWorldRooms,sampleWorldRooms,fallbackProbeRooms,verifyShardName,selectStrategicWinner,summarizeWorldRemoteRouting,selectRouteClearCandidate,summarizeWorldBuildability} from './world-scout-core.mjs';
 assert.deepEqual(extractWorldRooms({rooms:['W1N1','W1N1','E2S3','not-a-room']}),['E2S3','W1N1']);
 assert.deepEqual(extractWorldRooms({rooms:{W1N1:{}, E2S3:{}}}),['E2S3','W1N1']);
 assert.deepEqual(extractWorldRooms({rooms:[{room:'E2S3'}, {name:'W1N1'}]}),['E2S3','W1N1']);
@@ -41,7 +41,8 @@ for (const invalid of [null,{},routing(5,6,-1),routing(5,2,2),
 
 const deepRoom=(roomName,score,reachable=5,total=5)=>({
   roomName,eligible:true,controller:{owner:null,reservation:null},
-  best:{x:12,y:13},strategicScore:score,
+  best:{x:12,y:13,blueprint:{complete:true,structureRequired:86,structureFit:86,roadFitRatio:0.8},
+    layout:{hubReady:true,labReady:true}},strategicScore:score,
   statusVerification:{status:'normal'},
   deepAnalysis:{freshness:'fresh-api',remoteRoutes:{
     totalSources:total,reachableSources:reachable,inaccessibleSources:total-reachable}}
@@ -61,7 +62,8 @@ assert.deepEqual(selectRouteClearCandidate(routeCandidates),{
   scoreModel:'test-model',remoteRouting:{
     status:'clear',totalSources:5,reachableSources:5,inaccessibleSources:0,
     needsReview:false
-  }
+  },buildability:{status:'clear',structureRequired:86,structureFit:86,
+    roadFitRatio:0.8,hubReady:true,labReady:true,needsReview:false}
 },'Highest-scoring fully reachable candidate is an advisory, not the overall winner');
 assert.equal(selectRouteClearCandidate([
   {shard:'shardX',report:deepReport('shardX',[deepRoom('E3S3',99999)])},
@@ -77,7 +79,16 @@ const invalidOptions=[
   {...deepRoom('E1S2',100),best:{x:0,y:12}},
   {...deepRoom('E1S2',100),deepAnalysis:{freshness:'fresh-api'}},
   deepRoom('E1S2',100,0,0),
-  deepRoom('E1S2',100,4,5)
+  deepRoom('E1S2',100,4,5),
+  {...deepRoom('E1S2',100),best:{x:12,y:13}},
+  {...deepRoom('E1S2',100),best:{...deepRoom('E1S2',100).best,
+    blueprint:{complete:false,structureRequired:86,structureFit:86,roadFitRatio:0.8}}},
+  {...deepRoom('E1S2',100),best:{...deepRoom('E1S2',100).best,
+    blueprint:{complete:true,structureRequired:86,structureFit:85,roadFitRatio:0.8}}},
+  {...deepRoom('E1S2',100),best:{...deepRoom('E1S2',100).best,
+    layout:{hubReady:false,labReady:true}}},
+  {...deepRoom('E1S2',100),best:{...deepRoom('E1S2',100).best,
+    layout:{hubReady:true,labReady:false}}}
 ];
 for (const bad of invalidOptions)
   assert.equal(selectRouteClearCandidate([{shard:'shard0',
@@ -88,6 +99,18 @@ assert.equal(selectRouteClearCandidate([{shard:'shard0',report:{
   options:{place:true,deep:true}
 }}]),null,'Placement-enabled reports must be rejected');
 assert.equal(selectRouteClearCandidate([]),null);
+
+
+assert.deepEqual(summarizeWorldBuildability({
+  bestTile:deepRoom('W37N11',16154.5).best
+}),{status:'clear',structureRequired:86,structureFit:86,roadFitRatio:0.8,
+  hubReady:true,labReady:true,needsReview:false},
+'Selected bestTile must expose the same buildability as room.best');
+assert.equal(summarizeWorldBuildability(null).status,'unverified');
+assert.equal(summarizeWorldBuildability({best:{blueprint:{
+  complete:true,structureRequired:86,structureFit:87,roadFitRatio:0.8
+},layout:{hubReady:true,labReady:true}}}).status,'unverified',
+'Impossible fit > required must fail closed');
 
 const fallback = fallbackProbeRooms(null,24);
 assert.equal(fallback.length,24,'unknown world size must yield bounded fallback');
