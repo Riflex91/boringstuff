@@ -46,6 +46,9 @@ export function assessPinnedFirstSpawnSafety(dossier,finalCheck) {
       o.controllerLevel!==8))
     failures.push('KNOWN_RIVAL_LEVEL_CHANGED');
   if(finalCheck!==undefined) {
+    if(finalCheck?.evidence?.spawnNameCheckRaw?.ok===false ||
+       finalCheck?.evidence?.spawnNameCheckRaw?.error)
+      failures.push('SPAWN_NAME_API_REJECTED');
     if(finalCheck?.ok!==true||finalCheck?.room!==TARGET.room||
        finalCheck?.x!==TARGET.x||finalCheck?.y!==TARGET.y||
        finalCheck?.name!==TARGET.spawnName||finalCheck?.branch!==TARGET.branch||
@@ -118,6 +121,14 @@ export async function placePinnedWorldSpawn(api,id) {
   const lastGate=assessPinnedFirstSpawnSafety(refreshed,exactFinal);
   if(!lastGate.ok) throw Object.assign(new Error('WORLD_RECHECK_BEFORE_POST_FAILED'),{
     phase:'LAST_GET_ONLY_GATE',failures:lastGate.failures});
+  // The World startup must remain on default until separately authorized.
+  const beforeBranches=await api.userBranches();
+  if(!Array.isArray(beforeBranches?.list) ||
+     beforeBranches.list.filter(x=>x?.branch==='default'&&x.activeWorld===true).length!==1 ||
+     beforeBranches.list.filter(x=>x?.branch==='chatgpt'&&x.activeWorld===false).length!==1)
+    throw Object.assign(new Error('WORLD_ACTIVE_BRANCH_CHANGED'),{
+      phase:'LAST_BRANCH_STATE_GATE',
+      failures:['DEFAULT_MUST_BE_ACTIVE_AND_CHATGPT_MUST_BE_INACTIVE']});
   // Exactly one irreversible POST, on the fixed shard/room/tile/name.
   let raw;
   try {
