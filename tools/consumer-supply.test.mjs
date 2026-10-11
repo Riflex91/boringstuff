@@ -12,6 +12,7 @@ const require = createRequire(import.meta.url);
 global.RESOURCE_ENERGY = 'energy';
 global.FIND_MY_CREEPS = 1;
 global.FIND_MY_CONSTRUCTION_SITES = 2;
+global.FIND_DROPPED_RESOURCES = 10;
 global.FIND_STRUCTURES = 3;
 global.STRUCTURE_SPAWN = 'spawn';
 global.STRUCTURE_EXTENSION = 'extension';
@@ -26,6 +27,8 @@ global.STRUCTURE_WALL = 'wall';
 global.OK = 0;
 global.ERR_NOT_IN_RANGE = -9;
 global.ERR_FULL = -8;
+global.ERR_NO_PATH = -2;
+global.ERR_BUSY = -4;
 
 const objects = new Map();
 global.Game = {
@@ -98,6 +101,94 @@ function makeHauler(id, rangeMap = {}) {
 
 const config = require('../game/config.js');
 const energy = require('../game/energy.js');
+
+// Failed pickup/withdraw intents do not represent delivered energy or even
+// progress. The waiting counter must keep aging so a genuine unresolved
+// consumer request can trigger the existing bounded self-supply fallback.
+// A successful intent and ERR_NOT_IN_RANGE with a movement remain in progress.
+{
+  const worker = makeConsumer('worker-failed-local-energy', 'worker', 0, 2, false, 2);
+  const haulerA = makeHauler('hauler-failed-acquire-a');
+  const haulerB = makeHauler('hauler-failed-acquire-b');
+  room.creeps = [worker, haulerA, haulerB];
+  const drop = { resourceType: RESOURCE_ENERGY, amount: 30 };
+  worker.pos.findInRange = () => [drop];
+  const roleWorker = require('../game/role.worker.js');
+  let pickupResult = -6; // ERR_NOT_ENOUGH_RESOURCES: stale dropped energy
+  const movement = [];
+  worker.pickup = () => pickupResult;
+  worker.moveTo = (...args) => { movement.push(args); return OK; };
+  assert.equal(energy.acquireForConsumer(worker), false);
+  assert.equal(roleWorker._test.acquireWorkEnergy(worker), true);
+  assert.equal(worker.memory.waitingEnergyTicks, 3,
+    'failed local pickup must age the existing hauler wait');
+  assert.equal(worker.memory.logisticsFallback, false);
+  assert.equal(movement.length, 0, 'failed intent is not a move target');
+
+  // Previously each failed local pickup reset waiting to zero forever,
+  // preventing the configured fallback threshold from ever being reached.
+  const originalAcquire = energy.acquire;
+  try {
+    energy.acquire = () => true;
+    worker.memory.waitingEnergyTicks = config.CONSUMER_HAULER_WAIT_TICKS;
+    assert.equal(roleWorker._test.acquireWorkEnergy(worker), true);
+    assert.equal(worker.memory.waitingEnergyTicks, 0);
+    assert.equal(worker.memory.logisticsFallback, true,
+      'repeated failed pickup must reach the real fallback path');
+  } finally {
+    energy.acquire = originalAcquire;
+  }
+  worker.memory.logisticsFallback = false;
+  worker.memory.waitingEnergyTicks = 3;
+
+  pickupResult = OK;
+  assert.equal(roleWorker._test.acquireWorkEnergy(worker), true);
+  assert.equal(worker.memory.waitingEnergyTicks, 0,
+    'confirmed successful pickup may reset the wait');
+  pickupResult = ERR_NOT_IN_RANGE;
+  worker.memory.waitingEnergyTicks = 2;
+  assert.equal(roleWorker._test.acquireWorkEnergy(worker), true);
+  assert.equal(worker.memory.waitingEnergyTicks, 0,
+    'movement towards reachable energy remains valid progress');
+  assert.equal(movement.length, 1);
+  assert.equal(movement[0][0], drop);
+  assert.equal(movement[0][1].maxOps, config.PATH_MAX_OPS);
+
+  // A movement error is not progress and must preserve the wait counter.
+  worker.moveTo = (...args) => { movement.push(args); return ERR_NO_PATH; };
+  worker.memory.waitingEnergyTicks = 2;
+  assert.equal(energy.acquireForConsumer(worker), false);
+  assert.equal(roleWorker._test.acquireWorkEnergy(worker), true);
+  assert.equal(worker.memory.waitingEnergyTicks, 3);
+  worker.moveTo = (...args) => { movement.push(args); return ERR_BUSY; };
+  assert.equal(energy.acquireForConsumer(worker), false);
+  worker.moveTo = (...args) => { movement.push(args); return OK; };
+  movement.length = 1;
+
+  worker.pos.findInRange = () => [];
+  room.storage = { store: makeStore(500, 200) };
+  let withdrawResult = -7; // ERR_INVALID_TARGET
+  worker.withdraw = () => withdrawResult;
+  assert.equal(energy.acquireForConsumer(worker), false);
+  withdrawResult = OK;
+  assert.equal(energy.acquireForConsumer(worker), true);
+  withdrawResult = ERR_NOT_IN_RANGE;
+  assert.equal(energy.acquireForConsumer(worker), true);
+  assert.equal(movement.length, 2);
+  assert.equal(movement[1][0], room.storage);
+  delete room.storage;
+
+  const upgrader = makeConsumer('upgrader-failed-buffer', 'upgrader', 0, 1, false, 2);
+  const controllerBuffer = { structureType: STRUCTURE_CONTAINER, store: makeStore(500, 200) };
+  room.controller = { pos: { findInRange: () => [controllerBuffer] } };
+  upgrader.pos.findInRange = () => [];
+  upgrader.withdraw = () => -6; // ERR_NOT_ENOUGH_RESOURCES
+  room.creeps = [upgrader, haulerA, haulerB];
+  assert.equal(energy.acquireForConsumer(upgrader), false);
+  upgrader.withdraw = () => OK;
+  assert.equal(energy.acquireForConsumer(upgrader), true);
+  delete room.controller;
+}
 
 // A partially used but actively working high-priority builder must not steal a
 // delivery from an actually empty consumer. v0.2.14 targeted every consumer
