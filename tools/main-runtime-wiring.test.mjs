@@ -136,4 +136,17 @@ for(const forbidden of ['.claimController(','.reserveController(',
     'I4 operation remains entirely observation-only');
 }
 
+assert.match(
+  fs.readFileSync(path.resolve(here,'../game/expansion.operation.shadow.js'),'utf8'),
+  /require\(['"]expansion\.site\.shadow['"]\)/,
+  'I4 operation must invoke path/site evidence before advertising tile verification'
+);
+const siteSource=fs.readFileSync(path.resolve(here,
+  '../game/expansion.site.shadow.js'),'utf8');
+for (const forbidden of ['.claimController(','.reserveController(',
+  '.spawnCreep(','.createConstructionSite(','.createSpawn(']) {
+  assert.equal(siteSource.includes(forbidden),false,
+    'I4 site/path verification remains read-only');
+}
+
 console.log('main runtime wiring tests passed');
