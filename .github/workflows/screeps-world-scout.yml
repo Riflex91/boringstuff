@@ -1,6 +1,13 @@
 name: Screeps World strategic scouting (read-only)
 on:
   workflow_dispatch:
+    inputs:
+      max_per_shard:
+        description: Read-only room probes per normal shard (24/48/96)
+        required: true
+        type: choice
+        default: '24'
+        options: ['24', '48', '96']
   push:
     branches: [main]
     paths:
@@ -30,6 +37,7 @@ jobs:
         env:
           SCREEPS_TOKEN_WORLD: ${{ secrets.SCREEPS_TOKEN_WORLD }}
           WORLD_SCOUT_OUTPUT_DIR: ${{ runner.temp }}/world-scout-results
+          WORLD_SCOUT_MAX_PER_SHARD: ${{ inputs.max_per_shard || '24' }}
         run: node world-scout.mjs
       - name: Retain read-only scouting evidence
         if: always()

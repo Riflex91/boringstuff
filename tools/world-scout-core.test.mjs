@@ -25,6 +25,13 @@ assert.equal(fallback.length,24,'unknown world size must yield bounded fallback'
 assert.equal(new Set(fallback).size,24,'no duplicate probe rooms');
 assert.ok(fallback.every(name => /^[WE]\d+[NS]\d+$/.test(name)), 'only valid room names');
 assert.deepEqual(fallbackProbeRooms(null,24),fallback,'probes must be deterministic');
+for (const n of [48,96]) {
+  const probes=fallbackProbeRooms(null,n);
+  assert.equal(probes.length,n,`${n} distinct World probe rooms`);
+  assert.equal(new Set(probes).size,n);
+  assert.deepEqual(fallbackProbeRooms(null,n),probes,'deeper probing must be deterministic');
+  assert.notDeepEqual(probes.slice(0,24),fallback,'larger sampling should diversify the room grid');
+}
 assert.equal(fallbackProbeRooms({width:96,height:96},24).length,24);
 assert.ok(fallbackProbeRooms({width:16,height:16},24).length <=24);
 assert.throws(()=>fallbackProbeRooms(null,251),/candidate limit/);

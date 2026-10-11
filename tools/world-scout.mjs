@@ -13,7 +13,10 @@ import { extractWorldRooms, sampleWorldRooms, fallbackProbeRooms, selectStrategi
 const dir = path.dirname(fileURLToPath(import.meta.url));
 const output = process.env.WORLD_SCOUT_OUTPUT_DIR || path.join(os.tmpdir(), 'screeps-world-scout-results');
 const temp = process.env.RUNNER_TEMP;
-const maxPerShard = 24; // Sampling only; never claim full-map optimality.
+const maxPerShard = Number(process.env.WORLD_SCOUT_MAX_PER_SHARD || '24');
+if (![24, 48, 96].includes(maxPerShard))
+  throw new Error('WORLD_SCOUT_MAX_PER_SHARD must be 24, 48 or 96');
+// Bounded sampling only; never claim full-map optimality.
 function write(name, value) {
   fs.writeFileSync(path.join(output, name), JSON.stringify(value, null, 2) + '\n');
 }

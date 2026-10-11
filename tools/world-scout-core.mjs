@@ -42,7 +42,11 @@ export function fallbackProbeRooms(sizeResponse = null, max = 24) {
     }
     return [...new Set(out)];
   };
-  const xs = axis(w, 6), ys = axis(h, 4);
+  // Keep roughly a 3:2 geographic aspect ratio at each probe budget.
+  // 24 => 6x4; 48 => 8x6; 96 => 12x8, without inventing a room score.
+  const columns = Math.max(1, Math.round(Math.sqrt(max * 1.5)));
+  const rows = Math.max(1, Math.ceil(max / columns));
+  const xs = axis(w, columns), ys = axis(h, rows);
   const rooms = [];
   for (const y of ys) for (const x of xs) {
     const hname = x >= 0 ? 'E' + x : 'W' + (-x - 1);
@@ -50,7 +54,10 @@ export function fallbackProbeRooms(sizeResponse = null, max = 24) {
     rooms.push(hname + vname);
   }
   // A grid is a sampling strategy, never a replacement for room scoring.
-  return [...new Set(rooms)].slice(0, max);
+  const unique = [...new Set(rooms)];
+  if (unique.length <= max) return unique;
+  // Sample across the entire grid instead of truncating its last row.
+  return Array.from({length:max}, (_,i) => unique[Math.floor((i + 0.5) * unique.length / max)]);
 }
 
 export function verifyShardName(name) {
