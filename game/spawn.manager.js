@@ -208,12 +208,15 @@ function spawnOne(state) {
     else if (workers < want.worker) role = 'worker';
     else if (harvesters >= want.harvester &&
              countRoleAvailable(state, 'harvester') < want.harvester &&
+             countRoleAvailable(state, 'upgrader') >= baseUpgraderTarget(state) &&
              !state.emergency &&
              Number.isFinite(state.energyCapacityAvailable) &&
              state.energyCapacityAvailable >= 300 &&
              state.energyAvailable >= state.energyCapacityAvailable) {
-      // Optional replacement after the core roles are supplied. Do not
-      // deplete a partly refilled 300-energy RCL1 spawn to pre-spawn a miner.
+      // Optional replacement after the core roles INCLUDING a live base
+      // upgrader are supplied. Do not deprive controller progression of its
+      // minimum essential productive creep just to pre-spawn a miner.
+      // Never deplete a partly refilled 300-energy room.
       // The existing low-energy bypass is intentionally restricted to
       // productive worker/builder/upgrader replacements.
       role = 'harvester';
