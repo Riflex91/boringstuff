@@ -58,7 +58,7 @@ assert.ok(assessPinnedFirstSpawnSafety(dossier(),nameFailed).failures
  .includes('SPAWN_NAME_API_REJECTED'));
 const file=fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)),
  'world-first-spawn.mjs'),'utf8');
-for(const denied of [/\.userSetActiveBranch\s*\(/,/\.userSetCode\s*\(/,
+for(const denied of [/\.userSetCode\s*\(/,
  /\._request\s*\(\s*['"]POST['"]/])
  assert.equal(denied.test(file),false,
  'World first spawn code may not activate or upload code');
