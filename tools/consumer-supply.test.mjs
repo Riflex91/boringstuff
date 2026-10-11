@@ -27,6 +27,8 @@ global.STRUCTURE_WALL = 'wall';
 global.OK = 0;
 global.ERR_NOT_IN_RANGE = -9;
 global.ERR_FULL = -8;
+global.ERR_NO_PATH = -2;
+global.ERR_BUSY = -4;
 
 const objects = new Map();
 global.Game = {
