@@ -10,6 +10,7 @@ const stats = require('stats');
 const visuals = require('visuals');
 const commands = require('commands');
 const runtimeCapabilities = require('runtime.capabilities');
+const expansionReadinessShadow = require('expansion.readiness.shadow');
 const serverProfile = require('server.profile');
 const processScheduler = require('process.scheduler');
 const worldIntel = require('world.intel');
@@ -179,6 +180,7 @@ function statusSnapshot(roomStates, tickCpu) {
     gcl: Game.gcl ? { level: Game.gcl.level, progress: Game.gcl.progress, progressTotal: Game.gcl.progressTotal } : null,
     totalCreeps: Object.keys(Game.creeps).length,
     capabilities,
+    expansionReadiness: expansionReadinessShadow.evaluate(capabilities, roomStates, tickCpu),
     serverProfile: profile,
     scheduler: schedulerState,
     worldIntel: worldIntelState,
