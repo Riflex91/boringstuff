@@ -7,6 +7,7 @@ assert.deepEqual(sampleWorldRooms(['E2S3','W1N1'],24),['E2S3','W1N1']);
 assert.equal(sampleWorldRooms(Array.from({length:100},(_,i)=>'E'+(i+1)+'S1'),12).length,12);
 assert.throws(()=>sampleWorldRooms(['E2S3'],251),/limit/);
 assert.equal(verifyShardName('shard3'),'shard3');
+assert.equal(verifyShardName('shardX'),'shardX');
 assert.throws(()=>verifyShardName('shard3; echo leak'),/Invalid/);
 const report=(shard,score,status='normal')=>({server:'world',shard,options:{deep:true,place:false},selected:{
   room:'E2S3',x:24,y:25,strategicScore:score,categoryScores:{compositeScore:4},
