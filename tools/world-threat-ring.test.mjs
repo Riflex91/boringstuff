@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WORLD_TARGET } from './world-target-selection.mjs';
-import { threatRingRooms,inspectThreatRing } from './world-threat-ring.mjs';
+import { threatRingRooms,inspectThreatRing,threatRiskExitCode } from './world-threat-ring.mjs';
 
 const actual=threatRingRooms();
 assert.equal(actual.length,24);
@@ -105,6 +105,18 @@ function mocked({
   const f=mocked();
   await assert.rejects(()=>inspectThreatRing(f.api,''),/authenticated/);
 }
+assert.equal(threatRiskExitCode({
+  fixedTargetSitePassed:true,exactInactiveCode:true,
+  ring:{coverageComplete:true}
+}),0);
+for (const denied of [
+  {fixedTargetSitePassed:false,exactInactiveCode:true,ring:{coverageComplete:true}},
+  {fixedTargetSitePassed:true,exactInactiveCode:false,ring:{coverageComplete:true}},
+  {fixedTargetSitePassed:true,exactInactiveCode:true,ring:{coverageComplete:false}},
+  {fixedTargetSitePassed:true,exactInactiveCode:true,ring:{}},
+  {}
+]) assert.equal(threatRiskExitCode(denied),2,
+  'Missing ring or code evidence MUST fail the workflow even when GETs returned');
 const file=fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)),
   'world-threat-ring.mjs'),'utf8');
 for(const forbidden of [
