@@ -59,6 +59,7 @@ Options:
   --verbose              Print every rejected room, even in very large scans.
   --name NAME            Spawn name used with --place (default: Spawn1).
   --server NAME          Server config key from screeps.json (default: newbieland).
+  --shard NAME           Explicit shard for map, room, terrain and spawn API calls.
   --branch NAME          World code branch to activate after placement (default: chatgpt).
   --place                Place the first spawn after analysis. spawn:auto supplies this.
   --help                 Show this help.
@@ -75,7 +76,7 @@ function parseArgs(argv) {
     rooms: [], around: null, radius: 2, strategicRadius: 2, top: 10, topRooms: 10,
     deepTop: 10, fromReport: null, deep: true,
     concurrency: 4, delayMs: 35, cacheHours: 6, refresh: false, verbose: false,
-    name: 'Spawn1', server: DEFAULT_SERVER, branch: 'chatgpt', place: false
+    name: 'Spawn1', server: DEFAULT_SERVER, shard: null, branch: 'chatgpt', place: false
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -96,6 +97,7 @@ function parseArgs(argv) {
     else if (a === '--cache-hours') out.cacheHours = Number(argv[++i]);
     else if (a === '--name') out.name = argv[++i];
     else if (a === '--server') out.server = argv[++i];
+    else if (a === '--shard') out.shard = argv[++i];
     else if (a === '--branch') out.branch = argv[++i];
     else if (a.startsWith('--')) throw new Error(`Unknown option: ${a}`);
     else out.rooms.push(a.toUpperCase());
@@ -111,6 +113,7 @@ function parseArgs(argv) {
   if (out.around) out.rooms.push(...roomsAround(out.around.toUpperCase(), out.radius));
   out.rooms = [...new Set(out.rooms)];
   if (!out.rooms.length && !out.fromReport) throw new Error('Provide at least one room, use --around ROOM, or use --from-report latest');
+  if (out.shard !== null && !/^shard[0-9]+$/i.test(out.shard)) throw new Error('--shard must be an explicit shard name such as shard3');
   if (!/^[A-Za-z0-9_\-]{1,100}$/.test(out.name)) throw new Error('Spawn name must be 1-100 characters and use letters, digits, _, or -');
   if (!/^[A-Za-z0-9_\-]{1,100}$/.test(out.branch)) throw new Error('Branch name must be 1-100 characters and use letters, digits, _, or -');
   if (out.place) {
@@ -156,23 +159,24 @@ function safeWriteJson(name, data) {
   return p;
 }
 
-function cacheFile(server) {
-  return path.join(LOG_DIR, `spawn-planner-cache-v3-${server.replace(/[^A-Za-z0-9_.-]/g, '_')}.json`);
+function cacheFile(server, shard = null) {
+  const suffix = shard ? `-${shard}` : '';
+  return path.join(LOG_DIR, `spawn-planner-cache-v3-${server.replace(/[^A-Za-z0-9_.-]/g, '_')}${suffix}.json`);
 }
 
-function loadCache(server) {
-  const p = cacheFile(server);
+function loadCache(server, shard = null) {
+  const p = cacheFile(server, shard);
   try {
     const data = JSON.parse(fs.readFileSync(p, 'utf8'));
-    if (data?.version === CACHE_VERSION && data?.server === server && data?.rooms && typeof data.rooms === 'object') return data;
+    if (data?.version === CACHE_VERSION && data?.server === server && (data.shard ?? null) === shard && data?.rooms && typeof data.rooms === 'object') return data;
   } catch {}
-  return { version: CACHE_VERSION, server, updatedAt: null, rooms: {} };
+  return { version: CACHE_VERSION, server, shard, updatedAt: null, rooms: {} };
 }
 
 function saveCache(cache) {
   fs.mkdirSync(LOG_DIR, { recursive: true });
   cache.updatedAt = new Date().toISOString();
-  const p = cacheFile(cache.server);
+  const p = cacheFile(cache.server, cache.shard);
   const tmp = `${p}.tmp`;
   fs.writeFileSync(tmp, JSON.stringify(cache), 'utf8');
   fs.renameSync(tmp, p);
@@ -679,8 +683,8 @@ async function main() {
     args.cacheHours = 0;
     console.log(`Loaded ${args.rooms.length} candidate room(s) from report: ${sourceReportPath}`);
   }
-  console.log(`Connecting using Screeps config '${args.server}'...`);
-  const api = await ScreepsHttpClient.fromConfig(args.server, { app: 'chatgpt-initial-spawn-planner' });
+  console.log(`Connecting using Screeps config '${args.server}'${args.shard ? `, shard '${args.shard}'` : ''}...`);
+  const api = await ScreepsHttpClient.fromConfig(args.server, { app: 'chatgpt-initial-spawn-planner', shard: args.shard });
   const me = await api.authMe();
   const myUserId = me?._id || me?.id || null;
   console.log(`Authenticated as ${me?.username || me?.email || myUserId || 'unknown user'}`);
@@ -695,7 +699,7 @@ async function main() {
   if (args.place) console.log('Placement mode: cache disabled; all relevant data will be fetched fresh.');
   else console.log(`Planner cache: ${args.refresh ? 'refresh forced' : `${args.cacheHours}h TTL`} | concurrency=${args.concurrency} | delay=${args.delayMs}ms`);
 
-  const cache = loadCache(args.server);
+  const cache = loadCache(args.server, args.shard);
   const source = new RoomDataSource({ api, world, cache, args });
   const metaMap = new Map();
   let metaDone = 0;
@@ -795,6 +799,7 @@ async function main() {
     scoreModel: 'risk-routing-blueprint-v3.1-safety',
     createdAt: new Date().toISOString(),
     server: args.server,
+    shard: args.shard,
     branch: args.branch,
     worldDiscovery: {
       mode: world.mode,
@@ -849,7 +854,7 @@ async function main() {
 
   const reportPath = safeWriteJson(`initial-spawn-plan-${stampForFile()}.json`, report);
   console.log(`\nReport written to: ${reportPath}`);
-  console.log(`Cache file: ${cacheFile(args.server)}`);
+  console.log(`Cache file: ${cacheFile(args.server, args.shard)}`);
 
   if (!best) {
     console.error('\nNo eligible room/tile found. Nothing will be placed.');
@@ -895,6 +900,7 @@ async function main() {
     createdAt: new Date().toISOString(),
     toolVersion: TOOL_VERSION,
     server: args.server,
+    shard: args.shard,
     room: best.roomName,
     x: b.x,
     y: b.y,

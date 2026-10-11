@@ -66,7 +66,8 @@ function decodeResponseBody(text) {
 }
 
 export class ScreepsHttpClient {
-  constructor(serverName, server) {
+  constructor(serverName, server, options = {}) {
+    this.defaultShard = options.shard ?? null;
     this.serverName = serverName;
     this.server = server;
     this.token = server.token || null;
@@ -80,7 +81,7 @@ export class ScreepsHttpClient {
       throw new Error(`Screeps config not found: ${file}\nCreate it from screeps.json.example first.`);
     }
     const parsed = loadConfigFile(file);
-    const client = new ScreepsHttpClient(serverName, normalizeServer(parsed, serverName));
+    const client = new ScreepsHttpClient(serverName, normalizeServer(parsed, serverName), options);
     if (!client.token) await client.auth();
     return client;
   }
@@ -200,23 +201,23 @@ export class ScreepsHttpClient {
   }
 
   gameRooms(shard) {
-    return this._request('GET', '/api/game/rooms', { shard });
+    return this._request('GET', '/api/game/rooms', { shard: shard ?? this.defaultShard });
   }
 
   gameWorldSize(shard) {
-    return this._request('GET', '/api/game/world-size', { shard });
+    return this._request('GET', '/api/game/world-size', { shard: shard ?? this.defaultShard });
   }
 
   gameRoomStatus(room, shard) {
-    return this._request('GET', '/api/game/room-status', { room, shard });
+    return this._request('GET', '/api/game/room-status', { room, shard: shard ?? this.defaultShard });
   }
 
   gameRoomTerrain(room, shard) {
-    return this._request('GET', '/api/game/room-terrain', { room, encoded: 1, shard });
+    return this._request('GET', '/api/game/room-terrain', { room, encoded: 1, shard: shard ?? this.defaultShard });
   }
 
   gameRoomObjects(room, shard) {
-    return this._request('GET', '/api/game/room-objects', { room, shard });
+    return this._request('GET', '/api/game/room-objects', { room, shard: shard ?? this.defaultShard });
   }
 
   userWorldStatus() {
@@ -240,11 +241,11 @@ export class ScreepsHttpClient {
   }
 
   gameCheckUniqueObjectName(type, name, shard) {
-    return this._request('POST', '/api/game/check-unique-object-name', { type, name, shard });
+    return this._request('POST', '/api/game/check-unique-object-name', { type, name, shard: shard ?? this.defaultShard });
   }
 
   gamePlaceSpawn(room, x, y, name, shard) {
-    return this._request('POST', '/api/game/place-spawn', { room, x, y, name, shard });
+    return this._request('POST', '/api/game/place-spawn', { room, x, y, name, shard: shard ?? this.defaultShard });
   }
 
   userBranches() {
