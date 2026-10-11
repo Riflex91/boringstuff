@@ -161,7 +161,7 @@ export async function verifyInitialSpawnTarget({
     const list = Array.isArray(branches?.list) ? branches.list : [];
     const exists = list.some(v => v?.branch === branch);
     evidence.branchList = list.map(v => v?.branch).filter(Boolean);
-    checks.push(check('world-branch-present', exists, { branchName: branch }, 'warning'));
+    checks.push(check('world-branch-present', exists, { branchName: branch }, requireBranchPresent ? 'error' : 'warning'));
   } catch (err) {
     checks.push(check('world-branch-present', false, { branchName: branch, error: String(err?.message || err) }, 'warning'));
   }
