@@ -195,7 +195,8 @@ export function selectRouteClearCandidate(entries) {
       if (remoteRouting.status !== 'clear' || buildability.status !== 'clear') continue;
       candidates.push({shard, room:room.roomName, x:tile.x, y:tile.y,
         strategicScore:room.strategicScore, scoreModel:report.scoreModel,
-        remoteRouting,buildability});
+        remoteRouting,buildability,
+        threatExposure:summarizeWorldThreatExposure(room)});
     }
   }
   candidates.sort((a,b) => b.strategicScore - a.strategicScore ||
