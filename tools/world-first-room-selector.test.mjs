@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import { selectWorldStart } from './world-first-room-selector.mjs';
+const candidate = { shard:'shard3',room:'E1N1',available:true,status:'normal',sources:2,openTiles:1200,spawnX:25,spawnY:25,spawnTileFree:true,controllerUnowned:true };
+assert.equal(selectWorldStart([]),null);
+assert.equal(selectWorldStart([{...candidate,available:false}]),null);
+assert.equal(selectWorldStart([{...candidate,controllerUnowned:false}]),null);
+assert.equal(selectWorldStart([{...candidate,spawnTileFree:false}]),null);
+assert.equal(selectWorldStart([{...candidate,spawnX:0}]),null);
+assert.equal(selectWorldStart([{...candidate,status:'novice'}]),null);
+assert.equal(selectWorldStart([{...candidate,shard:'unknown'}]),null);
+assert.equal(selectWorldStart([candidate,{...candidate,room:'E2N2',sources:1}]).room,'E1N1');
+console.log('World first-room offline selector: PASS');
