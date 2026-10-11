@@ -65,6 +65,10 @@ async function main() {
     for (const shard of shards) {
       const scope = {shard, discovered:0, sampled:0, plannerCompleted:false, reason:null};
       evidence.scopes.push(scope);
+      if (shard === 'shardX') {
+        scope.reason = 'Restricted shard requires separate verified access entitlement';
+        continue;
+      }
       try {
         const all = extractWorldRooms(await api.gameRooms(shard));
         const selected = sampleWorldRooms(all,maxPerShard);

@@ -5,6 +5,10 @@ on:
     branches: [main]
     paths:
       - .github/workflows/screeps-world-scout.yml
+      - tools/world-scout.mjs
+      - tools/world-scout-core.mjs
+      - tools/initial-spawn-planner.mjs
+      - tools/screeps-client.mjs
 permissions:
   contents: read
 concurrency:

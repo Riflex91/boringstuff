@@ -89,7 +89,9 @@ export async function verifyInitialSpawnTarget({
   myUserId = null,
   branch = 'chatgpt',
   requireNormalStatus = true,
-  requireUniqueName = true
+  requireUniqueName = true,
+  requireBranchPresent = false,
+  requireWorldCodeReady = false
 }) {
   const checks = [];
   const evidence = {
@@ -160,9 +162,23 @@ export async function verifyInitialSpawnTarget({
     const list = Array.isArray(branches?.list) ? branches.list : [];
     const exists = list.some(v => v?.branch === branch);
     evidence.branchList = list.map(v => v?.branch).filter(Boolean);
-    checks.push(check('world-branch-present', exists, { branchName: branch }, 'warning'));
+    checks.push(check('world-branch-present', exists, { branchName: branch }, requireBranchPresent ? 'error' : 'warning'));
   } catch (err) {
-    checks.push(check('world-branch-present', false, { branchName: branch, error: String(err?.message || err) }, 'warning'));
+    checks.push(check('world-branch-present', false, { branchName: branch, error: String(err?.message || err) }, requireBranchPresent ? 'error' : 'warning'));
+  }
+
+  if (requireWorldCodeReady) {
+    try {
+      const payload = await api._request('GET', '/api/user/code', { branch });
+      const modules = payload?.modules;
+      const main = typeof modules?.main === 'string' && modules.main.trim().length > 10;
+      const config = typeof modules?.config === 'string' && /VERSION\s*:/.test(modules.config);
+      checks.push(check('world-code-ready', main && config,
+        { branchName: branch, mainModulePresent: main, configModulePresent: config }));
+    } catch (err) {
+      checks.push(check('world-code-ready', false,
+        { branchName: branch, error: String(err?.message || err) }));
+    }
   }
 
   const failures = checks.filter(c => c.severity === 'error' && !c.pass);

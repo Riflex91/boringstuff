@@ -113,7 +113,7 @@ function parseArgs(argv) {
   if (out.around) out.rooms.push(...roomsAround(out.around.toUpperCase(), out.radius));
   out.rooms = [...new Set(out.rooms)];
   if (!out.rooms.length && !out.fromReport) throw new Error('Provide at least one room, use --around ROOM, or use --from-report latest');
-  if (out.shard !== null && !/^shard[0-9]+$/i.test(out.shard)) throw new Error('--shard must be an explicit shard name such as shard3');
+  if (out.shard !== null && !/^shard(?:[0-9]+|X)$/i.test(out.shard)) throw new Error('--shard must be an explicit shard name such as shard3');
   if (!/^[A-Za-z0-9_\-]{1,100}$/.test(out.name)) throw new Error('Spawn name must be 1-100 characters and use letters, digits, _, or -');
   if (!/^[A-Za-z0-9_\-]{1,100}$/.test(out.branch)) throw new Error('Branch name must be 1-100 characters and use letters, digits, _, or -');
   if (out.place) {
@@ -652,7 +652,7 @@ async function runDeepPass({ api, world, myUserId, coarseEligible, args }) {
   return { results: deepResults, opponentProfiles, context };
 }
 
-async function finalPlacementVerification(api, roomName, x, y, spawnName, myUserId, branch) {
+async function finalPlacementVerification(api, roomName, x, y, spawnName, myUserId, branch, server) {
   return verifyInitialSpawnTarget({
     api,
     room: roomName,
@@ -662,7 +662,9 @@ async function finalPlacementVerification(api, roomName, x, y, spawnName, myUser
     myUserId,
     branch,
     requireNormalStatus: true,
-    requireUniqueName: true
+    requireUniqueName: true,
+    requireBranchPresent: server === 'world',
+    requireWorldCodeReady: server === 'world'
   });
 }
 
@@ -880,7 +882,7 @@ async function main() {
     return;
   }
 
-  const finalSafety = await finalPlacementVerification(api, best.roomName, b.x, b.y, args.name, myUserId, args.branch);
+  const finalSafety = await finalPlacementVerification(api, best.roomName, b.x, b.y, args.name, myUserId, args.branch, args.server);
   for (const c of finalSafety.checks) {
     const marker = c.pass ? 'PASS' : c.severity === 'warning' ? 'WARN' : 'FAIL';
     if (!c.pass || c.name === 'world-status-empty' || c.name === 'room-status-normal' || c.name === 'spawn-tile-free-and-buildable' || c.name === 'spawn-name-available') {
