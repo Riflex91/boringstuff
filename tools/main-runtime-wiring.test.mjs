@@ -98,11 +98,28 @@ assert.match(
 assert.match(mainSource,
   /const\s+expansionReadinessShadow\s*=\s*require\(['"]expansion\.readiness\.shadow['"]\)/,
   'main must load the passive expansion readiness observer');
-assert.match(mainSource,
-  /expansionReadiness:\s*expansionReadinessShadow\.evaluate\(capabilities,\s*roomStates,\s*tickCpu\)/,
-  'STATUS_SNAPSHOT must expose per-server dynamic GCL/CPU shadow readiness');
+assert.ok(mainSource.includes(
+  'const expansionReadiness = expansionReadinessShadow.evaluate(capabilities,roomStates,tickCpu);'),
+  'readiness must be evaluated once before bounded frontier screening');
+assert.ok(mainSource.includes('    expansionReadiness,'),
+  'STATUS_SNAPSHOT must preserve the expansion readiness payload');
+
 const expansionSource=fs.readFileSync(path.resolve(here,'../game/expansion.readiness.shadow.js'),'utf8');
 assert.doesNotMatch(expansionSource,/\.claimController\s*\(|\.spawnCreep\s*\(|\.createConstructionSite\s*\(/,
   'expansion readiness is strictly observational, without game actions');
+
+assert.ok(mainSource.includes("require('expansion.candidates.shadow')"),
+  'main must import bounded I0 expansion candidate observer');
+assert.ok(mainSource.includes('expansionCandidatesShadow.evaluate('),
+  'STATUS_SNAPSHOT must derive expansion candidates from readiness and stored intel');
+assert.ok(mainSource.includes('    expansionCandidates,'),
+  'STATUS_SNAPSHOT must publish the bounded advisory');
+const candidateSource=fs.readFileSync(path.resolve(here,
+  '../game/expansion.candidates.shadow.js'),'utf8');
+for (const forbidden of ['.claimController(', '.spawnCreep(',
+  '.createConstructionSite(', '.reserveController(']) {
+  assert.equal(candidateSource.includes(forbidden),false,
+    'Read-only expansion candidates must never issue gameplay intents');
+}
 
 console.log('main runtime wiring tests passed');
