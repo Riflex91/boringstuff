@@ -174,6 +174,7 @@ function directCandidate(creep, demand, roomState, now) {
     amount,
     score,
     components: {
+      demandTier: demand.kind === 'EMERGENCY_DELIVER' ? 1 : 0,
       priority,
       deadline,
       carriedResourceBonus: carriedBonus,
@@ -219,6 +220,7 @@ function pairedCandidate(creep, supply, demand, roomState, now) {
     amount,
     score,
     components: {
+      demandTier: demand.kind === 'EMERGENCY_DELIVER' ? 1 : 0,
       priority,
       deadline,
       carriedResourceBonus: 0,
@@ -258,6 +260,7 @@ function balanceCandidate(creep, request, roomState, now) {
     amount,
     score,
     components: {
+      demandTier: 0,
       priority,
       deadline,
       carriedResourceBonus: 0,
@@ -282,6 +285,10 @@ function candidateKey(candidate) {
     candidate.demand ? candidate.demand.id : '',
     candidate.mode
   ].join('|');
+}
+
+function demandTier(candidate) {
+  return candidate && candidate.demand && candidate.demand.kind === 'EMERGENCY_DELIVER' ? 1 : 0;
 }
 
 function better(a, b) {
@@ -555,6 +562,7 @@ module.exports = {
     activeSets,
     makeCandidates,
     revalidatedAmount,
-    better
+    better,
+    demandTier
   }
 };
