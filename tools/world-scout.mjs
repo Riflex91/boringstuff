@@ -8,7 +8,7 @@ import { buildWorldConfig } from './world-deployment-profile.mjs';
 import { inspectWorld } from './world-readonly-preflight.mjs';
 import { summarizeRoom } from './spawn-planner-core.mjs';
 import { inspectSpawnTile, normalizeRoomStatusResponse } from './spawn-safety.mjs';
-import { extractWorldRooms, sampleWorldRooms, fallbackProbeRooms, selectStrategicWinner, verifyShardName } from './world-scout-core.mjs';
+import { extractWorldRooms, sampleWorldRooms, fallbackProbeRooms, selectStrategicWinner, summarizeWorldRemoteRouting, verifyShardName } from './world-scout-core.mjs';
 
 const dir = path.dirname(fileURLToPath(import.meta.url));
 const output = process.env.WORLD_SCOUT_OUTPUT_DIR || path.join(os.tmpdir(), 'screeps-world-scout-results');
@@ -127,7 +127,8 @@ async function main() {
         const report = JSON.parse(fs.readFileSync(path.join(logDir,names[0]),'utf8'));
         scope.plannerCompleted = true;
         scope.bestScored = report.selected ? {room:report.selected.room,
-          score:report.selected.strategicScore,x:report.selected.x,y:report.selected.y} : null;
+          score:report.selected.strategicScore,x:report.selected.x,y:report.selected.y,
+          remoteRouting:summarizeWorldRemoteRouting(report.selected)} : null;
         reports.push({shard,report});
       } catch(err) {
         scope.reason = 'Read-only inspection failed: '+String(err?.message || err).slice(0,120);
@@ -137,7 +138,8 @@ async function main() {
     if (winner) {
       evidence.provisionalWinner = {shard:winner.shard,room:winner.report.selected.room,
         x:winner.report.selected.x,y:winner.report.selected.y,
-        strategicScore:winner.report.selected.strategicScore,scoreModel:winner.report.scoreModel};
+        strategicScore:winner.report.selected.strategicScore,scoreModel:winner.report.scoreModel,
+        remoteRouting:summarizeWorldRemoteRouting(winner.report.selected)};
       try {
         const me = await api.me();
         evidence.freshTileVerification = await verifyReadOnlyTarget(api,winner,me?._id||me?.id||null);
@@ -151,7 +153,8 @@ async function main() {
     console.log('WORLD_SCOUT_READONLY '+JSON.stringify({
       status:winner?'provisional-candidate':'no-verified-candidate',
       shards:evidence.scopes.map(s=>({shard:s.shard,discovered:s.discovered,
-        sampled:s.sampled,discoveryMode:s.discoveryMode || null,plannerCompleted:s.plannerCompleted,reason:s.reason})),
+        sampled:s.sampled,discoveryMode:s.discoveryMode || null,
+        plannerCompleted:s.plannerCompleted,bestScored:s.bestScored || null,reason:s.reason})),
       selected:evidence.provisionalWinner||null,
       freshTilePass:evidence.freshTileVerification?.ok===true,
       completeCoverage:evidence.completeCoverage,readyForPlacement:false
