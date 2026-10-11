@@ -77,10 +77,30 @@ function hasCriticalRcl2Work(state) {
   return extensionBuilt < extensionAllowed || sourceContainersBuilt < state.sources.length || !hasControllerContainer(state.room);
 }
 
-function pruneExcessRoadSites(room, cap) {
+function rcl2CriticalSiteDeficit(state) {
+  if (state.rcl !== 2 || !state.room.controller) return 0;
+  const absentSourceContainers = state.sources.filter(source=>
+    source.pos.findInRange(FIND_STRUCTURES,1,{
+      filter:s=>s.structureType===STRUCTURE_CONTAINER
+    }).length===0 &&
+    source.pos.findInRange(FIND_CONSTRUCTION_SITES,1,{
+      filter:s=>s.structureType===STRUCTURE_CONTAINER
+    }).length===0).length;
+  const controllerContainer = hasControllerContainer(state.room) ? 0 : 1;
+  const extensionQuota=CONTROLLER_STRUCTURES[STRUCTURE_EXTENSION][2]||0;
+  const extensionDeficit=Math.max(0,
+    extensionQuota-countStructureAndSites(state,STRUCTURE_EXTENSION));
+  return absentSourceContainers+controllerContainer+extensionDeficit;
+}
+
+function pruneExcessRoadSites(room, cap, reservedCriticalSites = 0) {
   const allSites = room.find(FIND_MY_CONSTRUCTION_SITES);
-  if (allSites.length <= cap) return 0;
-  let need = allSites.length - cap;
+  // A room with *exactly* cap road sites has zero room for RCL2
+  // extensions/containers. Reserve slots for missing critical construction
+  // sites before considering roads, including when the cap is exactly full.
+  const reserved = Math.min(cap, Math.max(0, reservedCriticalSites));
+  let need = Math.max(0, allSites.length + reserved - cap);
+  if (!need) return 0;
   const roads = allSites
     .filter(site => site.structureType === STRUCTURE_ROAD)
     .sort((a, b) => (a.progress || 0) - (b.progress || 0));
@@ -95,6 +115,7 @@ function pruneExcessRoadSites(room, cap) {
       room: room.name,
       removed,
       siteCap: cap,
+      reservedCriticalSites: reserved,
       liveSitesBefore: allSites.length
     }, { force: true, persist: true, dedupeTicks: 0 });
   }
@@ -110,7 +131,8 @@ function plan(state) {
 
   // v0.2.7 could leave a large road backlog. Only road sites are pruned; useful
   // extensions/containers are never removed by this migration.
-  if (rcl <= 2) pruneExcessRoadSites(room, cap);
+  if (rcl <= 2) pruneExcessRoadSites(room, cap,
+    rcl === 2 ? rcl2CriticalSiteDeficit(state) : 0);
 
   const liveSites = room.find(FIND_MY_CONSTRUCTION_SITES).length;
   if (liveSites >= cap) return;
