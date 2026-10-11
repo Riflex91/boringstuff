@@ -23,7 +23,7 @@ assert.equal(selectStrategicWinner([{shard:'shardX',report:report('shardX',999)}
 const fallback = fallbackProbeRooms(null,24);
 assert.equal(fallback.length,24,'unknown world size must yield bounded fallback');
 assert.equal(new Set(fallback).size,24,'no duplicate probe rooms');
-assert.ok(fallback.every(name => /^[WE]\\d+[NS]\\d+$/.test(name)), 'only valid room names');
+assert.ok(fallback.every(name => /^[WE]\d+[NS]\d+$/.test(name)), 'only valid room names');
 assert.deepEqual(fallbackProbeRooms(null,24),fallback,'probes must be deterministic');
 assert.equal(fallbackProbeRooms({width:96,height:96},24).length,24);
 assert.ok(fallbackProbeRooms({width:16,height:16},24).length <=24);
