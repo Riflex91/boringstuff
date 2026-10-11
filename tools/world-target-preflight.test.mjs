@@ -33,7 +33,8 @@ function mockWorld({
   worldStatus='empty',site=ordinaryRoom(null),
   rival=ordinaryRoom('rival'),reserve=ordinaryRoom(null),
   branches=[{branch:'default',activeWorld:true}],missingSource=false,
-  backup={modules:{main:'legacy',config:'old config'}}
+  backup={modules:{main:'legacy',config:'old config'}},
+  stagedModules={}
 }={}) {
   const rooms={W37N11:site,W35N11:rival,W36N13:reserve};
   const calls=[];
@@ -48,7 +49,7 @@ function mockWorld({
       assert.equal(endpoint,'/api/user/code');
       assert.ok(['default','chatgpt'].includes(params?.branch),
         'Only read code of current default or isolated chatgpt branch');
-      if (params.branch==='chatgpt') return {modules:{}};
+      if (params.branch==='chatgpt') return {modules:stagedModules};
       if (backup instanceof Error) throw backup;
       return backup;
     },
@@ -107,13 +108,46 @@ function mockWorld({
   const v=await inspectSelectedWorldTarget(f.api);
   assert.equal(v.risk,'NO_RIVAL_IN_CHECKED_ROOMS');
   assert.equal(v.worldBranchPresent,true);
-  assert.equal(v.nextAction,'AWAIT_FINAL_EXPLICIT_PLACEMENT_APPROVAL');
+  assert.equal(v.nextAction,'INVESTIGATE_WORLD_CODE_READBACK');
+  assert.equal(v.worldCodeReadiness.exactInactiveCode,false);
+  assert.equal(v.worldCodeReadiness.presentButUnverified,true);
   assert.equal(v.readyForPlacement,false,
     'Site and branch proof cannot automatically place World spawn');
   assert.equal(v.inactiveStageGate.preconditionsPass,false,
     'Existing World code branch must block an initial staging attempt');
   assert.equal(v.stagedCodeReadback.status,'INCOMPLETE_OR_MISMATCHED_CODE');
   assert.ok(v.inactiveStageGate.failures.includes('WORLD_BRANCH_ALREADY_EXISTS'));
+}
+{
+  const game=path.resolve(here,'..','game');
+  const files=fs.readdirSync(game).filter(name=>name.endsWith('.js'));
+  const stagedModules=Object.fromEntries(files.map(name=>[
+    name.slice(0,-3),fs.readFileSync(path.join(game,name),'utf8')
+  ]));
+  assert.ok(files.length>=8);
+  const f=mockWorld({branches:[
+    {branch:'default',activeWorld:true},
+    {branch:'chatgpt',activeWorld:false}
+  ],stagedModules});
+  const v=await inspectSelectedWorldTarget(f.api);
+  assert.equal(v.stagedCodeReadback.status,'EXACT_INACTIVE_CODE');
+  assert.equal(v.stagedCodeReadback.observedModuleCount,files.length);
+  assert.equal(v.worldCodeReadiness.exactInactiveCode,true);
+  assert.equal(v.worldCodeReadiness.presentButUnverified,false);
+  assert.equal(v.nextAction,'MANUAL_RIVAL_RISK_REVIEW');
+  assert.equal(v.worldCodeReadiness.placementAuthorized,false);
+  assert.equal(v.worldCodeReadiness.operatorRiskAccepted,false);
+  assert.equal(v.worldCodeReadiness.spawnNameUniquenessVerified,false);
+  assert.equal(v.worldCodeReadiness.finalPlacementVerificationPassed,false);
+  assert.equal(v.readyForPlacement,false);
+  assert.equal(v.readyForDeployment,false);
+  assert.equal(f.calls.some(x=>x.method!=='GET'),false);
+  // A branch that is already active must be blocked even with correct code.
+  const active=await inspectSelectedWorldTarget(mockWorld({branches:[
+    {branch:'default',activeWorld:true},{branch:'chatgpt',activeWorld:true}
+  ],stagedModules}).api);
+  assert.equal(active.worldCodeReadiness.exactInactiveCode,false);
+  assert.equal(active.nextAction,'INVESTIGATE_WORLD_CODE_READBACK');
 }
 {
   const site=ordinaryRoom(null);

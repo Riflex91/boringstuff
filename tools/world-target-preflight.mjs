@@ -229,6 +229,15 @@ export async function inspectSelectedWorldTarget(api,target=WORLD_TARGET) {
   ]));
   const stagedCode=await verifyStagedWorldCode(api,worldBranchList,expectedModules);
   const decision=decideWorldTarget({preflight,room,nearby},target);
+  // Inactive branch existence alone is not a usable runtime guarantee.
+  // The readback MUST match the exact checked-out modules and remain inactive.
+  const exactInactiveWorldCode =
+    stagedCode.status==='EXACT_INACTIVE_CODE' &&
+    stagedCode.exactSourceMatch===true &&
+    stagedCode.activeWorld===false &&
+    stagedCode.branchExists===true &&
+    stagedCode.expectedModuleCount===gameFiles.length &&
+    stagedCode.observedModuleCount===gameFiles.length;
   const stagePreconditionsPass=inactiveStageGate.ok &&
     decision.siteChecksPass && decision.risk!=='UNVERIFIED';
   const stageGateFailures=[
@@ -250,6 +259,15 @@ export async function inspectSelectedWorldTarget(api,target=WORLD_TARGET) {
     },
     room, ...decision,
     stagedCodeReadback:stagedCode,
+    worldCodeReadiness:{
+      exactInactiveCode:exactInactiveWorldCode,
+      presentButUnverified:decision.worldBranchPresent && !exactInactiveWorldCode,
+      operatorRiskAccepted:false,
+      spawnNameUniquenessVerified:false,
+      finalPlacementVerificationPassed:false,
+      placementAuthorized:false,
+      deploymentAuthorized:false
+    },
     inactiveStageGate:{
       preconditionsPass:stagePreconditionsPass,
       failures:stageGateFailures,
@@ -259,8 +277,13 @@ export async function inspectSelectedWorldTarget(api,target=WORLD_TARGET) {
       stagingAttempted:false,
       defaultCodeContentsIncluded:false
     },
-    nextAction:decision.stagingRequired && !stagePreconditionsPass
-      ? 'INVESTIGATE_INACTIVE_STAGE_GATE' : decision.nextAction
+    nextAction: !decision.siteChecksPass
+      ? 'INVESTIGATE_BLOCKING_SITE_GATE'
+      : decision.worldBranchPresent && !exactInactiveWorldCode
+        ? 'INVESTIGATE_WORLD_CODE_READBACK'
+        : decision.stagingRequired && !stagePreconditionsPass
+          ? 'INVESTIGATE_INACTIVE_STAGE_GATE'
+          : decision.nextAction
   };
 }
 
