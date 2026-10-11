@@ -1,6 +1,6 @@
 // Discovery and report selection only; room scoring remains in spawn-planner-core.mjs.
 const ROOM = /^[WE]\d+[NS]\d+$/;
-const SHARD = /^shard\d+$/i;
+const SHARD = /^shard(?:\d+|X)$/i;
 export function extractWorldRooms(response) {
   const raw = response?.rooms ?? response?.list ?? response?.data?.rooms ?? response?.data;
   let names = [];
