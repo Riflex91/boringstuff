@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {gzipSync} from 'node:zlib';
-import {decodeWorldMemory,assessWorldStartup,summarizeWorldRcl2Growth} from './world-postlaunch-monitor-core.mjs';
+import {decodeWorldMemory,assessWorldStartup,summarizeWorldRcl2Growth,summarizeLiveWorldConstructionSites} from './world-postlaunch-monitor-core.mjs';
 import {inspectCurrentWorldStartup,observeWorldFor100Ticks} from './world-postlaunch-monitor.mjs';
 
 const original={tick:2500,cpu:7,bucket:10000};
@@ -142,6 +142,65 @@ assert.ok(r.warnings.includes('GAMEPLAY_ERROR_EVENTS_PRESENT'));
  assert.equal(assessWorldStartup(unknown).infrastructureProgress
    .lowInfrastructureAtTwoRcl2Snapshots,false);
  assert.equal(summarizeWorldRcl2Growth([]).status,'UNKNOWN');
+}
+
+// The live room GET, not cadence snapshots, identifies the actual queued types.
+{
+ const x=fixture({rcl:2});
+ x.bot.telemetryJournal.snapshots[0].x.rooms.W37N11.energyCapacity=300;
+ x.roomObjects.objects.push(...Array.from({length:8},(_,i)=>({
+   type:'constructionSite',user:'mine',structureType:'road',x:20+i,y:10
+ })));
+ const report=assessWorldStartup(x);
+ assert.equal(report.status,'PASS');
+ assert.equal(report.liveConstructionSites.status,'VERIFIED');
+ assert.equal(report.liveConstructionSites.ownedCount,8);
+ assert.equal(report.liveConstructionSites.byType.road,8);
+ assert.ok(report.warnings.includes('RCL2_LIVE_ROAD_SITES_COMPETE_WITH_EXTENSIONS'),
+  'Eight real own road sites block the RCL2 critical-build slots');
+ assert.equal(JSON.stringify(report).includes('mine'),false,
+  'No World account IDs may escape into the sanitized receipt');
+ const critical=structuredClone(x);
+ critical.roomObjects.objects=critical.roomObjects.objects.filter(o=>
+   o.type!=='constructionSite');
+ critical.roomObjects.objects.push(
+   ...Array.from({length:5},(_,i)=>({
+     type:'constructionSite',user:'mine',structureType:'extension',x:22+i,y:12
+   })),
+   ...Array.from({length:3},(_,i)=>({
+     type:'constructionSite',user:'mine',structureType:'container',x:28+i,y:13
+   })));
+ const criticalReport=assessWorldStartup(critical);
+ assert.equal(criticalReport.status,'PASS');
+ assert.equal(criticalReport.liveConstructionSites.ownedCount,8);
+ assert.equal(criticalReport.liveConstructionSites.byType.extension,5);
+ assert.equal(criticalReport.liveConstructionSites.byType.container,3);
+ assert.equal(criticalReport.warnings.includes(
+  'RCL2_LIVE_ROAD_SITES_COMPETE_WITH_EXTENSIONS'),false);
+ const unknown=structuredClone(x);
+ delete unknown.roomObjects.objects.at(-1).user;
+ const partial=assessWorldStartup(unknown);
+ assert.equal(partial.liveConstructionSites.status,'PARTIAL');
+ assert.equal(partial.liveConstructionSites.unknownOwnerCount,1);
+ assert.equal(partial.warnings.includes(
+  'RCL2_LIVE_ROAD_SITES_COMPETE_WITH_EXTENSIONS'),false,
+  'Unknown site ownership must not produce a confident diagnosis');
+ const foreign=structuredClone(x);
+ foreign.roomObjects.objects.at(-1).user='foreign-account';
+ const foreignReport=assessWorldStartup(foreign);
+ assert.equal(foreignReport.liveConstructionSites.foreignCount,1);
+ assert.equal(foreignReport.liveConstructionSites.ownedCount,7);
+ assert.equal(foreignReport.warnings.includes(
+  'RCL2_LIVE_ROAD_SITES_COMPETE_WITH_EXTENSIONS'),false);
+ const grown=structuredClone(x);
+ grown.bot.telemetryJournal.snapshots[0].x.rooms.W37N11.energyCapacity=350;
+ assert.equal(assessWorldStartup(grown).warnings.includes(
+  'RCL2_LIVE_ROAD_SITES_COMPETE_WITH_EXTENSIONS'),false);
+ const previous=structuredClone(x);
+ previous.bot.telemetryJournal.snapshots[0].x.rooms.W37N11.rcl=3;
+ assert.equal(assessWorldStartup(previous).warnings.includes(
+  'RCL2_LIVE_ROAD_SITES_COMPETE_WITH_EXTENSIONS'),false);
+ assert.equal(summarizeLiveWorldConstructionSites(null,'mine').status,'UNKNOWN');
 }
 const calls=[];
 let stats=0;
