@@ -87,4 +87,12 @@ const wrongWorld = await verifyInitialSpawnTarget({
 assert.equal(wrongWorld.ok, false);
 assert.ok(wrongWorld.failures.some(c => c.name === 'world-status-empty'));
 
+const missingWorldCode = await verifyInitialSpawnTarget({
+  api: makeApi({async userBranches(){return {list:[{branch:'default',activeWorld:true}]};}}),
+  room:'E8N1', x:20, y:29, name:'Spawn1', myUserId:'me',
+  branch:'chatgpt', requireBranchPresent:true
+});
+assert.equal(missingWorldCode.ok,false);
+assert.ok(missingWorldCode.failures.some(c=>c.name==='world-branch-present'));
+assert.equal(missingWorldCode.evidence.placementEndpointCalled,false);
 console.log('spawn safety tests passed');
