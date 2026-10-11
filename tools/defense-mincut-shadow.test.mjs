@@ -325,4 +325,41 @@ function p2Plan({
   assert.equal(graph.edgeCount, 4);
 }
 
+{
+  // A single grid evaluation must reuse natural obstacle evidence rather
+  // than querying FIND_MINERALS twice for the same immutable tick snapshot.
+  // The direct protectedAssets API still supports callers without a cache.
+  const previousFindMinerals = global.FIND_MINERALS;
+  global.FIND_MINERALS = 117;
+  try {
+    const room = openRoom();
+    let mineralCalls = 0;
+    room.find = type => {
+      assert.equal(type, 117);
+      mineralCalls++;
+      return [{ id: 'test-mineral', pos: pos(14, 14) }];
+    };
+    const state = stateFor(room, pos(10, 10));
+    const plan = p2Plan();
+    const observed = defense.evaluate(state, plan, {}, { time: 1234 }, {
+      margin: 4, maxGridTiles: 400, maxAugmentations: 1000
+    });
+    assert.equal(observed.status, 'READY');
+    assert.equal(observed.authority, 'SHADOW');
+    assert.equal(observed.constructionAuthority, 'NONE');
+    assert.equal(mineralCalls, 1, 'evaluate obtains mineral obstacles once per grid');
+    const independent = defense.protectedAssets(state, plan, room.getTerrain());
+    assert.ok(independent.some(asset => asset.x === 10 && asset.y === 10),
+      'existing planned spawn coordinates stay protected');
+    assert.equal(mineralCalls, 2, 'direct public API still resolves natural obstacles');
+    const grid = defense.buildGrid(state, plan, { margin: 4, maxGridTiles: 400 });
+    assert.equal(mineralCalls, 3, 'each new grid builds exactly one natural snapshot');
+    assert.ok(grid.naturalSet.has('14,14'));
+    assert.equal(grid.indexByCoord[14 * 50 + 14], -1, 'natural mineral is impassable');
+  } finally {
+    if (previousFindMinerals === undefined) delete global.FIND_MINERALS;
+    else global.FIND_MINERALS = previousFindMinerals;
+  }
+}
+
 console.log('P3 min-cut defense shadow tests passed');
