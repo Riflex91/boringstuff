@@ -115,7 +115,7 @@ const energy = require('../game/energy.js');
   let pickupResult = -6; // ERR_NOT_ENOUGH_RESOURCES: stale dropped energy
   const movement = [];
   worker.pickup = () => pickupResult;
-  worker.moveTo = (...args) => movement.push(args);
+  worker.moveTo = (...args) => { movement.push(args); return OK; };
   assert.equal(energy.acquireForConsumer(worker), false);
   assert.equal(roleWorker._test.acquireWorkEnergy(worker), true);
   assert.equal(worker.memory.waitingEnergyTicks, 3,
@@ -151,6 +151,17 @@ const energy = require('../game/energy.js');
   assert.equal(movement.length, 1);
   assert.equal(movement[0][0], drop);
   assert.equal(movement[0][1].maxOps, config.PATH_MAX_OPS);
+
+  // A movement error is not progress and must preserve the wait counter.
+  worker.moveTo = (...args) => { movement.push(args); return ERR_NO_PATH; };
+  worker.memory.waitingEnergyTicks = 2;
+  assert.equal(energy.acquireForConsumer(worker), false);
+  assert.equal(roleWorker._test.acquireWorkEnergy(worker), true);
+  assert.equal(worker.memory.waitingEnergyTicks, 3);
+  worker.moveTo = (...args) => { movement.push(args); return ERR_BUSY; };
+  assert.equal(energy.acquireForConsumer(worker), false);
+  worker.moveTo = (...args) => { movement.push(args); return OK; };
+  movement.length = 1;
 
   worker.pos.findInRange = () => [];
   room.storage = { store: makeStore(500, 200) };
