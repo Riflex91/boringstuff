@@ -23,6 +23,7 @@ export function selectStrategicWinner(entries) {
   const valid = entries.filter(x => {
     const r = x?.report, s = r?.selected;
     return r?.server === 'world' && r?.shard === x.shard &&
+      (x.shard !== 'shardX' || x.accessVerified === true) &&
       r?.options?.place === false && r?.options?.deep === true &&
       s && ROOM.test(s.room) && Number.isInteger(s.x) && Number.isInteger(s.y) &&
       s.x > 0 && s.x < 49 && s.y > 0 && s.y < 49 &&
