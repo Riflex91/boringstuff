@@ -17,6 +17,7 @@ function fixture({
   tick=2400,session=2250,hostile=false,owned=true,spawn=true,
   active=true,creeps=2,bucket=10000,fatal=false,
   error=false,noStats=false,noSnapshot=false,retention=false,
+  startupCritical=false,lateCritical=false,currentBucket=10000,
   rcl=1
 }={}) {
   const record={t:2400,c:'STATUS_SNAPSHOT',x:{
@@ -40,10 +41,12 @@ function fixture({
     bot:{sessionStarted:session,sessionId:'W37N11-'+session,
       telemetryJournal:{events:[
         ...(fatal?[{c:'MAIN_FATAL',l:'ERROR',t:2399}]:[]),
-        ...(error?[{c:'CREEP_EXCEPTION',l:'ERROR',t:2380}]:[])
+        ...(error?[{c:'CREEP_EXCEPTION',l:'ERROR',t:2380}]:[]),
+        ...(startupCritical?[{c:'CPU_BUCKET_CRITICAL',l:'WARN',t:2280}]:[]),
+        ...(lateCritical?[{c:'CPU_BUCKET_CRITICAL',l:'WARN',t:2380}]:[])
       ],snapshots:noSnapshot?[]:[record],
       droppedThroughSeq:retention?50:0}},
-    stats:noStats?null:{tick}};
+    stats:noStats?null:{tick,bucket:currentBucket}};
 }
 let r=assessWorldStartup(fixture());
 assert.equal(r.status,'PASS',JSON.stringify(r));
@@ -74,6 +77,24 @@ for(const params of [
   const result=assessWorldStartup(fixture(params[0]));
   assert.equal(result.status,params[1],JSON.stringify({params,result}));
 }
+// Initial World CPU bucket recovery: event before +100 ticks is a
+// warning only if an actual post-100 snapshot and current bucket are healthy.
+const warm=assessWorldStartup(fixture({startupCritical:true}));
+assert.equal(warm.status,'PASS',JSON.stringify(warm));
+assert.equal(warm.startupCriticalBucketEventCount,1);
+assert.equal(warm.after100CriticalBucketEventCount,0);
+assert.ok(warm.warnings.includes('CPU_BUCKET_CRITICAL_DURING_FIRST_100_TICKS'));
+assert.equal(warm.fatalEventCodes.length,0);
+const pendingWarm=assessWorldStartup(fixture({
+  startupCritical:true,noSnapshot:true
+}));
+assert.equal(pendingWarm.status,'WAIT');
+const postWarm=assessWorldStartup(fixture({lateCritical:true}));
+assert.equal(postWarm.status,'FAIL');
+assert.equal(postWarm.after100CriticalBucketEventCount,1);
+const stillLow=assessWorldStartup(fixture({currentBucket:850}));
+assert.equal(stillLow.status,'FAIL');
+assert.ok(stillLow.failures.includes('CURRENT_CPU_BUCKET_STILL_CRITICAL'));
 r=assessWorldStartup(fixture({hostile:true,error:true}));
 assert.equal(r.status,'PASS');
 assert.ok(r.warnings.includes('HOSTILE_CREEPS_CURRENTLY_PRESENT'));
