@@ -1,0 +1,48 @@
+name: Screeps World operational rival watch W37N11 (GET only)
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/screeps-world-operational-rival-watch.yml
+      - tools/world-operational-rival-watch.mjs
+      - tools/world-operational-rival-watch.test.mjs
+      - tools/world-threat-ring.mjs
+      - tools/world-target-selection.mjs
+      - tools/screeps-client.mjs
+permissions:
+  contents: read
+concurrency:
+  group: screeps-world-operational-rival-watch
+  cancel-in-progress: false
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    defaults:
+      run:
+        working-directory: tools
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Install offline tools
+        run: npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+      - name: Verify live operation read-only risk logic
+        run: |
+          node world-operational-rival-watch.test.mjs
+          node world-threat-ring.test.mjs
+      - name: GET-only exact W37N11 owned spawn and 24 surrounding rooms
+        env:
+          SCREEPS_TOKEN_WORLD: ${{ secrets.SCREEPS_TOKEN_WORLD }}
+          WORLD_OPERATIONAL_RIVAL_OUTPUT_DIR: ${{ runner.temp }}/world-operational-rival
+        run: node world-operational-rival-watch.mjs
+      - name: Archive sanitized operational risk report even if the watch is blocked
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screeps-world-operational-rival-${{ github.sha }}
+          path: ${{ runner.temp }}/world-operational-rival/operational-rival-watch.json
+          retention-days: 14
+          if-no-files-found: warn
