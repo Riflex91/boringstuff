@@ -400,4 +400,112 @@ assert.equal(model.SCHEMA_VERSION, 3);
 assert.equal(model._test.validPathGeometry([pos(24, 25)], pos(23, 25), spawn.pos, 1), true);
 assert.equal(model._test.validPathGeometry([], pos(23, 25), spawn.pos, 1), false);
 
+// D0.7 offline adversarial fixtures: this is modeled observation, NOT live
+// combat validation. Simulate a simultaneous mixed attacker, close attacker,
+// and healer. A pure healer never increases hostile focused DPS.
+const combinedAttackers = state([
+  { ...mixed, id: 'mixed-concurrent', pos: pos(23, 25) },
+  { ...creep([part('attack'), part('move')], 24, 25), id: 'melee-concurrent' },
+  { ...creep([part('heal'), part('move')], 22, 25), id: 'healer-concurrent' }
+]);
+const combinedObservation = model.evaluate(combinedAttackers, game);
+assert.equal(combinedObservation.status, 'PARTIAL', 'missing melee route must stay UNKNOWN');
+assert.equal(combinedObservation.authority, 'SHADOW');
+assert.equal(combinedObservation.actionAuthority, 'NONE');
+assert.equal(combinedObservation.armedCount, 2, 'healer alone is not an attacker');
+assert.equal(combinedObservation.aggregate.meleeDps, 150);
+assert.equal(combinedObservation.aggregate.rangedDps, 10);
+assert.equal(combinedObservation.aggregate.healPerTick, 12);
+assert.equal(combinedObservation.pathSearches, 0);
+assert.equal(model.telemetrySummary(combinedObservation).unknownPaths, 1);
+assert.equal(combinedObservation.access.earliestImpactTick, 100);
+assert.equal(combinedObservation.access.criticalAssetsAtRisk[0].attackerCount, 2);
+assert.equal(combinedObservation.access.criticalAssetsAtRisk[0].focusedDps, 40,
+  'unknown 120 melee DPS from range two must not count');
+assert.equal(combinedObservation.access.criticalAssetsAtRisk[0].earliestLossTick, 225);
+assert.equal(combinedObservation.risk.recommendedSafeMode, false);
+assert.equal(combinedObservation.hostileActors.find(a => a.id === 'mixed-concurrent').nearbyHealPerTick, 12);
+assert.equal(combinedObservation.hostileActors.find(a => a.id === 'melee-concurrent').nearbyHealPerTick, 4);
+
+// Boosted melee + ranged damage, tough mitigation, and adjacent heal:
+// no intent should be issued, and a healer must not be counted as a
+// third contributing attacker in the focused-loss model.
+global.BOOSTS = {
+  attack: { XUH2O: { attack: 4 } },
+  ranged_attack: { XKHO2: { rangedAttack: 4 } },
+  tough: { XGHO2: { damage: 0.3 } },
+  heal: { XLHO2: { heal: 4, rangedHeal: 4 } }
+};
+const boostedCombat = state([
+  { ...creep([part('attack', 100, 'XUH2O'), part('ranged_attack', 100, 'XKHO2'),
+    part('tough', 100, 'XGHO2'), part('move')], 24, 25), id: 'boosted-dual' },
+  { ...creep([part('attack', 100, 'XUH2O'), part('move')], 25, 24), id: 'boosted-melee' },
+  { ...creep([part('heal', 100, 'XLHO2'), part('move')], 24, 24), id: 'boosted-healer' }
+]);
+const boostedObservation = model.evaluate(boostedCombat, game);
+assert.equal(boostedObservation.status, 'READY');
+assert.equal(boostedObservation.armedCount, 2);
+assert.equal(boostedObservation.aggregate.meleeDps, 240);
+assert.equal(boostedObservation.aggregate.rangedDps, 40);
+assert.equal(boostedObservation.aggregate.healPerTick, 48);
+assert.equal(boostedObservation.hostileActors[0].strength.effectiveTough, 333.333);
+assert.equal(boostedObservation.hostileActors[0].nearbyHealPerTick, 48);
+assert.equal(boostedObservation.hostileActors[1].nearbyHealPerTick, 48);
+assert.equal(boostedObservation.pathSearches, 0);
+assert.equal(boostedObservation.access.criticalAssetsAtRisk[0].attackerCount, 2);
+assert.equal(boostedObservation.access.criticalAssetsAtRisk[0].focusedDps, 280);
+assert.equal(boostedObservation.access.criticalAssetsAtRisk[0].earliestLossTick, 118);
+assert.equal(boostedObservation.risk.state, 'EMERGENCY');
+assert.equal(boostedObservation.risk.recommendedSafeMode, true);
+assert.equal(boostedObservation.risk.safetyAuthority, 'LEGACY_UNCHANGED');
+assert.equal(boostedObservation.actionAuthority, 'NONE');
+
+// Same attackers behind one real covering rampart must pay its hits ONCE.
+// The observed barrier delays the estimate without authorizing Safe Mode.
+const boostedProtected = {
+  ...boostedCombat,
+  structures: [...boostedCombat.structures,
+    { id: 'observed-rampart', my: true, structureType: 'rampart',
+      hits: 2000, pos: spawn.pos }]
+};
+const protectedCombat = model.evaluate(boostedProtected, game);
+assert.equal(protectedCombat.access.criticalAssetsAtRisk[0].barrierHits, 2000);
+assert.equal(protectedCombat.access.criticalAssetsAtRisk[0].impactTick, 108);
+assert.equal(protectedCombat.access.criticalAssetsAtRisk[0].earliestLossTick, 125);
+assert.equal(protectedCombat.risk.state, 'EMERGENCY',
+  '25-tick loss horizon is inclusive');
+assert.equal(protectedCombat.risk.recommendedSafeMode, true);
+boostedProtected.structures.at(-1).hits = 2200;
+const outsideHorizon = model.evaluate(boostedProtected, game);
+assert.equal(outsideHorizon.access.criticalAssetsAtRisk[0].earliestLossTick, 126);
+assert.equal(outsideHorizon.risk.state, 'DEFENSE');
+assert.equal(outsideHorizon.risk.recommendedSafeMode, false);
+delete global.BOOSTS;
+
+// Bounded incomplete PathFinder evidence under a concurrent mixed-weapon
+// horde must never be promoted to a verified impact or action authority.
+let incompleteSearches = 0;
+const incompleteConcurrentFinder = { CostMatrix: Matrix, search(origin, goal, options) {
+  incompleteSearches++;
+  assert.equal(options.maxOps, 200);
+  assert.equal(options.maxRooms, 1);
+  return { incomplete: true, path: [] };
+} };
+const unprovenHorde = state([
+  ...Array.from({ length: 6 }, (_, i) => ({
+    ...mixed, id: 'uncertain-mixed-' + i, pos: pos(5, 5)
+  })),
+  { ...creep([part('heal'), part('move')], 5, 5), id: 'uncertain-healer' }
+]);
+const unprovenCombat = model.evaluate(unprovenHorde, game,
+  { pathFinder: incompleteConcurrentFinder });
+assert.equal(unprovenCombat.pathSearches, 4);
+assert.equal(incompleteSearches, 4);
+assert.equal(unprovenCombat.status, 'PARTIAL');
+assert.equal(unprovenCombat.access.earliestImpactTick, null);
+assert.equal(unprovenCombat.access.criticalAssetsAtRisk.length, 0);
+assert.ok(unprovenCombat.access.breachPaths.some(p => p.reason === 'PATH_BUDGET'));
+assert.equal(unprovenCombat.risk.recommendedSafeMode, false);
+assert.equal(unprovenCombat.actionAuthority, 'NONE');
+
 console.log('D0 threat model shadow tests passed');
