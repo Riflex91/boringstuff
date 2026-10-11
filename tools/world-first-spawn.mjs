@@ -1,10 +1,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { pathToFileURL } from 'node:url';
 import { ScreepsHttpClient } from './screeps-client.mjs';
 import { buildWorldConfig } from './world-deployment-profile.mjs';
 import { WORLD_TARGET } from './world-target-selection.mjs';
-import { validateTarget } from './world-target-preflight.mjs';
+import { validateTarget,verifyStagedWorldCode } from './world-target-preflight.mjs';
 import { inspectWorldLaunchDossier } from './world-threat-ring.mjs';
 import { verifyInitialSpawnTarget } from './spawn-safety.mjs';
 
@@ -13,6 +14,7 @@ const TARGET=Object.freeze({shard:'shard0',room:'W37N11',x:12,y:13,
   spawnName:'Spawn1',branch:'chatgpt'});
 export const PLACEMENT_CONFIRM='PLACE_W37N11_12_13';
 export const RIVAL_CONFIRM='ACCEPT_W35N11_RCL8';
+export const ACTIVATION_CONFIRM='ACTIVATE_W37N11_AFTER_VERIFIED_SPAWN';
 
 export function assessPinnedFirstSpawnSafety(dossier,finalCheck) {
   const failures=[];
@@ -104,6 +106,79 @@ async function readBackSpawn(api,id) {
     observedWorldStatus:typeof status?.status==='string'?status.status:'UNKNOWN'};
 }
 
+/**
+ * Explicitly authorized World activation, only after the pinned owned spawn
+ * has been independently verified. NEVER automatically retry a POST.
+ */
+export async function activateVerifiedWorldSpawn(api,id,placement) {
+  if(api?.defaultShard!==TARGET.shard || !id ||
+     placement?.status!=='PASS' || placement?.spawnVerified!==true ||
+     placement?.target?.shard!==TARGET.shard ||
+     placement?.target?.room!==TARGET.room ||
+     placement?.target?.x!==TARGET.x || placement?.target?.y!==TARGET.y ||
+     placement?.activeBranch!=='default' ||
+     placement?.worldCodeActivated!==false)
+    throw Object.assign(new Error('WORLD_ACTIVATION_REQUIRES_VERIFIED_PLACEMENT'),{
+      phase:'ACTIVATION_PRECONDITIONS',
+      failures:['OWNED_EXACT_SPAWN_NOT_YET_VERIFIED']});
+  const proof=await readBackSpawn(api,id);
+  if(!proof.spawnVerified||!proof.activeDefault||!proof.inactiveChatgpt)
+    throw Object.assign(new Error('WORLD_SPAWN_OR_BRANCH_CHANGED'),{
+      phase:'ACTIVATION_FRESH_READBACK',
+      failures:['OWNED_SPAWN_AND_INACTIVE_BRANCH_REQUIRED']});
+  const game=path.join(path.dirname(fileURLToPath(import.meta.url)),'..','game');
+  const expected=Object.fromEntries(fs.readdirSync(game).filter(name=>name.endsWith('.js'))
+    .sort().map(name=>[name.slice(0,-3),
+      fs.readFileSync(path.join(game,name),'utf8')]));
+  if(Object.keys(expected).length<8)
+    throw Object.assign(new Error('WORLD_LOCAL_GAME_MODULE_SET_INVALID'),{
+      phase:'ACTIVATION_CODE_READBACK',failures:['GAME_MODULES_UNVERIFIED']});
+  const branches=await api.userBranches();
+  const exact=await verifyStagedWorldCode(api,branches?.list,expected);
+  if(exact.status!=='EXACT_INACTIVE_CODE'||exact.exactSourceMatch!==true)
+    throw Object.assign(new Error('WORLD_CODE_NOT_EXACTLY_STAGED'),{
+      phase:'ACTIVATION_CODE_READBACK',
+      failures:['CHATGPT_CODE_MUST_MATCH_EXACT_TESTED_MAIN']});
+  const final=await readBackSpawn(api,id);
+  if(!final.spawnVerified||!final.activeDefault||!final.inactiveChatgpt)
+    throw Object.assign(new Error('WORLD_ACTIVATION_STATE_CHANGED'),{
+      phase:'ACTIVATION_LAST_GET_GATE',
+      failures:['OWNED_SPAWN_OR_WORLD_BRANCH_CHANGED']});
+  let response;
+  try {
+    response=await api.userSetActiveBranch('chatgpt','activeWorld');
+  } catch {
+    throw Object.assign(new Error('WORLD_ACTIVATION_RESULT_UNCERTAIN'),{
+      phase:'ACTIVATION_POST_UNCERTAIN',
+      failures:['GET_ONLY_RECOVERY_DO_NOT_RETRY']});
+  }
+  if(response?.ok===false||response?.error)
+    throw Object.assign(new Error('WORLD_ACTIVATION_RESPONSE_REJECTED'),{
+      phase:'ACTIVATION_POST_REJECTED',
+      failures:['GET_ONLY_RECOVERY_DO_NOT_RETRY']});
+  try {
+    const [objects,branchesAfter]=await Promise.all([
+      api.gameRoomObjects(TARGET.room,TARGET.shard),api.userBranches()
+    ]);
+    const spawn=Array.isArray(objects?.objects)&&objects.objects.some(o=>
+      (o?.type==='spawn'||o?.structureType==='spawn') &&
+      o.x===TARGET.x && o.y===TARGET.y &&
+      o.name===TARGET.spawnName && String(o.user||'')===String(id));
+    const active=Array.isArray(branchesAfter?.list)?
+      branchesAfter.list.filter(b=>b?.activeWorld===true):[];
+    if(!spawn||active.length!==1||active[0]?.branch!=='chatgpt')
+      throw new Error('POST_ACTIVATION_READBACK_MISMATCH');
+  } catch {
+    throw Object.assign(new Error('WORLD_ACTIVATION_NOT_VERIFIED'),{
+      phase:'ACTIVATION_POST_GET_UNVERIFIED',
+      failures:['GET_ONLY_RECOVERY_DO_NOT_RETRY']});
+  }
+  return {status:'PASS',server:'world',target:{...TARGET},
+    spawnVerified:true,activeBranch:'chatgpt',
+    worldCodeActivated:true,placementApiCalls:1,activationApiCalls:1,
+    acceptedRisk:'W35N11_RCL8_ONLY'};
+}
+
 export async function placePinnedWorldSpawn(api,id) {
   if(api?.defaultShard!==TARGET.shard||!id)
     throw new Error('WORLD_EXACT_SHARD_OR_ID_REQUIRED');
@@ -167,6 +242,7 @@ async function main() {
   const required={
     WORLD_FIRST_SPAWN_CONFIRM:PLACEMENT_CONFIRM,
     WORLD_RCL8_RISK_CONFIRM:RIVAL_CONFIRM,
+    WORLD_ACTIVATION_CONFIRM:ACTIVATION_CONFIRM,
     SCREEPS_SERVER:'world',
     SCREEPS_SHARD:TARGET.shard,
     SCREEPS_BRANCH:'chatgpt'
@@ -190,10 +266,16 @@ async function main() {
     if(!id)throw new Error('WORLD_AUTH_ID_MISSING');
     try {
       const result=await placePinnedWorldSpawn(api,id);
+      // Durable spawn proof must survive even if later activation fails.
       safeReceipt(output,'world-first-spawn-success.json',{
         ...result,sourceCommit:process.env.GITHUB_SHA||null,
         confirmedAt:new Date().toISOString()});
       console.log('WORLD_FIRST_SPAWN_VERIFIED '+JSON.stringify(result));
+      const activated=await activateVerifiedWorldSpawn(api,id,result);
+      safeReceipt(output,'world-first-spawn-activation.json',{
+        ...activated,sourceCommit:process.env.GITHUB_SHA||null,
+        confirmedAt:new Date().toISOString()});
+      console.log('WORLD_FIRST_SPAWN_ACTIVATED '+JSON.stringify(activated));
     } catch(err) {
       const receipt={status:'FAILED_OR_UNVERIFIED',
         phase:typeof err?.phase==='string'?err.phase:'UNKNOWN_STAGE',
@@ -202,7 +284,11 @@ async function main() {
         target:{...TARGET},mayHavePlacedSpawn:
           ['PLACEMENT_API_RETURN_UNCERTAIN','PLACEMENT_API_REJECTED',
             'POST_PLACEMENT_GET_ONLY_VERIFICATION'].includes(err?.phase),
-        neverRetryAutomatically:true,activationAttempted:false,
+        neverRetryAutomatically:true,
+        activationAttempted:['ACTIVATION_POST_UNCERTAIN',
+          'ACTIVATION_POST_REJECTED','ACTIVATION_POST_GET_UNVERIFIED'].includes(err?.phase),
+        activationMayHaveOccurred:['ACTIVATION_POST_UNCERTAIN',
+          'ACTIVATION_POST_REJECTED','ACTIVATION_POST_GET_UNVERIFIED'].includes(err?.phase),
         verifiedAt:new Date().toISOString()};
       safeReceipt(output,'world-first-spawn-failure.json',receipt);
       console.error('WORLD_FIRST_SPAWN_FAIL_CLOSED '+JSON.stringify(receipt));
