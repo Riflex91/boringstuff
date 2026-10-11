@@ -79,6 +79,32 @@ export function summarizeWorldRcl2Growth(statusRecords) {
     lowInfrastructureAtTwoRcl2Snapshots:stagnant};
 }
 
+/**
+ * Classify construction sites from the *current* authenticated room-objects
+ * GET, independently of any older cadence-based STATUS_SNAPSHOT.
+ * Counts only exact owner matches; unknown/foreign objects never become ours.
+ */
+export function summarizeLiveWorldConstructionSites(objects,myUserId) {
+  const empty={status:'UNKNOWN',ownedCount:null,
+    byType:null,unknownOwnerCount:null,foreignCount:null};
+  if(!Array.isArray(objects)||!myUserId)return empty;
+  const types=['extension','container','road','tower','spawn'];
+  const totals=Object.fromEntries(types.map(x=>[x,0]));
+  totals.other=0;
+  let count=0,unknown=0,foreign=0;
+  for(const o of objects) {
+    if(o?.type!=='constructionSite')continue;
+    if(!o.user){unknown++;continue;}
+    if(String(o.user)!==String(myUserId)){foreign++;continue;}
+    count++;
+    if(types.includes(o.structureType))totals[o.structureType]++;
+    else totals.other++;
+  }
+  return {status:unknown?'PARTIAL':'VERIFIED',
+    ownedCount:count,byType:totals,
+    unknownOwnerCount:unknown,foreignCount:foreign};
+}
+
 export function assessWorldStartup({
   account,world,branches,roomStatus,roomObjects,
   bot,stats,nowVerified
@@ -170,6 +196,13 @@ export function assessWorldStartup({
   if(Number.isFinite(currentBucket)&&currentBucket<1000&&elapsed>=100)
     failures.push('CURRENT_CPU_BUCKET_STILL_CRITICAL');
   const latestRoom=after100?.x?.rooms?.[ROOM]||null;
+  const liveConstruction=summarizeLiveWorldConstructionSites(objects,myId);
+  if(latestRoom?.rcl===2&&latestRoom?.energyCapacity<=300 &&
+     liveConstruction.status==='VERIFIED' &&
+     liveConstruction.ownedCount>=8 &&
+     liveConstruction.byType.road>0 &&
+     liveConstruction.byType.extension<5)
+    warnings.push('RCL2_LIVE_ROAD_SITES_COMPETE_WITH_EXTENSIONS');
   const growth=summarizeWorldRcl2Growth(statusRecords);
   if(growth.lowInfrastructureAtTwoRcl2Snapshots)
     warnings.push('RCL2_NO_EXTENSION_OR_CONSTRUCTION_SITE_IN_TWO_SNAPSHOTS');
@@ -207,6 +240,7 @@ export function assessWorldStartup({
     observedTicks:elapsed,latestRoomSnapshotTick:after100?.t||null,
     rcl:latestRoom?.rcl??null,roles,spawnBusy:spawning,
     infrastructureProgress:growth,
+    liveConstructionSites:liveConstruction,
     energyAvailable:latestRoom?.energyAvailable??null,
     energyCapacity:latestRoom?.energyCapacity??null,
     ownedSpawn,ownedController,ownCreeps,hostiles,
