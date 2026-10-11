@@ -89,7 +89,8 @@ export async function verifyInitialSpawnTarget({
   myUserId = null,
   branch = 'chatgpt',
   requireNormalStatus = true,
-  requireUniqueName = true
+  requireUniqueName = true,
+  requireBranchPresent = false
 }) {
   const checks = [];
   const evidence = {
