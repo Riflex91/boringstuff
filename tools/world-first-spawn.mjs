@@ -95,7 +95,8 @@ async function readBackSpawn(api,id) {
     api.userBranches(),api.userWorldStatus()
   ]);
   const list=branches?.list||[];
-  const activeDefault=list.filter(x=>x?.branch==='default'&&x.activeWorld===true).length===1;
+  const activeWorld=list.filter(x=>x?.activeWorld===true);
+  const activeDefault=activeWorld.length===1 && activeWorld[0]?.branch==='default';
   const inactiveChatgpt=list.filter(x=>x?.branch==='chatgpt'&&x.activeWorld===false).length===1;
   const objectsList=Array.isArray(objects?.objects)?objects.objects:[];
   const spawn=objectsList.find(o=>
@@ -199,6 +200,7 @@ export async function placePinnedWorldSpawn(api,id) {
   // The World startup must remain on default until separately authorized.
   const beforeBranches=await api.userBranches();
   if(!Array.isArray(beforeBranches?.list) ||
+     beforeBranches.list.filter(x=>x?.activeWorld===true).length!==1 ||
      beforeBranches.list.filter(x=>x?.branch==='default'&&x.activeWorld===true).length!==1 ||
      beforeBranches.list.filter(x=>x?.branch==='chatgpt'&&x.activeWorld===false).length!==1)
     throw Object.assign(new Error('WORLD_ACTIVE_BRANCH_CHANGED'),{
