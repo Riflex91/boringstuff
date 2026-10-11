@@ -14,6 +14,14 @@ Only a manually gated upload of current tested `game/*.js` into an **inactive** 
 4. The World `chatgpt` branch does **not** exist, the World `default` branch is active, and the `default` code backup is readable. These are checked again by the stage process.
 5. The GitHub Actions secret `SCREEPS_TOKEN_WORLD` must be configured (never copy credentials to a GitHub issue, chat, output log, or workflow input).
 
+## Recovery after the first failed operator run
+
+The first staging run [#38158444393](https://github.com/Riflex91/boringstuff/actions/runs/38158444393) passed exact-main, full Node24 regression and P3 but stopped after the initial `WORLD_CODE_STAGE_GATE`. The latest GET-only World proof [#38159014016](https://github.com/Riflex91/boringstuff/actions/runs/38159014016) reported `stagedCodeReadback.status: BRANCH_ABSENT`; 56 expected module names were identified, and no inactive branch was created.
+
+The corrected bootstrap uses the separately documented `POST /api/user/clone-branch` endpoint to create `chatgpt` from `default` **before** uploading exact runtime bytes exclusively to `chatgpt`. The clone must be verified as inactive, `default` must remain active, and World must remain in the empty state before any code upload. An unsuccessful stage writes a sanitized failure receipt with a stage name and HTTP category, not tokens or code.
+
+**Do not re-run the old SHA.** A new manual stage attempt is permitted only after this correction has been merged, the exact new main has succeeded in Newbieland LIVE_100T_PASS and a fresh GET-only World probe proves `chatgpt` still absent. If the clone succeeds but the subsequent upload fails, stop; its partially created branch must be assessed before any subsequent attempt.
+
 ## Trigger the existing manual staging workflow
 
 1. Open [Screeps World code preparation (inactive branch only)](https://github.com/Riflex91/boringstuff/actions/workflows/screeps-world-bootstrap.yml).
