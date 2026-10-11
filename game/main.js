@@ -21,6 +21,7 @@ const plannerVNextShadow = require('planner.vnext.shadow');
 const defenseMinCutShadow = require('defense.mincut.shadow');
 const remoteRoiShadow = require('remote.roi.shadow');
 const threatModelShadow = require('threat.model.shadow');
+const defenseRequestsShadow = require('defense.requests.shadow');
 
 function bootstrapMemory() {
   if (!Memory.bot) Memory.bot = { version: config.VERSION, born: Game.time };
@@ -178,7 +179,8 @@ function statusSnapshot(roomStates, tickCpu) {
       plannerVNext: plannerVNextShadow.telemetrySummary(state.plannerVNextShadow),
       defenseMinCut: defenseMinCutShadow.telemetrySummary(state.defenseMinCutShadow),
       remoteRoi: remoteRoiShadow.telemetrySummary(state.remoteRoiShadow),
-      threatModel: threatModelShadow.telemetrySummary(state.threatModelShadow)
+      threatModel: threatModelShadow.telemetrySummary(state.threatModelShadow),
+      defenseRequests: defenseRequestsShadow.telemetrySummary(state.defenseRequestsShadow)
     };
   }
   logger.info('STATUS_SNAPSHOT', 'Structured bot status snapshot', {
@@ -313,6 +315,23 @@ module.exports.loop = function() {
       profiler.section('threat-model-shadow', function() {
         for (const state of roomStates) {
           state.threatModelShadow = threatModelShadow.evaluate(state, Game);
+          // D1 is an advisory derivative of D0, never an executor or a
+          // request-registry mutation. A D1 diagnostic exception must not
+          // interrupt survival, creep intents or the rest of the scheduler.
+          try {
+            state.defenseRequestsShadow = defenseRequestsShadow.evaluate(
+              state, state.threatModelShadow, Game);
+          } catch (_) {
+            state.defenseRequestsShadow = {
+              summary: {
+                schemaVersion: defenseRequestsShadow.SCHEMA_VERSION,
+                authority: 'SHADOW', actionAuthority: 'NONE',
+                status: 'UNVERIFIED', reason: 'D1_DIAGNOSTIC_ERROR',
+                roomName: state.room.name, tick: Game.time,
+                requestCount: 0
+              }
+            };
+          }
         }
       });
     }, schedulerContext);
