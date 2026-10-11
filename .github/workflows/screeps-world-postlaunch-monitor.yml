@@ -1,0 +1,45 @@
+name: Screeps World first colony 100-tick monitor (GET only)
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/screeps-world-postlaunch-monitor.yml
+      - tools/world-postlaunch-monitor.mjs
+      - tools/world-postlaunch-monitor-core.mjs
+      - tools/world-postlaunch-monitor.test.mjs
+      - tools/screeps-client.mjs
+permissions:
+  contents: read
+concurrency:
+  group: screeps-world-first-colony-readonly-monitor
+  cancel-in-progress: false
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 19
+    defaults:
+      run:
+        working-directory: tools
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Install read-only World client dependencies
+        run: npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+      - name: Validate offline memory and 100-tick evidence rules
+        run: node world-postlaunch-monitor.test.mjs
+      - name: Observe exact World Spawn1 startup for 100 real ticks (GET only)
+        env:
+          SCREEPS_TOKEN_WORLD: ${{ secrets.SCREEPS_TOKEN_WORLD }}
+          WORLD_MONITOR_OUTPUT_DIR: ${{ runner.temp }}/world-postlaunch-evidence
+        run: node world-postlaunch-monitor.mjs
+      - name: Save sanitized World health evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screeps-world-first-colony-health-${{ github.sha }}
+          path: ${{ runner.temp }}/world-postlaunch-evidence/W37N11-postlaunch-health.json
+          if-no-files-found: warn
+          retention-days: 14
