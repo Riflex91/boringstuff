@@ -77,11 +77,18 @@ function energyAmount(creep) {
 }
 function haulerReadiness(creep) {
   const carried = energyAmount(creep);
-  const capacity = creep && creep.store && typeof creep.store.getCapacity === 'function'
+  const hasCapacityReader = !!(creep && creep.store &&
+    typeof creep.store.getCapacity === 'function');
+  const capacity = hasCapacityReader
     ? Number(creep.store.getCapacity(RESOURCE_ENERGY)) : NaN;
   const knownCapacity = Number.isFinite(capacity) && capacity > 0;
-  const ready = carried > 0 && knownCapacity &&
-    (!!creep.memory.delivering || carried >= Math.max(50, Math.floor(capacity * 0.5)));
+  // Mirror energy.haulerReadyToDeliver exactly: a present capacity reader
+  // returning undefined/0/NaN does NOT veto a delivering hauler. The legacy
+  // selector uses (getCapacity(RESOURCE_ENERGY) || 0), then a 50-unit floor.
+  // Capacity quality is a separate observation, not a change in authority.
+  const threshold = Math.max(50, Math.floor((Number.isFinite(capacity) ? capacity : 0) * 0.5));
+  const ready = carried > 0 && hasCapacityReader &&
+    (!!(creep.memory && creep.memory.delivering) || carried >= threshold);
   return { carried, capacity: knownCapacity ? capacity : null, ready };
 }
 function sampleRoomCreeps(game, room) {
