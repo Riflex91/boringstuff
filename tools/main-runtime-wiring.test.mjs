@@ -105,4 +105,18 @@ const expansionSource=fs.readFileSync(path.resolve(here,'../game/expansion.readi
 assert.doesNotMatch(expansionSource,/\.claimController\s*\(|\.spawnCreep\s*\(|\.createConstructionSite\s*\(/,
   'expansion readiness is strictly observational, without game actions');
 
+assert.ok(mainSource.includes("require('expansion.candidates.shadow')"),
+  'main must import bounded I0 expansion candidate observer');
+assert.ok(mainSource.includes('expansionCandidatesShadow.evaluate('),
+  'STATUS_SNAPSHOT must derive expansion candidates from readiness and stored intel');
+assert.ok(mainSource.includes('    expansionCandidates,'),
+  'STATUS_SNAPSHOT must publish the bounded advisory');
+const candidateSource=fs.readFileSync(path.resolve(here,
+  '../game/expansion.candidates.shadow.js'),'utf8');
+for (const forbidden of ['.claimController(', '.spawnCreep(',
+  '.createConstructionSite(', '.reserveController(']) {
+  assert.equal(candidateSource.includes(forbidden),false,
+    'Read-only expansion candidates must never issue gameplay intents');
+}
+
 console.log('main runtime wiring tests passed');
