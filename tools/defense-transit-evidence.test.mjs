@@ -21,10 +21,10 @@ function room(name, hostile = false) {
     return hostile && kind === 501 ? [{ id: 'observed-threat' }] : [];
   } };
 }
-function defender(id, roomName, x, y = 20) {
+function defender(id, roomName, x, y = 20, target = B) {
   return {
     id, my: true, name: id, spawning: false, ticksToLive: 500,
-    memory: { role: 'defender', home: A },
+    memory: { role: 'defender', home: A, defenseSupportTarget: target },
     pos: { x, y, roomName },
     body: [{ type:'move', hits:100 }, { type:'attack', hits:100 }]
   };
@@ -91,10 +91,10 @@ assert.equal(transit.snapshot({time:212},gapMemory).summary.candidateRoutes,0);
 
 // A portal-like jump from a room edge is not a verifiable room exit.
 const portalMemory={};
-transit.observe({time:300,creeps:{a:defender('a',A,44)},rooms:{[A]:room(A)}},portalMemory);
+transit.observe({time:300,creeps:{a:defender('a',A,44,20,'E9N9')},rooms:{[A]:room(A)}},portalMemory);
 for(let x=45;x<=49;x++)transit.observe({time:300+x-44,
-  creeps:{a:defender('a',A,x)},rooms:{[A]:room(A)}},portalMemory);
-transit.observe({time:306,creeps:{a:defender('a','E9N9',0)},
+  creeps:{a:defender('a',A,x,20,'E9N9')},rooms:{[A]:room(A)}},portalMemory);
+transit.observe({time:306,creeps:{a:defender('a','E9N9',0,20,'E9N9')},
   rooms:{[A]:room(A),'E9N9':room('E9N9')}},portalMemory);
 assert.equal(transit.snapshot({time:306},portalMemory).summary.candidateRoutes,0);
 
@@ -107,7 +107,7 @@ for(let x=0;x<=49;x++)pathPositions.push([B,x]);
 for(let x=0;x<=5;x++)pathPositions.push([C,x]);
 for(let i=0;i<pathPositions.length;i++){
   const [roomName,x]=pathPositions[i];
-  transit.observe({time:400+i,creeps:{z:defender('z',roomName,x)},
+  transit.observe({time:400+i,creeps:{z:defender('z',roomName,x,20,C)},
     rooms:riskyRooms},riskyMemory);
 }
 assert.equal(transit.snapshot({time:461},riskyMemory).summary.candidateRoutes,0,
