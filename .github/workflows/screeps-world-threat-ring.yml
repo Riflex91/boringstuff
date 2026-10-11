@@ -1,0 +1,50 @@
+name: Screeps World W37N11 rival ring (GET only)
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/screeps-world-threat-ring.yml
+      - tools/world-threat-ring.mjs
+      - tools/world-threat-ring.test.mjs
+      - tools/world-target-selection.mjs
+      - tools/world-target-preflight.mjs
+      - tools/spawn-safety.mjs
+      - tools/screeps-client.mjs
+      - game/**
+permissions:
+  contents: read
+concurrency:
+  group: screeps-world-w37n11-risk-readonly
+  cancel-in-progress: false
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    defaults:
+      run:
+        working-directory: tools
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Install dependencies
+        run: npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+      - name: Offline no-write threat scanning and target preflight tests
+        run: |
+          node world-threat-ring.test.mjs
+          node world-target-preflight.test.mjs
+      - name: GET-only 5x5 W37N11 risk ring and exact inactive World code
+        env:
+          SCREEPS_TOKEN_WORLD: ${{ secrets.SCREEPS_TOKEN_WORLD }}
+          WORLD_RISK_OUTPUT_DIR: ${{ runner.temp }}/world-W37N11-risk
+        run: node world-threat-ring.mjs
+      - name: Preserve sanitized World 5x5 risk evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screeps-world-W37N11-risk-${{ github.sha }}
+          path: ${{ runner.temp }}/world-W37N11-risk/W37N11-risk-ring.json
+          if-no-files-found: warn
+          retention-days: 14
