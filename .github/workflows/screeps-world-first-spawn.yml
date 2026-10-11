@@ -1,4 +1,4 @@
-name: Screeps World first spawn W37N11 (manual pinned no activation)
+name: Screeps World first spawn W37N11 and post-verification activation (manual)
 on:
   workflow_dispatch:
     inputs:
@@ -16,6 +16,10 @@ on:
         type: string
       rival_confirmation:
         description: Type ACCEPT_W35N11_RCL8 to accept the neighboring rival risk
+        required: true
+        type: string
+      activation_confirmation:
+        description: Type ACTIVATE_W37N11_AFTER_VERIFIED_SPAWN for automatic World bot activation after owned Spawn1 verification
         required: true
         type: string
 permissions:
@@ -38,6 +42,7 @@ jobs:
       SCREEPS_TOKEN_WORLD: ${{ secrets.SCREEPS_TOKEN_WORLD }}
       WORLD_FIRST_SPAWN_CONFIRM: ${{ inputs.placement_confirmation }}
       WORLD_RCL8_RISK_CONFIRM: ${{ inputs.rival_confirmation }}
+      WORLD_ACTIVATION_CONFIRM: ${{ inputs.activation_confirmation }}
       WORLD_EXPECTED_MAIN_SHA: ${{ inputs.expected_main_sha }}
       WORLD_NEWBIELAND_LIVE_RUN_ID: ${{ inputs.newbieland_live_run_id }}
       GITHUB_TOKEN: ${{ github.token }}
@@ -56,6 +61,7 @@ jobs:
           test "${{ github.ref }}" = 'refs/heads/main'
           test "$WORLD_FIRST_SPAWN_CONFIRM" = 'PLACE_W37N11_12_13'
           test "$WORLD_RCL8_RISK_CONFIRM" = 'ACCEPT_W35N11_RCL8'
+          test "$WORLD_ACTIVATION_CONFIRM" = 'ACTIVATE_W37N11_AFTER_VERIFIED_SPAWN'
           [[ "$WORLD_EXPECTED_MAIN_SHA" =~ ^[a-f0-9]{40}$ ]]
           git fetch origin main --quiet
           test "$(git rev-parse origin/main)" = "$WORLD_EXPECTED_MAIN_SHA"
@@ -76,7 +82,7 @@ jobs:
         env:
           WORLD_RISK_OUTPUT_DIR: ${{ runner.temp }}/world-first-spawn-evidence/risk
         run: node world-threat-ring.mjs
-      - name: Place only Spawn1 at shard0 W37N11 (12,13) without activating code
+      - name: Place only Spawn1 at W37N11 (12,13), verify ownership, then activate exact chatgpt World code
         run: node world-first-spawn.mjs
       - name: Save sanitized exact World placement proof or fail-closed receipt
         if: always()
