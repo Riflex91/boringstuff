@@ -95,7 +95,10 @@ function validDefender(creep) {
     creep.memory && creep.memory.role === 'defender' &&
     typeof creep.memory.home === 'string' &&
     !!coord(creep.memory.home) && validPos(creep.pos) &&
-    validTick(creep.ticksToLive);
+    validTick(creep.ticksToLive) && Array.isArray(creep.body) &&
+    creep.body.some(p => (p.type || p) === 'move' && (p.hits === undefined || p.hits > 0)) &&
+    creep.body.some(p => ['attack','ranged_attack','heal'].includes(p.type || p) &&
+      (p.hits === undefined || p.hits > 0));
 }
 function roomSafe(room, game) {
   const observed = game.rooms && game.rooms[room];
@@ -115,7 +118,7 @@ function roomSafe(room, game) {
 }
 function newTrack(creep, now) {
   return { from: creep.memory.home, startedTick: now, lastTick: now,
-    lastPos: position(creep.pos), enteredTarget: null, risk: 'CLEAR' };
+    lastPos: position(creep.pos), enteredTarget: null, roomSafety: {} };
 }
 function trim(s, now) {
   for (const [id, t] of Object.entries(s.tracks)) {
@@ -159,13 +162,14 @@ function observe(game, root) {
         s.tracks[id] = newTrack(creep, now);
       continue;
     }
-    if (p.roomName !== t.from && t.lastPos.roomName !== p.roomName &&
-        p.roomName !== t.from && !roomSafe(t.lastPos.roomName, game) &&
-        t.lastPos.roomName !== t.from) t.risk = 'UNVERIFIED_CORRIDOR';
-    // Validate *every* intermediate room while traversing it, not only
-    // on room exit. The destination is permitted to contain the attack.
-    if (p.roomName !== t.from && !interior(p) &&
-        !roomSafe(p.roomName, game)) t.risk = 'UNVERIFIED_CORRIDOR';
+    // Collect a fail-closed safety witness for each crossed room.
+    // The eventual destination may legitimately contain hostiles; only
+    // *intermediate* rooms must be observed clean. Evaluate at completion
+    // once the final destination is known.
+    if (p.roomName !== t.from) {
+      t.roomSafety[p.roomName] = t.roomSafety[p.roomName] !== false &&
+        roomSafe(p.roomName, game);
+    }
     t.lastTick = now;
     t.lastPos = p;
     if (p.roomName === t.from) {
@@ -179,7 +183,9 @@ function observe(game, root) {
       t.enteredTarget = p.roomName;
     }
     if (!interior(p)) continue;
-    if (t.risk === 'CLEAR' && roomSafe(t.from, game)) {
+    const corridorClear = Object.keys(t.roomSafety).every(r =>
+      r === p.roomName || t.roomSafety[r] === true);
+    if (corridorClear && roomSafe(t.from, game)) {
       const key = t.from + '>' + p.roomName;
       const travel = now - t.startedTick;
       if (travel > 0 && travel <= MAX_TRANSIT_TICKS) {
