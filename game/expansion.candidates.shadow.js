@@ -24,11 +24,13 @@ function safeRecord(record, name, tick) {
   return record.classification?.roomStatus === 'normal';
 }
 
-function safeTransit(record) {
+function safeTransit(record, isVerifiedHome) {
   const controller = record.controller;
-  // Never infer safety across a known hostile-owned or reserved transit room.
-  return controller && controller.owner == null &&
-    controller.reservationOwner == null &&
+  // A known owned parent is an allowed origin. Other player-owned rooms and
+  // reserved rooms are never treated as safe expansion corridors.
+  const home = isVerifiedHome === true && controller?.my === true;
+  const neutral = controller?.owner == null && controller?.reservationOwner == null;
+  return !!controller && (home || neutral) &&
     record.threat && record.threat.hostileCreeps === 0;
 }
 
@@ -114,7 +116,7 @@ function evaluate(readiness, roomStates, game, memoryRoot) {
         intelAge:tick-record.observation.lastSeenTick,
         observationSource:record.observation.source});
     }
-    if (node.hops>=MAX_HOPS || !safeTransit(record) ||
+    if (node.hops>=MAX_HOPS || !safeTransit(record,node.hops===0) ||
         !Array.isArray(record.topology?.exits)) continue;
     const neighbors=record.topology.exits
       .map(e=>e?.roomName).filter(validRoomName).sort();
