@@ -26,7 +26,7 @@ global.FIND_MY_SPAWNS=2;
 
 const spawnManager=require('../game/spawn.manager.js');
 function makeColony({harvesterTtl=14,harvesters=2,
-  workers=2,energyAvailable=300,rcl=1,spawning=false,
+  workers=2,upgraders=1,energyAvailable=300,rcl=1,spawning=false,
   emergency=false}={}) {
  global.Memory={creeps:{},bot:{logs:[],logDedupe:{}},rooms:{}};
  global.Game={time:78229000,creeps:{}};
@@ -37,8 +37,10 @@ function makeColony({harvesterTtl=14,harvesters=2,
  for(let i=0;i<workers;i++)
    population.push({name:'worker-'+i,ticksToLive:1100,
      memory:{role:'worker'}});
- population.push({name:'upgrader-0',ticksToLive:1100,
-   memory:{role:'upgrader'}});
+ for(let i=0;i<upgraders;i++)population.push({
+   name:'upgrader-'+i,ticksToLive:1100,
+   memory:{role:'upgrader'}
+ });
  let issued=null;
  const spawn={
    spawning:spawning?{name:'old-harvester'}:null,
@@ -61,7 +63,7 @@ function makeColony({harvesterTtl=14,harvesters=2,
    energyAvailable,energyCapacityAvailable:300,energyStored:0,
    emergency,economyMetrics:{energyCappedStreak:0,spawnIdleStreak:0},
    economyModel:null,byRole:{harvester:harvesters,worker:workers,
-     upgrader:1,hauler:0,builder:0,repairer:0}
+     upgrader:upgraders,hauler:0,builder:0,repairer:0}
  };
  return {state,spawned:()=>issued};
 }
@@ -88,6 +90,12 @@ function makeColony({harvesterTtl=14,harvesters=2,
  assert.equal(spawnManager.spawnOne(state),false,
    'Optional early miner must not spend a partially filled 300-energy room');
  assert.equal(spawned(),null);
+}
+{
+ const {state,spawned}=makeColony({harvesterTtl:14,upgraders:0});
+ assert.equal(spawnManager.spawnOne(state),true);
+ assert.equal(spawned().opts.memory.role,'upgrader',
+   'Missing base upgrader must outrank optional harvester TTL pre-spawn');
 }
 {
  const {state,spawned}=makeColony({harvesterTtl:14,workers:1});
