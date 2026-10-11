@@ -5,7 +5,7 @@ import {pathToFileURL} from 'node:url';
 import {ScreepsHttpClient} from './screeps-client.mjs';
 import {buildWorldConfig} from './world-deployment-profile.mjs';
 import {WORLD_TARGET} from './world-target-selection.mjs';
-import {inspectThreatRing} from './world-threat-ring.mjs';
+import {inspectThreatRing,threatRingRooms} from './world-threat-ring.mjs';
 
 const EXPECTED={
   shard:'shard0',room:'W37N11',x:12,y:13,spawnName:'Spawn1',
@@ -35,9 +35,18 @@ export function assessOperationalRivalRing({
   else if(ring.coverageComplete!==true||ring.verifiedRooms!==24||
      ring.unverifiedRooms.length>0||ring.observations.some(o=>o?.verified!==true))
     missing.push('RIVAL_RING_GET_COVERAGE_INCOMPLETE');
-  const observations=ring?.observations||[];
+  const observations=Array.isArray(ring?.observations)?ring.observations:[];
+  const expectedNeighbors=new Map(threatRingRooms(WORLD_TARGET)
+    .map(({room,distance})=>[room,distance]));
+  const uniqueRooms=new Set(observations.map(o=>o?.room));
+  if(uniqueRooms.size!==24||observations.some(o=>
+    expectedNeighbors.get(o?.room)!==o?.distance))
+    missing.push('RIVAL_RING_ROOMS_OR_DISTANCES_INVALID');
   const owned=observations.filter(x=>x?.verified&&x.foreignOwner===true);
   const reserved=observations.filter(x=>x?.verified&&x.foreignReservation===true);
+  if(ring?.foreignOwnedRooms!==owned.length||
+     ring?.foreignReservedRooms!==reserved.length)
+    missing.push('RIVAL_RING_AGGREGATE_COUNTS_INCONSISTENT');
   const unknown=observations.filter(x=>x?.verified&&
     (x.foreignOwner==null||x.foreignReservation==null));
   if(unknown.length)missing.push('UNKNOWN_RIVAL_CONTROL');
