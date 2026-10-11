@@ -93,6 +93,44 @@ export function summarizeWorldRemoteRouting(selected) {
     reachableSources:reachable,inaccessibleSources:inaccessible,needsReview};
 }
 
+
+/**
+ * Read-only advisory: highest-scoring deeply inspected room whose measured
+ * remote sources are ALL reachable. Does not replace the strategic winner
+ * and never grants spawn/deployment permission.
+ */
+export function selectRouteClearCandidate(entries) {
+  const candidates = [];
+  for (const entry of entries || []) {
+    const shard = entry?.shard;
+    const report = entry?.report;
+    if (typeof shard !== 'string' || !SHARD.test(shard) ||
+        shard.toLowerCase() === 'shardx' ||
+        report?.server !== 'world' || report?.shard !== shard ||
+        report?.options?.place !== false || report?.options?.deep !== true ||
+        !Array.isArray(report?.rooms)) continue;
+    for (const room of report.rooms) {
+      const tile = room?.best;
+      if (room?.eligible !== true || room?.controller == null ||
+          room.controller.owner || room.controller.reservation ||
+          typeof room?.roomName !== 'string' || !ROOM.test(room.roomName) ||
+          room?.statusVerification?.status !== 'normal' ||
+          room?.deepAnalysis?.freshness !== 'fresh-api' ||
+          !Number.isFinite(room?.strategicScore) ||
+          !Number.isInteger(tile?.x) || tile.x <= 0 || tile.x >= 49 ||
+          !Number.isInteger(tile?.y) || tile.y <= 0 || tile.y >= 49) continue;
+      const remoteRouting = summarizeWorldRemoteRouting(room);
+      if (remoteRouting.status !== 'clear') continue;
+      candidates.push({shard, room:room.roomName, x:tile.x, y:tile.y,
+        strategicScore:room.strategicScore, scoreModel:report.scoreModel,
+        remoteRouting});
+    }
+  }
+  candidates.sort((a,b) => b.strategicScore - a.strategicScore ||
+    a.shard.localeCompare(b.shard) || a.room.localeCompare(b.room));
+  return candidates[0] || null;
+}
+
 export function selectStrategicWinner(entries) {
   const valid = entries.filter(x => {
     const r = x?.report, s = r?.selected;
