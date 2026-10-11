@@ -1,0 +1,91 @@
+name: Screeps World isolated deployment (manual gated)
+on:
+  workflow_dispatch:
+    inputs:
+      expected_main_sha:
+        description: Exact CI-tested main SHA (40 hex characters)
+        required: true
+        type: string
+      shard:
+        description: Verified World shard, e.g. shard3
+        required: true
+        type: string
+      room:
+        description: Verified owned room, e.g. E2S3
+        required: true
+        type: string
+      approval:
+        description: Enter DEPLOY_WORLD after the first spawn is placed
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: screeps-world-chatgpt
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 27
+    defaults:
+      run:
+        working-directory: tools
+    env:
+      SCREEPS_SERVER: world
+      SCREEPS_BRANCH: chatgpt
+      SCREEPS_SHARD: ${{ inputs.shard }}
+      SCREEPS_ROOM: ${{ inputs.room }}
+      WORLD_DEPLOY_APPROVAL: ${{ inputs.approval }}
+      SCREEPS_TOKEN_WORLD: ${{ secrets.SCREEPS_TOKEN_WORLD }}
+    steps:
+      - name: Set isolated ephemeral paths
+        working-directory: .
+        run: |
+          echo "SCREEPS_CONFIG=$RUNNER_TEMP/screeps-world-deploy.json" >> "$GITHUB_ENV"
+          echo "SCREEPS_LOG_DIR=$RUNNER_TEMP/screeps-world-verification" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Confirm manual gate and latest exact main
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ inputs.expected_main_sha }}
+        run: |
+          test "$WORLD_DEPLOY_APPROVAL" = 'DEPLOY_WORLD'
+          [[ "$EXPECTED_SHA" =~ ^[a-f0-9]{40}$ ]]
+          git fetch origin main --quiet
+          current="$(git rev-parse origin/main)"
+          checked="$(git rev-parse HEAD)"
+          test "$current" = "$EXPECTED_SHA"
+          test "$checked" = "$EXPECTED_SHA"
+          echo "World deployment exact main SHA verified: $current"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Install offline test dependencies
+        run: npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+      - name: Validate canonical test suite and P3 benchmark at exact main
+        run: |
+          npm test
+          npm run bench:p3
+      - name: Verify World account, shard, owned spawn, branch and backup access (GET only)
+        run: node world-deploy-guard.mjs
+      - name: Deploy World code to isolated branch and verify module bytes
+        run: node deploy-live.mjs
+      - name: Observe World release for 100 ticks with fatal/CPU guards
+        run: node ci-deployment-guard.mjs verify
+      - name: Preserve World rollback backup and deployment receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screeps-world-deployment-${{ github.sha }}
+          path: |
+            tools/logs/deploy-backup-*.json
+            ${{ runner.temp }}/screeps-world-verification/deployment-receipt-*.json
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Delete World API config
+        if: always()
+        shell: bash
+        run: rm -f "$SCREEPS_CONFIG"

@@ -21,6 +21,10 @@ assert.ok(scoped.calls.every(c => c.params.shard === 'shard3'));
 assert.equal(scoped.calls.filter(c => c.method === 'POST').length, 2);
 assert.equal(scoped.calls[4].params.encoded, 1);
 
+await scoped.api.userMemory('bot');
+assert.equal(scoped.calls.at(-1).params.shard, 'shard3');
+assert.equal(scoped.calls.at(-1).params.path, 'bot');
+
 await scoped.api.gameRoomObjects('E1S2', 'shard2');
 assert.equal(scoped.calls.at(-1).params.shard, 'shard2', 'explicit shard overrides scoped default');
 
