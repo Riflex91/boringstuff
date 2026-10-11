@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {gzipSync} from 'node:zlib';
-import {decodeWorldMemory,assessWorldStartup,summarizeWorldRcl2Growth,summarizeLiveWorldConstructionSites} from './world-postlaunch-monitor-core.mjs';
+import {decodeWorldMemory,assessWorldStartup,assessRetainedWorldWindow,summarizeWorldRcl2Growth,summarizeLiveWorldConstructionSites} from './world-postlaunch-monitor-core.mjs';
 import {inspectCurrentWorldStartup,observeWorldFor100Ticks} from './world-postlaunch-monitor.mjs';
 
 const original={tick:2500,cpu:7,bucket:10000};
@@ -235,6 +235,90 @@ assert.ok(r.warnings.includes('GAMEPLAY_ERROR_EVENTS_PRESENT'));
  assert.equal(assessWorldStartup(previous).warnings.includes(
   'RCL2_LIVE_ROAD_SITES_COMPETE_WITH_EXTENSIONS'),false);
  assert.equal(summarizeLiveWorldConstructionSites(null,'mine').status,'UNKNOWN');
+}
+
+// A sticky droppedThroughSeq proves historic pruning, NOT continuous loss.
+// Prove an entirely retained, contiguous, current 100-tick journal window.
+{
+  const x=fixture();
+  const j=x.bot.telemetryJournal;
+  const firstSnapshot=structuredClone(j.snapshots[0]);
+  firstSnapshot.t=2300;
+  firstSnapshot.q=52;
+  j.modelVersion=1;
+  j.droppedThroughSeq=50;
+  j.nextSeq=54;
+  j.events=[{q:51,t:2280,c:'ROOM_HEARTBEAT',l:'INFO'}];
+  j.snapshots=[firstSnapshot,{...structuredClone(firstSnapshot),q:53,t:2400}];
+  const window=assessRetainedWorldWindow(j,2250,2400);
+  assert.equal(window.status,'COMPLETE',JSON.stringify(window));
+  assert.equal(window.startTick,2281);
+  assert.equal(window.observedTicks,119);
+  const verified=assessWorldStartup(x);
+  assert.equal(verified.status,'PASS',JSON.stringify(verified));
+  assert.equal(verified.verifiedWindowStartTick,2281);
+  assert.equal(verified.verifiedWindowObservedTicks,119);
+  assert.equal(verified.historicalTelemetryPruned,true);
+  assert.equal(verified.verifiedJournalRecordCount,3);
+  assert.ok(verified.warnings.includes(
+    'HISTORICAL_TELEMETRY_PRUNED_ROLLING_WINDOW_VERIFIED'));
+  assert.equal(verified.latestRoomSnapshotTick,2400);
+  assert.equal(verified.minimumObservedBucket,10000);
+
+  const broken=structuredClone(x);
+  broken.bot.telemetryJournal.snapshots[0].q=54;
+  assert.equal(assessWorldStartup(broken).status,'WAIT',
+    'Sequence gaps after the last discarded record block green health');
+  assert.ok(assessWorldStartup(broken).missing.includes(
+    'TELEMETRY_RETENTION_GAP_UNVERIFIED'));
+  const duplicate=structuredClone(x);
+  duplicate.bot.telemetryJournal.snapshots[0].q=51;
+  assert.equal(assessWorldStartup(duplicate).status,'WAIT');
+  const retrograde=structuredClone(x);
+  retrograde.bot.telemetryJournal.snapshots[1].t=2279;
+  assert.equal(assessWorldStartup(retrograde).status,'WAIT',
+    'Tick order must also be proven monotonically increasing with sequence');
+  const unknown=structuredClone(x);
+  delete unknown.bot.telemetryJournal.nextSeq;
+  assert.equal(assessWorldStartup(unknown).status,'WAIT');
+  const missingModel=structuredClone(x);
+  delete missingModel.bot.telemetryJournal.modelVersion;
+  assert.equal(assessWorldStartup(missingModel).status,'WAIT');
+  const freshGap=structuredClone(x);
+  freshGap.bot.telemetryJournal.events[0].t=2350;
+  freshGap.bot.telemetryJournal.snapshots[0].t=2360;
+  assert.equal(assessWorldStartup(freshGap).status,'WAIT',
+    'Only 49 subsequent ticks: wait for a real retained 100T window');
+  const noRecentSnapshot=structuredClone(x);
+  noRecentSnapshot.bot.telemetryJournal.snapshots.pop();
+  noRecentSnapshot.bot.telemetryJournal.nextSeq=53;
+  assert.equal(assessWorldStartup(noRecentSnapshot).status,'WAIT',
+    'Contiguous journal without post-100 snapshot cannot pass');
+  const fatal=structuredClone(x);
+  fatal.bot.telemetryJournal.events.push({
+    q:54,t:2330,c:'MAIN_FATAL',l:'FATAL'
+  });
+  fatal.bot.telemetryJournal.nextSeq=55;
+  assert.equal(assessWorldStartup(fatal).status,'FAIL',
+    'Any retained real fatal within verified window must fail');
+  const bucket=structuredClone(x);
+  bucket.bot.telemetryJournal.events.push({
+    q:54,t:2350,c:'CPU_BUCKET_CRITICAL',l:'WARN'
+  });
+  bucket.bot.telemetryJournal.nextSeq=55;
+  assert.equal(assessWorldStartup(bucket).status,'FAIL',
+    'A current low CPU event after warmup is not historical pruning');
+
+  // An old record may still be present from a different bounded bucket,
+  // despite the greatest discarded sequence belonging to another bucket.
+  const older=structuredClone(x);
+  older.bot.telemetryJournal.events.push({
+    q:49,t:2255,c:'MAIN_FATAL',l:'FATAL'
+  });
+  const oldButNotCurrent=assessWorldStartup(older);
+  assert.equal(oldButNotCurrent.status,'PASS',
+    'Older retained events must not masquerade as errors in fresh 100T window');
+  assert.equal(oldButNotCurrent.fatalEventCodes.length,0);
 }
 const calls=[];
 let stats=0;
