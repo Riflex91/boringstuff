@@ -126,7 +126,11 @@ function bodyFor(role, energy, state) {
 }
 
 function productivePrespawnHorizon(role, state) {
-  if (role !== 'worker' && role !== 'builder' && role !== 'upgrader') return 0;
+  // RCL1 source income relies on two mobile harvesters. Replace one only
+  // within a spawn-time-sized TTL window; RCL2+ mining remains unchanged.
+  if (role === 'harvester' && state.rcl !== 1) return 0;
+  if (role !== 'harvester' && role !== 'worker' &&
+      role !== 'builder' && role !== 'upgrader') return 0;
   const budget = Math.max(0, Number(state.energyCapacityAvailable) || Number(state.energyAvailable) || 0);
   const replacementBody = bodyFor(role, budget, state);
   const spawnTimePerPart = typeof CREEP_SPAWN_TIME !== 'undefined' && Number.isFinite(CREEP_SPAWN_TIME)
@@ -202,6 +206,18 @@ function spawnOne(state) {
     else if (workers < 1 && workers < want.worker) role = 'worker';
     else if (harvesters < want.harvester) role = 'harvester';
     else if (workers < want.worker) role = 'worker';
+    else if (harvesters >= want.harvester &&
+             countRoleAvailable(state, 'harvester') < want.harvester &&
+             !state.emergency &&
+             Number.isFinite(state.energyCapacityAvailable) &&
+             state.energyCapacityAvailable >= 300 &&
+             state.energyAvailable >= state.energyCapacityAvailable) {
+      // Optional replacement after the core roles are supplied. Do not
+      // deplete a partly refilled 300-energy RCL1 spawn to pre-spawn a miner.
+      // The existing low-energy bypass is intentionally restricted to
+      // productive worker/builder/upgrader replacements.
+      role = 'harvester';
+    }
   }
 
   if (!role && state.rcl >= 2) {
