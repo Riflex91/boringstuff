@@ -48,8 +48,7 @@ function donor(room, options = {}) {
   return Object.assign(state, options);
 }
 
-function target() {
-  const room = 'W37N11';
+function target(room = 'W37N11', latestLossTick = 145) {
   const state = {
     room: { name: room, controller: { my: true } },
     hostileCreeps: [{}], emergency: false,
@@ -72,7 +71,7 @@ function target() {
     aggregate: { meleeDps: 30, rangedDps: 10, healPerTick: 12,
       dismantlePerTick: 0, effectiveHits: 1000 },
     risk: { state: 'DEFENSE' }, access: { criticalAssetsAtRisk: [
-      { assetId: 'core', earliestLossTick: 145, impactTick: 115 }
+      { assetId: 'core', earliestLossTick: latestLossTick, impactTick: 115 }
     ] } };
   state.defenseRequestsShadow = d1.evaluate(state, d0, game);
   state.defenseRegistryPreview = e0.evaluate(state.defenseRequestsShadow, game);
@@ -174,6 +173,48 @@ assert.equal(d2.evaluate([dst],routes,game).supportRequests[0].reason,
   'NO_VERIFIED_AFFORDABLE_TIMELY_DONOR');
 assert.equal(d2.evaluate([dst,src],routes,{time:101}).summary.targetCount,0);
 assert.equal(d2.evaluate([dst,src],routes,{}).summary.targetCount,0);
+// D2 may make several simultaneous requests, but one donor may support
+// at most one target in the same ephemeral plan. Earliest proven deadline
+// takes precedence regardless of original state array ordering.
+const earlierTarget = target('W37N12', 130);
+const multiRoutes = {
+  ...routes,
+  'W36N11>W37N12': route('W36N11','W37N12',12),
+  'W36N12>W37N12': route('W36N12','W37N12',8)
+};
+const multiple = d2.evaluate([dst,src,src2,earlierTarget],multiRoutes,game);
+assert.equal(multiple.summary.targetCount,2);
+assert.equal(multiple.summary.selectedCount,2);
+assert.equal(multiple.supportRequests[0].targetColony,'W37N12');
+assert.equal(multiple.supportRequests[0].selectedProvider,'W36N12');
+assert.equal(multiple.supportRequests[1].targetColony,'W37N11');
+assert.equal(multiple.supportRequests[1].selectedProvider,'W36N11');
+assert.equal(multiple.supportRequests[1].candidateProviders.find(c =>
+  c.roomName==='W36N12').reason,'SHADOW_DONOR_ALREADY_ALLOCATED');
+assert.deepEqual(d2.evaluate([earlierTarget,src2,dst,src],multiRoutes,game),
+  multiple,'Donor allocation must be independent of room enumeration order');
+
+const oneDonor = d2.evaluate([dst,src,earlierTarget],multiRoutes,game);
+assert.equal(oneDonor.summary.selectedCount,1);
+assert.equal(oneDonor.supportRequests[0].targetColony,'W37N12');
+assert.equal(oneDonor.supportRequests[0].selectedProvider,'W36N11');
+assert.equal(oneDonor.supportRequests[1].targetColony,'W37N11');
+assert.equal(oneDonor.supportRequests[1].status,'BLOCKED');
+assert.equal(oneDonor.supportRequests[1].candidateProviders[0].reason,
+  'SHADOW_DONOR_ALREADY_ALLOCATED');
+
+// A defender on another mission or outside the donor's physical room cannot
+// be counted toward available combat capacity. Keep the home garrison reserve.
+const busyDonor = donor('W36N11');
+busyDonor.creeps[3].memory.defenseSupportTarget='W37N12';
+blocked([dst,busyDonor],routes,'COMBAT_CAPACITY_SHORTFALL');
+const foreignCreepDonor = donor('W36N11');
+foreignCreepDonor.creeps[3].room.name='W35N11';
+blocked([dst,foreignCreepDonor],routes,'COMBAT_CAPACITY_SHORTFALL');
+const wrongHomeDonor = donor('W36N11');
+wrongHomeDonor.creeps[3].memory.home='W35N11';
+blocked([dst,wrongHomeDonor],routes,'COMBAT_CAPACITY_SHORTFALL');
+assert.equal(JSON.stringify(memory.bot.requestRegistry),JSON.stringify({sentinel:'unchanged'}));
 assert.equal(d2.telemetrySummary(output),output.summary);
 
 const source = fs.readFileSync(path.join(here,'../game/defense.reinforcement.shadow.js'),'utf8');
