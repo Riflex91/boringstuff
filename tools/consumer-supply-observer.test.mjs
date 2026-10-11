@@ -154,6 +154,20 @@ for (const candidate of [loaded, collecting,
     'observation readiness must equal unchanged production guard');
 }
 
+// Boundary matrix: telemetry must never diverge from the production selector
+// around the 50-energy floor, half-capacity threshold, and delivering override.
+for (const capacity of [undefined, 0, 50, 100, 101, 300]) {
+  for (const carried of [0, 1, 24, 49, 50, 51, 99, 100, 150]) {
+    for (const delivering of [false, true]) {
+      const candidate = creep('boundary', 'hauler', carried, capacity,
+        { delivering });
+      assert.equal(observer._test.haulerReadiness(candidate).ready,
+        legacyEnergy._test.haulerReadyToDeliver(candidate),
+        `readiness mismatch capacity=${capacity} carried=${carried} delivering=${delivering}`);
+    }
+  }
+}
+
 // Exercise the real logger -> slim() -> durable journal serialization path.
 // Diagnostic counts must remain actual numbers, without identifiers.
 g.time = 1125;
