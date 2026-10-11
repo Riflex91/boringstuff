@@ -24,8 +24,6 @@ jobs:
     defaults:
       run:
         working-directory: tools
-    env:
-      WORLD_TARGET_OUTPUT_DIR: ${{ runner.temp }}/world-target-preflight
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -38,6 +36,7 @@ jobs:
       - name: GET-only exact W37N11 (12,13), shard0, rival room evidence
         env:
           SCREEPS_TOKEN_WORLD: ${{ secrets.SCREEPS_TOKEN_WORLD }}
+          WORLD_TARGET_OUTPUT_DIR: ${{ runner.temp }}/world-target-preflight
         run: node world-target-preflight.mjs
       - name: Preserve sanitized World target evidence
         if: always()
