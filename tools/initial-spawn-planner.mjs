@@ -652,7 +652,7 @@ async function runDeepPass({ api, world, myUserId, coarseEligible, args }) {
   return { results: deepResults, opponentProfiles, context };
 }
 
-async function finalPlacementVerification(api, roomName, x, y, spawnName, myUserId, branch) {
+async function finalPlacementVerification(api, roomName, x, y, spawnName, myUserId, branch, server) {
   return verifyInitialSpawnTarget({
     api,
     room: roomName,
