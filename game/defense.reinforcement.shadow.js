@@ -146,7 +146,9 @@ function evaluate(states, routeEvidence, game) {
   if (!tickValid(now)) return result(null, []);
   const owned = (Array.isArray(states) ? states : []).filter(s =>
     s && s.room && s.room.controller && s.room.controller.my &&
-    typeof roomName(s) === 'string').slice(0, MAX_PROVIDERS + 1);
+    typeof roomName(s) === 'string')
+    .sort((a, b) => roomName(a).localeCompare(roomName(b)))
+    .slice(0, MAX_PROVIDERS + 1);
   const targets = [];
   // The cheapest donor is not allowed to promise the same field defenders to
   // multiple endangered colonies in one shadow evaluation. Sort by the first
