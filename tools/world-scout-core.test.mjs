@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {extractWorldRooms,sampleWorldRooms,fallbackProbeRooms,verifyShardName,selectStrategicWinner,summarizeWorldRemoteRouting} from './world-scout-core.mjs';
+import {extractWorldRooms,sampleWorldRooms,fallbackProbeRooms,verifyShardName,selectStrategicWinner,summarizeWorldRemoteRouting,selectRouteClearCandidate} from './world-scout-core.mjs';
 assert.deepEqual(extractWorldRooms({rooms:['W1N1','W1N1','E2S3','not-a-room']}),['E2S3','W1N1']);
 assert.deepEqual(extractWorldRooms({rooms:{W1N1:{}, E2S3:{}}}),['E2S3','W1N1']);
 assert.deepEqual(extractWorldRooms({rooms:[{room:'E2S3'}, {name:'W1N1'}]}),['E2S3','W1N1']);
@@ -37,6 +37,57 @@ for (const invalid of [null,{},routing(5,6,-1),routing(5,2,2),
     status:'unverified',totalSources:null,reachableSources:null,
     inaccessibleSources:null,needsReview:true}, 'Missing or malformed remote evidence must fail closed');
 }
+
+
+const deepRoom=(roomName,score,reachable=5,total=5)=>({
+  roomName,eligible:true,controller:{owner:null,reservation:null},
+  best:{x:12,y:13},strategicScore:score,
+  statusVerification:{status:'normal'},
+  deepAnalysis:{freshness:'fresh-api',remoteRoutes:{
+    totalSources:total,reachableSources:reachable,inaccessibleSources:total-reachable}}
+});
+const deepReport=(shard,rooms)=>({
+  server:'world',shard,scoreModel:'test-model',
+  options:{place:false,deep:true},rooms
+});
+const routeCandidates=[
+  {shard:'shard0',report:deepReport('shard0',[
+    deepRoom('W37S79',17299.6,2),deepRoom('W37N11',16154.5)])},
+  {shard:'shard2',report:deepReport('shard2',[
+    deepRoom('E31S15',14894),deepRoom('W15S52',14875,7,7)])}
+];
+assert.deepEqual(selectRouteClearCandidate(routeCandidates),{
+  shard:'shard0',room:'W37N11',x:12,y:13,strategicScore:16154.5,
+  scoreModel:'test-model',remoteRouting:{
+    status:'clear',totalSources:5,reachableSources:5,inaccessibleSources:0,
+    needsReview:false
+  }
+},'Highest-scoring fully reachable candidate is an advisory, not the overall winner');
+assert.equal(selectRouteClearCandidate([
+  {shard:'shardX',report:deepReport('shardX',[deepRoom('E3S3',99999)])},
+  {shard:'shard2',report:deepReport('shard2',[deepRoom('E31S15',14894)])}
+]).shard,'shard2','shardX must never appear in read-only safe shortlist');
+const invalidOptions=[
+  {...deepRoom('E1S2',100),eligible:false},
+  {...deepRoom('E1S2',100),controller:{owner:'other',reservation:null}},
+  {...deepRoom('E1S2',100),controller:{owner:null,reservation:'other'}},
+  {...deepRoom('E1S2',100),deepAnalysis:{freshness:'cache',remoteRoutes:{
+    totalSources:5,reachableSources:5,inaccessibleSources:0}}},
+  {...deepRoom('E1S2',100),statusVerification:{status:'novice'}},
+  {...deepRoom('E1S2',100),best:{x:0,y:12}},
+  {...deepRoom('E1S2',100),deepAnalysis:{freshness:'fresh-api'}},
+  deepRoom('E1S2',100,0,0),
+  deepRoom('E1S2',100,4,5)
+];
+for (const bad of invalidOptions)
+  assert.equal(selectRouteClearCandidate([{shard:'shard0',
+    report:deepReport('shard0',[bad])}]),null,
+  'Unverified, blocked or restricted candidate must not pass advisory filter');
+assert.equal(selectRouteClearCandidate([{shard:'shard0',report:{
+  ...deepReport('shard0',[deepRoom('W37N11',123)]),
+  options:{place:true,deep:true}
+}}]),null,'Placement-enabled reports must be rejected');
+assert.equal(selectRouteClearCandidate([]),null);
 
 const fallback = fallbackProbeRooms(null,24);
 assert.equal(fallback.length,24,'unknown world size must yield bounded fallback');
