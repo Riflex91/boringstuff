@@ -40,6 +40,45 @@ function latestRecord(items,code,atLeast=0) {
     .sort((a,b)=>b.t-a.t)[0]||null;
 }
 
+/**
+ * Read-only same-room snapshots. No inference about individual intervening
+ * ticks: "stalled" is only a two-snapshot diagnostic, not a hard game failure.
+ */
+export function summarizeWorldRcl2Growth(statusRecords) {
+  const entries=(Array.isArray(statusRecords)?statusRecords:[])
+    .filter(s=>Number.isInteger(s?.t)&&s?.x?.rooms?.W37N11 &&
+      typeof s.x.rooms.W37N11==='object')
+    .map(s=>({tick:s.t,room:s.x.rooms.W37N11}))
+    .sort((a,b)=>a.tick-b.tick);
+  const latest=entries.at(-1);
+  if(!latest)return {status:'UNKNOWN',observedSnapshots:0,
+    latestTick:null,rcl:null,capacity:null,constructionSites:null,
+    controllerProgress:null,controllerProgressDelta:null,
+    lowInfrastructureAtTwoRcl2Snapshots:false};
+  const prior=entries.filter(s=>s.tick<latest.tick &&
+    s.room.rcl===latest.room.rcl).at(-1);
+  const int=(v)=>Number.isSafeInteger(v)&&v>=0?v:null;
+  const latestProgress=int(latest.room.controllerProgress);
+  const previousProgress=int(prior?.room.controllerProgress);
+  const delta=prior&&latestProgress!==null&&previousProgress!==null
+    ?latestProgress-previousProgress:null;
+  const latestCap=int(latest.room.energyCapacity);
+  const latestSites=int(latest.room.constructionSites);
+  const priorCap=int(prior?.room.energyCapacity);
+  const priorSites=int(prior?.room.constructionSites);
+  const stagnant=Boolean(latest.room.rcl===2&&prior &&
+    latest.tick-prior.tick>=100&&
+    latestCap!==null&&latestCap<=300&&priorCap!==null&&priorCap<=300&&
+    latestSites===0&&priorSites===0);
+  return {status:'SAMPLED',observedSnapshots:entries.length,
+    latestTick:latest.tick,rcl:int(latest.room.rcl),
+    capacity:latestCap,constructionSites:latestSites,
+    controllerProgress:latestProgress,
+    controllerProgressDelta:delta,
+    previousSameRclSnapshotTick:prior?.tick??null,
+    lowInfrastructureAtTwoRcl2Snapshots:stagnant};
+}
+
 export function assessWorldStartup({
   account,world,branches,roomStatus,roomObjects,
   bot,stats,nowVerified
@@ -131,6 +170,9 @@ export function assessWorldStartup({
   if(Number.isFinite(currentBucket)&&currentBucket<1000&&elapsed>=100)
     failures.push('CURRENT_CPU_BUCKET_STILL_CRITICAL');
   const latestRoom=after100?.x?.rooms?.[ROOM]||null;
+  const growth=summarizeWorldRcl2Growth(statusRecords);
+  if(growth.lowInfrastructureAtTwoRcl2Snapshots)
+    warnings.push('RCL2_NO_EXTENSION_OR_CONSTRUCTION_SITE_IN_TWO_SNAPSHOTS');
   const roleCounts=latestRoom?.creeps;
   const roles=roleCounts&&typeof roleCounts==='object'&&!Array.isArray(roleCounts)
     ?Object.fromEntries(Object.entries(roleCounts).filter(([r,n])=>
@@ -164,6 +206,7 @@ export function assessWorldStartup({
     currentTick:Number.isInteger(statTick)&&statTick>0?statTick:null,
     observedTicks:elapsed,latestRoomSnapshotTick:after100?.t||null,
     rcl:latestRoom?.rcl??null,roles,spawnBusy:spawning,
+    infrastructureProgress:growth,
     energyAvailable:latestRoom?.energyAvailable??null,
     energyCapacity:latestRoom?.energyCapacity??null,
     ownedSpawn,ownedController,ownCreeps,hostiles,
