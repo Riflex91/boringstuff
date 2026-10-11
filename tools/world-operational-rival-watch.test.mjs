@@ -49,7 +49,7 @@ assert.equal(JSON.stringify(x).includes('my-account'),false,
 }
 {
  const v=structuredClone(input);
- v.ring.observations[2].foreignOwner=true;
+ v.ring.observations.find(o=>o.room==='W36N11').foreignOwner=true;
  v.ring.foreignOwnedRooms=2;
  assert.equal(assessOperationalRivalRing(v).status,'ALERT');
  assert.ok(assessOperationalRivalRing(v).alerts.includes(
