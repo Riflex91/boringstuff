@@ -98,11 +98,21 @@ export function assessWorldStartup({
   const during=Number.isInteger(sessionStart)?
     allEvents.filter(e=>Number.isInteger(e?.t)&&
       e.t>=sessionStart&&e.t<=statTick):[];
-  const dangerous=during.filter(e=>e?.l==='FATAL'||
-    e?.c==='MAIN_FATAL'||e?.c==='CPU_BUCKET_CRITICAL');
-  if(dangerous.length)failures.push('WORLD_RUNTIME_FATAL_OR_CRITICAL_CPU');
+  const fatal=during.filter(e=>e?.l==='FATAL'||e?.c==='MAIN_FATAL');
+  const bucketEvents=during.filter(e=>e?.c==='CPU_BUCKET_CRITICAL');
+  const startupBucketEvents=Number.isInteger(minTick)?
+    bucketEvents.filter(e=>e.t<minTick):[];
+  const postStartupBucketEvents=Number.isInteger(minTick)?
+    bucketEvents.filter(e=>e.t>=minTick):bucketEvents;
+  // First-spawn CPU buckets can start unfilled. Preserve the warning but
+  // require a post-100-tick healthy snapshot before declaring recovery.
+  if(fatal.length||postStartupBucketEvents.length)
+    failures.push('WORLD_RUNTIME_FATAL_OR_CRITICAL_CPU');
+  if(startupBucketEvents.length)
+    warnings.push('CPU_BUCKET_CRITICAL_DURING_FIRST_100_TICKS');
   const otherErrors=during.filter(e=>e?.l==='ERROR'||
-    fatalCodes.has(e?.c)).map(e=>e.c).filter(Boolean);
+    (fatalCodes.has(e?.c)&&e?.c!=='CPU_BUCKET_CRITICAL'))
+    .map(e=>e.c).filter(Boolean);
   if(otherErrors.length)warnings.push('GAMEPLAY_ERROR_EVENTS_PRESENT');
   if(Number(journal?.droppedThroughSeq)>0)
     missing.push('TELEMETRY_RETENTION_GAP_UNVERIFIED');
@@ -112,8 +122,14 @@ export function assessWorldStartup({
   if(after100&&(!Number.isFinite(Number(after100.x.cpu))||
      !Number.isFinite(Number(after100.x.bucket))))
     failures.push('CPU_SNAPSHOT_INVALID');
-  if(cpuSamples.some(s=>Number.isFinite(s.bucket)&&s.bucket<1000))
-    failures.push('OBSERVED_CRITICAL_BUCKET');
+  // The post-warmup 100T window is authoritative. Never hide an ongoing
+  // bucket emergency by averaging it with older pre-warmup observations.
+  if(cpuSamples.some(s=>s.tick>=minTick&&
+      Number.isFinite(s.bucket)&&s.bucket<1000))
+    failures.push('OBSERVED_POST_STARTUP_CRITICAL_BUCKET');
+  const currentBucket=Number(stats?.bucket);
+  if(Number.isFinite(currentBucket)&&currentBucket<1000&&elapsed>=100)
+    failures.push('CURRENT_CPU_BUCKET_STILL_CRITICAL');
   const latestRoom=after100?.x?.rooms?.[ROOM]||null;
   const roleCounts=latestRoom?.creeps;
   const roles=roleCounts&&typeof roleCounts==='object'&&!Array.isArray(roleCounts)
@@ -154,7 +170,11 @@ export function assessWorldStartup({
     minimumObservedBucket:Number.isFinite(minBucket)?minBucket:null,
     maximumObservedCpu:Number.isFinite(maxCpu)?maxCpu:null,
     snapshotCount:statusRecords.length,
-    fatalEventCodes:[...new Set(dangerous.map(e=>e.c))],
+    latestAvailableRoomSnapshotTick:statusRecords.at(-1)?.t||null,
+    startupCriticalBucketEventCount:startupBucketEvents.length,
+    after100CriticalBucketEventCount:postStartupBucketEvents.length,
+    currentCpuBucket:Number.isFinite(currentBucket)?currentBucket:null,
+    fatalEventCodes:[...new Set([...fatal,...postStartupBucketEvents].map(e=>e.c))],
     errorEventCodes:[...new Set(otherErrors)].slice(0,12),
     // No raw Screeps tokens, user identifiers, actor names or full memory.
     source:'AUTHENTICATED_SCREEPS_WORLD_GET_ONLY',
