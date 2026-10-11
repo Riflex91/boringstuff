@@ -1,0 +1,48 @@
+name: Screeps World W37N11 targeted preflight (GET only)
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/screeps-world-target-preflight.yml
+      - tools/world-target-selection.mjs
+      - tools/world-target-preflight.mjs
+      - tools/world-target-preflight.test.mjs
+      - tools/world-deployment-profile.mjs
+      - tools/world-readonly-preflight.mjs
+      - tools/spawn-safety.mjs
+      - tools/screeps-client.mjs
+permissions:
+  contents: read
+concurrency:
+  group: screeps-world-w37n11-readonly
+  cancel-in-progress: false
+jobs:
+  get-only-target-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: tools
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Install dependencies for read-only World client
+        run: npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+      - name: Verify offline no-write World preflight tests
+        run: node world-target-preflight.test.mjs
+      - name: GET-only exact W37N11 (12,13), shard0, rival room evidence
+        env:
+          SCREEPS_TOKEN_WORLD: ${{ secrets.SCREEPS_TOKEN_WORLD }}
+          WORLD_TARGET_OUTPUT_DIR: ${{ runner.temp }}/world-target-preflight
+        run: node world-target-preflight.mjs
+      - name: Preserve sanitized World target evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screeps-world-W37N11-get-only-${{ github.sha }}
+          path: ${{ runner.temp }}/world-target-preflight/W37N11-preflight.json
+          if-no-files-found: warn
+          retention-days: 14
