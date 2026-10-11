@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {extractWorldRooms,sampleWorldRooms,fallbackProbeRooms,verifyShardName,selectStrategicWinner,summarizeWorldRemoteRouting,selectRouteClearCandidate,summarizeWorldBuildability} from './world-scout-core.mjs';
+import {extractWorldRooms,sampleWorldRooms,fallbackProbeRooms,verifyShardName,selectStrategicWinner,summarizeWorldRemoteRouting,selectRouteClearCandidate,summarizeWorldBuildability,summarizeWorldThreatExposure} from './world-scout-core.mjs';
 assert.deepEqual(extractWorldRooms({rooms:['W1N1','W1N1','E2S3','not-a-room']}),['E2S3','W1N1']);
 assert.deepEqual(extractWorldRooms({rooms:{W1N1:{}, E2S3:{}}}),['E2S3','W1N1']);
 assert.deepEqual(extractWorldRooms({rooms:[{room:'E2S3'}, {name:'W1N1'}]}),['E2S3','W1N1']);
@@ -111,6 +111,44 @@ assert.equal(summarizeWorldBuildability({best:{blueprint:{
   complete:true,structureRequired:86,structureFit:87,roadFitRatio:0.8
 },layout:{hubReady:true,labReady:true}}}).status,'unverified',
 'Impossible fit > required must fail closed');
+
+
+const observedRivals=(overrides={})=>({neighborhood:{
+  hostileOwned:0.5,hostileReserved:1.4,opponentStrengthPenalty:769,
+  keeperPressure:0,directHostileRooms:0,directReservedRooms:0,
+  details:[{room:'W35N11',kind:'owned-by-other',distance:2,rcl:8,
+    activityObserved:true},{room:'W36N13',kind:'reserved-by-other',
+    distance:2,rcl:0,activityObserved:true}],...overrides}});
+assert.deepEqual(summarizeWorldThreatExposure(observedRivals()),{
+  status:'review',hostileOwnedPressure:0.5,hostileReservedPressure:1.4,
+  opponentStrengthPenalty:769,keeperPressure:0,
+  directHostileRooms:0,directReservedRooms:0,
+  nearestOwnedRival:{room:'W35N11',distance:2,rcl:8,activityObserved:true},
+  needsReview:true
+},'Nearby enemy RCL8 must be displayed without changing ranking');
+const clearExposure=summarizeWorldThreatExposure(observedRivals({
+  hostileOwned:0,hostileReserved:0,opponentStrengthPenalty:0,
+  keeperPressure:0,details:[]
+}));
+assert.equal(clearExposure.status,'clear','No measured pressure is only an observed clear signal');
+assert.equal(clearExposure.nearestOwnedRival,null);
+assert.equal(summarizeWorldThreatExposure(observedRivals({
+  hostileOwned:0,hostileReserved:0,opponentStrengthPenalty:0,
+  keeperPressure:1,details:[]})).status,'review','Keeper pressure triggers review');
+assert.equal(summarizeWorldThreatExposure(observedRivals({
+  hostileOwned:0,hostileReserved:0,opponentStrengthPenalty:0,
+  directHostileRooms:1,details:[]})).status,'review','Direct hostile counts trigger review');
+assert.equal(summarizeWorldThreatExposure(observedRivals({
+  details:[{room:'W35N11',kind:'owned-by-other',distance:2,rcl:8},
+    {room:'W36N11',kind:'owned-by-other',distance:1,rcl:6}]}))
+    .nearestOwnedRival.room,'W36N11','Nearest rival wins regardless of RCL');
+for(const invalid of [null,{},observedRivals({hostileOwned:-1}),
+  observedRivals({hostileOwned:NaN}),observedRivals({directHostileRooms:0.5}),
+  observedRivals({details:null}),observedRivals({keeperPressure:Infinity})]){
+  const signal=summarizeWorldThreatExposure(invalid);
+  assert.equal(signal.status,'unverified','Unknown/inconsistent threat evidence fails closed');
+  assert.equal(signal.needsReview,true);
+}
 
 const fallback = fallbackProbeRooms(null,24);
 assert.equal(fallback.length,24,'unknown world size must yield bounded fallback');
