@@ -127,6 +127,64 @@ export function summarizeLiveWorldConstructionSites(objects,myUserId) {
     progressRemaining:progressComplete?total-completed:null};
 }
 
+/**
+ * The journal's droppedThroughSeq is a *historical high-water mark*, not
+ * evidence that every later record is missing. A fresh 100-tick window can
+ * be proven only when all retained record sequence numbers after the last
+ * discarded one are contiguous through nextSeq - 1 and their ticks are
+ * monotonic. Begin one tick AFTER the first retained record to avoid an
+ * undetectable same-tick drop before that record.
+ *
+ * This proves event-journal retention, not the absence of unjournaled actions
+ * or runtime failures on ticks older than the new evidence window.
+ */
+export function assessRetainedWorldWindow(journal,sessionTick,currentTick) {
+  const gap=Number(journal?.droppedThroughSeq);
+  const valid=(n)=>Number.isSafeInteger(n)&&n>=0;
+  if(!valid(gap))return {status:'UNKNOWN',reason:'INVALID_JOURNAL_GAP_MARKER',
+    historicalRetentionGap:false,startTick:null,observedTicks:null};
+  if(gap===0)return {
+    status:'COMPLETE',reason:'FULL_SESSION_RETENTION',
+    historicalRetentionGap:false,
+    startTick:valid(sessionTick)&&sessionTick>0?sessionTick:null,
+    observedTicks:valid(sessionTick)&&valid(currentTick)&&currentTick>=sessionTick
+      ?currentTick-sessionTick:null
+  };
+  const incomplete=(reason,extra={})=>({
+    status:'INCOMPLETE',reason,historicalRetentionGap:true,
+    startTick:null,observedTicks:null,...extra
+  });
+  const events=journal?.events,snapshots=journal?.snapshots;
+  const end=journal?.nextSeq;
+  if(journal?.modelVersion!==1||!valid(end)||end<=gap||
+     !Array.isArray(events)||!Array.isArray(snapshots)||
+     !valid(sessionTick)||!valid(currentTick))
+    return incomplete('JOURNAL_SEQUENCE_METADATA_UNVERIFIED');
+  const records=events.concat(snapshots)
+    .filter(r=>valid(r?.q)&&r.q>gap)
+    .sort((a,b)=>a.q-b.q);
+  if(!records.length||records[0].q!==gap+1||
+     records.at(-1).q!==end-1)
+    return incomplete('JOURNAL_RECENT_SEQUENCE_INCOMPLETE');
+  let prevTick=-1;
+  for(let i=0;i<records.length;i++) {
+    const record=records[i];
+    if(record.q!==gap+1+i ||!valid(record.t) ||
+       record.t<prevTick||record.t>currentTick)
+      return incomplete('JOURNAL_RECENT_RECORD_ORDER_OR_TICK_INVALID');
+    prevTick=record.t;
+  }
+  const startTick=Math.max(sessionTick,records[0].t+1);
+  return {
+    status:'COMPLETE',
+    reason:'CONTIGUOUS_POST_RETENTION_WINDOW',
+    historicalRetentionGap:true,
+    startTick,
+    observedTicks:currentTick>=startTick?currentTick-startTick:null,
+    verifiedRecordCount:records.length
+  };
+}
+
 export function assessWorldStartup({
   account,world,branches,roomStatus,roomObjects,
   bot,stats,nowVerified
@@ -171,20 +229,34 @@ export function assessWorldStartup({
     Number.isInteger(statTick)&&statTick>=sessionStart
       ?statTick-sessionStart:null;
   const minTick=Number.isInteger(sessionStart)?sessionStart+100:null;
+  const retainedWindow=assessRetainedWorldWindow(journal,sessionStart,statTick);
+  const verifiedStart=retainedWindow.status==='COMPLETE'?
+    retainedWindow.startTick:null;
+  const requiredSnapshotTick=Number.isInteger(verifiedStart)?
+    verifiedStart+100:null;
   if(elapsed===null||elapsed<100)
     missing.push('HUNDRED_REAL_WORLD_TICKS_NOT_OBSERVED');
+  if(retainedWindow.status!=='COMPLETE')
+    missing.push('TELEMETRY_RETENTION_GAP_UNVERIFIED');
+  else if(retainedWindow.historicalRetentionGap){
+    warnings.push('HISTORICAL_TELEMETRY_PRUNED_ROLLING_WINDOW_VERIFIED');
+    if(retainedWindow.observedTicks===null||retainedWindow.observedTicks<100)
+      missing.push('CONTIGUOUS_RECENT_100T_WINDOW_NOT_YET_OBSERVED');
+  }
   const statusRecords=Number.isInteger(sessionStart)?
     snapshots.filter(s=>s?.c==='STATUS_SNAPSHOT'&&
       Number.isInteger(s?.t)&&s.t>=sessionStart&&
       s.t<=statTick&&s.x&&typeof s.x==='object' &&
       s.x.rooms&&typeof s.x.rooms[ROOM]==='object')
       .sort((a,b)=>a.t-b.t):[];
-  const after100=Number.isInteger(minTick)
-    ?latestRecord(statusRecords,'STATUS_SNAPSHOT',minTick):null;
+  // Use a current fully-retained 100T window if older journal records
+  // were pruned. No fresh snapshot means no green health receipt.
+  const after100=Number.isInteger(requiredSnapshotTick)
+    ?latestRecord(statusRecords,'STATUS_SNAPSHOT',requiredSnapshotTick):null;
   if(!after100)missing.push('POST_100T_ROOM_STATUS_SNAPSHOT_MISSING');
-  const during=Number.isInteger(sessionStart)?
+  const during=Number.isInteger(verifiedStart)?
     allEvents.filter(e=>Number.isInteger(e?.t)&&
-      e.t>=sessionStart&&e.t<=statTick):[];
+      e.t>=verifiedStart&&e.t<=statTick):[];
   const fatal=during.filter(e=>e?.l==='FATAL'||e?.c==='MAIN_FATAL');
   const bucketEvents=during.filter(e=>e?.c==='CPU_BUCKET_CRITICAL');
   const startupBucketEvents=Number.isInteger(minTick)?
@@ -201,9 +273,8 @@ export function assessWorldStartup({
     (fatalCodes.has(e?.c)&&e?.c!=='CPU_BUCKET_CRITICAL'))
     .map(e=>e.c).filter(Boolean);
   if(otherErrors.length)warnings.push('GAMEPLAY_ERROR_EVENTS_PRESENT');
-  if(Number(journal?.droppedThroughSeq)>0)
-    missing.push('TELEMETRY_RETENTION_GAP_UNVERIFIED');
-  const cpuSamples=statusRecords.map(s=>({
+  const cpuSamples=statusRecords.filter(s=>
+    Number.isInteger(verifiedStart)&&s.t>=verifiedStart).map(s=>({
     tick:s.t,cpu:Number(s.x.cpu),bucket:Number(s.x.bucket)
   }));
   if(after100&&(!Number.isFinite(Number(after100.x.cpu))||
@@ -211,7 +282,7 @@ export function assessWorldStartup({
     failures.push('CPU_SNAPSHOT_INVALID');
   // The post-warmup 100T window is authoritative. Never hide an ongoing
   // bucket emergency by averaging it with older pre-warmup observations.
-  if(cpuSamples.some(s=>s.tick>=minTick&&
+  if(cpuSamples.some(s=>s.tick>=requiredSnapshotTick&&
       Number.isFinite(s.bucket)&&s.bucket<1000))
     failures.push('OBSERVED_POST_STARTUP_CRITICAL_BUCKET');
   const currentBucket=Number(stats?.bucket);
@@ -260,6 +331,11 @@ export function assessWorldStartup({
     sessionTick:Number.isInteger(sessionStart)&&sessionStart>0?sessionStart:null,
     currentTick:Number.isInteger(statTick)&&statTick>0?statTick:null,
     observedTicks:elapsed,latestRoomSnapshotTick:after100?.t||null,
+    verifiedWindowStartTick:Number.isInteger(verifiedStart)?verifiedStart:null,
+    verifiedWindowObservedTicks:retainedWindow.observedTicks,
+    verifiedWindowReason:retainedWindow.reason,
+    historicalTelemetryPruned:retainedWindow.historicalRetentionGap,
+    verifiedJournalRecordCount:retainedWindow.verifiedRecordCount??null,
     rcl:latestRoom?.rcl??null,roles,spawnBusy:spawning,
     infrastructureProgress:growth,
     liveConstructionSites:liveConstruction,
