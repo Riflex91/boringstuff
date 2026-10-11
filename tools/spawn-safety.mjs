@@ -167,6 +167,20 @@ export async function verifyInitialSpawnTarget({
     checks.push(check('world-branch-present', false, { branchName: branch, error: String(err?.message || err) }, requireBranchPresent ? 'error' : 'warning'));
   }
 
+  if (requireWorldCodeReady) {
+    try {
+      const payload = await api._request('GET', '/api/user/code', { branch });
+      const modules = payload?.modules;
+      const main = typeof modules?.main === 'string' && modules.main.trim().length > 10;
+      const config = typeof modules?.config === 'string' && /VERSION\s*:/.test(modules.config);
+      checks.push(check('world-code-ready', main && config,
+        { branchName: branch, mainModulePresent: main, configModulePresent: config }));
+    } catch (err) {
+      checks.push(check('world-code-ready', false,
+        { branchName: branch, error: String(err?.message || err) }));
+    }
+  }
+
   const failures = checks.filter(c => c.severity === 'error' && !c.pass);
   const warnings = checks.filter(c => c.severity === 'warning' && !c.pass);
   return {
