@@ -86,12 +86,16 @@ export function summarizeWorldRcl2Growth(statusRecords) {
  */
 export function summarizeLiveWorldConstructionSites(objects,myUserId) {
   const empty={status:'UNKNOWN',ownedCount:null,
-    byType:null,unknownOwnerCount:null,foreignCount:null};
+    byType:null,unknownOwnerCount:null,foreignCount:null,
+    progressEvidence:'UNKNOWN',knownProgressSites:null,
+    unknownProgressSites:null,progressCompleted:null,
+    progressTotal:null,progressRemaining:null};
   if(!Array.isArray(objects)||!myUserId)return empty;
   const types=['extension','container','road','tower','spawn'];
   const totals=Object.fromEntries(types.map(x=>[x,0]));
   totals.other=0;
   let count=0,unknown=0,foreign=0;
+  let progressKnown=0,progressUnknown=0,completed=0,total=0;
   for(const o of objects) {
     if(o?.type!=='constructionSite')continue;
     if(!o.user){unknown++;continue;}
@@ -99,10 +103,28 @@ export function summarizeLiveWorldConstructionSites(objects,myUserId) {
     count++;
     if(types.includes(o.structureType))totals[o.structureType]++;
     else totals.other++;
+    // Individual live sites can omit progress fields in some API views.
+    // Never interpret absent data as zero completed construction work.
+    const good=Number.isSafeInteger(o.progress)&&o.progress>=0 &&
+      Number.isSafeInteger(o.progressTotal)&&o.progressTotal>0 &&
+      o.progress<=o.progressTotal &&
+      Number.isSafeInteger(completed+o.progress) &&
+      Number.isSafeInteger(total+o.progressTotal);
+    if(good){
+      progressKnown++;
+      completed+=o.progress;
+      total+=o.progressTotal;
+    }else progressUnknown++;
   }
+  const progressComplete=progressUnknown===0 && unknown===0;
   return {status:unknown?'PARTIAL':'VERIFIED',
     ownedCount:count,byType:totals,
-    unknownOwnerCount:unknown,foreignCount:foreign};
+    unknownOwnerCount:unknown,foreignCount:foreign,
+    progressEvidence:progressComplete?'VERIFIED':'PARTIAL',
+    knownProgressSites:progressKnown,unknownProgressSites:progressUnknown,
+    progressCompleted:progressComplete?completed:null,
+    progressTotal:progressComplete?total:null,
+    progressRemaining:progressComplete?total-completed:null};
 }
 
 export function assessWorldStartup({
