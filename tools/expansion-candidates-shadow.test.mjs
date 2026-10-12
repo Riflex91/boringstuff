@@ -2,7 +2,12 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {createRequire} from 'node:module';
+import Module from 'node:module';
 
+// Runtime requires game modules by Screeps module name; resolve the same
+// names in Node24 now that the candidate scorer has a module dependency.
+process.env.NODE_PATH=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../game');
+Module._initPaths();
 const require=createRequire(import.meta.url);
 const inspect=require('../game/expansion.candidates.shadow.js');
 const readiness={authority:'SHADOW',status:'PLANNING_CANDIDATE',
