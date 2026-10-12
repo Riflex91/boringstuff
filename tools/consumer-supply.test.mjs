@@ -313,77 +313,130 @@ const energy = require('../game/energy.js');
     'rescue should not force an underfilled hauler into normal delivery mode');
 }
 
-// Once a reserved target is fully supplied, the reservation and fallback state
-// are cleared immediately so the hauler can take a different request next tick.
+// Accepted OK is NOT an engine-settled delivery. A reserved target must
+// retain its waiting/fallback state and sticky assignment until a subsequent
+// consumer turn sees energy in its actual store.
 {
+  const roleWorker = require('../game/role.worker.js');
   const target = makeConsumer('worker-full-after', 'worker', 0, 7, true, 2);
+  target.memory.working = false;
   const hauler = makeHauler('hauler-fill');
   hauler.memory.consumerTargetId = target.id;
-  hauler.transfer = (consumer) => {
-    consumer.store.energy = 100;
-    return OK;
-  };
+  hauler.transfer = () => OK; // no simulated engine settlement yet
   room.creeps = [target, hauler];
 
+  Game.time = 1000;
   assert.equal(energy.deliverToConsumer(hauler), true);
-  assert.equal(hauler.memory.consumerTargetId, undefined);
+  assert.equal(hauler.memory.consumerTargetId, target.id);
+  assert.equal(target.store.energy, 0);
+  assert.equal(target.memory.waitingEnergyTicks, 7);
+  assert.equal(target.memory.logisticsFallback, true);
+  assert.equal(target.memory.lastHaulerIntentTick, 1000);
+  assert.equal(energy.isCriticalConsumerRequest(target), true);
+  assert.equal(roleWorker._test.needsEnergy(target), true,
+    'same-tick accepted intent must not restart empty consumer');
+
+  // Screeps applies the transfer only between ticks.
+  Game.time = 1001;
+  target.store.energy = 100;
+  assert.equal(roleWorker._test.needsEnergy(target), false);
+  assert.equal(target.memory.working, true);
   assert.equal(target.memory.waitingEnergyTicks, 0);
   assert.equal(target.memory.logisticsFallback, false);
+  assert.equal(target.memory.lastHaulerIntentTick, undefined);
+  assert.equal(energy._test.currentConsumerTarget(hauler), null);
+  assert.equal(hauler.memory.consumerTargetId, undefined);
 }
 
-
-// A partial hauler transfer is usable energy. The consumer should resume work
-// on its next turn instead of waiting until the entire CARRY store is full.
+// A partial settled load remains usable without allowing accepted intents to
+// erase an unresolved critical request in the current tick.
 {
   const roleWorker = require('../game/role.worker.js');
   const target = makeConsumer('builder-partial-hauler', 'builder', 0, 6, false, 2);
   target.memory.working = false;
   const hauler = makeHauler('hauler-partial');
-  hauler.transfer = (consumer) => {
-    consumer.store.energy = 30;
-    return OK;
-  };
+  hauler.transfer = () => OK;
   room.creeps = [target, hauler];
 
-  Game.time = 1000;
+  Game.time = 1002;
   assert.equal(energy.deliverToConsumer(hauler), true);
-  assert.equal(target.store.energy, 30);
-  assert.equal(target.memory.lastHaulerDeliveryTick, 1000);
+  assert.equal(target.memory.waitingEnergyTicks, 6);
+  assert.equal(target.store.energy, 0);
+  assert.equal(target.memory.lastHaulerIntentTick, 1002);
 
-  Game.time = 1001;
+  Game.time = 1003;
+  target.store.energy = 30; // next-tick actual store, not transfer() return
   assert.equal(roleWorker._test.needsEnergy(target), false);
   assert.equal(target.memory.working, true);
   assert.equal(target.memory.waitingEnergyTicks, 0);
-  assert.equal(target.memory.lastHaulerDeliveryTick, undefined);
+  assert.equal(target.memory.lastHaulerIntentTick, undefined);
+  assert.equal(energy.consumerNeedsDelivery(target), false);
 }
 
-// A successful partial hauler delivery must end self-supply fallback
-// immediately. Otherwise a nearly-full consumer stays falsely critical and
-// self-harvests again after spending the delivered energy.
+// Even after a partially settled load, a fallback consumer must stop
+// self-harvest once productive energy is visibly available on a later turn.
 {
   const roleWorker = require('../game/role.worker.js');
   const target = makeConsumer('upgrader-partial-fallback-clear', 'upgrader', 0, 0, true, 2);
   target.memory.working = false;
   const hauler = makeHauler('hauler-partial-fallback-clear');
-  hauler.transfer = (consumer) => {
-    consumer.store.energy = 95;
-    return OK;
-  };
+  hauler.transfer = () => OK;
   room.creeps = [target, hauler];
 
-  Game.time = 1002;
-  assert.equal(energy.isCriticalConsumerRequest(target), true);
+  Game.time = 1004;
   assert.equal(energy.deliverToConsumer(hauler), true);
-  assert.equal(target.store.energy, 95);
-  assert.equal(target.memory.logisticsFallback, false);
-  assert.equal(target.memory.waitingEnergyTicks, 0);
-  assert.equal(target.memory.lastHaulerDeliveryTick, 1002);
-  assert.equal(energy.consumerNeedsDelivery(target), false);
-  assert.equal(energy.isCriticalConsumerRequest(target), false);
-
-  Game.time = 1003;
+  assert.equal(target.memory.logisticsFallback, true);
+  assert.equal(energy.isCriticalConsumerRequest(target), true);
+  Game.time = 1005;
+  target.store.energy = 95;
   assert.equal(roleWorker._test.needsEnergy(target), false);
-  assert.equal(target.memory.working, true);
+  assert.equal(target.memory.logisticsFallback, false);
+  assert.equal(energy.isCriticalConsumerRequest(target), false);
+}
+
+// An accepted intent which never executes must not clear starvation or
+// fabricate productive partial energy, even when the hint becomes stale.
+{
+  const roleWorker = require('../game/role.worker.js');
+  const target = makeConsumer('builder-unsatisfied-intent', 'builder', 0, 4, true, 2);
+  target.memory.working = false;
+  const hauler = makeHauler('hauler-unsatisfied-intent');
+  hauler.transfer = () => OK;
+  room.creeps = [target, hauler];
+  Game.time = 1006;
+  assert.equal(energy.deliverToConsumer(hauler), true);
+  Game.time = 1007;
+  assert.equal(roleWorker._test.needsEnergy(target), true);
+  assert.equal(target.memory.logisticsFallback, true);
+  assert.equal(target.memory.waitingEnergyTicks, 4);
+  assert.equal(hauler.memory.consumerTargetId, target.id);
+  Game.time = 1008;
+  target.store.energy = 30; // e.g. fallback harvest, not hauler receipt
+  assert.equal(roleWorker._test.needsEnergy(target), true,
+    'expired intent must not be misreported as a confirmed partial load');
+  assert.equal(target.memory.logisticsFallback, true);
+}
+
+// Two critical consumers retain separate sticky guards on accepted intents,
+// while the third delivery-ready hauler remains available for infrastructure.
+{
+  const a = makeConsumer('worker-unsettled-a', 'worker', 0, 4, false, 2);
+  const b = makeConsumer('upgrader-unsettled-b', 'upgrader', 0, 7, true, 6);
+  const h1 = makeHauler('hauler-unsettled-a', {[a.id]: 1, [b.id]: 8});
+  const h2 = makeHauler('hauler-unsettled-b', {[a.id]: 9, [b.id]: 1});
+  const reserve = makeHauler('hauler-infra-reserve');
+  h1.transfer = h2.transfer = () => OK;
+  room.creeps = [a, b, h1, h2, reserve];
+  Game.time = 1010;
+  assert.deepEqual(energy._test.selectConsumerGuardHaulers(room).map(h => h.id),
+    [h1.id, h2.id]);
+  assert.equal(energy.deliverToConsumer(h1, true), true);
+  assert.equal(energy.deliverToConsumer(h2, true), true);
+  assert.equal(h1.memory.consumerTargetId, a.id);
+  assert.equal(h2.memory.consumerTargetId, b.id);
+  assert.equal(reserve.memory.consumerTargetId, undefined);
+  assert.equal(energy.isCriticalConsumerRequest(a), true);
+  assert.equal(energy.isCriticalConsumerRequest(b), true);
 }
 
 // Partial energy without an explicit hauler-delivery marker must not resume
