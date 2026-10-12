@@ -46,8 +46,12 @@ function roadPath(room, from, to, budget) {
   let built = 0;
   for (const step of path) {
     if (budget.remaining <= 0) break;
+    // Do not auto-build 45,000-energy wall tunnels at RCL2 (or at higher
+    // RCL without an explicit route-ROI validator). Unlike place(), the old
+    // roadPath() bypassed terrain/buildability checks entirely.
+    // Walls are 150x plain-road cost; keep existing tunnel sites untouched.
+    if (!isBuildable(room, step.x, step.y)) continue;
     if (room.lookForAt(LOOK_STRUCTURES, step.x, step.y).some(s => s.structureType === STRUCTURE_ROAD)) continue;
-    if (room.lookForAt(LOOK_CONSTRUCTION_SITES, step.x, step.y).length) continue;
     const rc = room.createConstructionSite(step.x, step.y, STRUCTURE_ROAD);
     if (rc === OK) { built++; budget.remaining--; }
     if (rc === ERR_FULL) break;

@@ -24,7 +24,7 @@ const planner=require('../game/room.planner.js');
 
 function roomFixture({rcl=2,roads=8,existingExtensions=0,
   builtExtensions=0,sourceContainers=0,controllerContainer=false,
-  extraRoadProgress=0}={}) {
+  extraRoadProgress=0,roadPathSteps=[],wallTiles=[]}={}) {
   globalThis.Memory={bot:{logs:[],logDedupe:{}}};
   let sites=[],created=[],removed=[];
   let next=0;
@@ -62,7 +62,9 @@ function roomFixture({rcl=2,roads=8,existingExtensions=0,
   const room={
     name:'W37N11',
     controller:{my:true,pos:makePos(27,27)},
-    getTerrain(){return {get:()=>0};},
+    getTerrain(){return {get:(x,y)=>wallTiles.some(p=>p.x===x&&p.y===y)
+      ?TERRAIN_MASK_WALL:0};},
+    findPath(){return roadPathSteps;},
     lookForAt(kind,x,y){
       return (kind===LOOK_STRUCTURES?structures:sites).filter(o=>
         o.x===x&&o.y===y);
@@ -142,4 +144,29 @@ function count(f,type){return f.sites().filter(x=>x.structureType===type).length
  assert.equal(f.removed.at(-1).progress,100,
   'Prune least-progressed road sites first, preserving advanced sites longest');
 }
-console.log('RCL2 critical container/extension site reservation over legacy road backlog: PASS');
+// Once all required RCL2 economy structures are constructed, roadPath()
+ // must not bypass wall terrain checks and accidentally create 45k tunnels.
+{
+  const steps=[{x:14,y:13},{x:15,y:13},{x:16,y:13},{x:17,y:13}];
+  const f=roomFixture({roads:0,builtExtensions:5,sourceContainers:2,
+    controllerContainer:true,roadPathSteps:steps,
+    wallTiles:[{x:14,y:13},{x:16,y:13}]});
+  planner.plan(f.state);
+  assert.deepEqual(f.created.map(x=>[x.x,x.y,x.type]),
+    [[15,13,STRUCTURE_ROAD],[17,13,STRUCTURE_ROAD]],
+    'Never create a natural wall tunnel, but preserve normal road placement');
+  assert.equal(f.sites().length,2);
+  assert.equal(f.removed.length,0,'No existing useful site can be dropped');
+  planner.plan(f.state);
+  assert.equal(f.sites().length,2,'Road paths are idempotent when revisited');
+}
+// Never prune 45k partially built roads merely for being expensive.
+// A separate critical construction-site cap policy retains its own controls.
+{
+  const f=roomFixture({roads:3,builtExtensions:5,sourceContainers:2,
+    controllerContainer:true,extraRoadProgress:20000});
+  planner.plan(f.state);
+  assert.equal(f.removed.length,0);
+  assert.equal(count(f,STRUCTURE_ROAD),3);
+}
+console.log('RCL2 critical-site cap and no new wall-road tunnel construction: PASS');
