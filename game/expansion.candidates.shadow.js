@@ -2,6 +2,7 @@
 
 // Bounded, read-only I3 reconnaissance over actually observed I0 room intel.
 // Graph adjacency is NOT a pathfinder route or a valid claim/placement decision.
+const marginalScore = require('expansion.marginal.score.shadow');
 const SCHEMA_VERSION = 1;
 const ROOM_NAME = /^[WE][0-9]+[NS][0-9]+$/;
 const MAX_HOPS = 3;
@@ -72,7 +73,7 @@ function safeParent(state) {
 function evaluate(readiness, roomStates, game, memoryRoot) {
   const base = {schemaVersion:SCHEMA_VERSION,authority:'SHADOW',
     claimActionEnabled:false,placementEnabled:false,
-    routeVerified:false,selectedRoom:null,scoreModel:'bounded-intel-recon-v1',
+    routeVerified:false,selectedRoom:null,scoreModel:'observed-room-quality-empire-fit-v1',
     candidateCount:0,topCandidates:[],visitedRooms:0,
     unknownOrStaleRooms:0,frontierTruncated:false,reason:null};
   if (!readiness || readiness.authority !== 'SHADOW' ||
@@ -105,16 +106,22 @@ function evaluate(readiness, roomStates, game, memoryRoot) {
       continue;
     }
     if (node.hops>0 && safeClaimCandidate(record,tick)) {
-      const sourceCount=record.resources.sourceCount;
-      const mineralPresent=!!record.resources.mineral?.type;
-      const exits=Array.isArray(record.topology?.exits)
-        ? record.topology.exits.length : 0;
-      candidates.push({roomName:node.roomName,parentRoom:node.parent,
-        hops:node.hops,sourceCount,
-        reconScore:sourceCount*40-node.hops*15+
-          (mineralPresent?4:0)+Math.min(4,exits)*2,
+      const parentRecord = Object.prototype.hasOwnProperty.call(records,node.parent)
+        ? records[node.parent] : null;
+      const valuation = marginalScore.score(record,parentRecord,node.hops,
+        tick,readiness);
+      // Never rank candidates using fabricated economic or topology data.
+      // I3 still ranks SURVEYS only: no room route, safe tile or claim proof.
+      if (valuation) candidates.push({
+        roomName:node.roomName,parentRoom:node.parent,
+        hops:node.hops,sourceCount:record.resources.sourceCount,
+        reconScore:valuation.total,
+        roomQualityScore:valuation.roomQuality,
+        empireFitScore:valuation.empireFit,
+        marginalScoreEvidence:valuation,
         intelAge:tick-record.observation.lastSeenTick,
-        observationSource:record.observation.source});
+        observationSource:record.observation.source
+      });
     }
     if (node.hops>=MAX_HOPS || !safeTransit(record,node.hops===0) ||
         !Array.isArray(record.topology?.exits)) continue;
