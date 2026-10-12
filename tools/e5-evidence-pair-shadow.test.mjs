@@ -27,6 +27,7 @@ function deliveryWindow(){
   w.waitingConsumerTicksBeforeFirstReceipt=5;
   w.waitingEpisodeObservedStarts=2;
   w.firstConfirmedWaitingDeliveries=1;
+  w.firstReceiptWithoutUniqueLoadedSticky=1;
   w.sampledWaitingTicksToFirstDeliveryTotal=4;
   w.maxSampledWaitingTicksToFirstDelivery=4;
   w.waitingEpisodesStoppedWithoutObservedReceipt=0;
@@ -60,7 +61,11 @@ assert.deepEqual(report.confirmedConsumerDeliveryLowerBound,{
 });
 assert.deepEqual(report.observedWaiting,{
   consumerTicks:9,consumerTicksWithoutFirstReceipt:5,
-  episodesStillOpen:1,firstConfirmedReceipts:1
+  episodesStillOpen:1,firstConfirmedReceipts:1,
+  consumerTicksWithLoadedSticky:0,
+  firstReceiptsFromSameExclusiveLoadedSticky:0,
+  firstReceiptsFromDifferentHaulerThanExclusiveSticky:0,
+  firstReceiptsWithoutUniqueLoadedSticky:1
 });
 assert.equal(report.routeAttributableCpuPerTick,null);
 assert.equal(report.fullRouteEnergyPerTick,null);
@@ -78,6 +83,7 @@ assert.equal(JSON.stringify({cpu,delivery}),original,
   d.confirmedConsumerEnergyPerTickLowerBound=0;
   d.ticksWithConfirmedConsumerDelivery=0;
   d.confirmedFirstDeliveryForPreviouslyWaitingConsumers=0;
+  d.firstConfirmedReceiptWithoutUniqueLoadedSticky=0;
   const p=pair.assess('E1N1',1099,cpu,d);
   assert.equal(p.status,'ALIGNED_OBSERVATION');
   assert.equal(p.confirmedConsumerDeliveryLowerBound.energy,0);
@@ -153,6 +159,9 @@ const badDelivery=[
   ['invented mean consumer energy',x=>x.confirmedConsumerEnergyPerTickLowerBound=99],
   ['events but no delivery ticks',x=>x.ticksWithConfirmedConsumerDelivery=0],
   ['invalid waiting sum',x=>x.observedWaitingConsumerTicksBeforeFirstReceipt=10],
+  ['fake sticky coverage',x=>x.observedWaitingConsumerTicksWithLoadedSticky=10],
+  ['inconsistent sticky receipt attribution',
+    x=>x.firstConfirmedReceiptFromSameExclusiveLoadedSticky=2],
   ['invalid open episodes',x=>x.openWaitingEpisodesWithoutConfirmedReceiptAtWindowEnd=2],
   ['missing open episode field',x=>{delete x.openWaitingEpisodesAtWindowEnd;}],
   ['claimed service success',x=>x.waitingServiceSuccessRate=1],
