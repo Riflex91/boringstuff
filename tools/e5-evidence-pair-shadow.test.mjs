@@ -39,6 +39,7 @@ function deliveryWindow(){
   return result;
 }
 const cpu=cpuWindow(),delivery=deliveryWindow();
+assert.equal(delivery.waitingObservationPhase,'BEFORE_CREEP_INTENTS');
 assert.equal(pair._test.validCpu(cpu),true);
 assert.equal(pair._test.validDelivery(delivery,'E1N1'),true);
 const original=JSON.stringify({cpu,delivery});
@@ -141,6 +142,7 @@ const badDelivery=[
   ['wrong room',x=>x.room='E9N9'],
   ['wrong authority',x=>x.authority='ACTIVE'],
   ['wrong schema',x=>x.schemaVersion=2],
+  ['wrong waiting phase',x=>x.waitingObservationPhase='AFTER_CREEP_INTENTS'],
   ['invalid event shift',x=>x.startEventTick=1000],
   ['malformed end event',x=>x.endEventTick=1099],
   ['fake duration',x=>x.observedTicks=99],
