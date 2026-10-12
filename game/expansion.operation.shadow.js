@@ -5,6 +5,7 @@
 // validated spawn tile. State is tiny, restart-safe and server independent.
 const candidates = require('expansion.candidates.shadow');
 const siteEvidence = require('expansion.site.shadow');
+const parentSupport = require('expansion.parent.support.shadow');
 const SCHEMA_VERSION = 1;
 const INTEL_MAX_AGE = 150;
 const MAX_ROUTE_HOPS = 3;
@@ -118,15 +119,7 @@ function roomRoute(game, rooms, from, to, tick) {
 function supportBudget(states, parent) {
   const state = (Array.isArray(states) ? states : [])
     .find(s => s && s.room && s.room.name === parent);
-  if (!test.safeParent(state)) return 'PARENT_NOT_STABLE';
-  const capacity = state.energyCapacityAvailable;
-  if (!Number.isFinite(capacity) || capacity < 650)
-    return 'CLAIMER_ENERGY_CAPACITY_INSUFFICIENT';
-  const reserve = state.energyStored;
-  if (!Number.isFinite(reserve) ||
-      reserve < Math.max(3000, capacity * 3))
-    return 'PARENT_SUPPORT_RESERVE_INSUFFICIENT';
-  return null;
+  return parentSupport.assess(state).reason;
 }
 
 function evaluate(readiness, advisory, roomStates, game, memoryRoot) {
@@ -238,6 +231,23 @@ function evaluate(readiness, advisory, roomStates, game, memoryRoot) {
     state.phase = 'AWAITING_TILE_VALIDATION';
     state.reason = 'TILE_PATH_AND_SPAWN_SITE_NOT_VERIFIED';
     return result(state);
+  }
+  // Support can collapse AFTER an earlier valid route/site observation.
+  // Revoke the geometric advisory when the live parent has insufficient
+  // infrastructure energy, mining redundancy, or active consumer starvation.
+  // Recovery requires another full support check and site path validation.
+  if (state.phase === 'AWAITING_TILE_VALIDATION' ||
+      state.phase === 'SITE_VERIFIED_ADVISORY') {
+    const supportReason = supportBudget(roomStates, choice.parentRoom);
+    if (supportReason) {
+      state.phase = 'SUPPORT_CHECK';
+      state.verifiedSite = null;
+      state.siteVerifiedTick = null;
+      state.pathCost = null;
+      state.siteCursor = 0;
+      state.reason = supportReason;
+      return result(state);
+    }
   }
   if (state.phase === 'SITE_VERIFIED_ADVISORY' &&
       (!Number.isSafeInteger(state.siteVerifiedTick) ||
