@@ -13,19 +13,29 @@ function needsEnergy(creep) {
     creep.memory.logisticsFallback = false;
     creep.memory.waitingEnergyTicks = 0;
     delete creep.memory.lastHaulerIntentTick;
+    delete creep.memory.lastHaulerIntentEnergy;
   }
 
-  // A hauler intent alone is not a settled receipt. Only actual positive
-  // CARRY on a consumer turn can use this short-lived intent hint to resume
-  // partial-load work. Self-harvest without such a hint still fills first.
+  // An accepted transfer intent cannot settle until the NEXT game tick.
+  // The consumer may already carry partial self-harvest energy, or may act
+  // later in the same tick after the hauler. Neither is a delivery receipt.
+  // Resume partial-load work only after a full tick boundary and a measured
+  // net increase over the store at intent time. This is a productivity hint,
+  // not source attribution: E5 Room.getEventLog() is the settlement witness.
   if (!creep.memory.working && (creep.store[RESOURCE_ENERGY] || 0) > 0) {
-    const deliveredTick = Number(creep.memory.lastHaulerIntentTick);
-    const now = typeof Game !== 'undefined' && Number.isFinite(Game.time) ? Game.time : null;
-    if (Number.isFinite(deliveredTick) && now !== null && now - deliveredTick >= 0 && now - deliveredTick <= 1) {
+    const intentTick = creep.memory.lastHaulerIntentTick;
+    const energyBefore = creep.memory.lastHaulerIntentEnergy;
+    const now = typeof Game !== 'undefined' && Number.isSafeInteger(Game.time)
+      ? Game.time : null;
+    if (now !== null && Number.isSafeInteger(intentTick) &&
+        now - intentTick === 1 &&
+        Number.isSafeInteger(energyBefore) && energyBefore >= 0 &&
+        (creep.store[RESOURCE_ENERGY] || 0) > energyBefore) {
       creep.memory.working = true;
       creep.memory.waitingEnergyTicks = 0;
       creep.memory.logisticsFallback = false;
       delete creep.memory.lastHaulerIntentTick;
+      delete creep.memory.lastHaulerIntentEnergy;
     }
   }
   return !creep.memory.working;
