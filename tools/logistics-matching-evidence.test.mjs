@@ -211,4 +211,89 @@ function state(overrides = {}) {
   assert.equal(summary.criticalCandidateUnmatchedTicks, 1);
 }
 
+// Release-grade windows require exactly 100 distinct, consecutive game ticks.
+// Repeated calls may happen through multiple process schedulers or replay.
+{
+  const memory={};
+  let observed=evidence.observe(state(),memory,{time:1000});
+  assert.equal(observed.current.ticks,1);
+  for(let i=0;i<200;i++){
+    observed=evidence.observe(state(),memory,{time:1000});
+    assert.equal(observed.completed,null,'Duplicate ticks cannot complete a window');
+    assert.equal(observed.current.ticks,1);
+  }
+  for(let t=1001;t<=1099;t++) observed=evidence.observe(state(),memory,{time:t});
+  assert.equal(observed.completed.ticks,100);
+  assert.equal(observed.completed.startTick,1000);
+  assert.equal(observed.completed.endTick,1099);
+  for(let i=0;i<3;i++){
+    const repeat=evidence.observe(state(),memory,{time:1099});
+    assert.equal(repeat.completed,null,'100th tick replay cannot begin another window');
+    assert.equal(repeat.lastWindow.endTick,1099);
+    assert.equal(memory.bot.logisticsMatchingEvidence.rooms.E1N1.window.ticks,0);
+  }
+  const next=evidence.observe(state(),memory,{time:1100});
+  assert.equal(next.completed,null);
+  assert.equal(next.current.ticks,1);
+  assert.equal(next.current.startTick,1100);
+}
+{
+  const memory={};
+  let result=null;
+  for(let t=2000;t<=2049;t++) result=evidence.observe(state(),memory,{time:t});
+  assert.equal(result.current.ticks,50);
+  // One skipped observation invalidates the prior 50 actual observations.
+  result=evidence.observe(state(),memory,{time:2051});
+  assert.equal(result.current.startTick,2051);
+  assert.equal(result.current.ticks,1);
+  assert.equal(result.completed,null);
+  for(let t=2052;t<=2149;t++) result=evidence.observe(state(),memory,{time:t});
+  assert.equal(result.completed,null);
+  result=evidence.observe(state(),memory,{time:2150});
+  assert.equal(result.completed.ticks,100);
+  assert.equal(result.completed.startTick,2051);
+  assert.equal(result.completed.endTick,2150);
+  assert.equal(result.completed.endTick-result.completed.startTick,99);
+}
+{
+  const memory={};
+  let result=null;
+  for(let t=3000;t<=3099;t++) result=evidence.observe(state(),memory,{time:t});
+  assert.ok(result.completed);
+  // Server simulation rewind clears stale completed history and starts fresh.
+  result=evidence.observe(state(),memory,{time:2000});
+  assert.equal(result.lastWindow,null);
+  assert.equal(result.current.ticks,1);
+  assert.equal(result.current.startTick,2000);
+  result=evidence.observe(state(),memory,{time:1999});
+  assert.equal(result.lastWindow,null);
+  assert.equal(result.current.startTick,1999);
+  assert.equal(result.current.ticks,1);
+}
+{
+  const memory={bot:{logisticsMatchingEvidence:{schemaVersion:1,rooms:{
+    E1N1:{window:{startTick:7,ticks:99},lastWindow:{
+      startTick:1,endTick:100,ticks:100
+    }}
+  }}}};
+  const r=evidence.observe(state(),memory,{time:5000});
+  assert.equal(memory.bot.logisticsMatchingEvidence.schemaVersion,2);
+  assert.equal(r.current.ticks,1,'Migrate invalid count-only windows by reset');
+  assert.equal(r.lastWindow,null);
+  assert.equal(r.completed,null);
+  const room=memory.bot.logisticsMatchingEvidence.rooms.E1N1;
+  room.window.ticks=99;
+  room.window.lastObservedTick=50;
+  const repaired=evidence.observe(state(),memory,{time:5001});
+  assert.equal(repaired.current.ticks,1);
+  assert.equal(repaired.current.startTick,5001);
+  assert.equal(repaired.completed,null,
+    'Corrupted persistent tick counters cannot manufacture full windows');
+  const before=JSON.stringify(memory);
+  assert.deepEqual(evidence.observe(state(),memory,{time:NaN}),{
+    current:null,completed:null,lastWindow:null
+  });
+  assert.equal(JSON.stringify(memory),before,
+    'Invalid game time must not mutate telemetry Memory');
+}
 console.log('logistics matching evidence tests passed');
