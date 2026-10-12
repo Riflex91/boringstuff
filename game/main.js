@@ -16,6 +16,7 @@ const runtimeCapabilities = require('runtime.capabilities');
 const expansionReadinessShadow = require('expansion.readiness.shadow');
 const expansionCandidatesShadow = require('expansion.candidates.shadow');
 const expansionOperationShadow = require('expansion.operation.shadow');
+const expansionBootstrapBudgetShadow = require('expansion.bootstrap.budget.shadow');
 const serverProfile = require('server.profile');
 const processScheduler = require('process.scheduler');
 const worldIntel = require('world.intel');
@@ -149,6 +150,10 @@ function statusSnapshot(roomStates, tickCpu) {
     expansionReadiness,roomStates,Game,Memory);
   const expansionOperation = expansionOperationShadow.evaluate(
     expansionReadiness,expansionCandidates,roomStates,Game,Memory);
+  const expansionParent = roomStates.find(state => state?.room?.name ===
+    expansionOperation.parentRoom) || null;
+  const expansionBootstrapBudget = expansionBootstrapBudgetShadow.assess(
+    expansionReadiness,expansionOperation,expansionParent);
   const schedulerState = processScheduler.snapshot();
   const worldIntelState = worldIntel.snapshot();
   const transitEvidence = defenseTransitEvidence.snapshot(Game, Memory);
@@ -216,6 +221,7 @@ function statusSnapshot(roomStates, tickCpu) {
     expansionReadiness,
     expansionCandidates,
     expansionOperation,
+    expansionBootstrapBudget,
     serverProfile: profile,
     scheduler: schedulerState,
     worldIntel: worldIntelState,
