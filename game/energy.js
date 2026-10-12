@@ -245,7 +245,8 @@ function selectConsumerRescueHauler(room, haulers, ready, critical) {
     h,
     requests: urgent.filter(c => !haulers.some(other =>
       other.id !== h.id && other.memory &&
-      other.memory.consumerTargetId === c.id))
+      other.memory.consumerTargetId === c.id &&
+      energyAmount(other) > 0))
   })).filter(x => x.requests.length);
   viable.sort((a, b) => {
     const sticky = x => x.requests.some(c => c.id === x.h.memory.consumerTargetId) ? 1 : 0;
@@ -358,7 +359,18 @@ function consumerReservations(creep) {
   const haulers = creep.room.find(FIND_MY_CREEPS, {
     filter: c => c.id !== creep.id && !c.spawning && c.memory && c.memory.role === 'hauler' && c.memory.consumerTargetId
   });
-  for (const hauler of haulers) reserved[hauler.memory.consumerTargetId] = true;
+  for (const hauler of haulers) {
+    // A depleted hauler cannot honor a sticky delivery reservation. Creep
+    // execution order may let a different ready hauler run before the empty
+    // carrier clears its own target in role.hauler. Reclaim the stale claim
+    // now, before assigning an actual deliverable hauler; never allow two
+    // live energy-carrying haulers to reserve the same consumer.
+    if (energyAmount(hauler) <= 0) {
+      delete hauler.memory.consumerTargetId;
+      continue;
+    }
+    reserved[hauler.memory.consumerTargetId] = true;
+  }
   return reserved;
 }
 
