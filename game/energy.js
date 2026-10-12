@@ -81,8 +81,20 @@ function acquireForHauler(creep) {
   if (dropped) {
     const rc = creep.pickup(dropped);
     consumerSupplyObserver.recordResult(creep, 'haulerAcquisition', rc);
-    if (rc === ERR_NOT_IN_RANGE) creep.moveTo(dropped, { reusePath: 8, maxOps: config.PATH_MAX_OPS, visualizePathStyle: { stroke: '#ffaa00' } });
-    return true;
+    if (rc === ERR_NOT_IN_RANGE) {
+      const moveRc = creep.moveTo(dropped, {
+        reusePath: 8, maxOps: config.PATH_MAX_OPS,
+        visualizePathStyle: { stroke: '#ffaa00' }
+      });
+      if (moveRc !== ERR_NO_PATH && moveRc !== ERR_INVALID_TARGET)
+        return true;
+    } else if (rc !== ERR_NOT_ENOUGH_RESOURCES &&
+               rc !== ERR_INVALID_TARGET) {
+      return true;
+    }
+    // A permanently unreachable or stale drop cannot hold a hauler idle.
+    // Fall through to an alternative source container or tombstone, never
+    // after an accepted pickup or a viable in-flight movement intent.
   }
 
   const containers = creep.room.find(FIND_STRUCTURES, {

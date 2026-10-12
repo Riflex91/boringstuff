@@ -1,0 +1,115 @@
+import assert from 'node:assert/strict';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
+import Module from 'node:module';
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+process.env.NODE_PATH = path.resolve(here, '../game');
+Module._initPaths();
+const require = createRequire(import.meta.url);
+
+global.RESOURCE_ENERGY = 'energy';
+global.FIND_DROPPED_RESOURCES = 10;
+global.FIND_TOMBSTONES = 11;
+global.FIND_STRUCTURES = 3;
+global.FIND_SOURCES = 4;
+global.STRUCTURE_CONTAINER = 'container';
+global.OK = 0;
+global.ERR_NOT_IN_RANGE = -9;
+global.ERR_NO_PATH = -2;
+global.ERR_INVALID_TARGET = -7;
+global.ERR_NOT_ENOUGH_RESOURCES = -6;
+global.ERR_BUSY = -4;
+
+const energy = require('../game/energy.js');
+const config = require('../game/config.js');
+const drop = {resourceType: RESOURCE_ENERGY, amount: 40};
+const container = {structureType: STRUCTURE_CONTAINER, store: {energy: 250}};
+const tomb = {store: {energy: 30}};
+const source = {pos: {getRangeTo() {return 1;}}};
+let present = {drop: true, container: true, tomb: true};
+const room = {
+  name: 'E1N1',
+  find(type, opts) {
+    const a = type === FIND_SOURCES ? [source] :
+      type === FIND_STRUCTURES ? (present.container ? [container] : []) : [];
+    return opts?.filter ? a.filter(opts.filter) : a;
+  }
+};
+let pickupRc = OK, moveRc = OK, withdrawRc = OK;
+let calls = [];
+const carrier = {
+  room, memory: {role: 'hauler'}, store: {energy: 0},
+  pos: {
+    findClosestByPath(targets, opts) {
+      if (opts) assert.equal(opts.maxOps, config.PATH_MAX_OPS);
+      const a = Array.isArray(targets) ? targets :
+        targets === FIND_DROPPED_RESOURCES ? (present.drop ? [drop] : []) :
+        targets === FIND_TOMBSTONES ? (present.tomb ? [tomb] : []) : [];
+      return (opts?.filter ? a.filter(opts.filter) : a)[0] || null;
+    }
+  },
+  pickup(target) {
+    calls.push(['pickup', target]);
+    return pickupRc;
+  },
+  withdraw(target, resource) {
+    assert.equal(resource, RESOURCE_ENERGY);
+    calls.push(['withdraw', target]);
+    return withdrawRc;
+  },
+  moveTo(target, opts) {
+    calls.push(['move', target]);
+    assert.equal(opts.maxOps, config.PATH_MAX_OPS);
+    return moveRc;
+  }
+};
+function reset() {
+  calls = []; pickupRc = OK; withdrawRc = OK; moveRc = OK;
+  present = {drop: true, container: true, tomb: true};
+}
+
+// Terminal route failure of a preferred dropped pile must not freeze the
+// hauler when a source container can accept a real pickup.
+reset();
+pickupRc = ERR_NOT_IN_RANGE; moveRc = ERR_NO_PATH;
+assert.equal(energy.acquireForHauler(carrier), true);
+assert.deepEqual(calls, [
+  ['pickup', drop], ['move', drop], ['withdraw', container]
+]);
+
+// An exhausted-but-still-listed drop is not a successful pickup intent.
+reset();
+pickupRc = ERR_NOT_ENOUGH_RESOURCES;
+assert.equal(energy.acquireForHauler(carrier), true);
+assert.deepEqual(calls, [['pickup', drop], ['withdraw', container]]);
+
+// A confirmed ACCEPTED intent must never be followed by another acquisition
+// action in the same tick (the engine has not yet settled its energy).
+reset();
+assert.equal(energy.acquireForHauler(carrier), true);
+assert.deepEqual(calls, [['pickup', drop]]);
+
+// Viable or transiently busy movement must not be overwritten by the alternate.
+for (const code of [OK, ERR_BUSY]) {
+  reset(); pickupRc = ERR_NOT_IN_RANGE; moveRc = code;
+  assert.equal(energy.acquireForHauler(carrier), true);
+  assert.deepEqual(calls, [['pickup', drop], ['move', drop]]);
+}
+
+// A terminally invalid drop may fall through to a tombstone if there is no
+// source container; the acquisition attempt count remains <= 2.
+reset();
+pickupRc = ERR_INVALID_TARGET;
+present.container = false;
+assert.equal(energy.acquireForHauler(carrier), true);
+assert.deepEqual(calls, [['pickup', drop], ['withdraw', tomb]]);
+
+// No viable resource: report false and let the established role-level
+// harvester/container positioning fallback run.
+reset();
+present = {drop: false, container: false, tomb: false};
+assert.equal(energy.acquireForHauler(carrier), false);
+assert.deepEqual(calls, []);
+console.log('hauler terminal drop-source failover tests passed');
