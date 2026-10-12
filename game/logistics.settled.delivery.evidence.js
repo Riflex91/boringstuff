@@ -5,7 +5,7 @@
 // Count ONLY unambiguous own hauler -> own consumer-creep energy transfers.
 // This is a conservative lower bound, NOT all infrastructure deliveries, route
 // throughput, transport CPU, delivery latency or authorization for switching.
-const SCHEMA_VERSION = 4;
+const SCHEMA_VERSION = 5;
 const WINDOW_TICKS = 100;
 const MAX_ROOMS = 3;
 const MAX_CREEPS = 120;
@@ -26,7 +26,11 @@ function newWindow(gameTick) {
     waitingEpisodesStoppedWithoutObservedReceipt:0,
     waitingEpisodesStoppedAfterObservedReceipt:0,
     waitingEpisodesLostVisibility:0,
-    maxConcurrentUnservedWaitingConsumers:0};
+    maxConcurrentUnservedWaitingConsumers:0,
+    waitingConsumerTicksWithLoadedSticky:0,
+    firstReceiptFromSameExclusiveLoadedSticky:0,
+    firstReceiptFromOtherThanExclusiveLoadedSticky:0,
+    firstReceiptWithoutUniqueLoadedSticky:0};
 }
 function ensure(memory) {
   if (!memory.bot) memory.bot = {};
@@ -53,7 +57,16 @@ function validWindow(w, allowCompleted = false) {
       'waitingEpisodesStoppedWithoutObservedReceipt',
       'waitingEpisodesStoppedAfterObservedReceipt',
       'waitingEpisodesLostVisibility',
-      'maxConcurrentUnservedWaitingConsumers'].every(k=>isInt(w[k])) &&
+      'maxConcurrentUnservedWaitingConsumers',
+      'waitingConsumerTicksWithLoadedSticky',
+      'firstReceiptFromSameExclusiveLoadedSticky',
+      'firstReceiptFromOtherThanExclusiveLoadedSticky',
+      'firstReceiptWithoutUniqueLoadedSticky'].every(k=>isInt(w[k])) &&
+    w.waitingConsumerTicksWithLoadedSticky<=w.waitingConsumerTicks &&
+    w.firstReceiptFromSameExclusiveLoadedSticky +
+      w.firstReceiptFromOtherThanExclusiveLoadedSticky +
+      w.firstReceiptWithoutUniqueLoadedSticky ===
+      w.firstConfirmedWaitingDeliveries &&
     w.waitingConsumerTicks <= w.ticks*MAX_CREEPS &&
     w.waitingConsumerTicksBeforeFirstReceipt <= w.waitingConsumerTicks &&
     w.waitingEpisodeObservedStarts <= w.waitingConsumerTicks &&
@@ -70,10 +83,9 @@ function validWindow(w, allowCompleted = false) {
       isInt(w.lastGameTick) &&
       w.lastGameTick - w.startGameTick === w.ticks - 1);
 }
-// Snapshot consumer identities BEFORE legacy hauler/worker handlers modify
-// waitingEnergyTicks. In particular, transfer() === OK is only an accepted
-// INTENT; energy.deliverToConsumer clears waiting on that return code before
-// Room.getEventLog() can confirm actual settlement on the next tick.
+// Snapshot waiting IDs and loaded sticky assignments BEFORE creep intents.
+// transfer() === OK is only an accepted intent, not engine-settled delivery.
+// A sticky reservation may exist without a real subsequent transfer.
 function capturePreIntentWaiting(states,game) {
   const now=game && game.time;
   if (!isInt(now) || now < 1 || !Array.isArray(states) ||
@@ -96,9 +108,25 @@ function capturePreIntentWaiting(states,game) {
       if(n!=null&&!isInt(n))return null;
       if((n||0)>0||!!c.memory.logisticsFallback)waiting.push(c.id);
     }
+    // Capture loaded sticky assignments before creep intents. Duplicate
+    // carriers still count for coverage but cannot identify a unique actor.
+    const waited=new Set(waiting), counts=Object.create(null),
+      exclusive=Object.create(null);
+    for(const c of creeps) {
+      if(!c||c.spawning||!c.memory||c.memory.role!=='hauler'||
+          !waited.has(c.memory.consumerTargetId))continue;
+      const carried=c.store && Number(c.store[RESOURCE_ENERGY]);
+      if(!Number.isSafeInteger(carried)||carried<=0)continue;
+      const target=c.memory.consumerTargetId;
+      counts[target]=(counts[target]||0)+1;
+      if(counts[target]===1)exclusive[target]=c.id;
+      else delete exclusive[target];
+    }
     rooms[room]={
       consumerIds:consumers.sort(),
-      waitingConsumerIds:waiting.sort()
+      waitingConsumerIds:waiting.sort(),
+      loadedStickyConsumerIds:Object.keys(counts).sort(),
+      exclusiveLoadedStickyHaulerByConsumer:exclusive
     };
   }
   return {tick:now,rooms};
@@ -130,7 +158,7 @@ function inspectRoom(state, includeConsumers = false, preIntent = null) {
   try { events=room.getEventLog(); } catch (_) { return null; }
   if (!Array.isArray(events) || events.length > MAX_EVENTS_PER_ROOM) return null;
   let deliveredEnergy=0,deliveryEvents=0;
-  const actors=new Set(), deliveredConsumerIds=[];
+  const actors=new Set(), deliveredConsumerIds=[], deliveredActorTargets=[];
   for (const e of events) {
     if (!e || e.event !== EVENT_TRANSFER ||
         !haulers.has(e.objectId)) continue;
@@ -152,7 +180,10 @@ function inspectRoom(state, includeConsumers = false, preIntent = null) {
     actors.add(e.objectId);
     deliveredEnergy+=amount;
     deliveryEvents++;
-    if (includeConsumers) deliveredConsumerIds.push(e.data.targetId);
+    if (includeConsumers) {
+      deliveredConsumerIds.push(e.data.targetId);
+      deliveredActorTargets.push({consumerId:e.data.targetId,haulerId:e.objectId});
+    }
   }
   const result={deliveredEnergy,deliveryEvents,rawEventCount:events.length};
   if (includeConsumers) {
@@ -161,14 +192,26 @@ function inspectRoom(state, includeConsumers = false, preIntent = null) {
     const current=[...consumers].sort();
     const saved=preIntent && preIntent.consumerIds;
     const waiting=preIntent && preIntent.waitingConsumerIds;
+    const loaded=preIntent && preIntent.loadedStickyConsumerIds;
+    const exclusive=preIntent && preIntent.exclusiveLoadedStickyHaulerByConsumer;
     if(!Array.isArray(saved)||!Array.isArray(waiting) ||
+       !Array.isArray(loaded)||!exclusive||
+       typeof exclusive!=='object'||Array.isArray(exclusive)||
        saved.length!==current.length ||
        saved.some((id,i)=>id!==current[i]) ||
        waiting.length>saved.length ||
        waiting.some((id,i)=>typeof id!=='string'||
-         !saved.includes(id)||(i>0&&waiting[i-1]>=id))) return null;
+         !saved.includes(id)||(i>0&&waiting[i-1]>=id)) ||
+       loaded.length>waiting.length ||
+       loaded.some((id,i)=>!waiting.includes(id)||
+         (i>0&&loaded[i-1]>=id)) ||
+       Object.entries(exclusive).some(([id,actor])=>
+         !loaded.includes(id)||typeof actor!=='string'||!actor))return null;
     result.deliveredConsumerIds=deliveredConsumerIds;
+    result.deliveredActorTargets=deliveredActorTargets;
     result.waitingConsumerIds=waiting.slice();
+    result.loadedStickyConsumerIds=loaded.slice();
+    result.exclusiveLoadedStickyHaulerByConsumer={...exclusive};
     result.visibleConsumerIds=current;
   }
   return result;
@@ -188,6 +231,14 @@ function summarize(w,room) {
       Math.round(w.deliveredEnergy / w.ticks * 10000)/10000,
     ticksWithConfirmedConsumerDelivery:w.ticksWithDelivery,
     observedWaitingConsumerTicks:w.waitingConsumerTicks,
+    observedWaitingConsumerTicksWithLoadedSticky:
+      w.waitingConsumerTicksWithLoadedSticky,
+    firstConfirmedReceiptFromSameExclusiveLoadedSticky:
+      w.firstReceiptFromSameExclusiveLoadedSticky,
+    firstConfirmedReceiptFromOtherThanExclusiveLoadedSticky:
+      w.firstReceiptFromOtherThanExclusiveLoadedSticky,
+    firstConfirmedReceiptWithoutUniqueLoadedSticky:
+      w.firstReceiptWithoutUniqueLoadedSticky,
     observedWaitingConsumerTicksBeforeFirstReceipt:
       w.waitingConsumerTicksBeforeFirstReceipt,
     observedWaitingEpisodeStarts:w.waitingEpisodeObservedStarts,
@@ -228,7 +279,12 @@ function validWaitingHistory(history) {
       Object.keys(history).length > MAX_CREEPS) return false;
   return Object.entries(history).every(([id,e])=>typeof id==='string' &&
     !!id && e && isInt(e.firstTick) && isInt(e.lastTick) &&
-    e.lastTick >= e.firstTick && typeof e.firstSettledObserved==='boolean');
+    e.lastTick >= e.firstTick && typeof e.firstSettledObserved==='boolean' &&
+    typeof e.lastHadLoadedSticky==='boolean' &&
+    (e.lastExclusiveLoadedStickyHaulerId===null ||
+      typeof e.lastExclusiveLoadedStickyHaulerId==='string' &&
+      !!e.lastExclusiveLoadedStickyHaulerId) &&
+    (!e.lastExclusiveLoadedStickyHaulerId||e.lastHadLoadedSticky));
 }
 function observe(states,game,memory,preIntent) {
   const now=game && game.time, root=memory || (typeof Memory!=='undefined'?Memory:null);
@@ -278,8 +334,10 @@ function observe(states,game,memory,preIntent) {
     // record observed at t-1 therefore precedes that actual settlement.
     // Only the FIRST receipt in a contiguous observed waiting episode counts.
     let firstDeliveries=0, waitingTicks=0, maximumWaiting=0;
+    let sameReserved=0, otherReserved=0, noUniqueReserved=0;
     const firstRecipientIds=new Set();
-    for (const id of measurement.deliveredConsumerIds) {
+    for (const receipt of measurement.deliveredActorTargets) {
+      const id=receipt.consumerId;
       const previous=entry.waiting[id];
       if (!previous || previous.lastTick !== now-1 ||
           previous.firstSettledObserved || firstRecipientIds.has(id)) continue;
@@ -289,6 +347,11 @@ function observe(states,game,memory,preIntent) {
       }
       firstRecipientIds.add(id);
       firstDeliveries++;
+      const oldSticky=previous.lastExclusiveLoadedStickyHaulerId;
+      if(oldSticky) {
+        if(oldSticky===receipt.haulerId)sameReserved++;
+        else otherReserved++;
+      } else noUniqueReserved++;
       waitingTicks+=duration;
       maximumWaiting=Math.max(maximumWaiting,duration);
     }
@@ -301,6 +364,7 @@ function observe(states,game,memory,preIntent) {
     const previousWaiting=entry.waiting;
     const visibleIds=new Set(measurement.visibleConsumerIds);
     const waitingIds=new Set(measurement.waitingConsumerIds);
+    const loadedIds=new Set(measurement.loadedStickyConsumerIds);
     let observedStarts=0, stoppedWithoutReceipt=0,
       stoppedAfterReceipt=0, lostVisibility=0;
     for (const [id,prior] of Object.entries(previousWaiting)) {
@@ -314,11 +378,17 @@ function observe(states,game,memory,preIntent) {
     for (const id of measurement.waitingConsumerIds) {
       const previous=entry.waiting[id];
       if (!(previous && previous.lastTick===now-1)) observedStarts++;
+      const loaded=loadedIds.has(id);
+      const sticky=measurement.exclusiveLoadedStickyHaulerByConsumer[id]||null;
       waiting[id]=previous && previous.lastTick===now-1 ?
         {firstTick:previous.firstTick,lastTick:now,
           firstSettledObserved:previous.firstSettledObserved ||
-            firstRecipientIds.has(id)} :
-        {firstTick:now,lastTick:now,firstSettledObserved:false};
+            firstRecipientIds.has(id),
+          lastHadLoadedSticky:loaded,
+          lastExclusiveLoadedStickyHaulerId:sticky} :
+        {firstTick:now,lastTick:now,firstSettledObserved:false,
+          lastHadLoadedSticky:loaded,
+          lastExclusiveLoadedStickyHaulerId:sticky};
     }
     const unservedWaiting=Object.values(waiting)
       .filter(x=>!x.firstSettledObserved).length;
@@ -330,6 +400,10 @@ function observe(states,game,memory,preIntent) {
     w.deliveredEnergy+=measurement.deliveredEnergy;
     if(measurement.deliveryEvents)w.ticksWithDelivery++;
     w.waitingConsumerTicks+=measurement.waitingConsumerIds.length;
+    w.waitingConsumerTicksWithLoadedSticky+=loadedIds.size;
+    w.firstReceiptFromSameExclusiveLoadedSticky+=sameReserved;
+    w.firstReceiptFromOtherThanExclusiveLoadedSticky+=otherReserved;
+    w.firstReceiptWithoutUniqueLoadedSticky+=noUniqueReserved;
     w.waitingConsumerTicksBeforeFirstReceipt+=unservedWaiting;
     w.waitingEpisodeObservedStarts+=observedStarts;
     w.waitingEpisodesStoppedWithoutObservedReceipt+=stoppedWithoutReceipt;
