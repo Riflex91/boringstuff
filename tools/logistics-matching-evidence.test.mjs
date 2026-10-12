@@ -11,7 +11,7 @@ const require = createRequire(import.meta.url);
 
 const evidence = require('../game/logistics.matching.evidence.js');
 
-function state(overrides = {}) {
+function state(overrides = {}, time = 1000) {
   return {
     room: { name: 'E1N1' },
     economyModel: {
@@ -20,11 +20,16 @@ function state(overrides = {}) {
       consumerFallbackCount: 0
     },
     logisticsMatchingShadow: {
+      schemaVersion: 1,
+      authority: 'SHADOW',
       jobs: [{
         mode: 'PICKUP_DELIVER',
         reservationIds: ['r1']
       }],
       summary: {
+        schemaVersion: 1,
+        authority: 'SHADOW',
+        planTick: time,
         deferred: false,
         haulerCount: 2,
         matchedHaulerCount: 1,
@@ -51,7 +56,7 @@ function state(overrides = {}) {
   const memory = {};
   let result = null;
   for (let t = 1000; t < 1100; t++) {
-    result = evidence.observe(state(), memory, { time: t });
+    result = evidence.observe(state({}, t), memory, { time: t });
   }
 
   assert.ok(result.completed);
@@ -104,8 +109,14 @@ function state(overrides = {}) {
       consumerFallbackCount: 0
     },
     logisticsMatchingShadow: {
+      schemaVersion: 1,
+      authority: 'SHADOW',
       jobs: [],
       summary: {
+        schemaVersion: 1,
+        authority: 'SHADOW',
+        planTick: null,
+        deferReason: 'LOW_CPU',
         deferred: true,
         haulerCount: 0,
         matchedHaulerCount: 0,
@@ -127,7 +138,7 @@ function state(overrides = {}) {
   });
   const result = evidence.observe(deferred, memory, { time: 2000 });
   assert.equal(result.current.deferredRatio, 1);
-  assert.equal(result.current.criticalCoverageRatio, 1);
+  assert.equal(result.current.criticalCoverageRatio, null, 'Deferred evidence cannot prove perfect matching');
   assert.equal(result.current.averageJobsPerTick, 0);
 }
 
@@ -215,24 +226,24 @@ function state(overrides = {}) {
 // Repeated calls may happen through multiple process schedulers or replay.
 {
   const memory={};
-  let observed=evidence.observe(state(),memory,{time:1000});
+  let observed=evidence.observe(state({},1000),memory,{time:1000});
   assert.equal(observed.current.ticks,1);
   for(let i=0;i<200;i++){
-    observed=evidence.observe(state(),memory,{time:1000});
+    observed=evidence.observe(state({},1000),memory,{time:1000});
     assert.equal(observed.completed,null,'Duplicate ticks cannot complete a window');
     assert.equal(observed.current.ticks,1);
   }
-  for(let t=1001;t<=1099;t++) observed=evidence.observe(state(),memory,{time:t});
+  for(let t=1001;t<=1099;t++) observed=evidence.observe(state({},t),memory,{time:t});
   assert.equal(observed.completed.ticks,100);
   assert.equal(observed.completed.startTick,1000);
   assert.equal(observed.completed.endTick,1099);
   for(let i=0;i<3;i++){
-    const repeat=evidence.observe(state(),memory,{time:1099});
+    const repeat=evidence.observe(state({},1099),memory,{time:1099});
     assert.equal(repeat.completed,null,'100th tick replay cannot begin another window');
     assert.equal(repeat.lastWindow.endTick,1099);
     assert.equal(memory.bot.logisticsMatchingEvidence.rooms.E1N1.window.ticks,0);
   }
-  const next=evidence.observe(state(),memory,{time:1100});
+  const next=evidence.observe(state({},1100),memory,{time:1100});
   assert.equal(next.completed,null);
   assert.equal(next.current.ticks,1);
   assert.equal(next.current.startTick,1100);
@@ -240,16 +251,16 @@ function state(overrides = {}) {
 {
   const memory={};
   let result=null;
-  for(let t=2000;t<=2049;t++) result=evidence.observe(state(),memory,{time:t});
+  for(let t=2000;t<=2049;t++) result=evidence.observe(state({},t),memory,{time:t});
   assert.equal(result.current.ticks,50);
   // One skipped observation invalidates the prior 50 actual observations.
-  result=evidence.observe(state(),memory,{time:2051});
+  result=evidence.observe(state({},2051),memory,{time:2051});
   assert.equal(result.current.startTick,2051);
   assert.equal(result.current.ticks,1);
   assert.equal(result.completed,null);
-  for(let t=2052;t<=2149;t++) result=evidence.observe(state(),memory,{time:t});
+  for(let t=2052;t<=2149;t++) result=evidence.observe(state({},t),memory,{time:t});
   assert.equal(result.completed,null);
-  result=evidence.observe(state(),memory,{time:2150});
+  result=evidence.observe(state({},2150),memory,{time:2150});
   assert.equal(result.completed.ticks,100);
   assert.equal(result.completed.startTick,2051);
   assert.equal(result.completed.endTick,2150);
@@ -258,14 +269,14 @@ function state(overrides = {}) {
 {
   const memory={};
   let result=null;
-  for(let t=3000;t<=3099;t++) result=evidence.observe(state(),memory,{time:t});
+  for(let t=3000;t<=3099;t++) result=evidence.observe(state({},t),memory,{time:t});
   assert.ok(result.completed);
   // Server simulation rewind clears stale completed history and starts fresh.
-  result=evidence.observe(state(),memory,{time:2000});
+  result=evidence.observe(state({},2000),memory,{time:2000});
   assert.equal(result.lastWindow,null);
   assert.equal(result.current.ticks,1);
   assert.equal(result.current.startTick,2000);
-  result=evidence.observe(state(),memory,{time:1999});
+  result=evidence.observe(state({},1999),memory,{time:1999});
   assert.equal(result.lastWindow,null);
   assert.equal(result.current.startTick,1999);
   assert.equal(result.current.ticks,1);
@@ -276,7 +287,7 @@ function state(overrides = {}) {
       startTick:1,endTick:100,ticks:100
     }}
   }}}};
-  const r=evidence.observe(state(),memory,{time:5000});
+  const r=evidence.observe(state({},5000),memory,{time:5000});
   assert.equal(memory.bot.logisticsMatchingEvidence.schemaVersion,2);
   assert.equal(r.current.ticks,1,'Migrate invalid count-only windows by reset');
   assert.equal(r.lastWindow,null);
@@ -284,13 +295,13 @@ function state(overrides = {}) {
   const room=memory.bot.logisticsMatchingEvidence.rooms.E1N1;
   room.window.ticks=99;
   room.window.lastObservedTick=50;
-  const repaired=evidence.observe(state(),memory,{time:5001});
+  const repaired=evidence.observe(state({},5001),memory,{time:5001});
   assert.equal(repaired.current.ticks,1);
   assert.equal(repaired.current.startTick,5001);
   assert.equal(repaired.completed,null,
     'Corrupted persistent tick counters cannot manufacture full windows');
   const before=JSON.stringify(memory);
-  assert.deepEqual(evidence.observe(state(),memory,{time:NaN}),{
+  assert.deepEqual(evidence.observe(state({},5001),memory,{time:NaN}),{
     current:null,completed:null,lastWindow:null
   });
   assert.equal(JSON.stringify(memory),before,
