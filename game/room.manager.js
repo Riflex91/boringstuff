@@ -15,6 +15,7 @@ const assignmentEvidence = require('assignment.evidence');
 const capacitySpawnShadow = require('spawn.capacity.shadow');
 const logisticsMatchingShadow = require('logistics.matching.shadow');
 const logisticsMatchingEvidence = require('logistics.matching.evidence');
+const logisticsTopologyShadow = require('logistics.topology.shadow');
 const profiler = require('profiler');
 const logger = require('logger');
 const config = require('config');
@@ -38,6 +39,7 @@ function status(state) {
     assignments: state.assignmentShadow ? state.assignmentShadow.summary : null,
     logisticsMatching: state.logisticsMatchingShadow ? state.logisticsMatchingShadow.summary : null,
     logisticsMatchingEvidence: state.logisticsMatchingEvidence ? (state.logisticsMatchingEvidence.lastWindow || state.logisticsMatchingEvidence.current) : null,
+    logisticsTopologyShadow: logisticsTopologyShadow.telemetrySummary(state.logisticsTopologyShadow),
     assignmentEvidence: state.assignmentEvidence ? (state.assignmentEvidence.lastWindow || state.assignmentEvidence.current) : null,
     colonyStateAvailable: !!state.colonyState
   };
@@ -194,6 +196,21 @@ function run(room, lowCpu) {
     }
     return evidence;
   });
+
+  // Evaluate E5 infrastructure feasibility ONLY on actual completed E4
+  // 100-real-tick windows. Never select or activate a logistics topology.
+  state.logisticsTopologyShadow = state.logisticsMatchingEvidence &&
+    state.logisticsMatchingEvidence.completed
+    ? profiler.detailSection('room.logistics-topology', function() {
+        const assessment = logisticsTopologyShadow.inspectTopology(
+          state, state.logisticsMatchingEvidence.completed, Game);
+        logger.info('LOGISTICS_TOPOLOGY_SHADOW', 'E5 topology prerequisites (no switch authority)', {
+          room: state.room.name,
+          assessment: logisticsTopologyShadow.telemetrySummary(assessment)
+        }, { force: true, persist: true, dedupeTicks: 0 });
+        return assessment;
+      })
+    : null;
 
   state.assignmentEvidence = profiler.detailSection('room.evidence', function() {
     const evidence = assignmentEvidence.observe(state);
