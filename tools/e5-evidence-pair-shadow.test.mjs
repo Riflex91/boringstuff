@@ -75,6 +75,7 @@ assert.equal(JSON.stringify({cpu,delivery}),original,
   d.confirmedConsumerDeliveryEvents=0;
   d.confirmedConsumerEnergyLowerBound=0;
   d.confirmedConsumerEnergyPerTickLowerBound=0;
+  d.ticksWithConfirmedConsumerDelivery=0;
   d.confirmedFirstDeliveryForPreviouslyWaitingConsumers=0;
   const p=pair.assess('E1N1',1099,cpu,d);
   assert.equal(p.status,'ALIGNED_OBSERVATION');
