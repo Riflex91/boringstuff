@@ -66,6 +66,12 @@ else {
       ' waiting(post)=' + s.consumers.waiting +
       ' haulersReady(post)=' + s.haulers.readyByGuardRule +
       ' energyCarried(post)=' + s.haulers.totalCarriedEnergy +
+      ' criticalWithoutReadySticky=' +
+        (s.reservationCoverage?.criticalWithoutReadySticky ?? 'UNKNOWN') +
+      ' criticalWithDuplicateSticky=' +
+        (s.reservationCoverage?.criticalWithDuplicateSticky ?? 'UNKNOWN') +
+      ' zeroEnergySticky=' +
+        (s.reservationCoverage?.stickyWithoutEnergy ?? 'UNKNOWN') +
       ' acceptedIntents=' + s.consumerTransfers.accepted +
       ' noRange=' + s.consumerTransfers.notInRange +
       ' roomEnergy(pre)=' + (pre?.roomEnergy ?? 'UNKNOWN') +
