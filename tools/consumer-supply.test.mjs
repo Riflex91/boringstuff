@@ -143,13 +143,13 @@ const energy = require('../game/energy.js');
 
   pickupResult = OK;
   assert.equal(roleWorker._test.acquireWorkEnergy(worker), true);
-  assert.equal(worker.memory.waitingEnergyTicks, 0,
-    'confirmed successful pickup may reset the wait');
+  assert.equal(worker.memory.waitingEnergyTicks, 4,
+    'pickup() OK is an accepted intent, not proof of engine-settled energy');
   pickupResult = ERR_NOT_IN_RANGE;
   worker.memory.waitingEnergyTicks = 2;
   assert.equal(roleWorker._test.acquireWorkEnergy(worker), true);
-  assert.equal(worker.memory.waitingEnergyTicks, 0,
-    'movement towards reachable energy remains valid progress');
+  assert.equal(worker.memory.waitingEnergyTicks, 3,
+    'moveTo() OK is route intent, not a received-energy acknowledgement');
   assert.equal(movement.length, 1);
   assert.equal(movement[0][0], drop);
   assert.equal(movement[0][1].maxOps, config.PATH_MAX_OPS);
