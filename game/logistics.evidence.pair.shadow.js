@@ -7,6 +7,11 @@ const SCHEMA_VERSION = 1;
 const TICKS = 100;
 function nat(n) { return Number.isSafeInteger(n) && n >= 0; }
 function finite(n) { return Number.isFinite(n) && n >= 0; }
+// Source report values are rounded to four decimal places independently;
+// permit only the stated reporting precision, never fabricated magnitudes.
+function agreesAtPrecision(a,b) {
+  return finite(a) && finite(b) && Math.abs(a-b) <= 0.00011;
+}
 function deferred(room, now, reason) {
   return {
     schemaVersion:SCHEMA_VERSION,authority:'SHADOW',actionAuthority:'NONE',
@@ -30,9 +35,14 @@ function validCpu(x) {
     x.totalHaulerCreepTicks <= TICKS*120 &&
     nat(x.ticksWithActiveHaulers) &&
     x.ticksWithActiveHaulers <= TICKS &&
+    agreesAtPrecision(x.haulerRoleCpuPerTick,x.totalRoleCpu/TICKS) &&
     (x.totalHaulerCreepTicks===0 ?
-      x.haulerRoleCpuPerCreepTick===null && x.totalRoleCpu===0 :
-      finite(x.haulerRoleCpuPerCreepTick)) &&
+      x.ticksWithActiveHaulers===0 &&
+        x.haulerRoleCpuPerCreepTick===null && x.totalRoleCpu===0 :
+      x.ticksWithActiveHaulers>0 &&
+        x.ticksWithActiveHaulers<=x.totalHaulerCreepTicks &&
+        agreesAtPrecision(x.haulerRoleCpuPerCreepTick,
+          x.totalRoleCpu/x.totalHaulerCreepTicks)) &&
     x.settledEnergyPerTick===null &&
     x.transportRouteCpuPerTick===null &&
     x.comparableAlternativeCpuPerTick===null;
@@ -69,8 +79,14 @@ function validDelivery(x, room) {
     'openWaitingEpisodesWithoutConfirmedReceiptAtWindowEnd']) {
     if (!nat(x[k])) return false;
   }
-  return finite(x.confirmedConsumerEnergyPerTickLowerBound) &&
+  return agreesAtPrecision(x.confirmedConsumerEnergyPerTickLowerBound,
+      x.confirmedConsumerEnergyLowerBound/TICKS) &&
     x.confirmedConsumerDeliveryEvents <= TICKS*120 &&
+    (x.confirmedConsumerDeliveryEvents===0 ?
+      x.ticksWithConfirmedConsumerDelivery===0 :
+      x.ticksWithConfirmedConsumerDelivery>0 &&
+      x.ticksWithConfirmedConsumerDelivery<=
+        x.confirmedConsumerDeliveryEvents) &&
     x.confirmedConsumerEnergyLowerBound >= x.confirmedConsumerDeliveryEvents &&
     x.ticksWithConfirmedConsumerDelivery <= TICKS &&
     x.confirmedFirstDeliveryForPreviouslyWaitingConsumers <=
