@@ -10,7 +10,11 @@ Module._initPaths();
 const require=createRequire(import.meta.url);
 const evidence=require('../game/logistics.hauler.cpu.evidence.js');
 
-const room=[{room:{name:'E1N1'}}];
+const room=[{room:{name:'E1N1'},creeps:[
+  {id:'h1',memory:{role:'hauler'}},
+  {id:'h2',memory:{role:'hauler'}}
+]}];
+const roomWithoutHaulers=[{room:{name:'E1N1'},creeps:[]}];
 const input=()=>({'E1N1':{haulers:2,roleCpu:1.25}});
 {
   const mem={};
@@ -84,11 +88,33 @@ const input=()=>({'E1N1':{haulers:2,roleCpu:1.25}});
   const mem={};
   const zero={'E1N1':{haulers:0,roleCpu:0}};
   let result=[];
-  for(let t=3000;t<=3099;t++)result=evidence.observe(room,zero,{time:t},mem);
+  for(let t=3000;t<=3099;t++)result=evidence.observe(roomWithoutHaulers,zero,{time:t},mem);
   assert.equal(result[0].observedTicks,100);
   assert.equal(result[0].haulerRoleCpuPerTick,0);
   assert.equal(result[0].haulerRoleCpuPerCreepTick,null);
   assert.equal(result[0].ticksWithActiveHaulers,0);
+}
+{
+  const mem={};
+  for(let t=7000;t<=7005;t++)evidence.observe(room,input(),{time:t},mem);
+  assert.equal(mem.bot.logisticsHaulerCpuEvidence.rooms.E1N1.window.ticks,6);
+  evidence.observe(room,{}, {time:7006},mem);
+  assert.equal(mem.bot.logisticsHaulerCpuEvidence.rooms.E1N1,undefined,
+    'Missing hauler callback cannot claim an idle zero-CPU sample');
+  evidence.observe(room,{'E1N1':{haulers:1,roleCpu:0.5}},
+    {time:7007},mem);
+  assert.equal(mem.bot.logisticsHaulerCpuEvidence.rooms.E1N1,undefined,
+    'Incomplete callback count fails closed against owned hauler census');
+  evidence.observe(room,input(),{time:7008},mem);
+  assert.equal(mem.bot.logisticsHaulerCpuEvidence.rooms.E1N1.window.ticks,1);
+  const forged=[{room:{name:'E1N1'},creeps:[
+    {id:'same',memory:{role:'hauler'}},
+    {id:'same',memory:{role:'hauler'}}
+  ]}];
+  const before=JSON.stringify(mem);
+  assert.deepEqual(evidence.observe(forged,input(),{time:7009},mem),[]);
+  assert.equal(JSON.stringify(mem),before,
+    'Ambiguous owned hauler identities must leave observer memory untouched');
 }
 {
   const mem={};
