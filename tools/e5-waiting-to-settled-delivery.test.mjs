@@ -49,7 +49,7 @@ assert.equal(emptySummary().averageSampledWaitingTicksBeforeFirstConfirmedDelive
     assert.equal(out.length,t===4099?1:0);
   }
   const w=out[0];
-  assert.equal(w.schemaVersion,2);
+  assert.equal(w.schemaVersion,3);
   assert.equal(w.observedTicks,100);
   assert.equal(w.confirmedConsumerDeliveryEvents,2);
   assert.equal(w.confirmedConsumerEnergyLowerBound,35);
