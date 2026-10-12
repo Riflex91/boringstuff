@@ -147,7 +147,8 @@ const events=()=>[
   const rec=memory.bot.e5SettledConsumerEnergy.rooms.E1N1;
   rec.window.ticks=99;rec.window.lastGameTick=7;
   observer.observe([state],{time:8001},memory);
-  assert.equal(rec.window.ticks,1,'Malformed persisted counters reset');
+  assert.equal(memory.bot.e5SettledConsumerEnergy.rooms.E1N1.window.ticks,1,
+    'Malformed persisted counters reset to new room record');
 }
 {
   const memory={};
