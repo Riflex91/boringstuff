@@ -91,6 +91,47 @@ function haulerReadiness(creep) {
     (!!(creep.memory && creep.memory.delivering) || carried >= threshold);
   return { carried, capacity: knownCapacity ? capacity : null, ready };
 }
+// Diagnostic-only identity reconciliation. An old sticky assignment is not
+// proof of a deliverable load: distinguish any assignment, a ready hauler,
+// duplicates, and a hauler carrying zero energy. These are point-in-time
+// observations AFTER intents but BEFORE the game resolves transfers.
+function snapshotReservationCoverage(criticalConsumers, haulers) {
+  const ids = criticalConsumers.map(c => c && (c.id || c.name));
+  if (ids.some(id => typeof id !== 'string' || !id) ||
+      new Set(ids).size !== ids.length) return null;
+  const byTarget = new Map(ids.map(id => [id, { sticky: 0, ready: 0 }]));
+  let stickyAssignments = 0, stickyToNoncritical = 0;
+  let stickyWithoutEnergy = 0, readyHaulersWithoutSticky = 0;
+  for (const h of haulers) {
+    const id = h && h.memory && h.memory.consumerTargetId;
+    const status = haulerReadiness(h);
+    if (typeof id !== 'string' || !id) {
+      if (status.ready) readyHaulersWithoutSticky++;
+      continue;
+    }
+    stickyAssignments++;
+    if (status.carried === 0) stickyWithoutEnergy++;
+    const consumer = byTarget.get(id);
+    if (!consumer) {
+      stickyToNoncritical++;
+      continue;
+    }
+    consumer.sticky++;
+    if (status.ready) consumer.ready++;
+  }
+  const counts = [...byTarget.values()];
+  return {
+    criticalWithSticky: counts.filter(x => x.sticky > 0).length,
+    criticalWithReadySticky: counts.filter(x => x.ready > 0).length,
+    criticalWithoutSticky: counts.filter(x => x.sticky === 0).length,
+    criticalWithoutReadySticky: counts.filter(x => x.ready === 0).length,
+    criticalWithDuplicateSticky: counts.filter(x => x.sticky > 1).length,
+    stickyAssignments, stickyToNoncritical, stickyWithoutEnergy,
+    readyHaulersWithoutSticky,
+    acceptedDeliveryProof: false
+  };
+}
+
 function sampleRoomCreeps(game, room) {
   const items = Object.values(game.creeps || {});
   const summary = {
@@ -99,19 +140,22 @@ function sampleRoomCreeps(game, room) {
     haulers: { live: 0, energyPositive: 0, deliveringFlag: 0,
       readyByGuardRule: 0, zeroEnergy: 0, totalCarriedEnergy: 0,
       capacityUnknown: 0 },
-    consumers: { live: 0, waiting: 0, fallback: 0, critical: 0, empty: 0 }
+    consumers: { live: 0, waiting: 0, fallback: 0, critical: 0, empty: 0 },
+    reservationCoverage: null
   };
   if (items.length > MAX_CREEPS_SCANNED) {
     // Do not claim complete readiness evidence for an oversized collection.
     summary.truncated = true;
     return summary;
   }
+  const criticalConsumers = [], liveHaulers = [];
   for (const creep of items) {
     if (!creep || creep.spawning || !creep.memory || !creep.room ||
         creep.room.name !== room) continue;
     summary.sampledCreepCount++;
     const role = creep.memory.role;
     if (role === 'hauler') {
+      liveHaulers.push(creep);
       const h = summary.haulers;
       h.live++;
       const status = haulerReadiness(creep);
@@ -129,10 +173,14 @@ function sampleRoomCreeps(game, room) {
       const fallback = !!creep.memory.logisticsFallback;
       if (waiting) c.waiting++;
       if (fallback) c.fallback++;
-      if (waiting || fallback) c.critical++;
+      if (waiting || fallback) {
+        c.critical++;
+        criticalConsumers.push(creep);
+      }
       if (energyAmount(creep) <= 0) c.empty++;
     }
   }
+  summary.reservationCoverage = snapshotReservationCoverage(criticalConsumers, liveHaulers);
   return summary;
 }
 function flush(states, logger, game) {
@@ -161,6 +209,7 @@ function flush(states, logger, game) {
     logger.info('CONSUMER_SUPPLY_DIAG', 'Post-hauler-intent supply observations', {
       room, phase: read.phase, sampledCreepCount: read.sampledCreepCount,
       haulers: read.haulers, consumers: read.consumers,
+      reservationCoverage: read.reservationCoverage,
       decisions: {
         guardChecks: records.guardChecks,
         guardSelected: records.guardSelected,
@@ -181,5 +230,5 @@ module.exports = {
   recordResult,
   flush,
   _test: { sampled, eligible, sampleRoomCreeps, haulerReadiness,
-    reset, getRoomCounters }
+    reset, getRoomCounters, snapshotReservationCoverage }
 };
