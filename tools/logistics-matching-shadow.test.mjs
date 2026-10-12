@@ -418,4 +418,24 @@ assert.equal(matcher._test.registryBackedCandidate({
   demand:{id:'phantom',dedupeKey:'phantom',kind:'DELIVER'}
 },new Map()),false);
 
+// Force a two-sided commit failure in the shadow reservation helper itself.
+// Its first successful pickup reservation must be rolled back when the demand
+// record is absent; no half-booked pickup may survive a rejected job.
+{
+  const memory={};
+  const registered=add(memory,690,[pickup('partial-source',100)]);
+  const fakeDemand=registry._test.normalize(
+    delivery('missing-half',50,15,10,true),'E1N1',690);
+  const proposal={
+    supply:registered[0],
+    demand:fakeDemand,
+    haulerId:'rollback-probe',
+    amount:25
+  };
+  assert.equal(matcher._test.reserveMatch(
+    'E1N1',proposal,memory,{time:690}),null);
+  assert.equal(registry.snapshot('E1N1',memory).reservationCount,0,
+    'Partial pickup booking must be rolled back atomically');
+  assert.equal(registry.list('E1N1',memory)[0].status,'OPEN');
+}
 console.log('logistics matching shadow tests passed');
