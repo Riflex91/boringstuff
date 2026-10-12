@@ -17,6 +17,10 @@ global.STRUCTURE_EXTENSION = 'extension';
 global.STRUCTURE_TOWER = 'tower';
 global.OK = 0;
 global.ERR_NOT_IN_RANGE = -9;
+global.ERR_NO_PATH = -2;
+global.ERR_INVALID_TARGET = -7;
+global.ERR_FULL = -8;
+global.ERR_BUSY = -4;
 global.Game = { time: 2000, getObjectById: () => null };
 
 const energy = require('../game/energy.js');
@@ -249,4 +253,67 @@ try {
 } finally {
   energy.acquireForHauler = originalAcquire;
 }
+// Infrastructure-first haulers must not lock indefinitely onto a single
+// path-impossible spawn. Retry at most one extension/tower target, without
+// diverting the infrastructure reserve to consumer logistics.
+{
+  const infraRoom = room();
+  infraRoom.structures[0].store.energy = 200;
+  infraRoom.structures[1].store.energy = 20;
+  const carrier = makeHauler('infrastructure-terminal-route', infraRoom, 250);
+  carrier.memory.delivering = true;
+  infraRoom.creeps = [carrier];
+  const spawn = infraRoom.structures[0];
+  const extension = infraRoom.structures[1];
+  let transferCalls = [], moveCalls = [];
+  carrier.transfer = target => {
+    transferCalls.push(target);
+    return ERR_NOT_IN_RANGE;
+  };
+  carrier.moveTo = (target, opts) => {
+    moveCalls.push({target, opts});
+    return target === spawn ? ERR_NO_PATH : OK;
+  };
+  assert.equal(energy.deliver(carrier), true);
+  assert.deepEqual(transferCalls, [spawn, extension],
+    'one terminal spawn path must allow the alternate extension');
+  assert.equal(moveCalls.length, 2);
+  assert.ok(moveCalls.every(x => x.opts.maxOps === config.PATH_MAX_OPS),
+    'both attempts remain bounded by the existing PathFinder budget');
+
+  // A race that made a filtered spawn target full/invalid may redirect the
+  // transfer intent, but cannot schedule more than one accepted transfer.
+  transferCalls = [];
+  moveCalls = [];
+  carrier.transfer = target => {
+    transferCalls.push(target);
+    return target === spawn ? ERR_FULL : OK;
+  };
+  assert.equal(energy.deliver(carrier), true);
+  assert.deepEqual(transferCalls, [spawn, extension]);
+  assert.equal(moveCalls.length, 0);
+
+  // Busy movement is transient: do not create a conflicting second movement.
+  transferCalls = [];
+  moveCalls = [];
+  carrier.transfer = target => { transferCalls.push(target); return ERR_NOT_IN_RANGE; };
+  carrier.moveTo = (target, opts) => {
+    moveCalls.push({target, opts}); return ERR_BUSY;
+  };
+  assert.equal(energy.deliver(carrier), true);
+  assert.deepEqual(transferCalls, [spawn]);
+  assert.equal(moveCalls.length, 1);
+
+  // Both candidates permanently unreachable: cap at exactly TWO targets,
+  // leave infrastructure as the priority, never issue a consumer diversion.
+  transferCalls = [];
+  moveCalls = [];
+  carrier.moveTo = (target, opts) => {
+    moveCalls.push({target, opts}); return ERR_INVALID_TARGET;
+  };
+  assert.equal(energy.deliver(carrier), true);
+  assert.deepEqual(transferCalls, [spawn, extension]);
+  assert.equal(moveCalls.length, 2);
+}
+
 console.log('active consumer rescue behavior and infrastructure interlocks PASS');
