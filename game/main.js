@@ -281,6 +281,7 @@ module.exports.loop = function() {
     };
 
     const roomStates = [];
+    let waitingBeforeIntents = null;
     profiler.detailValue('main.scheduler-setup', Math.max(0, Game.cpu.getUsed() - schedulerSetupStart));
     const scheduledStart = Game.cpu.getUsed();
 
@@ -306,6 +307,13 @@ module.exports.loop = function() {
          // E5 measures original per-creep CPU deltas; no new CPU probes
          // inside role execution. Missing/low-bucket samples break evidence.
          const samples = Object.create(null);
+         // Keep a copy of waiting identities BEFORE a hauler's accepted
+         // transfer intent clears waitingEnergyTicks in legacy creep Memory.
+         try {
+           waitingBeforeIntents = !lowCpu ?
+             settledDeliveryEvidence.capturePreIntentWaiting(roomStates, Game)
+             : null;
+         } catch (_) { waitingBeforeIntents = null; }
          const onHaulerRoleCpu = !lowCpu ? function(roomName, used) {
            const s = samples[roomName] ||
              (samples[roomName] = {haulers:0,roleCpu:0});
@@ -353,7 +361,7 @@ module.exports.loop = function() {
           config.SHADOW_CPU_RESERVE + 3 && roomStates.length <= 3) {
       try {
         const completed = settledDeliveryEvidence.observe(
-          roomStates, Game, Memory);
+          roomStates, Game, Memory, waitingBeforeIntents);
         for (const result of completed) {
           logger.info('E5_SETTLED_CONSUMER_DELIVERY_WINDOW',
             'Previous-tick actual consumer energy transfers (lower bound only)', {
