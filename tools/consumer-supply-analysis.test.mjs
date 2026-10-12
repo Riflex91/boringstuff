@@ -16,6 +16,13 @@ function diag(tick = 1025, jseq = 2) {
       deliveringFlag: 1, readyByGuardRule: 1, capacityUnknown: 0,
       totalCarriedEnergy: 140 },
     consumers: { live: 3, waiting: 2, fallback: 1, critical: 2, empty: 1 },
+    reservationCoverage: {
+      criticalWithSticky: 1, criticalWithReadySticky: 1,
+      criticalWithoutSticky: 1, criticalWithoutReadySticky: 1,
+      criticalWithDuplicateSticky: 0, stickyAssignments: 1,
+      stickyToNoncritical: 0, stickyWithoutEnergy: 0,
+      readyHaulersWithoutSticky: 0, acceptedDeliveryProof: false
+    },
     decisions: { guardChecks: 2, guardSelected: 1, uniqueGuardHaulers: 1 },
     consumerTransfers: { attempted: 2, accepted: 1, notInRange: 1, other: 0 },
     infrastructureTransfers: { attempted: 1, accepted: 0, notInRange: 1, other: 0 },
@@ -46,6 +53,8 @@ assert.equal(result.samples[0].heartbeat.roomEnergy, 1050);
 assert.equal(result.samples[0].heartbeat.fallbackConsumers, 2,
   'pre-handler fallback count must remain distinct from post-handler fallback');
 assert.equal(result.samples[0].consumers.fallback, 1);
+assert.equal(result.samples[0].reservationCoverage.criticalWithoutReadySticky, 1);
+assert.equal(result.samples[0].reservationCoverage.acceptedDeliveryProof, false);
 assert.deepEqual(result.windows.map(w => [w.startTick, w.endTick,
   w.fallbackConsumerTicks, w.diagnosticSampleTicks]), [[1001, 1100, 68, [1025]]]);
 assert.equal(result.integrity.completeCadence, false,
@@ -88,6 +97,24 @@ for (const [section, field, invalid] of [
     'REVIEW_REQUIRED', `invalid ${section}.${field} must not pass validation`);
 }
 
+for (const [field, invalid] of [
+  ['criticalWithSticky',2],['criticalWithReadySticky',2],
+  ['criticalWithoutSticky',2],['criticalWithDuplicateSticky',2],
+  ['stickyAssignments',0],['readyHaulersWithoutSticky',2],
+  ['acceptedDeliveryProof',true],['stickyWithoutEnergy',2]
+]) {
+  const broken=diag();
+  broken.ctx.reservationCoverage[field]=invalid;
+  assert.equal(analyzeSupplyEvidence({events:[marker,broken],receipt}).state,
+    'REVIEW_REQUIRED', 'Malformed optional coverage must be rejected: '+field);
+}
+// Older post-handler diagnostics lacking the additive coverage fields remain
+// valid samples, but explicitly UNKNOWN instead of falsely implying zero.
+const legacy=diag();
+delete legacy.ctx.reservationCoverage;
+const legacyResult=analyzeSupplyEvidence({events:[marker,legacy],receipt});
+assert.equal(legacyResult.state,'OBSERVATIONS_AVAILABLE');
+assert.equal(legacyResult.samples[0].reservationCoverage,null);
 const unjournaled = diag();
 delete unjournaled.jseq;
 assert.equal(analyzeSupplyEvidence({ events: [marker, unjournaled], receipt }).state,

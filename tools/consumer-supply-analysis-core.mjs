@@ -29,6 +29,29 @@ function validateDiagnostic(e) {
     if (count(d, field) === null) return false;
   }
   if (d.guardSelected > d.guardChecks || d.uniqueGuardHaulers > d.guardSelected) return false;
+  // Additive E4 diagnostic: prior release events may not include it. Where
+  // supplied, all reservation counts must reconcile; this is still only
+  // a pre-resolution observation, not proof of energy transfer.
+  if (c.reservationCoverage !== undefined && c.reservationCoverage !== null) {
+    const v = c.reservationCoverage;
+    if (!v || v.acceptedDeliveryProof !== false) return false;
+    for (const k of ['criticalWithSticky', 'criticalWithReadySticky',
+      'criticalWithoutSticky', 'criticalWithoutReadySticky',
+      'criticalWithDuplicateSticky', 'stickyAssignments',
+      'stickyToNoncritical', 'stickyWithoutEnergy',
+      'readyHaulersWithoutSticky']) {
+      if (count(v,k) === null) return false;
+    }
+    if (v.criticalWithSticky + v.criticalWithoutSticky !== consumers.critical ||
+        v.criticalWithReadySticky + v.criticalWithoutReadySticky !== consumers.critical ||
+        v.criticalWithReadySticky > v.criticalWithSticky ||
+        v.criticalWithDuplicateSticky > v.criticalWithSticky ||
+        v.criticalWithSticky > v.stickyAssignments ||
+        v.stickyToNoncritical > v.stickyAssignments ||
+        v.stickyWithoutEnergy > v.stickyAssignments ||
+        v.stickyAssignments > h.live ||
+        v.readyHaulersWithoutSticky > h.readyByGuardRule) return false;
+  }
   for (const group of ['consumerTransfers', 'infrastructureTransfers', 'haulerAcquisitions']) {
     const x = c[group];
     if (!x || ['attempted', 'accepted', 'notInRange', 'other']
@@ -131,6 +154,7 @@ export function analyzeSupplyEvidence({ events, receipt, roomName = 'E8N1' } = {
     samples.push({
       tick: e.tick, jseq: e.jseq, haulers: e.ctx.haulers,
       consumers: e.ctx.consumers, decisions: e.ctx.decisions,
+      reservationCoverage: e.ctx.reservationCoverage ?? null,
       consumerTransfers: e.ctx.consumerTransfers,
       infrastructureTransfers: e.ctx.infrastructureTransfers,
       haulerAcquisitions: e.ctx.haulerAcquisitions,
@@ -173,7 +197,8 @@ export function analyzeSupplyEvidence({ events, receipt, roomName = 'E8N1' } = {
     notes: [
       'ROOM_HEARTBEAT is pre-handler; CONSUMER_SUPPLY_DIAG is post-handler but before intent resolution.',
       'accepted means transfer() returned OK, not a settled quantity or proven consumer delivery.',
-      'Fallback/ready correlations and economic 100-tick totals are observational, never causal.'
+      'Fallback/ready correlations and economic 100-tick totals are observational, never causal.',
+      'Sticky critical-consumer coverage counts do not prove transport, delivery timing, or energy settlement.'
     ]
   };
 }
