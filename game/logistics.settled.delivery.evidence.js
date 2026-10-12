@@ -5,7 +5,7 @@
 // Count ONLY unambiguous own hauler -> own consumer-creep energy transfers.
 // This is a conservative lower bound, NOT all infrastructure deliveries, route
 // throughput, transport CPU, delivery latency or authorization for switching.
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 const WINDOW_TICKS = 100;
 const MAX_ROOMS = 3;
 const MAX_CREEPS = 120;
@@ -20,7 +20,13 @@ function newWindow(gameTick) {
     deliveryEvents:0,deliveredEnergy:0,ticksWithDelivery:0,
     firstConfirmedWaitingDeliveries:0,
     sampledWaitingTicksToFirstDeliveryTotal:0,
-    maxSampledWaitingTicksToFirstDelivery:0};
+    maxSampledWaitingTicksToFirstDelivery:0,
+    waitingConsumerTicks:0,waitingConsumerTicksBeforeFirstReceipt:0,
+    waitingEpisodeObservedStarts:0,
+    waitingEpisodesStoppedWithoutObservedReceipt:0,
+    waitingEpisodesStoppedAfterObservedReceipt:0,
+    waitingEpisodesLostVisibility:0,
+    maxConcurrentUnservedWaitingConsumers:0};
 }
 function ensure(memory) {
   if (!memory.bot) memory.bot = {};
@@ -42,6 +48,19 @@ function validWindow(w) {
     isInt(w.sampledWaitingTicksToFirstDeliveryTotal) &&
     isInt(w.maxSampledWaitingTicksToFirstDelivery) &&
     w.firstConfirmedWaitingDeliveries <= w.ticks*MAX_CREEPS &&
+    ['waitingConsumerTicks','waitingConsumerTicksBeforeFirstReceipt',
+      'waitingEpisodeObservedStarts',
+      'waitingEpisodesStoppedWithoutObservedReceipt',
+      'waitingEpisodesStoppedAfterObservedReceipt',
+      'waitingEpisodesLostVisibility',
+      'maxConcurrentUnservedWaitingConsumers'].every(k=>isInt(w[k])) &&
+    w.waitingConsumerTicks <= w.ticks*MAX_CREEPS &&
+    w.waitingConsumerTicksBeforeFirstReceipt <= w.waitingConsumerTicks &&
+    w.waitingEpisodeObservedStarts <= w.waitingConsumerTicks &&
+    w.maxConcurrentUnservedWaitingConsumers <= MAX_CREEPS &&
+    w.waitingEpisodesStoppedWithoutObservedReceipt +
+      w.waitingEpisodesStoppedAfterObservedReceipt +
+      w.waitingEpisodesLostVisibility <= w.ticks*MAX_CREEPS &&
     (w.firstConfirmedWaitingDeliveries === 0 ?
       w.sampledWaitingTicksToFirstDeliveryTotal === 0 &&
       w.maxSampledWaitingTicksToFirstDelivery === 0 :
@@ -106,6 +125,7 @@ function inspectRoom(state, includeConsumers = false) {
   if (includeConsumers) {
     result.deliveredConsumerIds=deliveredConsumerIds;
     result.waitingConsumerIds=waitingConsumers;
+    result.visibleConsumerIds=[...consumers];
   }
   return result;
 }
@@ -122,6 +142,22 @@ function summarize(w,room) {
     confirmedConsumerEnergyPerTickLowerBound:
       Math.round(w.deliveredEnergy / w.ticks * 10000)/10000,
     ticksWithConfirmedConsumerDelivery:w.ticksWithDelivery,
+    observedWaitingConsumerTicks:w.waitingConsumerTicks,
+    observedWaitingConsumerTicksBeforeFirstReceipt:
+      w.waitingConsumerTicksBeforeFirstReceipt,
+    observedWaitingEpisodeStarts:w.waitingEpisodeObservedStarts,
+    observedWaitingEpisodesStoppedWithoutHaulerReceipt:
+      w.waitingEpisodesStoppedWithoutObservedReceipt,
+    observedWaitingEpisodesStoppedAfterHaulerReceipt:
+      w.waitingEpisodesStoppedAfterObservedReceipt,
+    observedWaitingEpisodesLostVisibility:w.waitingEpisodesLostVisibility,
+    maximumConcurrentWaitingConsumersWithoutFirstReceipt:
+      w.maxConcurrentUnservedWaitingConsumers,
+    // These are observed episodes, not complete demand-resolution proofs:
+    // "stopped" can mean self-collection, role/memory changes or consumption.
+    // Open episodes are right-censored; no success percentage is inferred.
+    openWaitingEpisodesAtWindowEnd:null,
+    waitingServiceSuccessRate:null,
     confirmedFirstDeliveryForPreviouslyWaitingConsumers:
       w.firstConfirmedWaitingDeliveries,
     sampledWaitingTicksBeforeFirstConfirmedDeliveryTotal:
@@ -213,15 +249,30 @@ function observe(states,game,memory) {
       entry.lastProcessedGameTick=now;
       continue;
     }
+    const previousWaiting=entry.waiting;
+    const visibleIds=new Set(measurement.visibleConsumerIds);
+    const waitingIds=new Set(measurement.waitingConsumerIds);
+    let observedStarts=0, stoppedWithoutReceipt=0,
+      stoppedAfterReceipt=0, lostVisibility=0;
+    for (const [id,prior] of Object.entries(previousWaiting)) {
+      if (waitingIds.has(id)) continue;
+      if (!visibleIds.has(id)) lostVisibility++;
+      else if (prior.firstSettledObserved || firstRecipientIds.has(id))
+        stoppedAfterReceipt++;
+      else stoppedWithoutReceipt++;
+    }
     const waiting={};
     for (const id of measurement.waitingConsumerIds) {
       const previous=entry.waiting[id];
+      if (!(previous && previous.lastTick===now-1)) observedStarts++;
       waiting[id]=previous && previous.lastTick===now-1 ?
         {firstTick:previous.firstTick,lastTick:now,
           firstSettledObserved:previous.firstSettledObserved ||
             firstRecipientIds.has(id)} :
         {firstTick:now,lastTick:now,firstSettledObserved:false};
     }
+    const unservedWaiting=Object.values(waiting)
+      .filter(x=>!x.firstSettledObserved).length;
     entry.waiting=waiting;
     const w=entry.window;
     w.ticks++;
@@ -229,13 +280,22 @@ function observe(states,game,memory) {
     w.deliveryEvents+=measurement.deliveryEvents;
     w.deliveredEnergy+=measurement.deliveredEnergy;
     if(measurement.deliveryEvents)w.ticksWithDelivery++;
+    w.waitingConsumerTicks+=measurement.waitingConsumerIds.length;
+    w.waitingConsumerTicksBeforeFirstReceipt+=unservedWaiting;
+    w.waitingEpisodeObservedStarts+=observedStarts;
+    w.waitingEpisodesStoppedWithoutObservedReceipt+=stoppedWithoutReceipt;
+    w.waitingEpisodesStoppedAfterObservedReceipt+=stoppedAfterReceipt;
+    w.waitingEpisodesLostVisibility+=lostVisibility;
+    w.maxConcurrentUnservedWaitingConsumers=Math.max(
+      w.maxConcurrentUnservedWaitingConsumers,unservedWaiting);
     w.firstConfirmedWaitingDeliveries+=firstDeliveries;
     w.sampledWaitingTicksToFirstDeliveryTotal+=waitingTicks;
     w.maxSampledWaitingTicksToFirstDelivery=Math.max(
       w.maxSampledWaitingTicksToFirstDelivery,maximumWaiting);
     if(!isInt(w.deliveryEvents) || !isInt(w.deliveredEnergy) ||
        !isInt(w.firstConfirmedWaitingDeliveries) ||
-       !isInt(w.sampledWaitingTicksToFirstDeliveryTotal)) {
+       !isInt(w.sampledWaitingTicksToFirstDeliveryTotal) ||
+       !validWindow(w) && w.ticks !== WINDOW_TICKS) {
       entry.window=newWindow(now+1);entry.lastWindow=null;entry.waiting={};
       entry.lastProcessedGameTick=now;
       continue;
@@ -247,6 +307,11 @@ function observe(states,game,memory) {
     }
     if(w.ticks===WINDOW_TICKS) {
       const result=summarize(w,name);
+      result.openWaitingEpisodesAtWindowEnd=Object.keys(waiting).length;
+      result.openWaitingEpisodesWithoutConfirmedReceiptAtWindowEnd=
+        unservedWaiting;
+      // A right-censored open episode must not be treated as failure or
+      // disappearance. No service success rate is derivable from this window.
       entry.lastWindow=result;
       done.push(result);
       entry.window=newWindow(now+1);
