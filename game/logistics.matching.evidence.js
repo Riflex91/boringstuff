@@ -1,6 +1,6 @@
 'use strict';
 
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 const WINDOW_TICKS = 100;
 
 function round(value, digits) {
@@ -17,6 +17,9 @@ function newWindow(startTick) {
   return {
     startTick,
     ticks: 0,
+    // The evidence window represents exactly one observed game tick per row.
+    // Persistent version 2 explicitly invalidates older count-only windows.
+    lastObservedTick: null,
     deferredTicks: 0,
     haulerTicks: 0,
     matchedHaulerTicks: 0,
@@ -174,20 +177,54 @@ function summarize(window, endTick) {
 
 function observe(state, memoryRoot, game) {
   game = game || (typeof Game !== 'undefined' ? Game : null);
-  const now = tick(game);
+  const now = game && game.time;
   const roomName = state && state.room && state.room.name;
-  if (!roomName) return { current: null, completed: null, lastWindow: null };
+  if (!Number.isSafeInteger(now) || now < 0 || !roomName)
+    return { current: null, completed: null, lastWindow: null };
 
   const room = ensureRoom(roomName, memoryRoot, now);
-  accumulate(room.window, state);
+  // This also repairs malformed previous v2 records rather than treating
+  // arbitrary counters or replayed snapshot data as a verified tick window.
+  let w = room.window;
+  const valid = w && Number.isSafeInteger(w.startTick) &&
+    Number.isSafeInteger(w.ticks) && w.ticks >= 0 &&
+    w.ticks < WINDOW_TICKS &&
+    (w.ticks === 0 ? w.lastObservedTick === null :
+      Number.isSafeInteger(w.lastObservedTick) &&
+      w.lastObservedTick - w.startTick === w.ticks - 1);
+  if (!valid) {
+    room.window = newWindow(now);
+    w = room.window;
+  }
+  // Duplicate observation in one tick is idempotent. Never complete an
+  // artificial "100-tick" window by observing a single tick repeatedly.
+  if (w.lastObservedTick === now) {
+    return { current: summarize(w, now), completed: null,
+      lastWindow: room.lastWindow };
+  }
+  if (w.lastObservedTick !== null &&
+      now !== w.lastObservedTick + 1) {
+    // Missing or reversed tick breaks evidence. Do not splice together
+    // histories across observation gaps, respawns or simulation resets.
+    if (now < w.lastObservedTick) room.lastWindow = null;
+    room.window = newWindow(now);
+    w = room.window;
+  } else if (w.lastObservedTick === null && w.startTick !== now) {
+    // Recover from an empty window left after a completed 100-tick batch.
+    // If the next call is late, restart at the actual observed tick.
+    room.window = newWindow(now);
+    w = room.window;
+  }
+  accumulate(w, state);
+  w.lastObservedTick = now;
 
   let completed = null;
-  if (room.window.ticks >= WINDOW_TICKS) {
-    completed = summarize(room.window, now);
+  if (w.ticks === WINDOW_TICKS) {
+    // A full window must have 100 distinct, contiguous actual timestamps.
+    completed = summarize(w, now);
     room.lastWindow = completed;
     room.window = newWindow(now + 1);
   }
-
   return {
     current: summarize(room.window, now),
     completed,
