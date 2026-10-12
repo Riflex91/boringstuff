@@ -206,7 +206,10 @@ function inspectRoom(state, includeConsumers = false, preIntent = null) {
        loaded.some((id,i)=>!waiting.includes(id)||
          (i>0&&loaded[i-1]>=id)) ||
        Object.entries(exclusive).some(([id,actor])=>
-         !loaded.includes(id)||typeof actor!=='string'||!actor))return null;
+         !loaded.includes(id)||typeof actor!=='string'||!actor||
+         !haulers.has(actor)) ||
+       new Set(Object.values(exclusive)).size!==
+         Object.keys(exclusive).length)return null;
     result.deliveredConsumerIds=deliveredConsumerIds;
     result.deliveredActorTargets=deliveredActorTargets;
     result.waitingConsumerIds=waiting.slice();
@@ -231,6 +234,9 @@ function summarize(w,room) {
       Math.round(w.deliveredEnergy / w.ticks * 10000)/10000,
     ticksWithConfirmedConsumerDelivery:w.ticksWithDelivery,
     observedWaitingConsumerTicks:w.waitingConsumerTicks,
+    // Pre-intent CARRY-positive reservation COVERAGE, not delivery proof.
+    // Exclusive actor match is checked against next tick's real engine event;
+    // an ambiguous duplicate or absent reservation is never called a match.
     observedWaitingConsumerTicksWithLoadedSticky:
       w.waitingConsumerTicksWithLoadedSticky,
     firstConfirmedReceiptFromSameExclusiveLoadedSticky:
