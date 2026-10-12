@@ -35,7 +35,7 @@ function runCreep(creep) {
   }
 }
 
-function runAll() {
+function runAll(onHaulerRoleCpu) {
   const cpuByRole = {};
   for (const name in Game.creeps) {
     const creep = Game.creeps[name];
@@ -44,6 +44,13 @@ function runAll() {
     runCreep(creep);
     const used = Math.max(0, Game.cpu.getUsed() - start);
     cpuByRole[role] = (cpuByRole[role] || 0) + used;
+    // Reuse the original two CPU readings. Optional observer is side-effect
+    // isolated and must never interrupt gameplay if diagnostics fail.
+    if (role === 'hauler' && !creep.spawning &&
+        typeof onHaulerRoleCpu === 'function' &&
+        creep.room && typeof creep.room.name === 'string') {
+      try { onHaulerRoleCpu(creep.room.name, used); } catch (_) { /* optional */ }
+    }
   }
   for (const role in cpuByRole) profiler.detailValue('creep.' + role, cpuByRole[role]);
   return cpuByRole;

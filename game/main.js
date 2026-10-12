@@ -6,6 +6,7 @@ const profiler = require('profiler');
 const roomManager = require('room.manager');
 const creepManager = require('creep.manager');
 const consumerSupplyObserver = require('consumer.supply.observer');
+const logisticsHaulerCpuEvidence = require('logistics.hauler.cpu.evidence');
 const stats = require('stats');
 const visuals = require('visuals');
 const commands = require('commands');
@@ -299,7 +300,30 @@ module.exports.loop = function() {
       priorityClass: processScheduler.PRIORITY.CRITICAL,
       minimumInterval: 0
     }, function() {
-      profiler.section('creeps', function() { creepManager.runAll(); });
+      profiler.section('creeps', function() {
+         // E5 measures original per-creep CPU deltas; no new CPU probes
+         // inside role execution. Missing/low-bucket samples break evidence.
+         const samples = Object.create(null);
+         const onHaulerRoleCpu = !lowCpu ? function(roomName, used) {
+           const s = samples[roomName] ||
+             (samples[roomName] = {haulers:0,roleCpu:0});
+           s.haulers++;
+           s.roleCpu += used;
+         } : null;
+         creepManager.runAll(onHaulerRoleCpu);
+         if (!lowCpu) {
+           try {
+             const completed = logisticsHaulerCpuEvidence.observe(
+               roomStates, samples, Game, Memory);
+             for (const evidence of completed) {
+               logger.info('E5_HAULER_ROLE_CPU_WINDOW',
+                 'Measured hauler role CPU, not route CPU or settled delivery', {
+                   room:evidence.room,evidence
+                 }, {force:true,persist:true,dedupeTicks:0});
+             }
+           } catch (_) { /* optional observer must not block core gameplay */ }
+         }
+       });
     }, schedulerContext);
 
     // D2 observer is passive, bucket-gated and allowed to miss a tick.
