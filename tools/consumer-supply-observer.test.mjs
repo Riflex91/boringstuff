@@ -86,6 +86,42 @@ assert.deepEqual(evt.ctx.infrastructureTransfers,
 assert.deepEqual(evt.ctx.haulerAcquisitions,
   { attempted: 1, accepted: 0, notInRange: 1, other: 0 });
 assert.equal(evt.ctx.acceptedIsIntentNotSettled, true);
+assert.deepEqual(evt.ctx.reservationCoverage, {
+  criticalWithSticky: 0, criticalWithReadySticky: 0,
+  criticalWithoutSticky: 2, criticalWithoutReadySticky: 2,
+  criticalWithDuplicateSticky: 0, stickyAssignments: 0,
+  stickyToNoncritical: 0, stickyWithoutEnergy: 0,
+  readyHaulersWithoutSticky: 1, acceptedDeliveryProof: false
+});
+// Two haulers holding the same critical consumer ID do not represent two
+// independently served consumers. A non-ready sticky reservation is visible,
+// but must not be mistaken for an energy-ready guard.
+{
+  const h1 = creep('h1','hauler',300,300,
+    { delivering:true,consumerTargetId:'fallback' });
+  const h2 = creep('h2','hauler',25,300,
+    { delivering:false,consumerTargetId:'fallback' });
+  const idle = creep('h3','hauler',0,300,
+    { delivering:false,consumerTargetId:'unknown-consumer' });
+  const beforeCoverage = JSON.stringify({h1,h2,idle,fallback,waiting});
+  const sample = observer._test.sampleRoomCreeps({
+    creeps:{h1,h2,idle,fallback,waiting}
+  }, 'E8N1');
+  assert.deepEqual(sample.reservationCoverage,{
+    criticalWithSticky:1,criticalWithReadySticky:1,
+    criticalWithoutSticky:1,criticalWithoutReadySticky:1,
+    criticalWithDuplicateSticky:1,stickyAssignments:3,
+    stickyToNoncritical:1,stickyWithoutEnergy:1,
+    readyHaulersWithoutSticky:0,acceptedDeliveryProof:false
+  });
+  assert.equal(JSON.stringify({h1,h2,idle,fallback,waiting}),beforeCoverage,
+    'Optional consumer reservation diagnostics cannot mutate Game creeps');
+  const ambiguous = { ...fallback, id: '', name: '' };
+  assert.equal(observer._test.sampleRoomCreeps({
+    creeps:{h1,ambiguous}
+  }, 'E8N1').reservationCoverage,null,
+    'Unidentifiable critical consumer must not create fabricated coverage');
+}
 assert.equal(evt.opts.journal, true);
 assert.equal(evt.opts.persist, undefined);
 assert.equal(JSON.stringify(g.creeps), before,
