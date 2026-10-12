@@ -283,9 +283,15 @@ function selectConsumerGuardHaulers(room) {
   const rescuer = selectConsumerRescueHauler(room, haulers, ready, critical);
   if (rescuer) return [rescuer];
 
+  // Protect a delivery-READY infrastructure carrier, not merely a living
+  // hauler. Previously a nonready/empty hauler counted as the reserve and
+  // the sole loaded carrier could be diverted while spawn/extensions starved.
+  // A partial-load rescuer above remains the only one-ready exception, and
+  // is already gated on FULL spawn/extensions and healthy tower reserves.
+  if (ready.length <= 1) return [];
   const maxGuards = Math.min(
     critical.length,
-    ready.length,
+    ready.length - 1,
     Math.max(1, haulers.length - 1)
   );
   const criticalIds = {};

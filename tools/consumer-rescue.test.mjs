@@ -129,11 +129,31 @@ try {
   assert.equal(partial.memory.consumerTargetId, undefined,
     'fallback to normal acquisition must release consumer reservation');
   assert.equal(acquisitions, 1);
+  // Underfilled spawn/extensions means partial rescue is forbidden. The
+  // only loaded ready carrier must serve hard infrastructure, not become a
+  // normal starvation guard by treating the collecting hauler as a reserve.
+  assert.deepEqual(energy._test.selectConsumerGuardHaulers(r), []);
+  assert.equal(energy.shouldPrioritizeConsumer(ready), false);
+  const protectedCalls = [];
+  const infraDeliver = energy.deliver;
+  const consumerDeliver = energy.deliverToConsumer;
+  try {
+    energy.deliver = () => { protectedCalls.push('infrastructure'); return true; };
+    energy.deliverToConsumer = () => { protectedCalls.push('consumer'); return true; };
+    role.run(ready);
+    assert.deepEqual(protectedCalls, ['infrastructure'],
+      'the only loaded ready hauler must actually try infrastructure first');
+  } finally {
+    energy.deliver = infraDeliver;
+    energy.deliverToConsumer = consumerDeliver;
+  }
   r.energyAvailable = 1050;
 
   r.structures[2].store.energy = 499;
   assert.equal(energy.shouldRescueConsumer(partial), false,
     'tower below 50% forbids new diversion');
+  assert.equal(energy.shouldPrioritizeConsumer(ready), false,
+    'tower reserve deficit also protects the sole ready infrastructure hauler');
   r.structures[2].store.energy = 600;
   r.structures[2].store.getCapacity = () => undefined;
   assert.equal(energy.shouldRescueConsumer(partial), false,
@@ -214,11 +234,18 @@ try {
   assert.equal(energy.shouldRescueConsumer(partial), false,
     'unobservable infrastructure capacity must fail closed');
 
-  // Existing normal guards still behave normally when rescue is ineligible.
+  // Without a safe rescuer, a lone ready hauler remains protected even
+  // when a consumer is critically waiting and infrastructure is underfilled.
   r.energyAvailable = 750;
   ready.memory.consumerTargetId = undefined;
+  assert.deepEqual(energy._test.selectConsumerGuardHaulers(r), []);
+
+  // Once a SECOND hauler is genuinely delivery-ready, a normal guard may
+  // operate while one loaded ready carrier still handles spawn/extensions.
+  partial.store.energy = 160;
   assert.deepEqual(energy._test.selectConsumerGuardHaulers(r).map(c => c.id),
     ['ready']);
+  assert.equal(energy._test.haulerReadyToDeliver(partial), true);
 } finally {
   energy.acquireForHauler = originalAcquire;
 }
