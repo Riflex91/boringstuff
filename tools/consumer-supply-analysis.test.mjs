@@ -55,6 +55,13 @@ assert.equal(result.samples[0].heartbeat.fallbackConsumers, 2,
 assert.equal(result.samples[0].consumers.fallback, 1);
 assert.equal(result.samples[0].reservationCoverage.criticalWithoutReadySticky, 1);
 assert.equal(result.samples[0].reservationCoverage.acceptedDeliveryProof, false);
+assert.equal(result.samples[0].triage.classification,
+  'CRITICAL_COVERAGE_GAP_OBSERVED');
+assert.deepEqual(result.samples[0].triage.reasonCodes,[
+  'CRITICAL_READY_COVERAGE_GAP'
+]);
+assert.deepEqual(result.repeatedPatterns,[],
+  'A single optional sample cannot prove a recurring pattern');
 assert.deepEqual(result.windows.map(w => [w.startTick, w.endTick,
   w.fallbackConsumerTicks, w.diagnosticSampleTicks]), [[1001, 1100, 68, [1025]]]);
 assert.equal(result.integrity.completeCadence, false,

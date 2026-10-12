@@ -70,6 +70,8 @@ else {
         (s.reservationCoverage?.criticalWithoutReadySticky ?? 'UNKNOWN') +
       ' criticalWithDuplicateSticky=' +
         (s.reservationCoverage?.criticalWithDuplicateSticky ?? 'UNKNOWN') +
+      ' triage=' + (s.triage?.classification ?? 'UNKNOWN') +
+      ' triageReasons=' + (s.triage?.reasonCodes?.join(',') || '-') +
       ' zeroEnergySticky=' +
         (s.reservationCoverage?.stickyWithoutEnergy ?? 'UNKNOWN') +
       ' acceptedIntents=' + s.consumerTransfers.accepted +
@@ -81,6 +83,12 @@ else {
     console.log('window=' + w.startTick + '-' + w.endTick +
       ' fallbackConsumerTicks=' + (w.fallbackConsumerTicks ?? 'UNKNOWN') +
       ' observedDiagnosticTicks=' + w.diagnosticSampleTicks.join(','));
+  }
+  for (const entry of report.repeatedPatterns || []) {
+    console.log('repeatedGap=' + entry.reasonCode +
+      ' window=' + entry.startTick + '-' + entry.endTick +
+      ' samples=' + entry.sampleCount +
+      ' evidence=' + entry.classification);
   }
   for (const note of report.notes || []) console.log('NOTE:', note);
 }

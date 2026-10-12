@@ -1,3 +1,5 @@
+import { triageSupplySample, repeatedSupplyObservations } from './consumer-supply-triage.mjs';
+
 // Read-only correlation of optional post-handler supply observations with
 // pre-handler room heartbeats and exact 100-tick economy windows.
 // Correlation is not causality; accepted transfer intents are not deliveries.
@@ -163,6 +165,10 @@ export function analyzeSupplyEvidence({ events, receipt, roomName = 'E8N1' } = {
       acceptedIsIntentNotSettled: true
     });
   }
+  // Triage derives from fully validated post-intent samples only. No action
+  // authority or causal inference; unknown coverage remains explicitly unknown.
+  for (const s of samples) s.triage = triageSupplySample(s);
+  const repeatedPatterns = repeatedSupplyObservations(samples);
   const byWindow = new Map();
   for (const e of unique) {
     const w = fullWindow(e, room, marker.tick);
@@ -187,7 +193,7 @@ export function analyzeSupplyEvidence({ events, receipt, roomName = 'E8N1' } = {
     reason: invalidTicks.length ? 'INVALID_OR_DUPLICATE_DIAGNOSTIC' :
       samples.length ? 'SAMPLED_EVIDENCE_NOT_DELIVERY_PROOF' : 'NO_DIAGNOSTIC_SAMPLES',
     room, markerTick: marker.tick, latestTick,
-    samples, invalidTicks, windows,
+    samples, invalidTicks, windows, repeatedPatterns,
     integrity: {
       retentionGap,
       journalEventCount: seenSeq.size,
@@ -198,7 +204,8 @@ export function analyzeSupplyEvidence({ events, receipt, roomName = 'E8N1' } = {
       'ROOM_HEARTBEAT is pre-handler; CONSUMER_SUPPLY_DIAG is post-handler but before intent resolution.',
       'accepted means transfer() returned OK, not a settled quantity or proven consumer delivery.',
       'Fallback/ready correlations and economic 100-tick totals are observational, never causal.',
-      'Sticky critical-consumer coverage counts do not prove transport, delivery timing, or energy settlement.'
+      'Sticky critical-consumer coverage counts do not prove transport, delivery timing, or energy settlement.',
+      'Repeated 25-tick diagnostic associations are not intervention recommendations; require verified settled deliveries and counterfactual gating.'
     ]
   };
 }
