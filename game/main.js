@@ -7,6 +7,7 @@ const roomManager = require('room.manager');
 const creepManager = require('creep.manager');
 const consumerSupplyObserver = require('consumer.supply.observer');
 const logisticsHaulerCpuEvidence = require('logistics.hauler.cpu.evidence');
+const settledDeliveryEvidence = require('logistics.settled.delivery.evidence');
 const stats = require('stats');
 const visuals = require('visuals');
 const commands = require('commands');
@@ -341,6 +342,25 @@ module.exports.loop = function() {
         // An optional ETA observer must never block core gameplay.
       }
     }, schedulerContext);
+
+    // E5 settlement witness reads last tick's actual Room.getEventLog()
+    // after the active hauler handlers. Skip under CPU/bucket pressure; a
+    // missed tick breaks the 100-real-tick evidence window. This is purely
+    // lower-bound consumer delivery observation, NOT route/mode authority.
+    if (!lowCpu && Game.time >= 1 &&
+        Game.cpu.limit - Game.cpu.getUsed() >
+          config.SHADOW_CPU_RESERVE + 3 && roomStates.length <= 3) {
+      try {
+        const completed = settledDeliveryEvidence.observe(
+          roomStates, Game, Memory);
+        for (const result of completed) {
+          logger.info('E5_SETTLED_CONSUMER_DELIVERY_WINDOW',
+            'Previous-tick actual consumer energy transfers (lower bound only)', {
+              room:result.room, evidence:result
+            }, {force:true,persist:true,dedupeTicks:0});
+        }
+      } catch (_) { /* optional event observation must never block gameplay */ }
+    }
 
     // Observations happen AFTER creep handlers issued intents, never inside
     // room.heartbeat (which is captured BEFORE creep actions). Sample every
