@@ -82,6 +82,47 @@ function duplicateReservationCount(jobs) {
   return duplicates;
 }
 
+// Only a verified, fresh E4 shadow plan represents one genuine sampled
+// decision tick. Missing, stale or self-contradictory summaries are gaps,
+// NOT zero-demand / perfect-coverage proof.
+function validatedMatching(state, now) {
+  const matching = state && state.logisticsMatchingShadow;
+  const summary = matching && matching.summary;
+  if (!matching || matching.authority !== 'SHADOW' ||
+      !Array.isArray(matching.jobs) ||
+      matching.schemaVersion !== 1 ||
+      !summary || summary.authority !== 'SHADOW' ||
+      summary.schemaVersion !== 1 ||
+      typeof summary.deferred !== 'boolean') return false;
+  if (summary.deferred) {
+    return summary.planTick === null &&
+      typeof summary.deferReason === 'string' && !!summary.deferReason &&
+      matching.jobs.length === 0 && summary.jobCount === 0;
+  }
+  if (summary.planTick !== now) return false;
+  const keys = ['haulerCount','matchedHaulerCount','candidateCount',
+    'jobCount','pairedJobCount','directCarriedJobCount',
+    'criticalRequestCount','criticalMatchedCount','unmatchedCriticalCount',
+    'criticalCandidateRequestCount','criticalNoCandidateCount',
+    'criticalCandidateUnmatchedCount','criticalSlotCapacity'];
+  if (keys.some(key => !Number.isSafeInteger(summary[key]) ||
+      summary[key] < 0)) return false;
+  if (!Number.isFinite(summary.reservedAmount) || summary.reservedAmount < 0 ||
+      !Number.isFinite(summary.averageTransportTicks) ||
+      summary.averageTransportTicks < 0) return false;
+  return summary.jobCount === matching.jobs.length &&
+    summary.matchedHaulerCount === summary.jobCount &&
+    summary.jobCount <= summary.haulerCount &&
+    summary.criticalMatchedCount + summary.unmatchedCriticalCount ===
+      summary.criticalRequestCount &&
+    summary.criticalCandidateRequestCount + summary.criticalNoCandidateCount ===
+      summary.criticalRequestCount &&
+    summary.criticalCandidateUnmatchedCount <= summary.unmatchedCriticalCount &&
+    summary.criticalMatchedCount <= summary.criticalCandidateRequestCount &&
+    summary.criticalSlotCapacity <=
+      Math.min(summary.criticalRequestCount, summary.haulerCount);
+}
+
 function accumulate(window, state) {
   const matching = state && state.logisticsMatchingShadow || null;
   const summary = matching && matching.summary || {};
@@ -149,18 +190,17 @@ function summarize(window, endTick) {
     criticalNoCandidateTicks: Math.max(0, Number(window.criticalNoCandidateTicks) || 0),
     criticalCandidateUnmatchedTicks: Math.max(0, Number(window.criticalCandidateUnmatchedTicks) || 0),
     criticalSlotCapacityTicks: criticalSlotCapacity,
-    criticalCoverageRatio: critical
-      ? round(criticalMatched / critical)
-      : 1,
-    criticalCandidateRatio: critical
-      ? round(criticalCandidates / critical)
-      : 1,
-    criticalCandidateCoverageRatio: criticalCandidates
-      ? round(criticalMatched / criticalCandidates)
-      : (critical ? 0 : 1),
-    criticalSlotCoverageRatio: criticalSlotCapacity
-      ? round(criticalMatched / criticalSlotCapacity)
-      : (critical ? 0 : 1),
+    // An entirely deferred window proves nothing about matching quality.
+    criticalCoverageRatio: window.deferredTicks === window.ticks
+      ? null : (critical ? round(criticalMatched / critical) : 1),
+    criticalCandidateRatio: window.deferredTicks === window.ticks
+      ? null : (critical ? round(criticalCandidates / critical) : 1),
+    criticalCandidateCoverageRatio: window.deferredTicks === window.ticks
+      ? null : (criticalCandidates
+        ? round(criticalMatched / criticalCandidates) : (critical ? 0 : 1)),
+    criticalSlotCoverageRatio: window.deferredTicks === window.ticks
+      ? null : (criticalSlotCapacity
+        ? round(criticalMatched / criticalSlotCapacity) : (critical ? 0 : 1)),
     averageReservedAmountPerTick: round(window.reservedAmountTicks / ticks, 2),
     averagePredictedTransportTicks: window.transportJobCount
       ? round(window.transportTickTotal / window.transportJobCount, 2)
@@ -184,6 +224,16 @@ function observe(state, memoryRoot, game) {
     return { current: null, completed: null, lastWindow: null };
 
   const room = ensureRoom(roomName, memoryRoot, now);
+  // A skipped/broken E4 plan is not a zero-work tick. Invalidate any
+  // incomplete streak and withhold a current snapshot rather than projecting
+  // a false 100-tick complete matching record.
+  if (!validatedMatching(state, now)) {
+    room.window = newWindow(now + 1);
+    room.lastProcessedTick = now;
+    return { current: null, completed: null,
+      lastWindow: room.lastWindow || null,
+      invalidReason: 'MISSING_STALE_OR_INCONSISTENT_SHADOW_PLAN' };
+  }
   // Keep a boundary guard after 100th-tick rollover, otherwise a second
   // observer call on the completed tick would start another false window.
   if (room.lastProcessedTick === now) {
@@ -269,6 +319,7 @@ module.exports = {
     newWindow,
     ensureRoom,
     duplicateReservationCount,
+    validatedMatching,
     accumulate
   }
 };
