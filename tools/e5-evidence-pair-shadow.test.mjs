@@ -127,7 +127,10 @@ const badCpu=[
   ['unauthorized change',x=>x.topologySwitchAuthorized=true],
   ['wrong source',x=>x.source='ENGINE_ROUTE_CPU'],
   ['fake route CPU',x=>x.transportRouteCpuPerTick=4],
-  ['wrong role CPU detail',x=>x.haulerRoleCpuPerCreepTick=null]
+  ['wrong role CPU detail',x=>x.haulerRoleCpuPerCreepTick=null],
+  ['invented mean CPU',x=>x.haulerRoleCpuPerTick=4],
+  ['invented per creep CPU',x=>x.haulerRoleCpuPerCreepTick=4],
+  ['zero active ticks with hauler workload',x=>x.ticksWithActiveHaulers=0]
 ];
 for(const [name,change] of badCpu){
   const x=structuredClone(cpu);change(x);
@@ -144,6 +147,8 @@ const badDelivery=[
   ['more receipts than events',x=>x.confirmedFirstDeliveryForPreviouslyWaitingConsumers=3],
   ['energy below count',x=>x.confirmedConsumerEnergyLowerBound=1],
   ['infinite lower bound',x=>x.confirmedConsumerEnergyPerTickLowerBound=Infinity],
+  ['invented mean consumer energy',x=>x.confirmedConsumerEnergyPerTickLowerBound=99],
+  ['events but no delivery ticks',x=>x.ticksWithConfirmedConsumerDelivery=0],
   ['invalid waiting sum',x=>x.observedWaitingConsumerTicksBeforeFirstReceipt=10],
   ['invalid open episodes',x=>x.openWaitingEpisodesWithoutConfirmedReceiptAtWindowEnd=2],
   ['missing open episode field',x=>{delete x.openWaitingEpisodesAtWindowEnd;}],
