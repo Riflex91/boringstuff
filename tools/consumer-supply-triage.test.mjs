@@ -41,6 +41,20 @@ const inconsistent=triageSupplySample({
     criticalWithReadySticky:2}
 });
 assert.equal(inconsistent.classification,'UNKNOWN');
+const falselySettled=triageSupplySample({
+  ...base,reservationCoverage:{
+    ...base.reservationCoverage,acceptedDeliveryProof:true
+  }
+});
+assert.equal(falselySettled.classification,'UNKNOWN');
+assert.equal(falselySettled.evidenceReason,
+  'UNSUPPORTED_DELIVERY_SETTLEMENT_CLAIM');
+const overstated=triageSupplySample({
+  ...base,reservationCoverage:{
+    ...base.reservationCoverage,stickyAssignments:0
+  }
+});
+assert.equal(overstated.classification,'UNKNOWN');
 const allReady=triageSupplySample({
   ...base,reservationCoverage:{...base.reservationCoverage,
     criticalWithSticky:2,criticalWithReadySticky:2,
@@ -87,6 +101,13 @@ assert.deepEqual(patterns,[
     classification:'REPEATED_ASSOCIATION_NOT_CAUSAL',
     actionAuthority:'NONE',causalProof:false,settledDeliveryProof:false}
 ]);
+const forged=[sample(100),sample(125),sample(150)];
+for (const x of forged) {
+  x.reservationCoverage=null;
+  x.triage=current;
+}
+assert.deepEqual(repeatedSupplyObservations(forged),[],
+  'Pre-attached classifications must not bypass validation of raw evidence');
 assert.deepEqual(repeatedSupplyObservations([...a].reverse()),patterns,
   'Journal order must not matter to repeated-association detection');
 assert.equal(JSON.stringify(a),before,'No mutation of observed samples');
