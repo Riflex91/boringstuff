@@ -51,12 +51,29 @@ function observe(roomStates, samples, game, memoryRoot) {
   if (names.length>MAX_ROOMS ||
       names.some(n=>typeof n!=='string'||!n||n.length>20) ||
       new Set(names).size!==names.length) return [];
+  // A missing optional callback cannot masquerade as zero hauling. The
+  // existing room.state owned creep census independently bounds each sample.
+  const counts=Object.create(null);
+  for (const state of roomStates) {
+    if (!Array.isArray(state.creeps)) return [];
+    const ids=new Set();
+    let total=0;
+    for (const creep of state.creeps) {
+      if (!creep || creep.spawning || !creep.memory ||
+          creep.memory.role!=='hauler') continue;
+      const id=creep.id||creep.name;
+      if (typeof id!=='string'||!id||ids.has(id))return [];
+      ids.add(id);
+      total++;
+    }
+    counts[state.room.name]=total;
+  }
   const record=ensure(root,now), completed=[];
   // Never report an arbitrary partial census of a >3-room colony.
   for(const room of names.sort()){
     const sample=samples[room] || {haulers:0,roleCpu:0};
     if(!Number.isSafeInteger(sample.haulers) || sample.haulers<0 ||
-       !valid(sample.roleCpu)) {
+       sample.haulers!==counts[room] || !valid(sample.roleCpu)) {
       delete record.rooms[room];
       continue;
     }
