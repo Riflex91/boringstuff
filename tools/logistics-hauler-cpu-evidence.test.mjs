@@ -33,9 +33,9 @@ const input=()=>({'E1N1':{haulers:2,roleCpu:1.25}});
     settledEnergyPerTick:null,transportRouteCpuPerTick:null,
     comparableAlternativeCpuPerTick:null,topologySwitchAuthorized:false
   });
-  assert.deepEqual(evidence.snapshot('E1N1',mem),{
-    ...w,room:undefined
-  }===undefined ? {} : (({room,...rest})=>rest)(w));
+  const {room:roomId,...windowSummary}=w;
+  assert.equal(roomId,'E1N1');
+  assert.deepEqual(evidence.snapshot('E1N1',mem),windowSummary);
   assert.deepEqual(evidence.observe(room,input(),{time:1099},mem),[],
     '100th tick replay never opens another evidence batch');
   assert.deepEqual(evidence.observe(room,input(),{time:1100},mem),[]);
