@@ -155,11 +155,35 @@ function deliveryTargets(creep) {
 
 function deliver(creep) {
   const targets = deliveryTargets(creep);
-  const target = targets[0];
-  if (!target) return false;
-  const rc = creep.transfer(target, RESOURCE_ENERGY);
+  if (!targets.length) return false;
+
+  // A permanently unreachable spawn/extension can otherwise monopolize the
+  // infrastructure hauler forever. Retry at most ONE alternative structure
+  // after an explicit terminal target/path failure; preserve the hard
+  // infrastructure reserve and the bounded legacy PathFinder budget.
+  for (let i = 0; i < Math.min(2, targets.length); i++) {
+    const target = targets[i];
+    const rc = creep.transfer(target, RESOURCE_ENERGY);
     consumerSupplyObserver.recordResult(creep, 'infrastructure', rc);
-  if (rc === ERR_NOT_IN_RANGE) creep.moveTo(target, { reusePath: 10, maxOps: config.PATH_MAX_OPS, visualizePathStyle: { stroke: '#ffffff' } });
+    if (rc === OK) return true;
+    if (rc === ERR_NOT_IN_RANGE) {
+      const moveRc = creep.moveTo(target, {
+        reusePath: 10, maxOps: config.PATH_MAX_OPS,
+        visualizePathStyle: { stroke: '#ffffff' }
+      });
+      if ((typeof ERR_NO_PATH !== 'undefined' && moveRc === ERR_NO_PATH) ||
+          (typeof ERR_INVALID_TARGET !== 'undefined' &&
+           moveRc === ERR_INVALID_TARGET)) continue;
+      return true;
+    }
+    if ((typeof ERR_INVALID_TARGET !== 'undefined' && rc === ERR_INVALID_TARGET) ||
+        (typeof ERR_FULL !== 'undefined' && rc === ERR_FULL)) continue;
+    // All other return codes are not authoritative proof that an alternative
+    // target would be safe. Do not divert the protected hauler to consumers.
+    return true;
+  }
+  // Two terminal attempts still leave hard infrastructure as the priority.
+  // Never misinterpret a failed move as an accepted delivery.
   return true;
 }
 
