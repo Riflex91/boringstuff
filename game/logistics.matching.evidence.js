@@ -82,6 +82,69 @@ function duplicateReservationCount(jobs) {
   return duplicates;
 }
 
+// Reconcile *individual* non-executable E4 jobs with their claimed totals.
+// A copied or malformed summary is not evidence that independent haulers
+// received independent capacity/reservations. This scans only the jobs already
+// bounded by the colony's live hauler count and issues no game actions.
+function validatedJobAccounting(jobs, summary) {
+  if (!Array.isArray(jobs) || !summary ||
+      !Number.isSafeInteger(summary.haulerCount) ||
+      summary.haulerCount < 0 ||
+      jobs.length > summary.haulerCount) return false;
+  const haulerIds = new Set(), reservationIds = new Set();
+  const criticalDemandIds = new Set();
+  let paired = 0, direct = 0, totalAmount = 0, totalTransport = 0;
+  for (const job of jobs) {
+    if (!job || job.authority !== 'SHADOW' ||
+        job.schemaVersion !== 1 ||
+        typeof job.haulerId !== 'string' || !job.haulerId ||
+        haulerIds.has(job.haulerId) ||
+        typeof job.demandRequestId !== 'string' || !job.demandRequestId ||
+        !Number.isFinite(job.amount) || job.amount <= 0 ||
+        !job.predicted || !Number.isFinite(job.predicted.transportTicks) ||
+        job.predicted.transportTicks < 0 ||
+        !Array.isArray(job.reservationIds)) return false;
+    haulerIds.add(job.haulerId);
+    let expectedReservations;
+    if (job.mode === 'PICKUP_DELIVER') {
+      if (typeof job.supplyRequestId !== 'string' || !job.supplyRequestId ||
+          job.supplyRequestId === job.demandRequestId) return false;
+      paired++;
+      expectedReservations = 2;
+    } else if (job.mode === 'BALANCE') {
+      if (job.supplyRequestId !== job.demandRequestId) return false;
+      paired++;
+      expectedReservations = 1;
+    } else if (job.mode === 'DIRECT_CARRIED') {
+      if (job.supplyRequestId !== null) return false;
+      direct++;
+      expectedReservations = 1;
+    } else return false;
+    if (job.reservationIds.length !== expectedReservations) return false;
+    for (const id of job.reservationIds) {
+      if (typeof id !== 'string' || !id || reservationIds.has(id))
+        return false;
+      reservationIds.add(id);
+    }
+    if (typeof job.critical !== 'boolean' ||
+        job.critical !== (job.requestKind === 'EMERGENCY_DELIVER'))
+      return false;
+    if (job.critical) criticalDemandIds.add(job.demandRequestId);
+    totalAmount += job.amount;
+    totalTransport += job.predicted.transportTicks;
+  }
+  // Shadow matcher deliberately rounds both economy totals to cents / 2 dp.
+  const round2 = x => Math.round(x * 100) / 100;
+  return summary.pairedJobCount === paired &&
+    summary.directCarriedJobCount === direct &&
+    summary.jobCount === jobs.length &&
+    summary.matchedHaulerCount === jobs.length &&
+    summary.criticalMatchedCount === criticalDemandIds.size &&
+    summary.reservedAmount === round2(totalAmount) &&
+    summary.averageTransportTicks ===
+      (jobs.length ? round2(totalTransport / jobs.length) : 0);
+}
+
 // Only a verified, fresh E4 shadow plan represents one genuine sampled
 // decision tick. Missing, stale or self-contradictory summaries are gaps,
 // NOT zero-demand / perfect-coverage proof.
@@ -110,7 +173,8 @@ function validatedMatching(state, now) {
   if (!Number.isFinite(summary.reservedAmount) || summary.reservedAmount < 0 ||
       !Number.isFinite(summary.averageTransportTicks) ||
       summary.averageTransportTicks < 0) return false;
-  return summary.jobCount === matching.jobs.length &&
+  return validatedJobAccounting(matching.jobs, summary) &&
+    summary.jobCount === matching.jobs.length &&
     summary.matchedHaulerCount === summary.jobCount &&
     summary.jobCount <= summary.haulerCount &&
     summary.criticalMatchedCount + summary.unmatchedCriticalCount ===
@@ -320,6 +384,7 @@ module.exports = {
     ensureRoom,
     duplicateReservationCount,
     validatedMatching,
+    validatedJobAccounting,
     accumulate
   }
 };
