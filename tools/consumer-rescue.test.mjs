@@ -234,11 +234,18 @@ try {
   assert.equal(energy.shouldRescueConsumer(partial), false,
     'unobservable infrastructure capacity must fail closed');
 
-  // Existing normal guards still behave normally when rescue is ineligible.
+  // Without a safe rescuer, a lone ready hauler remains protected even
+  // when a consumer is critically waiting and infrastructure is underfilled.
   r.energyAvailable = 750;
   ready.memory.consumerTargetId = undefined;
+  assert.deepEqual(energy._test.selectConsumerGuardHaulers(r), []);
+
+  // Once a SECOND hauler is genuinely delivery-ready, a normal guard may
+  // operate while one loaded ready carrier still handles spawn/extensions.
+  partial.store.energy = 160;
   assert.deepEqual(energy._test.selectConsumerGuardHaulers(r).map(c => c.id),
     ['ready']);
+  assert.equal(energy._test.haulerReadyToDeliver(partial), true);
 } finally {
   energy.acquireForHauler = originalAcquire;
 }
