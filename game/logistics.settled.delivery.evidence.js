@@ -39,9 +39,9 @@ function ensure(memory) {
   }
   return record;
 }
-function validWindow(w) {
+function validWindow(w, allowCompleted = false) {
   return !!w && isInt(w.startGameTick) &&
-    isInt(w.ticks) && w.ticks < WINDOW_TICKS &&
+    isInt(w.ticks) && w.ticks <= (allowCompleted ? WINDOW_TICKS : WINDOW_TICKS-1) &&
     isInt(w.deliveryEvents) && isInt(w.deliveredEnergy) &&
     isInt(w.ticksWithDelivery) && w.ticksWithDelivery <= w.ticks &&
     isInt(w.firstConfirmedWaitingDeliveries) &&
@@ -295,16 +295,12 @@ function observe(states,game,memory) {
     if(!isInt(w.deliveryEvents) || !isInt(w.deliveredEnergy) ||
        !isInt(w.firstConfirmedWaitingDeliveries) ||
        !isInt(w.sampledWaitingTicksToFirstDeliveryTotal) ||
-       !validWindow(w) && w.ticks !== WINDOW_TICKS) {
+       !validWindow(w,true)) {
       entry.window=newWindow(now+1);entry.lastWindow=null;entry.waiting={};
       entry.lastProcessedGameTick=now;
       continue;
     }
     entry.lastProcessedGameTick=now;
-    if(!validWindow(w) && w.ticks !== WINDOW_TICKS) {
-      entry.window=newWindow(now+1);entry.lastWindow=null;entry.waiting={};
-      continue;
-    }
     if(w.ticks===WINDOW_TICKS) {
       const result=summarize(w,name);
       result.openWaitingEpisodesAtWindowEnd=Object.keys(waiting).length;
