@@ -61,7 +61,8 @@ function ensureRoom(roomName, memoryRoot, now) {
   if (!root.rooms[roomName]) {
     root.rooms[roomName] = {
       window: newWindow(now),
-      lastWindow: null
+      lastWindow: null,
+      lastProcessedTick: null
     };
   }
   if (!root.rooms[roomName].window) root.rooms[roomName].window = newWindow(now);
@@ -183,6 +184,17 @@ function observe(state, memoryRoot, game) {
     return { current: null, completed: null, lastWindow: null };
 
   const room = ensureRoom(roomName, memoryRoot, now);
+  // Keep a boundary guard after 100th-tick rollover, otherwise a second
+  // observer call on the completed tick would start another false window.
+  if (room.lastProcessedTick === now) {
+    return { current: summarize(room.window, now), completed: null,
+      lastWindow: room.lastWindow };
+  }
+  if (Number.isSafeInteger(room.lastProcessedTick) &&
+      now < room.lastProcessedTick) {
+    room.window = newWindow(now);
+    room.lastWindow = null;
+  }
   // This also repairs malformed previous v2 records rather than treating
   // arbitrary counters or replayed snapshot data as a verified tick window.
   let w = room.window;
@@ -217,6 +229,7 @@ function observe(state, memoryRoot, game) {
   }
   accumulate(w, state);
   w.lastObservedTick = now;
+  room.lastProcessedTick = now;
 
   let completed = null;
   if (w.ticks === WINDOW_TICKS) {
