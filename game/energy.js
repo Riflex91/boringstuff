@@ -456,7 +456,23 @@ function deliverToConsumer(creep, criticalOnly = false) {
     // itself observes usable energy. This hint is NOT receipt evidence.
     if (target.memory && typeof Game !== 'undefined' &&
         Number.isSafeInteger(Game.time)) {
-      target.memory.lastHaulerIntentTick = Game.time;
+      const carriedNow = energyAmount(target);
+      const priorTick = target.memory.lastHaulerIntentTick;
+      const priorEnergy = target.memory.lastHaulerIntentEnergy;
+      // When haulers run before consumers on consecutive ticks, do not
+      // overwrite a still-unconsumed witness of the PREVIOUS tick's real
+      // energy increase. Otherwise the new current-tick intent can hide the
+      // actual earlier gain and prevent productive partial-load recovery.
+      const previousGain = Number.isSafeInteger(priorTick) &&
+        priorTick === Game.time - 1 &&
+        Number.isSafeInteger(priorEnergy) && priorEnergy >= 0 &&
+        carriedNow > priorEnergy;
+      if (!previousGain) {
+        target.memory.lastHaulerIntentTick = Game.time;
+        // Record pre-settlement CARRY; positive CARRY by itself is not proof
+        // that this particular transfer intent executed.
+        target.memory.lastHaulerIntentEnergy = carriedNow;
+      }
     }
     return true;
   }

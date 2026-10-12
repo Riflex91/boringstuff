@@ -460,6 +460,80 @@ const energy = require('../game/energy.js');
   assert.equal(target.memory.logisticsFallback, true);
 }
 
+// Regress handler execution ordering: a consumer can already carry partial
+// fallback-harvested energy when a hauler receives OK earlier in the same tick.
+// Accepted intents must not turn OLD energy into a fabricated new delivery.
+{
+  const roleWorker = require('../game/role.worker.js');
+  const target = makeConsumer('worker-old-partial-unchanged', 'worker', 35, 0, true, 2);
+  target.memory.working = false;
+  const hauler = makeHauler('hauler-old-partial-unchanged');
+  hauler.transfer = () => OK;
+  room.creeps = [target, hauler];
+  Game.time = 1100;
+  assert.equal(energy.deliverToConsumer(hauler, true), true);
+  assert.equal(target.memory.lastHaulerIntentTick, 1100);
+  assert.equal(target.memory.lastHaulerIntentEnergy, 35);
+  assert.equal(roleWorker._test.needsEnergy(target), true,
+    'same-tick accepted intent is not engine settlement, even with old CARRY');
+  assert.equal(target.memory.logisticsFallback, true);
+  Game.time = 1101;
+  assert.equal(roleWorker._test.needsEnergy(target), true,
+    'unchanged next-tick partial store is not new hauler energy');
+  assert.equal(target.memory.logisticsFallback, true);
+  Game.time = 1102;
+  target.store.energy = 50;
+  assert.equal(roleWorker._test.needsEnergy(target), true,
+    'stale intent hint must not claim energy gained only two ticks later');
+  assert.equal(target.memory.working, false);
+}
+
+// If a hauler runs BEFORE the worker in two adjacent ticks, the newly
+// accepted second intent must not erase the preceding tick's real store gain.
+{
+  const roleWorker = require('../game/role.worker.js');
+  const target = makeConsumer('worker-consecutive-intents', 'worker', 30, 0, true, 2);
+  target.memory.working = false;
+  const hauler = makeHauler('hauler-consecutive-intents');
+  hauler.transfer = () => OK;
+  room.creeps = [target, hauler];
+  Game.time = 1110;
+  assert.equal(energy.deliverToConsumer(hauler, true), true);
+  assert.equal(target.memory.lastHaulerIntentEnergy, 30);
+  Game.time = 1111;
+  target.store.energy = 45; // 15 actual new CARRY since previous intent
+  assert.equal(energy.deliverToConsumer(hauler, true), true);
+  assert.equal(target.memory.lastHaulerIntentTick, 1110,
+    'preserve last-tick gain through newly accepted same-tick intent');
+  assert.equal(target.memory.lastHaulerIntentEnergy, 30);
+  assert.equal(roleWorker._test.needsEnergy(target), false);
+  assert.equal(target.memory.working, true);
+  assert.equal(target.memory.logisticsFallback, false);
+  assert.equal(target.memory.lastHaulerIntentEnergy, undefined);
+}
+
+// If the older intent did not yield an increase, the newer accepted intent
+// must replace the witness; only its eventual NEXT-tick increase may count.
+{
+  const roleWorker = require('../game/role.worker.js');
+  const target = makeConsumer('worker-retry-no-first-receipt', 'worker', 25, 0, true, 2);
+  target.memory.working = false;
+  const hauler = makeHauler('hauler-retry-no-first-receipt');
+  hauler.transfer = () => OK;
+  room.creeps = [target, hauler];
+  Game.time = 1120;
+  assert.equal(energy.deliverToConsumer(hauler, true), true);
+  Game.time = 1121;
+  assert.equal(energy.deliverToConsumer(hauler, true), true);
+  assert.equal(target.memory.lastHaulerIntentTick, 1121);
+  assert.equal(target.memory.lastHaulerIntentEnergy, 25);
+  assert.equal(roleWorker._test.needsEnergy(target), true);
+  Game.time = 1122;
+  target.store.energy = 40;
+  assert.equal(roleWorker._test.needsEnergy(target), false);
+  assert.equal(target.memory.logisticsFallback, false);
+}
+
 // Two critical consumers retain separate sticky guards on accepted intents,
 // while the third delivery-ready hauler remains available for infrastructure.
 {
