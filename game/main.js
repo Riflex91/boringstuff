@@ -8,6 +8,7 @@ const creepManager = require('creep.manager');
 const consumerSupplyObserver = require('consumer.supply.observer');
 const logisticsHaulerCpuEvidence = require('logistics.hauler.cpu.evidence');
 const settledDeliveryEvidence = require('logistics.settled.delivery.evidence');
+const pairedLogisticsEvidence = require('logistics.evidence.pair.shadow');
 const stats = require('stats');
 const visuals = require('visuals');
 const commands = require('commands');
@@ -357,6 +358,16 @@ module.exports.loop = function() {
           logger.info('E5_SETTLED_CONSUMER_DELIVERY_WINDOW',
             'Previous-tick actual consumer energy transfers (lower bound only)', {
               room:result.room, evidence:result
+            }, {force:true,persist:true,dedupeTicks:0});
+          // Combine ONLY strictly matching completed CPU/settlement intervals.
+          // No mode economics are inferred from generic role CPU divided by
+          // a restricted subset of consumer-only confirmed energy events.
+          const paired = pairedLogisticsEvidence.assess(
+            result.room, Game.time,
+            logisticsHaulerCpuEvidence.snapshot(result.room, Memory), result);
+          logger.info('E5_PAIRED_EVIDENCE_STATUS',
+            'Aligned E5 hauler CPU and settled consumer receipts, or explicit gap', {
+              room:result.room, evidence:paired
             }, {force:true,persist:true,dedupeTicks:0});
         }
       } catch (_) { /* optional event observation must never block gameplay */ }
