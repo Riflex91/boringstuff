@@ -241,6 +241,49 @@ const energy = require('../game/energy.js');
   assert.equal(energy._test.selectConsumerTarget(hauler2).id, builder.id);
 }
 
+// An empty hauler's previous sticky claim must not block a different
+// energy-ready hauler. Reclaim the ghost assignment before reserving; no
+// simultaneous duplicate live assignments are ever left in Creep Memory.
+// This can happen when the ready carrier runs before the depleted one.
+{
+  const critical = makeConsumer('worker-empty-sticky-critical', 'worker', 0, 8, true, 2);
+  const depleted = makeHauler('hauler-empty-sticky');
+  depleted.store.energy = 0;
+  depleted.memory.delivering = true;
+  depleted.memory.consumerTargetId = critical.id;
+  const ready = makeHauler('hauler-empty-sticky-ready');
+  ready.memory.delivering = true;
+  room.creeps = [critical, ready, depleted];
+
+  assert.equal(energy._test.selectConsumerTarget(ready, true).id, critical.id);
+  assert.equal(depleted.memory.consumerTargetId, undefined,
+    'an unserviceable zero-energy assignment must be reclaimed');
+  assert.equal(ready.memory.consumerTargetId, undefined,
+    'selection alone does not reserve for the chosen hauler');
+  assert.equal(energy.deliverToConsumer(ready, true), true);
+  assert.equal(ready.memory.consumerTargetId, critical.id);
+  assert.equal(energy.isCriticalConsumerRequest(critical), true,
+    'accepted movement must not hide unsatisfied starvation');
+}
+
+// A partially loaded hauler may still become an emergency rescuer. Preserve
+// its claim even below the normal ready threshold: duplicate hauling is
+// worse than a one-tick conservative wait, and rescue will re-evaluate.
+{
+  const critical = makeConsumer('worker-live-underfilled-sticky', 'worker', 0, 5, true);
+  const partial = makeHauler('hauler-live-underfilled');
+  partial.store.energy = 30;
+  partial.memory.delivering = false;
+  partial.memory.consumerTargetId = critical.id;
+  const ready = makeHauler('hauler-other-ready');
+  ready.memory.delivering = true;
+  room.creeps = [critical, partial, ready];
+
+  assert.equal(energy._test.selectConsumerTarget(ready, true), null);
+  assert.equal(partial.memory.consumerTargetId, critical.id,
+    'nonzero CARRY is a potentially serviceable reservation and stays sticky');
+}
+
 // A selected emergency guard can have a sticky reservation for a *fresh*
 // empty (noncritical) consumer. It must drop that stale priority and deliver
 // to a genuinely waiting/fallbacking consumer instead of spending the limited
