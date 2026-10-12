@@ -17,8 +17,11 @@ function validState(time) {
       consumerFallbackCount:0},
     logisticsMatchingShadow:{
       schemaVersion:1,authority:'SHADOW',
-      jobs:[{id:'job',haulerId:'h1',amount:50,mode:'DIRECT_CARRIED',
-        reservationIds:['r1']}],
+      jobs:[{id:'job',schemaVersion:1,authority:'SHADOW',
+        haulerId:'h1',amount:50,mode:'DIRECT_CARRIED',
+        supplyRequestId:null,demandRequestId:'req-critical',
+        reservationIds:['r1'],predicted:{transportTicks:5},
+        requestKind:'EMERGENCY_DELIVER',critical:true}],
       summary:{
         schemaVersion:1,authority:'SHADOW',planTick:time,
         deferred:false,deferReason:null,

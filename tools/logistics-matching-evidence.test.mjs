@@ -23,8 +23,12 @@ function state(overrides = {}, time = 1000) {
       schemaVersion: 1,
       authority: 'SHADOW',
       jobs: [{
-        mode: 'PICKUP_DELIVER',
-        reservationIds: ['r1']
+        schemaVersion: 1, authority: 'SHADOW', haulerId: 'h1',
+        mode: 'PICKUP_DELIVER', amount: 50,
+        supplyRequestId: 'req-supply', demandRequestId: 'req-critical',
+        reservationIds: ['r1', 'r2'],
+        predicted: {transportTicks:10},
+        requestKind: 'EMERGENCY_DELIVER', critical: true
       }],
       summary: {
         schemaVersion: 1,
