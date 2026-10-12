@@ -13,6 +13,7 @@ const base={
     criticalWithSticky:1,criticalWithReadySticky:1,
     criticalWithoutSticky:1,criticalWithoutReadySticky:1,
     criticalWithDuplicateSticky:0,stickyWithoutEnergy:0,
+    stickyAssignments:1,
     readyHaulersWithoutSticky:1,acceptedDeliveryProof:false
   }
 };
@@ -59,7 +60,7 @@ const allReady=triageSupplySample({
   ...base,reservationCoverage:{...base.reservationCoverage,
     criticalWithSticky:2,criticalWithReadySticky:2,
     criticalWithoutSticky:0,criticalWithoutReadySticky:0,
-    readyHaulersWithoutSticky:0}
+    stickyAssignments:2,readyHaulersWithoutSticky:0}
 });
 assert.equal(allReady.classification,'READY_STICKY_COVERAGE_OBSERVED');
 assert.deepEqual(allReady.reasonCodes,[]);
