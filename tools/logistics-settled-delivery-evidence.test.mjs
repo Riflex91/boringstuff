@@ -11,6 +11,10 @@ const require=createRequire(import.meta.url);
 globalThis.EVENT_TRANSFER=21;
 globalThis.RESOURCE_ENERGY='energy';
 const observer=require('../game/logistics.settled.delivery.evidence.js');
+function observe(states, game, memory) {
+  return observer.observe(states, game, memory,
+    observer.capturePreIntentWaiting(states, game));
+}
 const creep=(id,role)=>({id,name:id,spawning:false,memory:{role}});
 const hauler=creep('hauler1','hauler');
 const hauler2=creep('hauler2','hauler');
@@ -65,9 +69,9 @@ const events=()=>[
   const memory={};
   let completed=[];
   for(let now=1000;now<=1099;now++){
-    completed=observer.observe([state],{time:now},memory);
+    completed=observe([state],{time:now},memory);
     if(now<1099)assert.deepEqual(completed,[]);
-    assert.deepEqual(observer.observe([state],{time:now},memory),[],
+    assert.deepEqual(observe([state],{time:now},memory),[],
       'Same tick replay cannot double count previous-tick transfers');
   }
   assert.equal(completed.length,1);
@@ -81,7 +85,7 @@ const events=()=>[
   assert.equal(w.confirmedConsumerEnergyLowerBound,2500);
   assert.equal(w.confirmedConsumerEnergyPerTickLowerBound,25);
   assert.equal(w.ticksWithConfirmedConsumerDelivery,100);
-  assert.equal(w.schemaVersion,3);
+  assert.equal(w.schemaVersion,4);
   assert.equal(w.confirmedFirstDeliveryForPreviouslyWaitingConsumers,0);
   assert.equal(w.sampledWaitingTicksBeforeFirstConfirmedDeliveryTotal,0);
   assert.equal(w.averageSampledWaitingTicksBeforeFirstConfirmedDelivery,null);
@@ -93,10 +97,10 @@ const events=()=>[
   assert.equal(w.topologySwitchAuthorized,false);
   assert.equal(w.actionAuthority,'NONE');
   assert.deepEqual(observer.snapshot('E1N1',memory),w);
-  assert.deepEqual(observer.observe([state],{time:1099},memory),[]);
+  assert.deepEqual(observe([state],{time:1099},memory),[]);
   assert.equal(memory.bot.e5SettledConsumerEnergy.rooms.E1N1.window.ticks,0,
     '100th game tick replay cannot fabricate another window');
-  assert.deepEqual(observer.observe([state],{time:1100},memory),[]);
+  assert.deepEqual(observe([state],{time:1100},memory),[]);
   assert.equal(memory.bot.e5SettledConsumerEnergy.rooms.E1N1.window.ticks,1);
   // Now a target dies: the new event can no longer be safely attributed.
   // The observer reports a conservative LOWER BOUND, never full throughput.
@@ -109,21 +113,21 @@ const events=()=>[
   const memory={};
   currentEvents=[settled('hauler1','worker1',10)];
   for(let t=2000;t<=2049;t++){
-    assert.deepEqual(observer.observe([state],{time:t},memory),[]);
+    assert.deepEqual(observe([state],{time:t},memory),[]);
   }
   assert.equal(memory.bot.e5SettledConsumerEnergy.rooms.E1N1.window.ticks,50);
   // A missing game tick destroys continuity; the next 100 actual distinct
   // ticks are required again before a complete settlement summary is emitted.
-  observer.observe([state],{time:2051},memory);
+  observe([state],{time:2051},memory);
   assert.equal(memory.bot.e5SettledConsumerEnergy.rooms.E1N1.window.startGameTick,2051);
   for(let t=2052;t<=2149;t++){
-    assert.deepEqual(observer.observe([state],{time:t},memory),[]);
+    assert.deepEqual(observe([state],{time:t},memory),[]);
   }
-  const complete=observer.observe([state],{time:2150},memory);
+  const complete=observe([state],{time:2150},memory);
   assert.equal(complete.length,1);
   assert.equal(complete[0].observedTicks,100);
   assert.equal(complete[0].confirmedConsumerEnergyLowerBound,1000);
-  observer.observe([state],{time:500},memory);
+  observe([state],{time:500},memory);
   assert.equal(observer.snapshot('E1N1',memory),null,
     'Time rewind cannot reuse stale previous-round settled evidence');
   assert.equal(memory.bot.e5SettledConsumerEnergy.rooms.E1N1.window.startGameTick,500);
@@ -132,41 +136,41 @@ const events=()=>[
   const memory={};
   currentEvents=[];
   let result=[];
-  for(let t=3000;t<=3099;t++)result=observer.observe([state],{time:t},memory);
+  for(let t=3000;t<=3099;t++)result=observe([state],{time:t},memory);
   assert.equal(result[0].confirmedConsumerEnergyLowerBound,0);
   assert.equal(result[0].confirmedConsumerDeliveryEvents,0);
   assert.equal(result[0].ticksWithConfirmedConsumerDelivery,0);
   currentEvents=[settled('hauler1','worker1',10)];
-  for(let t=3100;t<=3120;t++)observer.observe([state],{time:t},memory);
+  for(let t=3100;t<=3120;t++)observe([state],{time:t},memory);
   currentEvents=[{event:EVENT_TRANSFER,objectId:'hauler1'}];
-  assert.deepEqual(observer.observe([state],{time:3121},memory),[]);
+  assert.deepEqual(observe([state],{time:3121},memory),[]);
   assert.equal(observer.snapshot('E1N1',memory),null,
     'Malformed event log invalidates complete historical window too');
   currentEvents=[settled('hauler1','worker1',10)];
-  observer.observe([state],{time:3122},memory);
+  observe([state],{time:3122},memory);
   assert.equal(memory.bot.e5SettledConsumerEnergy.rooms.E1N1.window.ticks,1);
 }
 {
   const memory={};
   currentEvents=[];
-  observer.observe([state],{time:8000},memory);
+  observe([state],{time:8000},memory);
   const rec=memory.bot.e5SettledConsumerEnergy.rooms.E1N1;
   rec.window.ticks=99;rec.window.lastGameTick=7;
-  observer.observe([state],{time:8001},memory);
+  observe([state],{time:8001},memory);
   assert.equal(memory.bot.e5SettledConsumerEnergy.rooms.E1N1.window.ticks,1,
     'Malformed persisted counters reset to new room record');
 }
 {
   const memory={};
   currentEvents=[];
-  assert.deepEqual(observer.observe([
+  assert.deepEqual(observe([
     {room:{name:'E1N1'}},{room:{name:'E2N2'}},
     {room:{name:'E3N3'}},{room:{name:'E4N4'}}
   ],{time:3000},memory),[]);
   assert.equal(memory.bot,undefined,'>3 rooms must not claim partial evidence');
-  assert.deepEqual(observer.observe([state,state],{time:3000},memory),[]);
+  assert.deepEqual(observe([state,state],{time:3000},memory),[]);
   assert.equal(memory.bot,undefined,'Ambiguous owned room identities fail closed');
-  assert.deepEqual(observer.observe([state],{time:NaN},memory),[]);
+  assert.deepEqual(observe([state],{time:NaN},memory),[]);
   assert.equal(memory.bot,undefined);
 }
 const src=fs.readFileSync(path.join(here,'../game/logistics.settled.delivery.evidence.js'),'utf8');
