@@ -116,10 +116,10 @@ assert.ok(snapshotIndex>=0 && actionsIndex>snapshotIndex &&
   'Pre-intent witness must be captured before active hauler work');
 const source=fs.readFileSync(path.join(dir,
   '../game/logistics.settled.delivery.evidence.js'),'utf8');
-for(const forbidden of [
-  /.transfers*(/,/.withdraws*(/,/.moveTos*(/,
-  /.spawnCreeps*(/,/.getUseds*(/,/Memorys*./
-]) assert.equal(forbidden.test(source),false,
+for (const forbidden of [
+  '.transfer(', '.withdraw(', '.moveTo(', '.spawnCreep(',
+  '.getUsed(', 'Memory.'
+]) assert.equal(source.includes(forbidden),false,
   'Pre-intent witness is passive and does not alter active gameplay');
 console.log('E5 pre-intent waiting snapshot vs accepted transfer intent and next-tick confirmed event PASS');
 
