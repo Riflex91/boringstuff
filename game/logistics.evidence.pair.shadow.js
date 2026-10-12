@@ -48,7 +48,8 @@ function validCpu(x) {
     x.comparableAlternativeCpuPerTick===null;
 }
 function validDelivery(x, room) {
-  if (!x || x.schemaVersion!==3 || x.authority!=='SHADOW_EVIDENCE' ||
+  if (!x || x.schemaVersion!==4 || x.waitingObservationPhase!=='BEFORE_CREEP_INTENTS' ||
+      x.authority!=='SHADOW_EVIDENCE' ||
       x.actionAuthority!=='NONE' || x.room!==room ||
       x.source!=='SCREEPS_PREVIOUS_TICK_SETTLED_TRANSFER_EVENTS' ||
       x.coverage!=='CURRENTLY_VISIBLE_OWNED_HAULER_TO_CONSUMER_CREEP_LOWER_BOUND' ||

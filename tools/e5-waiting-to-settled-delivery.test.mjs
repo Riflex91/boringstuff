@@ -12,6 +12,10 @@ const require=createRequire(import.meta.url);
 globalThis.EVENT_TRANSFER=21;
 globalThis.RESOURCE_ENERGY='energy';
 const observer=require('../game/logistics.settled.delivery.evidence.js');
+function observe(states, game, memory) {
+  return observer.observe(states, game, memory,
+    observer.capturePreIntentWaiting(states, game));
+}
 
 const a={id:'h1',spawning:false,memory:{role:'hauler'}};
 const b={id:'h2',spawning:false,memory:{role:'hauler'}};
@@ -45,11 +49,11 @@ assert.equal(emptySummary().averageSampledWaitingTicksBeforeFirstConfirmedDelive
     events=[];
     if(t===4010)events=[delivered('h1','c1',15)];
     if(t===4032)events=[delivered('h2','c2',20)];
-    out=observer.observe([state],{time:t},memory);
+    out=observe([state],{time:t},memory);
     assert.equal(out.length,t===4099?1:0);
   }
   const w=out[0];
-  assert.equal(w.schemaVersion,3);
+  assert.equal(w.schemaVersion,4);
   assert.equal(w.observedTicks,100);
   assert.equal(w.confirmedConsumerDeliveryEvents,2);
   assert.equal(w.confirmedConsumerEnergyLowerBound,35);
@@ -73,7 +77,7 @@ assert.equal(emptySummary().averageSampledWaitingTicksBeforeFirstConfirmedDelive
     q.memory.waitingEnergyTicks=0;
     events=t===5014?[delivered('h1','c1',5)]
       :t===5016?[delivered('h2','c1',10)]:[];
-    result=observer.observe([state],{time:t},memory);
+    result=observe([state],{time:t},memory);
   }
   assert.equal(result[0].confirmedConsumerDeliveryEvents,2);
   assert.equal(result[0].confirmedFirstDeliveryForPreviouslyWaitingConsumers,1);
@@ -88,7 +92,7 @@ assert.equal(emptySummary().averageSampledWaitingTicksBeforeFirstConfirmedDelive
     c.memory.waitingEnergyTicks=t===6010?1:0;
     q.memory.waitingEnergyTicks=0;
     events=t===6010?[delivered('h1','c1',25)]:[];
-    seen.push(...observer.observe([state],{time:t},memory));
+    seen.push(...observe([state],{time:t},memory));
   }
   assert.equal(seen[0].confirmedConsumerEnergyLowerBound,25);
   assert.equal(seen[0].confirmedFirstDeliveryForPreviouslyWaitingConsumers,0);
@@ -98,19 +102,19 @@ assert.equal(emptySummary().averageSampledWaitingTicksBeforeFirstConfirmedDelive
   // history; the following event cannot invent a valid earlier wait.
   const memory={};
   c.memory.waitingEnergyTicks=1;events=[];
-  observer.observe([state],{time:7000},memory);
+  observe([state],{time:7000},memory);
   c.memory.waitingEnergyTicks=2;events=[delivered('h1','c1',12)];
-  observer.observe([state],{time:7002},memory);
+  observe([state],{time:7002},memory);
   assert.equal(memory.bot.e5SettledConsumerEnergy.rooms.E1N1
     .window.firstConfirmedWaitingDeliveries,0);
   c.memory.waitingEnergyTicks=3;events=[];
-  observer.observe([state],{time:7003},memory);
+  observe([state],{time:7003},memory);
   const old=room.getEventLog;
   room.getEventLog=()=>{throw Error('events unavailable');};
-  observer.observe([state],{time:7004},memory);
+  observe([state],{time:7004},memory);
   room.getEventLog=old;
   c.memory.waitingEnergyTicks=0;events=[delivered('h1','c1',12)];
-  observer.observe([state],{time:7005},memory);
+  observe([state],{time:7005},memory);
   assert.equal(memory.bot.e5SettledConsumerEnergy.rooms.E1N1
     .window.firstConfirmedWaitingDeliveries,0);
 }
@@ -120,7 +124,7 @@ assert.equal(emptySummary().averageSampledWaitingTicksBeforeFirstConfirmedDelive
   const ambiguous={...state,creeps:[a,b,c,{...q,id:'c1'}]};
   c.memory.waitingEnergyTicks=4;events=[delivered('h1','c1',10)];
   assert.equal(observer._test.inspectRoom(ambiguous,true),null);
-  assert.deepEqual(observer.observe([ambiguous],{time:8000},memory),[]);
+  assert.deepEqual(observe([ambiguous],{time:8000},memory),[]);
   assert.equal(observer.snapshot('E1N1',memory),null);
 }
 const src=fs.readFileSync(path.join(here,'../game/logistics.settled.delivery.evidence.js'),'utf8');
