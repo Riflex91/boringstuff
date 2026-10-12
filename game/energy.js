@@ -457,6 +457,9 @@ function deliverToConsumer(creep, criticalOnly = false) {
     if (target.memory && typeof Game !== 'undefined' &&
         Number.isSafeInteger(Game.time)) {
       target.memory.lastHaulerIntentTick = Game.time;
+      // Record the pre-settlement store level. A still-positive store on a
+      // later tick does not itself prove that this intent added any energy.
+      target.memory.lastHaulerIntentEnergy = energyAmount(target);
     }
     return true;
   }
