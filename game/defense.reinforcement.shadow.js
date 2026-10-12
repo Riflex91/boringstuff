@@ -115,6 +115,67 @@ function routeFor(from, to, routeEvidence, now) {
     source: r.source };
 }
 
+
+// At most 11 defenders remain after the mandatory home-garrison reserve.
+// Enumerate a bounded set of complete individual bodies, not synthetic
+// fractional MOVE/ATTACK/HEAL "parts". Every proposed subset actually meets
+// all three capacity dimensions and has a deterministic energy/size/ID rank.
+// This produces *non-executable* proposals only; it cannot grant authority.
+function minimumCombatSubset(defenders, demand) {
+  if (!Array.isArray(defenders) || !defenders.length ||
+      defenders.length > MAX_DEFENDERS - 1 || !demand ||
+      !['damagePerTick', 'healPerTick', 'effectiveHits'].every(k =>
+        Number.isSafeInteger(demand[k]) && demand[k] >= 0) ||
+      demand.damagePerTick + demand.healPerTick === 0) return null;
+  const ordered = defenders.slice().sort((a, b) => a.id.localeCompare(b.id));
+  const ids = new Set();
+  for (const d of ordered) {
+    if (!d || typeof d.id !== 'string' || !d.id || ids.has(d.id) ||
+        !Number.isSafeInteger(d.bodyReplacementEnergy) ||
+        d.bodyReplacementEnergy <= 0 ||
+        !['damagePerTick', 'healPerTick', 'effectiveHits'].every(k =>
+          Number.isSafeInteger(d[k]) && d[k] >= 0)) return null;
+    ids.add(d.id);
+  }
+  let best = null;
+  const combinations = 1 << ordered.length;
+  for (let mask = 1; mask < combinations; mask++) {
+    let cost = 0, count = 0, damage = 0, heal = 0, hits = 0;
+    const chosen = [];
+    for (let i = 0; i < ordered.length; i++) {
+      if (!(mask & (1 << i))) continue;
+      const d = ordered[i];
+      cost += d.bodyReplacementEnergy;
+      if (best && cost > best.replacementEnergy) break;
+      count++;
+      damage += d.damagePerTick;
+      heal += d.healPerTick;
+      hits += d.effectiveHits;
+      chosen.push(d.id);
+    }
+    if (best && cost > best.replacementEnergy) continue;
+    if (damage < demand.damagePerTick || heal < demand.healPerTick ||
+        hits < demand.effectiveHits) continue;
+    const lex = chosen.join('|');
+    if (!best || cost < best.replacementEnergy ||
+        (cost === best.replacementEnergy && count < best.defenderCount) ||
+        (cost === best.replacementEnergy && count === best.defenderCount &&
+          lex < best.lex)) {
+      best = {
+        replacementEnergy: cost, defenderCount: count,
+        defenderIds: chosen,
+        combatCapacity: {
+          damagePerTick: damage, healPerTick: heal, effectiveHits: hits
+        },
+        lex
+      };
+    }
+  }
+  if (!best) return null;
+  const { lex, ...answer } = best;
+  return answer;
+}
+
 function result(now, targets) {
   const total = targets.length;
   const selected = targets.filter(t => t.status === 'PROPOSED_SHADOW').length;
@@ -194,7 +255,8 @@ function evaluate(states, routeEvidence, game) {
         arrivalTick: null, replacementEnergy: null,
         spareEnergyBudget: null, availableCapacity: null,
         defenderCount: 0, donorSpawnAvailable: false,
-        routeEvidence: null };
+        routeEvidence: null, selectedDefenderIds: [],
+        selectedCombatCapacity: null, selectedDefenderCount: 0 };
       support.candidateProviders.push(candidate);
       if (shadowDonorLocks.has(from)) {
         candidate.reason = 'SHADOW_DONOR_ALREADY_ALLOCATED';
@@ -246,6 +308,12 @@ function evaluate(states, routeEvidence, game) {
           a.id.localeCompare(b.id)).slice(0, MAX_DEFENDERS);
       // Keep the most valuable defender at home even when clear.
       const reserve = all[0];
+      // Creep IDs are a prerequisite for a non-duplicative individual plan.
+      if (all.some(d => !d.id) ||
+          new Set(all.map(d => d.id)).size !== all.length) {
+        candidate.reason = 'DEFENDER_IDENTITY_AMBIGUOUS';
+        continue;
+      }
       const available = all.slice(1).filter(d =>
         d.ticksToLive > route.travelTicks + MIN_ENGAGEMENT_TICKS);
       candidate.defenderCount = available.length;
@@ -269,16 +337,23 @@ function evaluate(states, routeEvidence, game) {
         candidate.reason = 'COMBAT_CAPACITY_SHORTFALL';
         continue;
       }
-      // Stage one uses the complete spare set as an upper-bound support
-      // cost, not a fictitious optimized combat party or real spawn queue.
-      candidate.replacementEnergy = available.reduce((n, d) =>
-        n + d.bodyReplacementEnergy, 0);
+      // Choose the lowest replacement-energy *whole-body* combination.
+      // A whole-spare-set cost can falsely reject a smaller feasible team.
+      const subset = minimumCombatSubset(available, demand.amounts);
+      if (!subset) {
+        candidate.reason = 'COMBAT_SUBSET_UNVERIFIED';
+        continue;
+      }
+      candidate.replacementEnergy = subset.replacementEnergy;
+      candidate.selectedDefenderIds = subset.defenderIds;
+      candidate.selectedDefenderCount = subset.defenderCount;
+      candidate.selectedCombatCapacity = subset.combatCapacity;
       if (candidate.replacementEnergy > candidate.spareEnergyBudget) {
         candidate.reason = 'REPLACEMENT_BUDGET_SHORTFALL';
         continue;
       }
       candidate.status = 'ELIGIBLE_SHADOW';
-      candidate.reason = 'COMPLETE_SINGLE_DONOR_CAPACITY_PROXY';
+      candidate.reason = 'BOUNDED_MINIMUM_COST_COMBAT_SUBSET';
     }
     const ranked = support.candidateProviders.filter(c =>
       c.status === 'ELIGIBLE_SHADOW')
@@ -296,7 +371,11 @@ function evaluate(states, routeEvidence, game) {
       status: 'NON_EXECUTABLE_PROJECTION', from: ranked[0].roomName,
       to: room, observedTransitTicks: ranked[0].etaTicks,
       replacementEnergyBudget: ranked[0].replacementEnergy,
-      requiredCombatCapacity: demand.amounts
+      requiredCombatCapacity: demand.amounts,
+      projectedDefenderIds: ranked[0].selectedDefenderIds.slice(),
+      projectedDefenderCount: ranked[0].selectedDefenderCount,
+      projectedCombatCapacity: ranked[0].selectedCombatCapacity,
+      selectionMethod: 'BOUNDED_WHOLE_BODY_EXHAUSTIVE_SHADOW'
     };
   }
   return result(now, targets);
@@ -307,4 +386,5 @@ function telemetrySummary(value) {
 }
 
 module.exports = { SCHEMA_VERSION, AUTHORITY, MAX_PROVIDERS,
-  evaluate, telemetrySummary, _test: { freshRequest, needed, defender, routeFor } };
+  evaluate, telemetrySummary, _test: { freshRequest, needed, defender, routeFor,
+    minimumCombatSubset } };
