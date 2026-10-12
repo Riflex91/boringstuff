@@ -5,7 +5,7 @@
 // Count ONLY unambiguous own hauler -> own consumer-creep energy transfers.
 // This is a conservative lower bound, NOT all infrastructure deliveries, route
 // throughput, transport CPU, delivery latency or authorization for switching.
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 const WINDOW_TICKS = 100;
 const MAX_ROOMS = 3;
 const MAX_CREEPS = 120;
@@ -70,7 +70,40 @@ function validWindow(w, allowCompleted = false) {
       isInt(w.lastGameTick) &&
       w.lastGameTick - w.startGameTick === w.ticks - 1);
 }
-function inspectRoom(state, includeConsumers = false) {
+// Snapshot consumer identities BEFORE legacy hauler/worker handlers modify
+// waitingEnergyTicks. In particular, transfer() === OK is only an accepted
+// INTENT; energy.deliverToConsumer clears waiting on that return code before
+// Room.getEventLog() can confirm actual settlement on the next tick.
+function capturePreIntentWaiting(states,game) {
+  const now=game && game.time;
+  if (!isInt(now) || now < 1 || !Array.isArray(states) ||
+      states.length > MAX_ROOMS) return null;
+  const rooms=Object.create(null);
+  for (const state of states) {
+    const room=state && state.room && state.room.name;
+    const creeps=state && state.creeps;
+    if (typeof room!=='string'||!room||room.length>20 ||
+        Object.prototype.hasOwnProperty.call(rooms,room) ||
+        !Array.isArray(creeps)||creeps.length>MAX_CREEPS) return null;
+    const seen=new Set(), consumers=[],waiting=[];
+    for(const c of creeps) {
+      if(!c||c.spawning||!c.memory) continue;
+      if(typeof c.id!=='string'||!c.id||seen.has(c.id))return null;
+      seen.add(c.id);
+      if(!CONSUMERS[c.memory.role])continue;
+      consumers.push(c.id);
+      const n=c.memory.waitingEnergyTicks;
+      if(n!=null&&!isInt(n))return null;
+      if((n||0)>0||!!c.memory.logisticsFallback)waiting.push(c.id);
+    }
+    rooms[room]={
+      consumerIds:consumers.sort(),
+      waitingConsumerIds:waiting.sort()
+    };
+  }
+  return {tick:now,rooms};
+}
+function inspectRoom(state, includeConsumers = false, preIntent = null) {
   const creeps=state && state.creeps;
   const room=state && state.room;
   if (!room || typeof room.getEventLog !== 'function' ||
@@ -123,9 +156,20 @@ function inspectRoom(state, includeConsumers = false) {
   }
   const result={deliveredEnergy,deliveryEvents,rawEventCount:events.length};
   if (includeConsumers) {
+    // In production an exact BEFORE_INTENTS census is mandatory. Refuse to
+    // substitute post-intent memory: it can claim a premature wait recovery.
+    const current=[...consumers].sort();
+    const saved=preIntent && preIntent.consumerIds;
+    const waiting=preIntent && preIntent.waitingConsumerIds;
+    if(!Array.isArray(saved)||!Array.isArray(waiting) ||
+       saved.length!==current.length ||
+       saved.some((id,i)=>id!==current[i]) ||
+       waiting.length>saved.length ||
+       waiting.some((id,i)=>typeof id!=='string'||
+         !saved.includes(id)||(i>0&&waiting[i-1]>=id))) return null;
     result.deliveredConsumerIds=deliveredConsumerIds;
-    result.waitingConsumerIds=waitingConsumers;
-    result.visibleConsumerIds=[...consumers];
+    result.waitingConsumerIds=waiting.slice();
+    result.visibleConsumerIds=current;
   }
   return result;
 }
@@ -133,6 +177,7 @@ function summarize(w,room) {
   return {
     schemaVersion:SCHEMA_VERSION,authority:'SHADOW_EVIDENCE',
     source:'SCREEPS_PREVIOUS_TICK_SETTLED_TRANSFER_EVENTS',
+    waitingObservationPhase:'BEFORE_CREEP_INTENTS',
     coverage:'CURRENTLY_VISIBLE_OWNED_HAULER_TO_CONSUMER_CREEP_LOWER_BOUND',
     actionAuthority:'NONE',room,
     startGameTick:w.startGameTick,endGameTick:w.lastGameTick,
@@ -185,13 +230,17 @@ function validWaitingHistory(history) {
     !!id && e && isInt(e.firstTick) && isInt(e.lastTick) &&
     e.lastTick >= e.firstTick && typeof e.firstSettledObserved==='boolean');
 }
-function observe(states,game,memory) {
+function observe(states,game,memory,preIntent) {
   const now=game && game.time, root=memory || (typeof Memory!=='undefined'?Memory:null);
   if (!isInt(now) || now < 1 || !root || !Array.isArray(states) ||
       states.length > MAX_ROOMS) return [];
   const names=states.map(s=>s && s.room && s.room.name);
   if (names.some(n=>typeof n !== 'string' || !n || n.length > 20) ||
-      new Set(names).size !== names.length) return [];
+      new Set(names).size !== names.length ||
+      !preIntent || preIntent.tick!==now || !preIntent.rooms ||
+      Object.keys(preIntent.rooms).length!==names.length ||
+      names.some(n=>!Object.prototype.hasOwnProperty.call(preIntent.rooms,n)))
+    return [];
   const record=ensure(root),done=[];
   for(const state of states.slice().sort((a,b)=>a.room.name.localeCompare(b.room.name))) {
     const name=state.room.name;
@@ -216,7 +265,7 @@ function observe(states,game,memory) {
       entry.lastWindow=null;
       entry.waiting={};
     }
-    const measurement=inspectRoom(state,true);
+    const measurement=inspectRoom(state,true,preIntent.rooms[name]);
     if(!measurement) {
       // Never convert inaccessible/oversized/invalid event logs to zero.
       entry.window=newWindow(now+1);
@@ -324,5 +373,5 @@ function snapshot(room,memory) {
     record.rooms && record.rooms[room] &&
     record.rooms[room].lastWindow || null;
 }
-module.exports={observe,snapshot,_test:{inspectRoom,newWindow,validWindow,
-  validWaitingHistory,summarize}};
+module.exports={observe,snapshot,capturePreIntentWaiting,
+  _test:{inspectRoom,newWindow,validWindow,validWaitingHistory,summarize}};
