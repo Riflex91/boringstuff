@@ -420,8 +420,8 @@ const energy = require('../game/energy.js');
 // Two critical consumers retain separate sticky guards on accepted intents,
 // while the third delivery-ready hauler remains available for infrastructure.
 {
-  const a = makeConsumer('worker-unsettled-a', 'worker', 0, 4, false, 2);
-  const b = makeConsumer('upgrader-unsettled-b', 'upgrader', 0, 7, true, 6);
+  const a = makeConsumer('worker-unsettled-a', 'worker', 0, 4, true, 2);
+  const b = makeConsumer('upgrader-unsettled-b', 'upgrader', 0, 7, false, 6);
   const h1 = makeHauler('hauler-unsettled-a', {[a.id]: 1, [b.id]: 8});
   const h2 = makeHauler('hauler-unsettled-b', {[a.id]: 9, [b.id]: 1});
   const reserve = makeHauler('hauler-infra-reserve');
