@@ -33,15 +33,22 @@ export function triageSupplySample(sample) {
     ...unknown('RESERVATION_COVERAGE_NOT_OBSERVED'),
     criticalCount:c.critical
   };
+  if (v.acceptedDeliveryProof !== false)
+    return unknown('UNSUPPORTED_DELIVERY_SETTLEMENT_CLAIM');
   for (const key of ['criticalWithReadySticky','criticalWithoutReadySticky',
     'criticalWithSticky','criticalWithoutSticky',
     'criticalWithDuplicateSticky','stickyWithoutEnergy',
-    'readyHaulersWithoutSticky']) {
+    'readyHaulersWithoutSticky','stickyAssignments']) {
     if (!nonnegative(v[key])) return unknown('INVALID_RESERVATION_COVERAGE');
   }
   if (v.criticalWithReadySticky + v.criticalWithoutReadySticky !== c.critical ||
       v.criticalWithSticky + v.criticalWithoutSticky !== c.critical ||
-      v.criticalWithReadySticky > v.criticalWithSticky)
+      v.criticalWithReadySticky > v.criticalWithSticky ||
+      v.criticalWithSticky > v.stickyAssignments ||
+      v.criticalWithDuplicateSticky > v.criticalWithSticky ||
+      v.stickyWithoutEnergy > v.stickyAssignments ||
+      v.readyHaulersWithoutSticky > h.readyByGuardRule ||
+      v.stickyAssignments > h.live)
     return unknown('INCONSISTENT_RESERVATION_COVERAGE');
   const reasons=[];
   if (v.criticalWithDuplicateSticky > 0)
@@ -78,7 +85,8 @@ export function repeatedSupplyObservations(samples) {
   for (const s of (Array.isArray(samples) ? samples : []).slice()
     .filter(s=>s&&nonnegative(s.tick))
     .sort((a,b)=>a.tick-b.tick)) {
-    const t=s.triage||triageSupplySample(s);
+    // Never trust a preattached classification; revalidate raw counts.
+    const t=triageSupplySample(s);
     const reason=(t.classification==='CRITICAL_COVERAGE_GAP_OBSERVED' &&
       t.reasonCodes.find(x=>GAP_CODES.includes(x))) || null;
     if (!reason) {
