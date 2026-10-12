@@ -109,10 +109,23 @@ assert.equal(req.status,'PROPOSED_SHADOW');
 assert.equal(req.selectedProvider,'W36N12','equal cost chooses faster arrival');
 assert.equal(req.transportOrSpawnPlan.status,'NON_EXECUTABLE_PROJECTION');
 assert.equal(req.transportOrSpawnPlan.replacementEnergyBudget,810);
+assert.deepEqual(req.transportOrSpawnPlan.projectedDefenderIds,
+  ['W36N12-attack1','W36N12-attack2','W36N12-healer']);
+assert.equal(req.transportOrSpawnPlan.projectedDefenderCount,3);
+assert.deepEqual(req.transportOrSpawnPlan.projectedCombatCapacity,{
+  damagePerTick:60,healPerTick:24,effectiveHits:600
+});
+assert.equal(req.transportOrSpawnPlan.selectionMethod,
+  'BOUNDED_WHOLE_BODY_EXHAUSTIVE_SHADOW');
 for(const candidate of req.candidateProviders) {
   assert.equal(candidate.status,'ELIGIBLE_SHADOW');
   assert.equal(candidate.defenderCount,3);
   assert.equal(candidate.replacementEnergy,810);
+  assert.equal(candidate.selectedDefenderCount,3);
+  assert.equal(candidate.selectedDefenderIds.includes(candidate.roomName+'-reserve'),false);
+  assert.deepEqual(candidate.selectedCombatCapacity,{
+    damagePerTick:60,healPerTick:24,effectiveHits:600
+  });
   assert.equal(candidate.spareEnergyBudget,4100);
   assert.equal(candidate.availableCapacity.damagePerTick,60);
   assert.equal(candidate.availableCapacity.healPerTick,24);
@@ -214,6 +227,29 @@ blocked([dst,foreignCreepDonor],routes,'COMBAT_CAPACITY_SHORTFALL');
 const wrongHomeDonor = donor('W36N11');
 wrongHomeDonor.creeps[3].memory.home='W35N11';
 blocked([dst,wrongHomeDonor],routes,'COMBAT_CAPACITY_SHORTFALL');
+// Exact-budget false negatives are removed: a fourth expendable attacker
+// raises full-spare-set cost above the donor budget, but the cheapest three
+// complete defenders meet every demand vector with 810 replacement energy.
+const extra = creep('W36N11-attack3','W36N11',[part('attack'),part('move')]);
+const affordableDonor = donor('W36N11',{energyStored:1800});
+affordableDonor.creeps.push(extra);
+const affordable = d2.evaluate([dst,affordableDonor],routes,game);
+assert.equal(affordable.summary.selectedCount,1);
+const affordableCandidate=affordable.supportRequests[0].candidateProviders[0];
+assert.equal(affordableCandidate.defenderCount,4);
+assert.equal(affordableCandidate.spareEnergyBudget,900);
+assert.equal(affordableCandidate.replacementEnergy,810);
+assert.equal(affordableCandidate.selectedDefenderCount,3);
+assert.deepEqual(affordableCandidate.selectedDefenderIds,
+  ['W36N11-attack1','W36N11-attack2','W36N11-healer']);
+assert.ok(affordableCandidate.selectedCombatCapacity.damagePerTick>=32);
+assert.ok(affordableCandidate.selectedCombatCapacity.healPerTick>=20);
+assert.ok(affordableCandidate.selectedCombatCapacity.effectiveHits>=120);
+assert.equal(affordable.supportRequests[0].transportOrSpawnPlan.status,
+  'NON_EXECUTABLE_PROJECTION');
+const duplicateDonor = donor('W36N11');
+duplicateDonor.creeps[2].id=duplicateDonor.creeps[1].id;
+blocked([dst,duplicateDonor],routes,'DEFENDER_IDENTITY_AMBIGUOUS');
 assert.equal(JSON.stringify(memory.bot.requestRegistry),JSON.stringify({sentinel:'unchanged'}));
 assert.equal(d2.telemetrySummary(output),output.summary);
 
