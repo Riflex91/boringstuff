@@ -75,7 +75,12 @@ const parent=()=>({
   spawn:{name:'Home',pos:pos(25,25,'E2N2')},
   rcl:5,emergency:false,health:{status:'HEALTHY'},hostileCreeps:[],
   economyModel:{haulerCarryDeficit:0},
-  energyCapacityAvailable:1050,energyStored:6000
+  energyCapacityAvailable:1050,energyAvailable:1050,energyStored:6000,
+  creeps:[
+    {memory:{role:'harvester'}},{memory:{role:'harvester'}},
+    {memory:{role:'hauler'}},{memory:{role:'hauler'}},
+    {memory:{role:'upgrader',waitingEnergyTicks:0,logisticsFallback:false}}
+  ]
 });
 const fixture=()=>{
   const intel=records();
