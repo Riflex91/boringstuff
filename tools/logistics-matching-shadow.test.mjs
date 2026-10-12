@@ -344,4 +344,98 @@ function add(memory, time, specs) {
   assert.equal(deferred.jobs.length, 0);
 }
 
+// A future scheduler may pass stale snapshots or a request generated for the
+// wrong room. Neither may produce a pretend "matched" job without an actual
+// matching E0 RequestRegistry reservation in the local room.
+{
+  const memory={};
+  const persisted=add(memory,600,[
+    pickup('live-pickup',100),
+    delivery('vanished-critical',40,15,10,true)
+  ]);
+  const removed=registry.ensureRoom('E1N1',memory);
+  delete removed.requests['vanished-critical'];
+  const previous=JSON.stringify(removed);
+  const out=matcher.plan({room:{name:'E1N1'},
+    creeps:[hauler('missing-target',6,5,0,50)]},
+  persisted,memory,{time:600});
+  assert.equal(out.summary.jobCount,0);
+  assert.equal(out.summary.criticalRequestCount,1);
+  assert.equal(out.summary.criticalMatchedCount,0);
+  assert.equal(out.summary.criticalNoCandidateCount,1);
+  assert.equal(out.unmatchedCritical.length,1);
+  assert.equal(out.summary.reservedAmount,0);
+  assert.equal(registry.snapshot('E1N1',memory).reservationCount,0);
+  assert.ok(!JSON.stringify(removed).includes('hauler-shadow'));
+  assert.equal(Object.keys(removed.requests).length,1);
+}
+{
+  const memory={};
+  const stale=structuredClone(add(memory,625,[
+    delivery('old-demand',80,15,10,true)
+  ]));
+  registry.upsert('E1N1',
+    delivery('old-demand',10,15,10,true),memory,{time:625});
+  const out=matcher.plan({room:{name:'E1N1'},
+    creeps:[hauler('stale-upsert',10,10,50,50)]},
+    stale,memory,{time:625});
+  assert.equal(out.summary.jobCount,1);
+  assert.equal(out.jobs[0].amount,10,
+    'Stale snapshot must not reserve beyond current registry demand');
+  assert.equal(out.jobs[0].reservationIds.length,1);
+  const active=registry.list('E1N1',memory)[0];
+  assert.equal(active.reservations.length,1);
+  assert.equal(active.reservations[0].amount,10);
+}
+{
+  const memory={};
+  registry.upsert('E2N2',delivery('foreign',50,15,10,true),
+    memory,{time:650});
+  const foreign=registry.list('E2N2',memory);
+  const out=matcher.plan({room:{name:'E1N1'},
+    creeps:[hauler('foreign-request',10,10,50,50)]},
+    foreign,memory,{time:650});
+  assert.equal(out.summary.jobCount,0);
+  assert.equal(out.summary.criticalNoCandidateCount,1);
+  assert.equal(registry.snapshot('E1N1',memory).reservationCount,0);
+  assert.equal(registry.snapshot('E2N2',memory).reservationCount,0);
+}
+{
+  const memory={};
+  const spec=delivery('kind-changed',50,15,10,true);
+  const stale=structuredClone(add(memory,675,[spec]));
+  registry.upsert('E1N1',{...spec,kind:'DELIVER'},memory,{time:675});
+  const out=matcher.plan({room:{name:'E1N1'},
+    creeps:[hauler('kind-changed-test',10,10,50,50)]},
+    stale,memory,{time:675});
+  assert.equal(out.summary.jobCount,0);
+  assert.equal(registry.snapshot('E1N1',memory).reservationCount,0);
+}
+// Directly reject missing or mismatched registry records at candidate stage.
+assert.equal(matcher._test.registeredRequest(
+  {id:'missing',dedupeKey:'a',kind:'DELIVER'},new Map()),null);
+assert.equal(matcher._test.registryBackedCandidate({
+  demand:{id:'phantom',dedupeKey:'phantom',kind:'DELIVER'}
+},new Map()),false);
+
+// Force a two-sided commit failure in the shadow reservation helper itself.
+// Its first successful pickup reservation must be rolled back when the demand
+// record is absent; no half-booked pickup may survive a rejected job.
+{
+  const memory={};
+  const registered=add(memory,690,[pickup('partial-source',100)]);
+  const fakeDemand=registry._test.normalize(
+    delivery('missing-half',50,15,10,true),'E1N1',690);
+  const proposal={
+    supply:registered[0],
+    demand:fakeDemand,
+    haulerId:'rollback-probe',
+    amount:25
+  };
+  assert.equal(matcher._test.reserveMatch(
+    'E1N1',proposal,memory,{time:690}),null);
+  assert.equal(registry.snapshot('E1N1',memory).reservationCount,0,
+    'Partial pickup booking must be rolled back atomically');
+  assert.equal(registry.list('E1N1',memory)[0].status,'OPEN');
+}
 console.log('logistics matching shadow tests passed');
