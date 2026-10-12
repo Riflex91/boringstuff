@@ -62,8 +62,13 @@ function inspectRoom(state) {
   const actors=new Set();
   for (const e of events) {
     if (!e || e.event !== EVENT_TRANSFER ||
-        !haulers.has(e.objectId) || !e.data ||
-        !consumers.has(e.data.targetId) ||
+        !haulers.has(e.objectId)) continue;
+    // A malformed energy transfer by one of our haulers cannot be interpreted
+    // as "no delivery"; incomplete event data breaks the evidence window.
+    if (!e.data || typeof e.data !== 'object' ||
+        typeof e.data.targetId !== 'string' ||
+        typeof e.data.resourceType !== 'string') return null;
+    if (!consumers.has(e.data.targetId) ||
         e.data.resourceType !== RESOURCE_ENERGY) continue;
     // The only counted source is an owned hauler; the only destination is an
     // owned worker-type Creep. withdraw() from a Creep is impossible.
@@ -110,7 +115,9 @@ function observe(states,game,memory) {
     let entry=record.rooms[name];
     if (!entry || !validWindow(entry.window) ||
         (entry.lastProcessedGameTick != null &&
-        !isInt(entry.lastProcessedGameTick))) {
+        !isInt(entry.lastProcessedGameTick)) ||
+        (entry.window && entry.window.ticks > 0 &&
+        entry.lastProcessedGameTick !== entry.window.lastGameTick)) {
       entry={window:newWindow(now),lastWindow:null,lastProcessedGameTick:null};
       record.rooms[name]=entry;
     }
@@ -137,6 +144,11 @@ function observe(states,game,memory) {
     w.deliveryEvents+=measurement.deliveryEvents;
     w.deliveredEnergy+=measurement.deliveredEnergy;
     if(measurement.deliveryEvents)w.ticksWithDelivery++;
+    if(!isInt(w.deliveryEvents) || !isInt(w.deliveredEnergy)) {
+      entry.window=newWindow(now+1);entry.lastWindow=null;
+      entry.lastProcessedGameTick=now;
+      continue;
+    }
     entry.lastProcessedGameTick=now;
     if(!validWindow(w) && w.ticks !== WINDOW_TICKS) {
       entry.window=newWindow(now+1);entry.lastWindow=null;
