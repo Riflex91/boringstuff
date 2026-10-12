@@ -85,7 +85,7 @@ const events=()=>[
   assert.equal(w.confirmedConsumerEnergyLowerBound,2500);
   assert.equal(w.confirmedConsumerEnergyPerTickLowerBound,25);
   assert.equal(w.ticksWithConfirmedConsumerDelivery,100);
-  assert.equal(w.schemaVersion,4);
+  assert.equal(w.schemaVersion,5);
   assert.equal(w.confirmedFirstDeliveryForPreviouslyWaitingConsumers,0);
   assert.equal(w.sampledWaitingTicksBeforeFirstConfirmedDeliveryTotal,0);
   assert.equal(w.averageSampledWaitingTicksBeforeFirstConfirmedDelivery,null);
