@@ -48,7 +48,7 @@ function validCpu(x) {
     x.comparableAlternativeCpuPerTick===null;
 }
 function validDelivery(x, room) {
-  if (!x || x.schemaVersion!==4 || x.waitingObservationPhase!=='BEFORE_CREEP_INTENTS' ||
+  if (!x || x.schemaVersion!==5 || x.waitingObservationPhase!=='BEFORE_CREEP_INTENTS' ||
       x.authority!=='SHADOW_EVIDENCE' ||
       x.actionAuthority!=='NONE' || x.room!==room ||
       x.source!=='SCREEPS_PREVIOUS_TICK_SETTLED_TRANSFER_EVENTS' ||
@@ -70,6 +70,10 @@ function validDelivery(x, room) {
     'ticksWithConfirmedConsumerDelivery',
     'confirmedFirstDeliveryForPreviouslyWaitingConsumers',
     'observedWaitingConsumerTicks',
+    'observedWaitingConsumerTicksWithLoadedSticky',
+    'firstConfirmedReceiptFromSameExclusiveLoadedSticky',
+    'firstConfirmedReceiptFromOtherThanExclusiveLoadedSticky',
+    'firstConfirmedReceiptWithoutUniqueLoadedSticky',
     'observedWaitingConsumerTicksBeforeFirstReceipt',
     'observedWaitingEpisodeStarts',
     'observedWaitingEpisodesStoppedWithoutHaulerReceipt',
@@ -92,6 +96,12 @@ function validDelivery(x, room) {
     x.ticksWithConfirmedConsumerDelivery <= TICKS &&
     x.confirmedFirstDeliveryForPreviouslyWaitingConsumers <=
       x.confirmedConsumerDeliveryEvents &&
+    x.observedWaitingConsumerTicksWithLoadedSticky <=
+      x.observedWaitingConsumerTicks &&
+    x.firstConfirmedReceiptFromSameExclusiveLoadedSticky +
+      x.firstConfirmedReceiptFromOtherThanExclusiveLoadedSticky +
+      x.firstConfirmedReceiptWithoutUniqueLoadedSticky ===
+      x.confirmedFirstDeliveryForPreviouslyWaitingConsumers &&
     x.observedWaitingConsumerTicksBeforeFirstReceipt <=
       x.observedWaitingConsumerTicks &&
     x.openWaitingEpisodesWithoutConfirmedReceiptAtWindowEnd <=
@@ -137,7 +147,15 @@ function assess(room, now, cpu, delivery) {
         delivery.observedWaitingConsumerTicksBeforeFirstReceipt,
       episodesStillOpen:delivery.openWaitingEpisodesAtWindowEnd,
       firstConfirmedReceipts:
-        delivery.confirmedFirstDeliveryForPreviouslyWaitingConsumers
+        delivery.confirmedFirstDeliveryForPreviouslyWaitingConsumers,
+      consumerTicksWithLoadedSticky:
+        delivery.observedWaitingConsumerTicksWithLoadedSticky,
+      firstReceiptsFromSameExclusiveLoadedSticky:
+        delivery.firstConfirmedReceiptFromSameExclusiveLoadedSticky,
+      firstReceiptsFromDifferentHaulerThanExclusiveSticky:
+        delivery.firstConfirmedReceiptFromOtherThanExclusiveLoadedSticky,
+      firstReceiptsWithoutUniqueLoadedSticky:
+        delivery.firstConfirmedReceiptWithoutUniqueLoadedSticky
     },
     // These independent measurements do not form comparable economics:
     // numerator includes ALL hauler role CPU; denominator excludes deliveries
