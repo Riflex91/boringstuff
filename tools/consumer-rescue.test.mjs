@@ -181,6 +181,21 @@ try {
   assert.equal(energy.shouldRescueConsumer(partial), false);
   ready.memory.consumerTargetId = undefined;
 
+  // A zero-energy sticky hauler must not monopolize an urgent consumer or
+  // block the one safe partial-load rescuer. Guard selection stays read-only;
+  // stale claim cleanup happens during actual consumer target selection.
+  const depleted = makeHauler('depleted-sticky', r, 0);
+  depleted.memory.consumerTargetId = urgent.id;
+  r.creeps = [ready, partial, depleted, urgent];
+  assert.deepEqual(energy._test.selectConsumerGuardHaulers(r).map(c => c.id),
+    [partial.id], 'ready infrastructure reserve must remain untouched');
+  assert.equal(depleted.memory.consumerTargetId, urgent.id,
+    'guard selection must not mutate another creep Memory');
+  assert.equal(energy._test.selectConsumerTarget(partial, true).id, urgent.id);
+  assert.equal(depleted.memory.consumerTargetId, undefined,
+    'actual assignment selection reclaims the depleted sticky claim');
+  r.creeps = [ready, partial, urgent];
+
   // Same-tick simultaneous candidates choose exactly one stable rescuer.
   const closer = makeHauler('closer', r, 75, 1);
   partial.pos.getRangeTo = () => 7;
