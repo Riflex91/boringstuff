@@ -115,19 +115,25 @@ function acquireWorkEnergy(creep) {
     return energy.acquire(creep, true);
   }
 
-  if (energy.acquireForConsumer(creep)) {
-    creep.memory.waitingEnergyTicks = 0;
-    return true;
-  }
-
+  // The local drop/storage/controller-container helper returns true on an
+  // accepted pickup/withdraw intent OR an accepted moveTo. Neither proves
+  // that CARRY changed. Do not indefinitely restart the hauler wait clock
+  // while walking toward a distant or emptying local source.
+  const acquiring = energy.acquireForConsumer(creep);
   creep.memory.waitingEnergyTicks = (creep.memory.waitingEnergyTicks || 0) + 1;
   if (creep.memory.waitingEnergyTicks <= config.CONSUMER_HAULER_WAIT_TICKS) {
-    waitNearWork(creep);
+    // Never overwrite an already issued pickup/withdraw or local approach
+    // movement with a second moveTo near the work site in this same tick.
+    if (!acquiring) waitNearWork(creep);
     return true;
   }
 
   creep.memory.waitingEnergyTicks = 0;
   creep.memory.logisticsFallback = true;
+  // Finish the in-flight local action/move this tick. Starting NEXT tick,
+  // persistent fallback collects independent of the stalled hauler path.
+  // This also avoids issuing competing movement intents in one tick.
+  if (acquiring) return true;
   return energy.acquire(creep, true);
 }
 
