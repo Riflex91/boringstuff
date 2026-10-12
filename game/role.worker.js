@@ -54,8 +54,23 @@ function constructionPriority(site) {
   }
 }
 
+// A road on natural wall terrain costs 45,000 build energy rather than
+// 300 on plain or 1,500 on swamp. Pending a real route-ROI decision, defer
+// expensive tunnel work at ALL RCLs. Keep existing partial progress/sites
+// intact (no remove()): builders return to useful repair/controller work.
+const MAX_UNVERIFIED_ROAD_SITE_COST = 1500;
+function economicConstructionSite(site) {
+  if (!site) return false;
+  if (site.structureType !== STRUCTURE_ROAD) return true;
+  // progressTotal is part of the real Screeps ConstructionSite API; missing
+  // or malformed evidence fails closed rather than assuming a cheap road.
+  return Number.isSafeInteger(site.progressTotal) &&
+    site.progressTotal > 0 && site.progressTotal <= MAX_UNVERIFIED_ROAD_SITE_COST;
+}
+
 function preferredConstructionSite(creep) {
-  const sites = creep.room.find(FIND_MY_CONSTRUCTION_SITES);
+  const sites = creep.room.find(FIND_MY_CONSTRUCTION_SITES)
+    .filter(economicConstructionSite);
   if (!sites.length) return null;
   let bestPriority = Infinity;
   for (const site of sites) bestPriority = Math.min(bestPriority, constructionPriority(site));
@@ -217,4 +232,4 @@ function run(creep) {
   upgrade(creep);
 }
 
-module.exports = { run, _test: { acquireWorkEnergy, needsEnergy, liveHaulerCount, shouldAssistInfrastructure, emergencyRepair } };
+module.exports = { run, _test: { acquireWorkEnergy, needsEnergy, liveHaulerCount, shouldAssistInfrastructure, emergencyRepair, economicConstructionSite, preferredConstructionSite } };
