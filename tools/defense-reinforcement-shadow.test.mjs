@@ -113,7 +113,7 @@ assert.deepEqual(req.transportOrSpawnPlan.projectedDefenderIds,
   ['W36N12-attack1','W36N12-attack2','W36N12-healer']);
 assert.equal(req.transportOrSpawnPlan.projectedDefenderCount,3);
 assert.deepEqual(req.transportOrSpawnPlan.projectedCombatCapacity,{
-  damagePerTick:60,healPerTick:24,effectiveHits:600
+  damagePerTick:60,healPerTick:24,effectiveHits:700
 });
 assert.equal(req.transportOrSpawnPlan.selectionMethod,
   'BOUNDED_WHOLE_BODY_EXHAUSTIVE_SHADOW');
@@ -124,7 +124,7 @@ for(const candidate of req.candidateProviders) {
   assert.equal(candidate.selectedDefenderCount,3);
   assert.equal(candidate.selectedDefenderIds.includes(candidate.roomName+'-reserve'),false);
   assert.deepEqual(candidate.selectedCombatCapacity,{
-    damagePerTick:60,healPerTick:24,effectiveHits:600
+    damagePerTick:60,healPerTick:24,effectiveHits:700
   });
   assert.equal(candidate.spareEnergyBudget,4100);
   assert.equal(candidate.availableCapacity.damagePerTick,60);
