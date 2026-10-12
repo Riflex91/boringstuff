@@ -540,6 +540,53 @@ const energy = require('../game/energy.js');
   assert.equal(energy.shouldPrioritizeConsumer(hauler3), false);
 }
 
+// The infrastructure reserve must be able to DELIVER, not merely exist.
+// With one energy-ready hauler and another empty/nonready carrier, the old
+// count-based policy diverted the only ready hauler to the critical consumer.
+{
+  const critical = makeConsumer('worker-one-ready-critical', 'worker', 0, 8, true);
+  const ready = makeHauler('hauler-one-ready');
+  ready.memory.delivering = true;
+  const depleted = makeHauler('hauler-one-ready-empty');
+  depleted.store.energy = 0;
+  depleted.memory.delivering = false;
+  room.creeps = [critical, ready, depleted];
+
+  assert.deepEqual(energy._test.selectConsumerGuardHaulers(room), [],
+    'never divert the only energy-ready infrastructure carrier');
+  assert.equal(energy.shouldPrioritizeConsumer(ready), false);
+
+  depleted.store.energy = 75; // not delivery-ready, may rescue only if safe
+  assert.deepEqual(energy._test.selectConsumerGuardHaulers(room), [],
+    'a collecting partial hauler is not a ready infrastructure reserve');
+  const thirdEmpty = makeHauler('hauler-one-ready-third-empty');
+  thirdEmpty.store.energy = 0;
+  room.creeps = [critical, ready, depleted, thirdEmpty];
+  assert.deepEqual(energy._test.selectConsumerGuardHaulers(room), [],
+    'additional empty/collecting carriers never increase ready guard capacity');
+}
+
+// With three haulers but only two carrying delivery-ready loads, exactly
+// one normal guard may serve consumers, leaving one real ready infra carrier.
+{
+  const first = makeConsumer('worker-two-ready-critical-a', 'worker', 0, 8, true, 2);
+  const second = makeConsumer('upgrader-two-ready-critical-b', 'upgrader', 0, 7, true, 4);
+  const readyA = makeHauler('hauler-two-ready-a', {[first.id]: 1});
+  const readyB = makeHauler('hauler-two-ready-b', {[second.id]: 1});
+  const collecting = makeHauler('hauler-not-ready');
+  collecting.store.energy = 75;
+  collecting.memory.delivering = false;
+  room.creeps = [first, second, readyA, readyB, collecting];
+
+  const guards = energy._test.selectConsumerGuardHaulers(room);
+  assert.equal(guards.length, 1,
+    'two ready carriers cannot both be redirected away from infrastructure');
+  const remainingReady = [readyA, readyB].filter(h => !guards.some(g => g.id === h.id));
+  assert.equal(remainingReady.length, 1);
+  assert.equal(energy.shouldPrioritizeConsumer(remainingReady[0]), false);
+  assert.equal(energy._test.haulerReadyToDeliver(remainingReady[0]), true);
+}
+
 // Two old sticky reservations for the same critical consumer must not
 // consume both emergency guard slots and starve another distinct request.
 // The duplicate hauler remains available to the ordinary infrastructure
