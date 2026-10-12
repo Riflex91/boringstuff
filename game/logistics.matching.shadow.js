@@ -347,6 +347,26 @@ function revalidatedAmount(candidate) {
   return 0;
 }
 
+// E4 may be given stale/foreign request snapshots by a future scheduler.
+// Only exact, nonterminal, currently registered room requests can back a
+// shadow reservation. Do not generate a phantom matched job from a snapshot
+// that has no actual RequestRegistry record.
+function registeredRequest(request, registered) {
+  if (!request || typeof request.dedupeKey !== 'string' ||
+      typeof request.id !== 'string') return null;
+  const stored = registered.get(request.dedupeKey);
+  if (!stored || stored.id !== request.id ||
+      stored.kind !== request.kind || stored.domain !== 'logistics' ||
+      TERMINAL[stored.status] || !LOGISTICS_KINDS[stored.kind]) return null;
+  return stored;
+}
+
+function registryBackedCandidate(candidate, registered) {
+  return !!(candidate && candidate.demand &&
+    registeredRequest(candidate.demand, registered) &&
+    (!candidate.supply || registeredRequest(candidate.supply, registered)));
+}
+
 function reserveMatch(roomName, candidate, memoryRoot, game) {
   const validUntilTick = tick(game);
   const reservations = [];
@@ -370,6 +390,18 @@ function reserveMatch(roomName, candidate, memoryRoot, game) {
     }, memoryRoot, game);
     if (demandReservation) reservations.push(demandReservation);
   }
+  // If either side could not be reserved, undo any partial shadow
+  // commitment instead of publishing a misleading executable-looking job.
+  const expected = candidate.supply && candidate.supply !== candidate.demand ? 2 : 1;
+  if (reservations.length !== expected) {
+    for (const reservation of reservations) {
+      const key = candidate.supply &&
+        reservation.requestId === candidate.supply.id
+        ? candidate.supply.dedupeKey : candidate.demand.dedupeKey;
+      registry.releaseReservation(roomName, key, reservation.id, memoryRoot, game);
+    }
+    return null;
+  }
   return reservations;
 }
 
@@ -379,11 +411,17 @@ function plan(state, requests, memoryRoot, game) {
   const roomName = state && state.room && state.room.name;
   if (!roomName) return deferredSnapshot('NO_ROOM');
   const roomState = ensureRoom(roomName, memoryRoot);
+  const registered = new Map(registry.list(roomName, memoryRoot)
+    .map(request => [request.dedupeKey, request]));
   const sets = activeSets(requests);
   const initialCritical = sets.demand.filter(r => r.kind === 'EMERGENCY_DELIVER' && remainingAmount(r) > 0);
   const haulers = (state.creeps || []).filter(c => c && !c.spawning && role(c) === 'hauler' && (c.id || c.name));
   const candidates = [];
-  for (const hauler of haulers) candidates.push(...makeCandidates(hauler, sets, roomState, now));
+  for (const hauler of haulers) {
+    for (const candidate of makeCandidates(hauler, sets, roomState, now)) {
+      if (registryBackedCandidate(candidate, registered)) candidates.push(candidate);
+    }
+  }
   candidates.sort((a, b) => better(a, b) ? -1 : (better(b, a) ? 1 : 0));
 
   // Track whether each critical request was serviceable by at least one
@@ -402,11 +440,19 @@ function plan(state, requests, memoryRoot, game) {
   const usedHaulers = {};
   for (const candidate of candidates) {
     if (usedHaulers[candidate.haulerId]) continue;
-    const amount = revalidatedAmount(candidate);
+    const source = candidate.supply ?
+      registeredRequest(candidate.supply, registered) : null;
+    const demand = registeredRequest(candidate.demand, registered);
+    if (!demand || (candidate.supply && !source)) continue;
+    const amount = Math.min(
+      revalidatedAmount(candidate),
+      remainingAmount(demand),
+      source && source !== demand ? remainingAmount(source) : Infinity);
     if (amount <= 0) continue;
     candidate.amount = amount;
 
     const reservations = reserveMatch(roomName, candidate, memoryRoot, game);
+    if (!reservations) continue; // no phantom assignment or partial booking
     const job = {
       schemaVersion: SCHEMA_VERSION,
       authority: 'SHADOW',
@@ -555,6 +601,9 @@ module.exports = {
     activeSets,
     makeCandidates,
     revalidatedAmount,
+    registeredRequest,
+    registryBackedCandidate,
+    reserveMatch,
     better
   }
 };
