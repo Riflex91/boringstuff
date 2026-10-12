@@ -12,21 +12,20 @@ function needsEnergy(creep) {
     creep.memory.working = true;
     creep.memory.logisticsFallback = false;
     creep.memory.waitingEnergyTicks = 0;
-    delete creep.memory.lastHaulerDeliveryTick;
+    delete creep.memory.lastHaulerIntentTick;
   }
 
-  // Under hauler logistics, a confirmed partial delivery should be consumed
-  // immediately instead of forcing the worker to wait until CARRY is 100% full.
-  // The explicit marker is important: partial energy from self-harvest fallback
-  // must retain the historical fill-before-work behavior or the old one-tick
-  // fallback/wait loop returns.
+  // A hauler intent alone is not a settled receipt. Only actual positive
+  // CARRY on a consumer turn can use this short-lived intent hint to resume
+  // partial-load work. Self-harvest without such a hint still fills first.
   if (!creep.memory.working && (creep.store[RESOURCE_ENERGY] || 0) > 0) {
-    const deliveredTick = Number(creep.memory.lastHaulerDeliveryTick);
+    const deliveredTick = Number(creep.memory.lastHaulerIntentTick);
     const now = typeof Game !== 'undefined' && Number.isFinite(Game.time) ? Game.time : null;
     if (Number.isFinite(deliveredTick) && now !== null && now - deliveredTick >= 0 && now - deliveredTick <= 1) {
       creep.memory.working = true;
       creep.memory.waitingEnergyTicks = 0;
-      delete creep.memory.lastHaulerDeliveryTick;
+      creep.memory.logisticsFallback = false;
+      delete creep.memory.lastHaulerIntentTick;
     }
   }
   return !creep.memory.working;
