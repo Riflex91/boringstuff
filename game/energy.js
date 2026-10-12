@@ -433,23 +433,12 @@ function deliverToConsumer(creep, criticalOnly = false) {
     return true;
   }
   if (rc === OK) {
-    if (target.memory) {
-      // Any confirmed hauler delivery means logistics has recovered for this
-      // consumer. Clear the self-supply fallback immediately, even when the
-      // transfer is partial, or the consumer remains falsely critical and
-      // re-enters self-harvest on its next empty cycle.
-      target.memory.waitingEnergyTicks = 0;
-      target.memory.logisticsFallback = false;
-    }
-
-    if (freeEnergyCapacity(target) <= 0) {
-      if (target.memory) delete target.memory.lastHaulerDeliveryTick;
-      clearConsumerTarget(creep);
-    } else if (target.memory && typeof Game !== 'undefined' && Number.isFinite(Game.time)) {
-      // Partial delivery is still useful productive energy. Mark it explicitly
-      // so role.worker can resume work on the next consumer turn without
-      // mistaking self-harvest/fallback energy for a logistics delivery.
-      target.memory.lastHaulerDeliveryTick = Game.time;
+    // OK only accepts an intent, not a settled energy delivery. Preserve the
+    // real waiting/fallback request and sticky reservation until the consumer
+    // itself observes usable energy. This hint is NOT receipt evidence.
+    if (target.memory && typeof Game !== 'undefined' &&
+        Number.isSafeInteger(Game.time)) {
+      target.memory.lastHaulerIntentTick = Game.time;
     }
     return true;
   }
