@@ -20,7 +20,12 @@ const owned = (options={}) => ({
   room:{name:'E2N2',controller:{my:true}},spawn:{name:'First'},
   rcl:5,emergency:false,health:{status:'HEALTHY'},
   hostileCreeps:[],economyModel:{haulerCarryDeficit:0},
-  energyCapacityAvailable:1050,energyStored:6000,...options
+  energyCapacityAvailable:1050,energyAvailable:1050,energyStored:6000,
+  creeps:[
+    {memory:{role:'harvester'}},{memory:{role:'harvester'}},
+    {memory:{role:'hauler'}},{memory:{role:'hauler'}},
+    {memory:{role:'upgrader',waitingEnergyTicks:0,logisticsFallback:false}}
+  ],...options
 });
 function record(name, exits, mine=false, options={}) {
   return {schemaVersion:1,roomName:name,
@@ -156,6 +161,72 @@ const evaluate=(f,r=readiness,a=advisory,states=[owned()])=>
   assert.equal(evaluate(f,{...readiness,claimActionEnabled:true}).phase,'HOLD');
   assert.equal(evaluate(f,readiness,{...advisory,placementEnabled:true}).phase,'HOLD');
 }
+// Parent support is a read-only preflight; claim and spawn authority remain off.
+// A healthy status alone does not prove replenished energy or redundancy.
+{
+  const support=require('../game/expansion.parent.support.shadow.js');
+  const healthy=owned();
+  const original=JSON.stringify(healthy);
+  const pass=support.assess(healthy);
+  assert.equal(pass.status,'ADVISORY_OK');
+  assert.equal(pass.claimActionEnabled,false);
+  assert.equal(pass.spawnActionEnabled,false);
+  assert.equal(pass.supportActionEnabled,false);
+  assert.equal(JSON.stringify(healthy),original);
+  const scenarios=[
+    [owned({energyAvailable:53}),'PARENT_INFRASTRUCTURE_REFILL_PRESSURE'],
+    [owned({energyAvailable:undefined}),'PARENT_INFRASTRUCTURE_ENERGY_UNVERIFIED'],
+    [owned({energyAvailable:1100}),'PARENT_INFRASTRUCTURE_ENERGY_UNVERIFIED'],
+    [owned({energyAvailable:944}),'PARENT_INFRASTRUCTURE_REFILL_PRESSURE'],
+    [owned({energyStored:1000}),'PARENT_SUPPORT_RESERVE_INSUFFICIENT'],
+    [owned({creeps:undefined}),'PARENT_WORKFORCE_UNVERIFIED'],
+    [owned({creeps:healthy.creeps.slice(0,3)}),
+      'PARENT_MINING_OR_HAULING_REDUNDANCY_LOW'],
+    [owned({creeps:healthy.creeps.map((c,i)=>i===4?
+      {memory:{...c.memory,waitingEnergyTicks:5}}:c)}),
+      'PARENT_CONSUMER_SUPPLY_PRESSURE'],
+    [owned({creeps:healthy.creeps.map((c,i)=>i===4?
+      {memory:{...c.memory,logisticsFallback:true}}:c)}),
+      'PARENT_CONSUMER_SUPPLY_PRESSURE'],
+    [owned({health:{status:'RECOVERING'}}),'PARENT_NOT_STABLE']
+  ];
+  for(const [parent,reason] of scenarios){
+    const result=support.assess(parent);
+    assert.equal(result.reason,reason);
+    assert.equal(result.status,'HOLD');
+    assert.equal(result.claimActionEnabled,false);
+  }
+  assert.equal(support.assess(owned({energyAvailable:945})).status,
+    'ADVISORY_OK');
+}
+{
+  const f=fixture();
+  evaluate(f);evaluate(f);
+  assert.equal(evaluate(f).phase,'AWAITING_TILE_VALIDATION');
+  const blocked=evaluate(f,readiness,advisory,[owned({energyAvailable:53})]);
+  assert.equal(blocked.phase,'SUPPORT_CHECK');
+  assert.equal(blocked.reason,'PARENT_INFRASTRUCTURE_REFILL_PRESSURE');
+  assert.equal(blocked.readyForClaim,false);
+  assert.equal(evaluate(f,readiness,advisory,[owned()]).phase,
+    'AWAITING_TILE_VALIDATION');
+
+  const state=f.memory.bot.expansionOperationShadow;
+  state.phase='SITE_VERIFIED_ADVISORY';
+  state.verifiedSite={x:25,y:25,roomName:'E2N3'};
+  state.pathCost=123;
+  state.siteVerifiedTick=f.game.time;
+  state.siteCursor=2;
+  const parent=owned({creeps:owned().creeps.map((c,i)=>i===4?
+    {memory:{...c.memory,logisticsFallback:true}}:c)});
+  const revoked=evaluate(f,readiness,advisory,[parent]);
+  assert.equal(revoked.phase,'SUPPORT_CHECK');
+  assert.equal(revoked.reason,'PARENT_CONSUMER_SUPPLY_PRESSURE');
+  assert.equal(revoked.spawnTileVerified,false);
+  assert.equal(revoked.spawnSite,null);
+  assert.equal(state.verifiedSite,null);
+  assert.equal(state.siteCursor,0);
+}
+
 const source=fs.readFileSync(path.resolve(here,
   '../game/expansion.operation.shadow.js'),'utf8');
 for(const forbidden of ['.claimController(','.reserveController(',
