@@ -447,7 +447,20 @@ function deliverToConsumer(creep, criticalOnly = false) {
   const rc = creep.transfer(target, RESOURCE_ENERGY);
   consumerSupplyObserver.recordResult(creep, 'consumer', rc);
   if (rc === ERR_NOT_IN_RANGE) {
-    creep.moveTo(target, { reusePath: 5, maxOps: config.PATH_MAX_OPS, visualizePathStyle: { stroke: '#ffffff' } });
+    const moveRc = creep.moveTo(target, {
+      reusePath: 5, maxOps: config.PATH_MAX_OPS,
+      visualizePathStyle: { stroke: '#ffffff' }
+    });
+    // An impossible path cannot service the reserved consumer. Relinquish
+    // this claim immediately so a different loaded hauler is not excluded
+    // by an undeliverable sticky assignment. Do not treat transient fatigue,
+    // busy movement, or a bounded route attempt as terminal failures.
+    if ((typeof ERR_NO_PATH !== 'undefined' && moveRc === ERR_NO_PATH) ||
+        (typeof ERR_INVALID_TARGET !== 'undefined' &&
+         moveRc === ERR_INVALID_TARGET)) {
+      clearConsumerTarget(creep);
+      return false;
+    }
     return true;
   }
   if (rc === OK) {

@@ -28,6 +28,7 @@ global.OK = 0;
 global.ERR_NOT_IN_RANGE = -9;
 global.ERR_FULL = -8;
 global.ERR_NO_PATH = -2;
+global.ERR_INVALID_TARGET = -7;
 global.ERR_BUSY = -4;
 
 const objects = new Map();
@@ -264,6 +265,44 @@ const energy = require('../game/energy.js');
   assert.equal(ready.memory.consumerTargetId, critical.id);
   assert.equal(energy.isCriticalConsumerRequest(critical), true,
     'accepted movement must not hide unsatisfied starvation');
+}
+
+// A hauler whose moveTo() has a terminal routing error cannot fulfill its
+// sticky critical reservation. Another carrier must be able to take over
+// even when the failed hauler still has a full CARRY load.
+{
+  const starved = makeConsumer('worker-terminal-route', 'worker', 0, 8, true);
+  const trapped = makeHauler('hauler-terminal-route');
+  const backup = makeHauler('hauler-backup-route');
+  trapped.memory.delivering = backup.memory.delivering = true;
+  trapped.transfer = () => ERR_NOT_IN_RANGE;
+  let rc = ERR_NO_PATH;
+  trapped.moveTo = () => rc;
+  room.creeps = [starved, trapped, backup];
+  assert.equal(energy.deliverToConsumer(trapped, true), false);
+  assert.equal(trapped.memory.consumerTargetId, undefined);
+  assert.equal(energy._test.selectConsumerTarget(backup, true).id, starved.id,
+    'terminal unreachable reservation must not monopolize demand');
+  assert.equal(energy.deliverToConsumer(backup, true), true);
+  assert.equal(backup.memory.consumerTargetId, starved.id);
+  assert.equal(energy.isCriticalConsumerRequest(starved), true,
+    'failed move is not delivered energy');
+
+  // A different terminal path error must also release its reservation.
+  backup.memory.consumerTargetId = undefined;
+  rc = ERR_INVALID_TARGET;
+  assert.equal(energy.deliverToConsumer(trapped, true), false);
+  assert.equal(trapped.memory.consumerTargetId, undefined);
+
+  // A transient busy movement is NOT evidence that the route is terminal.
+  rc = ERR_BUSY;
+  assert.equal(energy.deliverToConsumer(trapped, true), true);
+  assert.equal(trapped.memory.consumerTargetId, starved.id);
+  assert.equal(energy._test.selectConsumerTarget(backup, true), null,
+    'a still viable sticky reservation remains exclusive');
+  rc = OK;
+  assert.equal(energy.deliverToConsumer(trapped, true), true);
+  assert.equal(trapped.memory.consumerTargetId, starved.id);
 }
 
 // A partially loaded hauler may still become an emergency rescuer. Preserve
