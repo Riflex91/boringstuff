@@ -49,7 +49,7 @@ function transfer(actor,target,amount){
       'Replay of a tick must not double-count waiting episodes');
   }
   const x=result[0];
-  assert.equal(x.schemaVersion,4);
+  assert.equal(x.schemaVersion,5);
   assert.equal(x.observedTicks,100);
   assert.equal(x.confirmedConsumerEnergyLowerBound,23);
   assert.equal(x.confirmedFirstDeliveryForPreviouslyWaitingConsumers,2);
@@ -133,7 +133,7 @@ function transfer(actor,target,amount){
   }}};
   state.creeps=[h1,h2,A];A.memory.waitingEnergyTicks=1;ev=[];
   observe([state],{time:4100},memory);
-  assert.equal(memory.bot.e5SettledConsumerEnergy.schemaVersion,4);
+  assert.equal(memory.bot.e5SettledConsumerEnergy.schemaVersion,5);
   assert.equal(observer.snapshot('E1N1',memory),null,
     'Old v2 episode evidence must not survive migration');
 }

@@ -58,7 +58,7 @@ const settled=(amount)=>({event:EVENT_TRANSFER,objectId:'hauler1',
     const capture=observer.capturePreIntentWaiting([state],{time:t});
     const done=observer.observe([state],{time:t},memory,capture);
     if(t===1099){
-      assert.equal(done[0].schemaVersion,4);
+      assert.equal(done[0].schemaVersion,5);
       assert.equal(done[0].waitingObservationPhase,'BEFORE_CREEP_INTENTS');
       assert.equal(done[0].confirmedConsumerEnergyLowerBound,17);
       assert.equal(done[0].confirmedFirstDeliveryForPreviouslyWaitingConsumers,1);
