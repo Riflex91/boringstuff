@@ -6,6 +6,7 @@
 const candidates = require('expansion.candidates.shadow');
 const siteEvidence = require('expansion.site.shadow');
 const parentSupport = require('expansion.parent.support.shadow');
+const parentStability = require('expansion.parent.stability.shadow');
 const SCHEMA_VERSION = 1;
 const INTEL_MAX_AGE = 150;
 const MAX_ROUTE_HOPS = 3;
@@ -122,7 +123,7 @@ function supportBudget(states, parent) {
   return parentSupport.assess(state).reason;
 }
 
-function evaluate(readiness, advisory, roomStates, game, memoryRoot) {
+function evaluate(readiness, advisory, roomStates, game, memoryRoot, stability) {
   const tick = game && game.time;
   const unavailable = initial(null, null);
   unavailable.phase = 'HOLD';
@@ -228,24 +229,30 @@ function evaluate(readiness, advisory, roomStates, game, memoryRoot) {
       state.reason = reason;
       return result(state);
     }
+    if (!parentStability.qualifies(stability, choice.parentRoom, tick)) {
+      state.reason = 'PARENT_SUPPORT_CONTINUITY_UNVERIFIED';
+      return result(state);
+    }
     state.phase = 'AWAITING_TILE_VALIDATION';
     state.reason = 'TILE_PATH_AND_SPAWN_SITE_NOT_VERIFIED';
     return result(state);
   }
-  // Support can collapse AFTER an earlier valid route/site observation.
-  // Revoke the geometric advisory when the live parent has insufficient
-  // infrastructure energy, mining redundancy, or active consumer starvation.
+  // Parent support or its 100-tick continuity can collapse AFTER a prior
+  // valid route/site observation. Revoke geometric advisory immediately;
+  // recovery requires another full continuity and site-path check.
   // Recovery requires another full support check and site path validation.
   if (state.phase === 'AWAITING_TILE_VALIDATION' ||
       state.phase === 'SITE_VERIFIED_ADVISORY') {
     const supportReason = supportBudget(roomStates, choice.parentRoom);
-    if (supportReason) {
+    const continuityMissing = !parentStability.qualifies(
+      stability, choice.parentRoom, tick);
+    if (supportReason || continuityMissing) {
       state.phase = 'SUPPORT_CHECK';
       state.verifiedSite = null;
       state.siteVerifiedTick = null;
       state.pathCost = null;
       state.siteCursor = 0;
-      state.reason = supportReason;
+      state.reason = supportReason || 'PARENT_SUPPORT_CONTINUITY_UNVERIFIED';
       return result(state);
     }
   }
