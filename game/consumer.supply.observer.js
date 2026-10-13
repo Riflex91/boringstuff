@@ -50,7 +50,11 @@ function getRoomCounters(room, game) {
       selectedRescueHaulers: Object.create(null),
       consumer: { attempted: 0, accepted: 0, notInRange: 0, other: 0 },
       infrastructure: { attempted: 0, accepted: 0, notInRange: 0, other: 0 },
-      haulerAcquisition: { attempted: 0, accepted: 0, notInRange: 0, other: 0 }
+      haulerAcquisition: { attempted: 0, accepted: 0, notInRange: 0, other: 0 },
+      consumerTravel: { moveAttempts:0, rangeAtMost5:0, range6to10:0,
+        rangeOver10:0, rangeUnknown:0, moveAccepted:0,
+        moveNoPath:0, moveInvalidTarget:0, moveTemporarilyBlocked:0,
+        moveOther:0 }
     };
   }
   return perRoom[room];
@@ -85,6 +89,36 @@ function recordResult(creep, kind, rc) {
   else if (rc === ERR_NOT_IN_RANGE) target.notInRange++;
   else target.other++;
 }
+// Called exactly after the existing ERR_NOT_IN_RANGE -> moveTo branch.
+// Range is an inexpensive Chebyshev distance, NOT path length or ETA.
+// Even moveTo() OK only accepts an intent; movement is not yet resolved.
+function recordConsumerTravel(creep, target, moveRc) {
+  const c = getRoomCounters(roomName(creep));
+  if (!c) return;
+  const t = c.consumerTravel;
+  t.moveAttempts++;
+  let range = null;
+  try {
+    if (creep && creep.pos && typeof creep.pos.getRangeTo === 'function') {
+      const value = creep.pos.getRangeTo(target);
+      if (Number.isSafeInteger(value) && value >= 0) range = value;
+    }
+  } catch (_) { /* Unknown distance is not a zero-distance observation. */ }
+  if (range === null) t.rangeUnknown++;
+  else if (range <= 5) t.rangeAtMost5++;
+  else if (range <= 10) t.range6to10++;
+  else t.rangeOver10++;
+  if (moveRc === OK) t.moveAccepted++;
+  else if (typeof ERR_NO_PATH !== 'undefined' && moveRc === ERR_NO_PATH)
+    t.moveNoPath++;
+  else if (typeof ERR_INVALID_TARGET !== 'undefined' &&
+           moveRc === ERR_INVALID_TARGET) t.moveInvalidTarget++;
+  else if ((typeof ERR_BUSY !== 'undefined' && moveRc === ERR_BUSY) ||
+           (typeof ERR_TIRED !== 'undefined' && moveRc === ERR_TIRED))
+    t.moveTemporarilyBlocked++;
+  else t.moveOther++;
+}
+
 function energyAmount(creep) {
   const value = creep && creep.store ? Number(creep.store[RESOURCE_ENERGY]) : NaN;
   return Number.isFinite(value) && value >= 0 ? value : 0;
@@ -300,7 +334,11 @@ function flush(states, logger, game) {
       rescueChecks: 0, rescueSelected: 0, selectedRescueHaulers: {},
       consumer: { attempted: 0, accepted: 0, notInRange: 0, other: 0 },
       infrastructure: { attempted: 0, accepted: 0, notInRange: 0, other: 0 },
-      haulerAcquisition: { attempted: 0, accepted: 0, notInRange: 0, other: 0 }
+      haulerAcquisition: { attempted: 0, accepted: 0, notInRange: 0, other: 0 },
+      consumerTravel: { moveAttempts:0, rangeAtMost5:0, range6to10:0,
+        rangeOver10:0, rangeUnknown:0, moveAccepted:0,
+        moveNoPath:0, moveInvalidTarget:0, moveTemporarilyBlocked:0,
+        moveOther:0 }
     };
     // The only output side effect is an ordinary, version-stamped,
     // journaled BOTLOG entry once per 25 ticks per owned room.
@@ -320,6 +358,7 @@ function flush(states, logger, game) {
       consumerTransfers: records.consumer,
       infrastructureTransfers: records.infrastructure,
       haulerAcquisitions: records.haulerAcquisition,
+      consumerTravel: records.consumerTravel,
       acceptedIsIntentNotSettled: true
     }, { force: true, journal: true, dedupeTicks: 0 });
     emitted++;
@@ -331,6 +370,7 @@ module.exports = {
   recordGuard,
   recordRescue,
   recordResult,
+  recordConsumerTravel,
   flush,
   _test: { sampled, eligible, sampleRoomCreeps, haulerReadiness,
     reset, getRoomCounters, snapshotReservationCoverage,
