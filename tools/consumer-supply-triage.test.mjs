@@ -8,7 +8,7 @@ import { triageSupplySample, repeatedSupplyObservations } from
 const dir=path.dirname(fileURLToPath(import.meta.url));
 const base={
   consumers:{critical:2},
-  haulers:{live:3,readyByGuardRule:2},
+  haulers:{live:3,readyByGuardRule:3},
   reservationCoverage:{
     criticalWithSticky:1,criticalWithReadySticky:1,
     criticalWithoutSticky:1,criticalWithoutReadySticky:1,
