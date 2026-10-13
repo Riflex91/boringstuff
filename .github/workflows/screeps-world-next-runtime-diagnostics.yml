@@ -1,8 +1,19 @@
 name: Screeps World W37S79 runtime diagnostics (GET only)
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '17 */3 * * *'
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/screeps-world-next-runtime-diagnostics.yml
+      - tools/world-next-runtime-diagnostics.mjs
+      - tools/world-next-runtime-diagnostics.test.mjs
 permissions:
   contents: read
+concurrency:
+  group: screeps-world-w37s79-readonly-runtime
+  cancel-in-progress: false
 jobs:
   diagnose:
     runs-on: ubuntu-latest
@@ -17,6 +28,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24.21.0'
+      - name: Validate diagnostics offline
+        run: node world-next-runtime-diagnostics.test.mjs
       - name: Observe active World branch, spawn, creeps, energy and controller without writes
         env:
           SCREEPS_TOKEN_WORLD: ${{ secrets.SCREEPS_TOKEN_WORLD }}
