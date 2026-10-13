@@ -23,7 +23,7 @@ function hostilePriority(hostile, state) {
   }
   // Pure deterministic ranking: prioritize active healers, immediate damage
   // capability and proximity to critical assets. No new attack authority.
-  return heal * 120 + ranged * 80 + attack * 65 + work * 12 +
+  return heal * 220 + ranged * 80 + attack * 65 + work * 12 +
     proximity * 18;
 }
 
