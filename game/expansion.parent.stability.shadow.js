@@ -12,7 +12,7 @@ function validTick(value) {
   return Number.isSafeInteger(value) && value >= 0;
 }
 function safeRoomName(name) {
-  return typeof name === 'string' && /^[WE]\\d+[NS]\\d+$/.test(name) &&
+  return typeof name === 'string' && /^[WE][0-9]+[NS][0-9]+$/.test(name) &&
     name.length <= 16;
 }
 function publicRow(name, value) {
@@ -97,8 +97,10 @@ function observe(roomStates, game, memoryRoot) {
       assessment.reason === null;
     const old = Object.prototype.hasOwnProperty.call(prior,name)
       ? prior[name] : null;
-    const validOld = old && validTick(old.streak) &&
+    const validOld = old && validTick(old.streak) && old.streak > 0 &&
       old.streak <= REQUIRED_TICKS && validTick(old.lastTick) &&
+      validTick(old.firstTick) && old.firstTick <= old.lastTick &&
+      old.lastTick - old.firstTick + 1 >= old.streak &&
       old.reason === null;
     // Same-tick reevaluation cannot manufacture additional observed ticks.
     const continues = pass && validOld &&
