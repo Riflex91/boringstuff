@@ -25,7 +25,7 @@ export function validateTarget(t) {
       !/^[A-Za-z0-9_-]{1,100}$/.test(t.spawnName) ||
       t.branch !== 'chatgpt' ||
       !Array.isArray(t.knownRivalRooms) ||
-      t.knownRivalRooms.length > 8 ||
+      t.knownRivalRooms.length < 1 || t.knownRivalRooms.length > 8 ||
       new Set(t.knownRivalRooms).size !== t.knownRivalRooms.length ||
       t.knownRivalRooms.some(r => !VALID_ROOM.test(r) || r === t.room) ||
       t.placementApproved !== false || t.deploymentApproved !== false)
