@@ -6,6 +6,7 @@
 // creep lifetime, route travel time, defense and CPU remain unverified.
 const parentSupport=require('expansion.parent.support.shadow');
 const parentStability=require('expansion.parent.stability.shadow');
+const siteEvidence=require('expansion.site.shadow');
 const SCHEMA_VERSION=1;
 const CREW=Object.freeze([
   {role:'claimer',count:1,body:['move','claim']},
@@ -56,10 +57,23 @@ function assess(readiness,operation,parent,continuity,tick){
      operation.readyForClaim!==false||
      operation.phase!=='SITE_VERIFIED_ADVISORY'||
      operation.spawnTileVerified!==true||
+     operation.tilePathVerified!==true||
+     operation.routeLevel!=='ROOM_LEVEL_ONLY'||
+     typeof operation.candidateRoom!=='string'||
+     !/^[WE][0-9]+[NS][0-9]+$/.test(operation.candidateRoom)||
      !operation.spawnSite||
+     operation.spawnSite.roomName!==operation.candidateRoom||
+     !siteEvidence._test.validPos(operation.spawnSite,operation.candidateRoom)||
+     operation.spawnSite.x<5||operation.spawnSite.x>44||
+     operation.spawnSite.y<5||operation.spawnSite.y>44||
+     !Number.isFinite(operation.pathCost)||operation.pathCost<0||
+     !Number.isSafeInteger(operation.siteCandidatesChecked)||
+     operation.siteCandidatesChecked<0||
+     operation.siteCandidatesChecked>=siteEvidence.MAX_CANDIDATES||
      !Number.isSafeInteger(operation.routeHops)||
      operation.routeHops<1||operation.routeHops>3||
      typeof operation.parentRoom!=='string'||
+     operation.parentRoom===operation.candidateRoom||
      operation.parentRoom!==parent?.room?.name)
     return out;
 
