@@ -4,6 +4,7 @@
 // gameplay authority. Event counters describe return codes from attempted
 // intents, never verified end-of-tick energy transfer volumes.
 const config = require('config');
+const bodyBuilder = require('body.builder');
 
 const SAMPLE_INTERVAL = 25;
 const MAX_CREEPS_SCANNED = 120;
@@ -132,6 +133,21 @@ function snapshotReservationCoverage(criticalConsumers, haulers) {
   };
 }
 
+// Match the current spawn manager's normal replacement-body sizing without
+// giving this optional observer any spawn or creep execution authority.
+// Unknown room capacity / body constants mean UNKNOWN, not a zero-TTL risk.
+function haulerReplacementHorizon(creep) {
+  const capacity = creep && creep.room && creep.room.energyCapacityAvailable;
+  if (!Number.isFinite(capacity) || capacity <= 0) return null;
+  if (typeof CARRY === 'undefined' || typeof MOVE === 'undefined' ||
+      typeof BODYPART_COST === 'undefined') return null;
+  const parts = bodyBuilder.hauler(capacity);
+  if (!Array.isArray(parts) || parts.length === 0) return null;
+  const spawnTime = typeof CREEP_SPAWN_TIME !== 'undefined' &&
+    Number.isFinite(CREEP_SPAWN_TIME) ? CREEP_SPAWN_TIME : 3;
+  return parts.length * spawnTime + 3;
+}
+
 function sampleRoomCreeps(game, room) {
   const items = Object.values(game.creeps || {});
   const summary = {
@@ -139,7 +155,9 @@ function sampleRoomCreeps(game, room) {
     sampledCreepCount: 0, truncated: false,
     haulers: { live: 0, energyPositive: 0, deliveringFlag: 0,
       readyByGuardRule: 0, zeroEnergy: 0, totalCarriedEnergy: 0,
-      capacityUnknown: 0, collectingEmpty: 0, collectingPartialBelowThreshold: 0 },
+      capacityUnknown: 0, collectingEmpty: 0, collectingPartialBelowThreshold: 0,
+      knownTtl: 0, unknownTtl: 0, withinSpawnHorizon: 0,
+      minimumKnownTtl: null, spawnHorizonTicks: null },
     consumers: { live: 0, waiting: 0, fallback: 0, critical: 0, empty: 0 },
     reservationCoverage: null
   };
@@ -169,6 +187,16 @@ function sampleRoomCreeps(game, room) {
         else h.collectingPartialBelowThreshold++;
       }
       if (status.capacity === null) h.capacityUnknown++;
+      const ttl = creep.ticksToLive;
+      const horizon = haulerReplacementHorizon(creep);
+      if (Number.isSafeInteger(horizon) && horizon > 0)
+        h.spawnHorizonTicks = horizon;
+      if (Number.isSafeInteger(ttl) && ttl >= 0) {
+        h.knownTtl++;
+        h.minimumKnownTtl = h.minimumKnownTtl === null
+          ? ttl : Math.min(h.minimumKnownTtl, ttl);
+        if (horizon !== null && ttl <= horizon) h.withinSpawnHorizon++;
+      } else h.unknownTtl++;
     } else if (role === 'worker' || role === 'builder' ||
                role === 'repairer' || role === 'upgrader') {
       const c = summary.consumers;
@@ -234,5 +262,6 @@ module.exports = {
   recordResult,
   flush,
   _test: { sampled, eligible, sampleRoomCreeps, haulerReadiness,
-    reset, getRoomCounters, snapshotReservationCoverage }
+    reset, getRoomCounters, snapshotReservationCoverage,
+    haulerReplacementHorizon }
 };
