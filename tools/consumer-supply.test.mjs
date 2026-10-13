@@ -911,3 +911,30 @@ console.log('consumer supply tests passed');
   assert.equal(energy.shouldPrioritizeConsumer(nearCovered), false,
     'keep the third ready hauler for infrastructure');
 }
+
+
+// Readiness must agree with the role's transition from collecting to
+// delivering: the full threshold is capacity-dependent, with a 50-energy
+// floor. An underfilled hauler is not an infrastructure-ready reserve.
+{
+  const roleHauler = require('../game/role.hauler.js');
+  const hauler = makeHauler('hauler-readiness-transition');
+  hauler.store.energy = 149;
+  hauler.memory.delivering = false;
+  room.creeps = [hauler];
+  assert.equal(energy._test.haulerReadyToDeliver(hauler), false);
+  // No energy source: the role may attempt collection, but must not claim
+  // a delivery-ready load before the threshold is reached.
+  hauler.pos.findClosestByPath = () => null;
+  room.find = room.find.bind(room);
+  roleHauler.run(hauler);
+  assert.equal(hauler.memory.delivering, false);
+  hauler.store.energy = 150;
+  assert.equal(energy._test.haulerReadyToDeliver(hauler), true);
+  // Explicit delivering state remains ready for any positive remaining load.
+  hauler.store.energy = 1;
+  hauler.memory.delivering = true;
+  assert.equal(energy._test.haulerReadyToDeliver(hauler), true);
+  hauler.store.energy = 0;
+  assert.equal(energy._test.haulerReadyToDeliver(hauler), false);
+}
