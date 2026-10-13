@@ -1,0 +1,23 @@
+name: Screeps World W37S79 runtime diagnostics (GET only)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: tools
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Observe active World branch, spawn, creeps, energy and controller without writes
+        env:
+          SCREEPS_TOKEN_WORLD: ${{ secrets.SCREEPS_TOKEN_WORLD }}
+        run: node world-next-runtime-diagnostics.mjs
