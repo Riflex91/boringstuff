@@ -69,5 +69,11 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(new URL(im
     deploymentId:pinned.receipt.deploymentId,...report},null,2));
   console.log('WORLD_SUPPLY_EVIDENCE ' + JSON.stringify({state:report.state,
     sampleCount:report.sampleCount,invalidSamples:report.invalidSamples,
-    repeatedPatterns:report.patterns.length,settledDeliveryProof:false}));
+    repeatedPatterns:report.patterns.length,
+    patterns:report.patterns.map(p=>({reasonCode:p.reasonCode,startTick:p.startTick,
+      endTick:p.endTick,sampleCount:p.sampleCount,maximumUncoveredCritical:p.maximumUncoveredCritical})),
+    observedCadenceComplete:report.observedCadenceComplete,
+    missingSampleTicks:report.missingSampleTicks,
+    classifications:report.classifications,
+    settledDeliveryProof:false}));
 }
