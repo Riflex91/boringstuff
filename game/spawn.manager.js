@@ -146,11 +146,22 @@ function bodyFor(role, energy, state) {
 }
 
 function productivePrespawnHorizon(role, state) {
-  // RCL1 source income relies on two mobile harvesters. Replace one only
-  // within a spawn-time-sized TTL window; RCL2+ mining remains unchanged.
-  if (role === 'harvester' && state.rcl !== 1) return 0;
-  if (role !== 'harvester' && role !== 'worker' &&
-      role !== 'builder' && role !== 'upgrader') return 0;
+  // Preserve the modeled 2+ hauler service floor before an expiring carrier
+  // disappears. Do not anticipate bootstrap/mobile hauling, an optional
+  // one-hauler fleet, or emergency recovery. This changes timing only, not
+  // the number of haulers requested by the economy model.
+  if (role === 'hauler') {
+    if (state.rcl < 2 || state.emergency || !state.economyModel ||
+        !Array.isArray(state.sources) || state.sources.length === 0 ||
+        state.economyModel.sourceContainersReady !== state.sources.length ||
+        (state.economyModel.recommendedHaulerCount || 0) < 2) return 0;
+  } else {
+    // RCL1 source income relies on two mobile harvesters. Replace one only
+    // within a spawn-time-sized TTL window; RCL2+ mining remains unchanged.
+    if (role === 'harvester' && state.rcl !== 1) return 0;
+    if (role !== 'harvester' && role !== 'worker' &&
+        role !== 'builder' && role !== 'upgrader') return 0;
+  }
   const budget = Math.max(0, Number(state.energyCapacityAvailable) || Number(state.energyAvailable) || 0);
   const replacementBody = bodyFor(role, budget, state);
   const spawnTimePerPart = typeof CREEP_SPAWN_TIME !== 'undefined' && Number.isFinite(CREEP_SPAWN_TIME)
@@ -249,7 +260,7 @@ function spawnOne(state) {
     const workers = countRoleAvailable(state, 'worker');
     const builders = countRoleAvailable(state, 'builder');
     const upgraders = countRoleForDesired(state, 'upgrader', want.upgrader);
-    const haulers = countRole(state.room, 'hauler');
+    const haulers = countRoleAvailable(state, 'hauler');
     const emergencyRepairNeeded = !state.emergency &&
       workPriority.hasEmergencyRepair(state.structures) &&
       countRole(state.room, 'repairer') < want.repairer;
@@ -288,7 +299,8 @@ function spawnOne(state) {
 
   if (!role) {
     for (const r of priority) {
-      const count = (r === 'worker' || r === 'builder' || r === 'upgrader')
+      const count = (r === 'worker' || r === 'builder' ||
+        r === 'upgrader' || r === 'hauler')
         ? countRoleForDesired(state, r, want[r])
         : countRole(state.room, r);
       if (count < want[r]) { role = r; break; }
@@ -314,8 +326,15 @@ function spawnOne(state) {
 
   const available = state.emergency ? state.energyAvailable : state.energyCapacityAvailable;
   const prespawnShortfall = productivePrespawnShortfall(state, role, want[role]);
+  // Early hauler replacement is optional until the old carrier expires.
+  // Never drain a partially refilled room for a reduced-capacity hauler
+  // solely because its predecessor entered the overlap horizon.
+  const earlyHaulerReplacement = role === 'hauler' &&
+    countRole(state.room, role) >= want[role] &&
+    countRoleAvailable(state, role) < want[role];
   let creepBody = bodyFor(role, available, state);
   let cost = creepBody.reduce((sum, p) => sum + BODYPART_COST[p], 0);
+  if (earlyHaulerReplacement && cost > state.energyAvailable) return false;
   if (cost > state.energyAvailable) {
     const lowEnergyFloor = Math.min(300, state.energyCapacityAvailable);
     if (!state.emergency && state.energyAvailable < lowEnergyFloor && !prespawnShortfall) return false;
