@@ -66,6 +66,7 @@ observer.recordRescue(collecting, true);
 observer.recordRescue(loaded, false);
 observer.recordResult(loaded, 'consumer', OK);
 observer.recordResult(loaded, 'consumer', ERR_NOT_IN_RANGE);
+observer.recordConsumerTravel(loaded, waiting, OK);
 observer.recordResult(loaded, 'consumer', -8);
 observer.recordResult(loaded, 'infrastructure', OK);
 observer.recordResult(collecting, 'haulerAcquisition', ERR_NOT_IN_RANGE);
@@ -114,6 +115,11 @@ assert.deepEqual(evt.ctx.decisions,
     rescueChecks: 3, rescueSelected: 2, uniqueRescueHaulers: 1 });
 assert.deepEqual(evt.ctx.consumerTransfers,
   { attempted: 3, accepted: 1, notInRange: 1, other: 1 });
+assert.deepEqual(evt.ctx.consumerTravel,{
+  moveAttempts:1, rangeAtMost5:0, range6to10:0, rangeOver10:0,
+  rangeUnknown:1, moveAccepted:1, moveNoPath:0, moveInvalidTarget:0,
+  moveTemporarilyBlocked:0, moveOther:0
+},'missing position data is an explicitly unknown range, not zero distance');
 assert.deepEqual(evt.ctx.infrastructureTransfers,
   { attempted: 1, accepted: 1, notInRange: 0, other: 0 });
 assert.deepEqual(evt.ctx.haulerAcquisitions,
@@ -361,6 +367,43 @@ assert.equal(stored.x.haulers.collectingPartialBelowThreshold, 1);
 }
 console.log('post-creep observer: read-only guard and intent diagnostics PASS');
 
+// Consumer transfer movement histogram has no pathfinder calls, stable
+// room-bound aggregate counts, and classifies terminal/temporary move results.
+{
+  global.ERR_NO_PATH = -2;
+  global.ERR_INVALID_TARGET = -7;
+  global.ERR_BUSY = -4;
+  global.ERR_TIRED = -11;
+  g.time = 2025;
+  const target={id:'consumer-target'};
+  const moves=[
+    [2,OK,'rangeAtMost5'],
+    [7,ERR_NO_PATH,'range6to10'],
+    [15,ERR_INVALID_TARGET,'rangeOver10'],
+    [4,ERR_BUSY,'rangeAtMost5'],
+    [9,ERR_TIRED,'range6to10'],
+    [null,-8,'rangeUnknown']
+  ];
+  const beforeMemory=JSON.stringify(loaded.memory);
+  for(const [range,rc] of moves) {
+    const carrier={...loaded,
+      pos:range===null?{getRangeTo(){throw Error('bad read');}}:
+        {getRangeTo(x){assert.equal(x,target);return range;}}};
+    observer.recordConsumerTravel(carrier,target,rc);
+  }
+  const travel=observer._test.getRoomCounters(room.name).consumerTravel;
+  assert.deepEqual(travel,{
+    moveAttempts:6, rangeAtMost5:2,range6to10:2,rangeOver10:1,
+    rangeUnknown:1,moveAccepted:1,moveNoPath:1,
+    moveInvalidTarget:1,moveTemporarilyBlocked:2,moveOther:1
+  });
+  assert.equal(JSON.stringify(loaded.memory),beforeMemory,
+    'distance/move observations cannot mutate the carrier');
+  g.time=2026;
+  observer.recordConsumerTravel(loaded,target,OK);
+  assert.equal(observer._test.getRoomCounters(room.name),null,
+    'only actual 25-tick samples accumulate travel evidence');
+}
 // Distinguish an empty collector from a positive but below-threshold collector.
 {
   const empty = creep('empty-collector','hauler',0,300,{delivering:false});

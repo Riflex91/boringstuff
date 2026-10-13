@@ -945,3 +945,38 @@ console.log('consumer supply tests passed');
   hauler.store.energy = 0;
   assert.equal(energy._test.haulerReadyToDeliver(hauler), false);
 }
+
+// End-to-end: consumer transfer stays unfulfilled on ERR_NOT_IN_RANGE, but
+// the observer classifies the accompanying move return and geometric range.
+{
+  const supplyObserver=require('../game/consumer.supply.observer.js');
+  const oldTime=Game.time;
+  const oldName=room.name;
+  Game.time=4025;
+  room.name='E8N1';
+  const critical=makeConsumer('travel-critical','worker',0,8,true);
+  const blocked=makeHauler('travel-no-path',{[critical.id]:9});
+  blocked.memory.delivering=true;
+  blocked.moveTo=()=>ERR_NO_PATH;
+  const moving=makeHauler('travel-moving',{[critical.id]:3});
+  moving.memory.delivering=true;
+  moving.moveTo=()=>OK;
+  room.creeps=[critical,blocked,moving];
+  assert.equal(energy.deliverToConsumer(blocked,true),false,
+    'terminally unreachable route still releases its sticky reservation');
+  assert.equal(blocked.memory.consumerTargetId,undefined);
+  assert.equal(energy.deliverToConsumer(moving,true),true);
+  assert.equal(moving.memory.consumerTargetId,critical.id);
+  const counters=supplyObserver._test.getRoomCounters(room.name);
+  assert.equal(counters.consumer.notInRange,2);
+  assert.deepEqual(counters.consumerTravel,{
+    moveAttempts:2,rangeAtMost5:1,range6to10:1,rangeOver10:0,
+    rangeUnknown:0,moveAccepted:1,moveNoPath:1,moveInvalidTarget:0,
+    moveTemporarilyBlocked:0,moveOther:0
+  });
+  assert.equal(critical.store.energy,0,
+    'accepted move intents are not settled consumer energy transfers');
+  Game.time=oldTime;
+  if (oldName === undefined) delete room.name;
+  else room.name=oldName;
+}
