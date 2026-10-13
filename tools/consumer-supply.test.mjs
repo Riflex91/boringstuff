@@ -925,9 +925,16 @@ console.log('consumer supply tests passed');
   assert.equal(energy._test.haulerReadyToDeliver(hauler), false);
   // No energy source: the role may attempt collection, but must not claim
   // a delivery-ready load before the threshold is reached.
-  hauler.pos.findClosestByPath = () => null;
-  room.find = room.find.bind(room);
-  roleHauler.run(hauler);
+  const acquireOriginal = energy.acquireForHauler;
+  const rescueOriginal = energy.shouldRescueConsumer;
+  try {
+    energy.acquireForHauler = () => true;
+    energy.shouldRescueConsumer = () => false;
+    roleHauler.run(hauler);
+  } finally {
+    energy.acquireForHauler = acquireOriginal;
+    energy.shouldRescueConsumer = rescueOriginal;
+  }
   assert.equal(hauler.memory.delivering, false);
   hauler.store.energy = 150;
   assert.equal(energy._test.haulerReadyToDeliver(hauler), true);
