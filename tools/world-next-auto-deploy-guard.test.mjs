@@ -6,6 +6,8 @@ status:{status:'normal'},room:{objects:[
 {type:'controller',user:'me',level:1}]},
 code:{modules:Object.fromEntries(Array.from({length:8},(_,i)=>['module'+i,'code']))}};
 assert.equal(assessAutoDeployGate(base).ok,true);
+assert.equal(assessAutoDeployGate({...base,room:{objects:[base.room.objects[0],{type:'controller',level:1}]}}).ok,true);
+assert.equal(assessAutoDeployGate({...base,room:{objects:[base.room.objects[0],{type:'controller',user:'other',level:1}]}}).ok,false);
 for(const patch of [
 {me:{_id:'other'}},{status:{status:'empty'}},
 {branches:{list:[{branch:'chatgpt',activeWorld:true}]}},
