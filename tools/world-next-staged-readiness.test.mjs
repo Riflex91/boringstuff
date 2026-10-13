@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import {assessStagedCode,STAGING_BRANCH} from './world-next-staged-readiness.mjs';
+const branches={list:[{branch:'chatgpt',activeWorld:true},{branch:'default',activeWorld:false},{branch:STAGING_BRANCH,activeWorld:false}]};
+const expected={main:'x',config:'y'};
+assert.equal(assessStagedCode(branches,{status:'empty'},{modules:expected},expected).ok,true);
+assert.equal(assessStagedCode(branches,{status:'empty'},{modules:{main:'z',config:'y'}},expected).ok,false);
+assert.equal(assessStagedCode(branches,{status:'normal'},{modules:expected},expected).ok,false);
+assert.equal(assessStagedCode({list:[{branch:'chatgpt',activeWorld:true}]},{status:'empty'},{modules:expected},expected).ok,false);
+assert.equal(assessStagedCode({list:[{branch:'chatgpt',activeWorld:true},{branch:STAGING_BRANCH,activeWorld:true}]},{status:'empty'},{modules:expected},expected).ok,false);
+console.log('W37S79 staged readiness code gate: PASS');
