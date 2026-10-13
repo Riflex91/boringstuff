@@ -355,9 +355,14 @@ function selectConsumerGuardHaulers(room) {
   // infrastructure-first delivery path clears stale reservations.
   const remaining = ready.filter(h => !selectedIds[h.id] &&
     !(h.memory.consumerTargetId && coveredReservedTargets.has(h.memory.consumerTargetId)));
+  // A ready hauler should be compared against critical consumers not already
+  // covered by a selected sticky guard. This avoids spending the last guard
+  // slot near a request that already has a delivery-ready reservation.
+  const uncovered = critical.filter(c => !coveredReservedTargets.has(c.id));
+  const distanceTargets = uncovered.length ? uncovered : critical;
   remaining.sort((a, b) => {
-    const rangeA = Math.min.apply(null, critical.map(c => a.pos && a.pos.getRangeTo ? a.pos.getRangeTo(c) : 999));
-    const rangeB = Math.min.apply(null, critical.map(c => b.pos && b.pos.getRangeTo ? b.pos.getRangeTo(c) : 999));
+    const rangeA = Math.min.apply(null, distanceTargets.map(c => a.pos && a.pos.getRangeTo ? a.pos.getRangeTo(c) : 999));
+    const rangeB = Math.min.apply(null, distanceTargets.map(c => b.pos && b.pos.getRangeTo ? b.pos.getRangeTo(c) : 999));
     if (rangeA !== rangeB) return rangeA - rangeB;
 
     const energyDelta = energyAmount(b) - energyAmount(a);
