@@ -104,8 +104,21 @@ function acquireForHauler(creep) {
   if (container) {
     const rc = creep.withdraw(container, RESOURCE_ENERGY);
     consumerSupplyObserver.recordResult(creep, 'haulerAcquisition', rc);
-    if (rc === ERR_NOT_IN_RANGE) creep.moveTo(container, { reusePath: 8, maxOps: config.PATH_MAX_OPS, visualizePathStyle: { stroke: '#ffaa00' } });
-    return true;
+    if (rc === ERR_NOT_IN_RANGE) {
+      const moveRc = creep.moveTo(container, {
+        reusePath: 8, maxOps: config.PATH_MAX_OPS,
+        visualizePathStyle: { stroke: '#ffaa00' }
+      });
+      if (moveRc !== ERR_NO_PATH && moveRc !== ERR_INVALID_TARGET)
+        return true;
+    } else if (rc !== ERR_NOT_ENOUGH_RESOURCES &&
+               rc !== ERR_INVALID_TARGET) {
+      return true;
+    }
+    // Concurrent pickups can empty a filtered source container before this
+    // hauler's withdrawal intent. A permanent path failure has the same
+    // effect. Only these terminal outcomes may fall through to a tombstone;
+    // accepted withdrawals and viable/in-flight movement never do so.
   }
 
   const tomb = creep.pos.findClosestByPath(FIND_TOMBSTONES, { maxOps: config.PATH_MAX_OPS, filter: t => (t.store[RESOURCE_ENERGY] || 0) > 0 });
