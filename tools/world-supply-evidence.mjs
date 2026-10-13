@@ -14,6 +14,7 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
   const samples = [];
   const ticks = new Set();
   const haulerLoadStates = [];
+  const haulerLifetimeStates = [];
   let invalid = 0;
   for (const e of entries) {
     if (e?.c !== 'CONSUMER_SUPPLY_DIAG' || !Number.isSafeInteger(e.t) ||
@@ -49,6 +50,31 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
           collectingPartialBelowThreshold: h.collectingPartialBelowThreshold });
       }
     }
+    // Optional lifetime evidence is descriptive, not proof of the reason
+    // for a later disappearance. Require complete, internally valid counters.
+    const ttlKeys = ['knownTtl', 'unknownTtl', 'withinSpawnHorizon',
+      'minimumKnownTtl', 'spawnHorizonTicks'];
+    const hasAnyTtl = h && ttlKeys.some(k => Object.hasOwn(h, k));
+    if (hasAnyTtl) {
+      const validCount = v => Number.isSafeInteger(v) && v >= 0;
+      const min = h.minimumKnownTtl, horizon = h.spawnHorizonTicks;
+      if (!ttlKeys.every(k => Object.hasOwn(h, k)) ||
+          !validCount(h.live) || !validCount(h.knownTtl) ||
+          !validCount(h.unknownTtl) ||
+          !validCount(h.withinSpawnHorizon) ||
+          h.knownTtl + h.unknownTtl !== h.live ||
+          h.withinSpawnHorizon > h.knownTtl ||
+          (h.knownTtl === 0 ? min !== null : !validCount(min)) ||
+          (horizon !== null && (!validCount(horizon) || horizon === 0)) ||
+          (h.withinSpawnHorizon > 0 && (horizon === null ||
+            min > horizon))) {
+        malformedLoadState = true;
+      } else haulerLifetimeStates.push({
+        tick: e.t, live: h.live, knownTtl: h.knownTtl,
+        unknownTtl: h.unknownTtl, withinSpawnHorizon: h.withinSpawnHorizon,
+        minimumKnownTtl: min, spawnHorizonTicks: horizon
+      });
+    }
     const sample = {tick: e.t, consumers: x.consumers, haulers: x.haulers,
       reservationCoverage: x.reservationCoverage};
     sample.triage = triageSupplySample(sample);
@@ -57,6 +83,7 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
   }
   samples.sort((a,b) => a.tick-b.tick);
   haulerLoadStates.sort((a,b) => a.tick-b.tick);
+  haulerLifetimeStates.sort((a,b) => a.tick-b.tick);
   // A journal is a bounded rolling buffer. Never interpret a missing tick as
   // healthy supply, and never call an incomplete series continuous evidence.
   const missingSampleTicks = [];
@@ -78,6 +105,15 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
       uncoveredCriticalCount: s.triage.uncoveredCriticalCount,
       reasonCodes: s.triage.reasonCodes
     }));
+  const lifetimeByTick = new Map(haulerLifetimeStates.map(s => [s.tick, s]));
+  const criticalGapLifetimeStates = samples
+    .filter(s => s.triage.classification === 'CRITICAL_COVERAGE_GAP_OBSERVED' &&
+      lifetimeByTick.has(s.tick))
+    .map(s => ({
+      ...lifetimeByTick.get(s.tick),
+      uncoveredCriticalCount: s.triage.uncoveredCriticalCount,
+      reasonCodes: s.triage.reasonCodes
+    }));
   return {state: invalid ? 'REVIEW_REQUIRED' : samples.length ? 'OBSERVATIONS_AVAILABLE' : 'UNKNOWN',
     reason: invalid ? 'INVALID_DIAGNOSTIC_SAMPLES' : samples.length ?
       'POST_INTENT_OBSERVATIONS_ONLY' : 'NO_POST_DEPLOYMENT_DIAGNOSTICS',
@@ -88,6 +124,9 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
     observedHaulerLoadStateSamples: haulerLoadStates.length,
     haulerLoadStates,
     criticalGapLoadStates,
+    observedHaulerLifetimeSamples: haulerLifetimeStates.length,
+    haulerLifetimeStates,
+    criticalGapLifetimeStates,
     classifications: samples.map(s => ({tick:s.tick, classification:s.triage.classification,
       reasonCodes:s.triage.reasonCodes})), patterns,
     settledDeliveryProof:false, actionAuthority:'NONE'};
@@ -120,6 +159,9 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(new URL(im
     observedHaulerLoadStateSamples:report.observedHaulerLoadStateSamples,
     haulerLoadStates:report.haulerLoadStates,
     criticalGapLoadStates:report.criticalGapLoadStates,
+    observedHaulerLifetimeSamples:report.observedHaulerLifetimeSamples,
+    haulerLifetimeStates:report.haulerLifetimeStates,
+    criticalGapLifetimeStates:report.criticalGapLifetimeStates,
     classifications:report.classifications,
     settledDeliveryProof:false}));
 }
