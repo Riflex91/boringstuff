@@ -57,8 +57,22 @@ function fixture() {
   const memory = {bot:{worldIntel:{rooms}}};
   return {rooms,game,memory,get calls(){return calls;}};
 }
-const evaluate=(f,r=readiness,a=advisory,states=[owned()])=>
-  operation.evaluate(r,a,states,f.game,f.memory);
+// Test pre-existing route/site behavior with an independently verified
+// current parent support window; negative fixtures below remove that proof.
+function parentContinuity(f) {
+  return {
+    schemaVersion:1,authority:'SHADOW_EVIDENCE',actionAuthority:'NONE',
+    claimActionEnabled:false,status:'OBSERVATIONS_AVAILABLE',
+    requiredTicks:100,lastTick:f.game.time,rooms:[{
+      room:'E2N2',status:'CONTINUOUS_SUPPORT_OBSERVED',reason:null,
+      firstTick:f.game.time-99,lastTick:f.game.time,
+      consecutiveSupportTicks:100,requiredTicks:100,
+      actionAuthority:'NONE',claimActionEnabled:false
+    }]
+  };
+}
+const evaluate=(f,r=readiness,a=advisory,states=[owned()],continuity=parentContinuity(f))=>
+  operation.evaluate(r,a,states,f.game,f.memory,continuity);
 
 {
   const f=fixture();
@@ -225,6 +239,63 @@ const evaluate=(f,r=readiness,a=advisory,states=[owned()])=>
   assert.equal(revoked.spawnSite,null);
   assert.equal(state.verifiedSite,null);
   assert.equal(state.siteCursor,0);
+}
+
+// Continuity is a mandatory independent I4 gate: a healthy point-in-time
+// parent with good intel cannot advance site verification without it.
+{
+  const f=fixture();
+  const a=evaluate(f);
+  assert.equal(a.phase,'ROUTE_CHECK');
+  assert.equal(evaluate(f).phase,'SUPPORT_CHECK');
+  assert.equal(evaluate(f,readiness,advisory,[owned()],null).phase,'SUPPORT_CHECK');
+  const missing=evaluate(f,readiness,advisory,[owned()],null);
+  assert.equal(missing.reason,'PARENT_SUPPORT_CONTINUITY_UNVERIFIED');
+  assert.equal(missing.spawnTileVerified,false);
+  assert.equal(missing.claimActionEnabled,false);
+  const verified=parentContinuity(f);
+  const bad=[
+    {...verified,status:'STALE'},
+    {...verified,lastTick:f.game.time-1},
+    {...verified,actionAuthority:'CLAIM'},
+    {...verified,claimActionEnabled:true},
+    {...verified,rooms:[]},
+    {...verified,rooms:[{...verified.rooms[0],room:'E2N4'}]},
+    {...verified,rooms:[{...verified.rooms[0],consecutiveSupportTicks:99}]},
+    {...verified,rooms:[{...verified.rooms[0],lastTick:f.game.time-1}]},
+    {...verified,rooms:[{...verified.rooms[0],status:'OBSERVING'}]},
+    {...verified,rooms:[{...verified.rooms[0],firstTick:f.game.time-98}]},
+    {...verified,rooms:verified.rooms.concat(verified.rooms)}
+  ];
+  for(const unverified of bad) {
+    const held=evaluate(f,readiness,advisory,[owned()],unverified);
+    assert.equal(held.phase,'SUPPORT_CHECK');
+    assert.equal(held.reason,'PARENT_SUPPORT_CONTINUITY_UNVERIFIED');
+    assert.equal(held.spawnTileVerified,false);
+  }
+  assert.equal(evaluate(f).phase,'AWAITING_TILE_VALIDATION',
+    'fresh 100-tick evidence should restore only shadow site preflight');
+  const st=f.memory.bot.expansionOperationShadow;
+  st.phase='SITE_VERIFIED_ADVISORY';
+  st.verifiedSite={x:25,y:25,roomName:'E2N3'};
+  st.siteVerifiedTick=f.game.time;
+  st.pathCost=110;
+  st.siteCursor=3;
+  const revoked=evaluate(f,readiness,advisory,[owned()],null);
+  assert.equal(revoked.phase,'SUPPORT_CHECK');
+  assert.equal(revoked.reason,'PARENT_SUPPORT_CONTINUITY_UNVERIFIED');
+  assert.equal(revoked.readyForClaim,false);
+  assert.equal(revoked.spawnTileVerified,false);
+  assert.equal(revoked.spawnSite,null);
+  assert.equal(st.verifiedSite,null);
+  assert.equal(st.siteVerifiedTick,null);
+  assert.equal(st.pathCost,null);
+  assert.equal(st.siteCursor,0);
+  assert.equal(evaluate(f).phase,'AWAITING_TILE_VALIDATION');
+  assert.equal(evaluate(f,readiness,advisory,[owned()],null).phase,'SUPPORT_CHECK',
+    'lost proof during site scanning resets geometry checks too');
+  const main=fs.readFileSync(path.resolve(here,'../game/main.js'),'utf8');
+  assert.ok(main.includes('expansionReadiness,expansionCandidates,roomStates,Game,Memory,\\n    expansionParentStability'.replace('\\n','\\n')));
 }
 
 const source=fs.readFileSync(path.resolve(here,
