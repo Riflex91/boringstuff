@@ -6,6 +6,12 @@ import { parseBotMemory } from './ci-deployment-guard.mjs';
 import { readDeploymentReceipt, DEFAULT_VERIFICATION_LOG_DIR } from './deployment-receipt.mjs';
 import { triageSupplySample, repeatedSupplyObservations } from './consumer-supply-triage.mjs';
 
+const PRESWPAN_BLOCKER_CODES = new Set([
+  'RCL_BELOW_2', 'COLONY_EMERGENCY', 'NO_SOURCES',
+  'SOURCE_CONTAINER_COVERAGE_MISMATCH',
+  'MODELED_HAULER_DEMAND_BELOW_TWO'
+]);
+
 export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
   const markerTick = bot?.deploymentId === deploymentId ? bot.deploymentTick : null;
   const entries = bot?.telemetryJournal?.events;
@@ -59,7 +65,9 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
     const hasAnyTtl = h && ttlKeys.some(k => Object.hasOwn(h, k));
     const policyKeys = ['prespawnPolicyEligible', 'eligibleExpiringHaulers'];
     const hasAnyPolicy = h && policyKeys.some(k => Object.hasOwn(h, k));
-    if (hasAnyPolicy && !hasAnyTtl) malformedLoadState = true;
+    const hasBlockers = h && Object.hasOwn(h, 'prespawnPolicyBlockers');
+    if ((hasAnyPolicy || hasBlockers) && !hasAnyTtl ||
+        (hasBlockers && !hasAnyPolicy)) malformedLoadState = true;
     if (hasAnyTtl) {
       const validCount = v => Number.isSafeInteger(v) && v >= 0;
       const min = h.minimumKnownTtl, horizon = h.spawnHorizonTicks;
@@ -67,14 +75,24 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
       const expiring = h.eligibleExpiringHaulers;
       const expectedUnknown = eligible === null ||
         (eligible === true && h.live > 0 && horizon === null);
-      const policyValid = !hasAnyPolicy || (
+      const blockers = h.prespawnPolicyBlockers;
+      const blockersValid = !hasBlockers || (
+        (eligible === null && blockers === null) ||
+        (Array.isArray(blockers) &&
+          blockers.length <= PRESWPAN_BLOCKER_CODES.size &&
+          blockers.every(code => PRESWPAN_BLOCKER_CODES.has(code)) &&
+          new Set(blockers).size === blockers.length &&
+          (eligible === true ? blockers.length === 0 :
+            eligible === false && blockers.length > 0))
+      );
+      const policyValid = blockersValid && (!hasAnyPolicy || (
         policyKeys.every(k => Object.hasOwn(h, k)) &&
         (eligible === true || eligible === false || eligible === null) &&
         (expectedUnknown ? expiring === null : validCount(expiring)) &&
         (eligible !== false || expiring === 0) &&
         (eligible !== true || horizon === null || expiring === h.withinSpawnHorizon) &&
         (eligible !== true || horizon !== null || h.live > 0 || expiring === 0)
-      );
+      ));
       if (!policyValid ||
           !ttlKeys.every(k => Object.hasOwn(h, k)) ||
           !validCount(h.live) || !validCount(h.knownTtl) ||
@@ -93,7 +111,8 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
         minimumKnownTtl: min, spawnHorizonTicks: horizon,
         ...(hasAnyPolicy ? {
           prespawnPolicyEligible: eligible,
-          eligibleExpiringHaulers: expiring
+          eligibleExpiringHaulers: expiring,
+          ...(hasBlockers ? { prespawnPolicyBlockers: blockers } : {})
         } : {})
       };
     }

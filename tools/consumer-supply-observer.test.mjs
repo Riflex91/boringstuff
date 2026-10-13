@@ -80,7 +80,8 @@ assert.deepEqual(evt.ctx.haulers, {
   capacityUnknown: 0, collectingEmpty: 0, collectingPartialBelowThreshold: 1,
   knownTtl: 0, unknownTtl: 2, withinSpawnHorizon: 0,
   minimumKnownTtl: null, spawnHorizonTicks: null,
-  prespawnPolicyEligible: null, eligibleExpiringHaulers: null
+  prespawnPolicyEligible: null, prespawnPolicyBlockers: null,
+  eligibleExpiringHaulers: null
 });
 assert.deepEqual(evt.ctx.consumers,
   { live: 2, waiting: 1, fallback: 1, critical: 2, empty: 2 });
@@ -265,6 +266,7 @@ assert.equal(stored.x.haulers.collectingPartialBelowThreshold, 1);
   assert.equal(sample.haulers.minimumKnownTtl,30);
   assert.equal(sample.haulers.spawnHorizonTicks,30);
   assert.equal(sample.haulers.prespawnPolicyEligible,null);
+  assert.equal(sample.haulers.prespawnPolicyBlockers,null);
   assert.equal(sample.haulers.eligibleExpiringHaulers,null);
   const spawnManager = require('../game/spawn.manager.js');
   const eligibleState={room:liveRoom,rcl:2,emergency:false,
@@ -275,6 +277,7 @@ assert.equal(stored.x.haulers.collectingPartialBelowThreshold, 1);
     creeps:{expiring,healthy,noTtl}
   },'E8N1',eligibleState);
   assert.equal(eligible.haulers.prespawnPolicyEligible,true);
+  assert.deepEqual(eligible.haulers.prespawnPolicyBlockers,[]);
   assert.equal(eligible.haulers.eligibleExpiringHaulers,1);
   assert.equal(spawnManager._test.productivePrespawnHorizon(
     'hauler',eligibleState),30,
@@ -297,12 +300,28 @@ assert.equal(stored.x.haulers.collectingPartialBelowThreshold, 1);
     },'E8N1',disabledState);
     assert.equal(blocked.haulers.withinSpawnHorizon,1,
       'physical TTL horizon is still observable');
+    assert.equal(blocked.haulers.prespawnPolicyBlockers.length,1);
     assert.equal(blocked.haulers.eligibleExpiringHaulers,0,
       'disabled policy cannot report a replaceable expiring hauler');
   }
   assert.equal(observer._test.haulerPrespawnPolicyEligible({
     ...eligibleState,economyModel:null}),null,
     'unknown economy model is not equivalent to policy ineligibility');
+  assert.deepEqual(observer._test.haulerPrespawnPolicyBlockers({
+    ...eligibleState, rcl:1, emergency:true, sources:[],
+    economyModel:{sourceContainersReady:1,recommendedHaulerCount:1}
+  }), [
+    'RCL_BELOW_2','COLONY_EMERGENCY','NO_SOURCES',
+    'SOURCE_CONTAINER_COVERAGE_MISMATCH',
+    'MODELED_HAULER_DEMAND_BELOW_TWO'
+  ], 'expose all simultaneously observed reasons, not a guessed root cause');
+  assert.deepEqual(disabledStates.map(state =>
+    observer._test.haulerPrespawnPolicyBlockers(state)),[
+    ['SOURCE_CONTAINER_COVERAGE_MISMATCH'],
+    ['MODELED_HAULER_DEMAND_BELOW_TWO'],
+    ['RCL_BELOW_2'],
+    ['COLONY_EMERGENCY']
+  ]);
   liveRoom.energyCapacityAvailable=undefined;
   assert.equal(observer._test.haulerReplacementHorizon(expiring),null);
   const missing=observer._test.sampleRoomCreeps({

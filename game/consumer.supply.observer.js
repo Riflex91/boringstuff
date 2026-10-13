@@ -151,17 +151,29 @@ function haulerReplacementHorizon(creep) {
 // Observing a short TTL does not mean the live spawn policy permits
 // prespawn. Mirror only its bounded eligibility gates, without selecting
 // or requesting any creep action. Missing model fields remain UNKNOWN.
-function haulerPrespawnPolicyEligible(state) {
+function haulerPrespawnPolicyBlockers(state) {
   const m = state && state.economyModel;
   if (!state || !Number.isSafeInteger(state.rcl) ||
       typeof state.emergency !== 'boolean' ||
       !Array.isArray(state.sources) || !m ||
       !Number.isSafeInteger(m.sourceContainersReady) ||
       !Number.isSafeInteger(m.recommendedHaulerCount)) return null;
-  return state.rcl >= 2 && !state.emergency &&
-    state.sources.length > 0 &&
-    m.sourceContainersReady === state.sources.length &&
-    m.recommendedHaulerCount >= 2;
+  // Mirror the live spawn-manager gates without issuing or predicting a
+  // spawn action. Multiple blockers may coexist; UNKNOWN is never a pass.
+  const blockers = [];
+  if (state.rcl < 2) blockers.push('RCL_BELOW_2');
+  if (state.emergency) blockers.push('COLONY_EMERGENCY');
+  if (!state.sources.length) blockers.push('NO_SOURCES');
+  if (m.sourceContainersReady !== state.sources.length)
+    blockers.push('SOURCE_CONTAINER_COVERAGE_MISMATCH');
+  if (m.recommendedHaulerCount < 2)
+    blockers.push('MODELED_HAULER_DEMAND_BELOW_TWO');
+  return blockers;
+}
+
+function haulerPrespawnPolicyEligible(state) {
+  const blockers = haulerPrespawnPolicyBlockers(state);
+  return blockers === null ? null : blockers.length === 0;
 }
 
 function sampleRoomCreeps(game, room, state = null) {
@@ -175,6 +187,7 @@ function sampleRoomCreeps(game, room, state = null) {
       knownTtl: 0, unknownTtl: 0, withinSpawnHorizon: 0,
       minimumKnownTtl: null, spawnHorizonTicks: null,
       prespawnPolicyEligible: haulerPrespawnPolicyEligible(state),
+      prespawnPolicyBlockers: haulerPrespawnPolicyBlockers(state),
       eligibleExpiringHaulers: null },
     consumers: { live: 0, waiting: 0, fallback: 0, critical: 0, empty: 0 },
     reservationCoverage: null
@@ -288,5 +301,6 @@ module.exports = {
   flush,
   _test: { sampled, eligible, sampleRoomCreeps, haulerReadiness,
     reset, getRoomCounters, snapshotReservationCoverage,
-    haulerReplacementHorizon, haulerPrespawnPolicyEligible }
+    haulerReplacementHorizon, haulerPrespawnPolicyEligible,
+    haulerPrespawnPolicyBlockers }
 };
