@@ -63,12 +63,12 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
       const min = h.minimumKnownTtl, horizon = h.spawnHorizonTicks;
       const eligible = h.prespawnPolicyEligible;
       const expiring = h.eligibleExpiringHaulers;
+      const expectedUnknown = eligible === null ||
+        (eligible === true && h.live > 0 && horizon === null);
       const policyValid = !hasAnyPolicy || (
         policyKeys.every(k => Object.hasOwn(h, k)) &&
         (eligible === true || eligible === false || eligible === null) &&
-        (eligible === null || (eligible === true && h.live > 0 &&
-            horizon === null)
-          ? expiring === null : validCount(expiring)) &&
+        (expectedUnknown ? expiring === null : validCount(expiring)) &&
         (eligible !== false || expiring === 0) &&
         (eligible !== true || horizon === null || expiring === h.withinSpawnHorizon) &&
         (eligible !== true || horizon !== null || h.live > 0 || expiring === 0)
