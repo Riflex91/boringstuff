@@ -36,6 +36,10 @@ assert.deepEqual(result.criticalGapLoadStates,[],
 assert.equal(result.observedHaulerLifetimeSamples,0);
 assert.deepEqual(result.haulerLifetimeStates,[]);
 assert.deepEqual(result.criticalGapLifetimeStates,[]);
+assert.equal(result.observedHaulerActionSamples,0);
+assert.deepEqual(result.haulerActionStates,[]);
+assert.deepEqual(result.criticalGapActionStates,[],
+  'Legacy samples without guarded transfer intent counters remain unknown');
 {
   const load = (tick, overrides={}) => {
     const e=sample(tick);
@@ -304,5 +308,87 @@ assert.deepEqual(result.criticalGapLifetimeStates,[]);
     assert.equal(invalid.invalidSamples,1);
     assert.equal(invalid.observedHaulerLifetimeSamples,0);
   }
+}
+// Join actual decisions and returned intent codes, never a settled energy
+// receipt. Only complete and internally coherent groups are admissible.
+{
+  const action=(tick,changes={})=>{
+    const e=sample(tick);
+    e.x.haulers={live:3,readyByGuardRule:2,zeroEnergy:1,energyPositive:2,
+      collectingEmpty:1,collectingPartialBelowThreshold:0,
+      knownTtl:3,unknownTtl:0,withinSpawnHorizon:0,
+      minimumKnownTtl:450,spawnHorizonTicks:30};
+    e.x.decisions={guardChecks:3,guardSelected:1,uniqueGuardHaulers:1};
+    e.x.consumerTransfers={attempted:1,accepted:0,notInRange:1,other:0};
+    e.x.infrastructureTransfers={attempted:1,accepted:1,notInRange:0,other:0};
+    e.x.haulerAcquisitions={attempted:1,accepted:0,notInRange:1,other:0};
+    Object.assign(e.x,changes);
+    return e;
+  };
+  const green=action(100);
+  const healthy=action(125);
+  healthy.x.consumers={critical:0};
+  healthy.x.reservationCoverage=null;
+  const report=summarizeSupplyJournal({...bot,telemetryJournal:{
+    events:[green,healthy,action(150)]
+  }},id);
+  assert.equal(report.state,'OBSERVATIONS_AVAILABLE');
+  assert.equal(report.observedHaulerActionSamples,3);
+  assert.deepEqual(report.haulerActionStates.map(s=>s.tick),[100,125,150]);
+  assert.equal(report.haulerActionStates[0].guardChecks,3);
+  assert.equal(report.haulerActionStates[0].guardSelected,1);
+  assert.equal(report.haulerActionStates[0].uniqueGuardHaulers,1);
+  assert.deepEqual(report.haulerActionStates[0].consumerTransferIntents,
+    {attempted:1,accepted:0,notInRange:1,other:0});
+  assert.deepEqual(report.haulerActionStates[0].infrastructureTransferIntents,
+    {attempted:1,accepted:1,notInRange:0,other:0});
+  assert.deepEqual(report.haulerActionStates[0].haulerAcquisitionIntents,
+    {attempted:1,accepted:0,notInRange:1,other:0});
+  assert.equal(report.haulerActionStates[0].settledDeliveryProof,false);
+  assert.deepEqual(report.criticalGapActionStates.map(s=>s.tick),[100,150],
+    'Healthy middle tick must not be associated with a critical gap');
+  assert.equal(report.criticalGapActionStates[0].uncoveredCriticalCount,1);
+  assert.deepEqual(report.criticalGapActionStates[0].reasonCodes,
+    ['CRITICAL_READY_COVERAGE_GAP']);
+  assert.equal(report.criticalGapActionStates[0].settledDeliveryProof,false,
+    'Accepted return code is an intent, never actual energy delivery');
+  const old=sample(100);
+  const mixed=summarizeSupplyJournal({...bot,telemetryJournal:{
+    events:[old,action(125)]
+  }},id);
+  assert.equal(mixed.state,'OBSERVATIONS_AVAILABLE');
+  assert.equal(mixed.observedHaulerActionSamples,1,
+    'Historical missing action counters cannot be interpreted as zeros');
+  assert.deepEqual(mixed.haulerActionStates.map(s=>s.tick),[125]);
+  const bad=[
+    {decisions:{guardChecks:1,guardSelected:2,uniqueGuardHaulers:1}},
+    {decisions:{guardChecks:3,guardSelected:1,uniqueGuardHaulers:2}},
+    {decisions:{guardChecks:3,guardSelected:3,uniqueGuardHaulers:4}},
+    {decisions:{guardChecks:3,guardSelected:1,uniqueGuardHaulers:-1}},
+    {decisions:{guardChecks:3,guardSelected:1,uniqueGuardHaulers:1.5}},
+    {consumerTransfers:{attempted:1,accepted:1,notInRange:1,other:0}},
+    {infrastructureTransfers:{attempted:1,accepted:-1,notInRange:1,other:1}},
+    {haulerAcquisitions:{attempted:2,accepted:0,notInRange:1,other:0}},
+    {consumerTransfers:undefined}
+  ];
+  for (const patch of bad) {
+    const invalid=summarizeSupplyJournal({...bot,telemetryJournal:{
+      events:[action(100,patch)]
+    }},id);
+    assert.equal(invalid.state,'REVIEW_REQUIRED');
+    assert.equal(invalid.invalidSamples,1);
+    assert.equal(invalid.observedHaulerActionSamples,0);
+    assert.equal(invalid.observedHaulerLoadStateSamples,0);
+    assert.equal(invalid.observedHaulerLifetimeSamples,0);
+    assert.deepEqual(invalid.criticalGapActionStates,[]);
+    assert.deepEqual(invalid.criticalGapLoadStates,[]);
+  }
+  const broken=summarizeSupplyJournal({...bot,telemetryJournal:{
+    events:[action(100),action(125,bad[0]),action(150)]
+  }},id);
+  assert.equal(broken.invalidSamples,1);
+  assert.deepEqual(broken.haulerActionStates.map(s=>s.tick),[100,150]);
+  assert.deepEqual(broken.patterns,[],
+    'Malformed intent snapshot must break an otherwise consecutive pattern');
 }
 console.log('World supply evidence tests: PASS');
