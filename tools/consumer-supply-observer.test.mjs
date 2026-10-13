@@ -268,6 +268,7 @@ assert.equal(stored.x.haulers.collectingPartialBelowThreshold, 1);
   assert.equal(sample.haulers.eligibleExpiringHaulers,null);
   const spawnManager = require('../game/spawn.manager.js');
   const eligibleState={room:liveRoom,rcl:2,emergency:false,
+    energyAvailable:550,energyCapacityAvailable:550,
     sources:[{id:'a'},{id:'b'}],
     economyModel:{sourceContainersReady:2,recommendedHaulerCount:2}};
   const eligible=observer._test.sampleRoomCreeps({
