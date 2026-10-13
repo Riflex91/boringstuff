@@ -1,0 +1,53 @@
+name: Screeps World W37S79 first spawn (manual placement only)
+on:
+  workflow_dispatch:
+    inputs:
+      expected_main_sha:
+        required: true
+        type: string
+        description: Exact tested main SHA
+      placement_approval:
+        required: true
+        type: string
+        description: Type PLACE_W37S79_37_26_ONLY
+permissions:
+  contents: read
+concurrency:
+  group: screeps-world-chatgpt
+  cancel-in-progress: false
+jobs:
+  place:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: tools
+    env:
+      WORLD_W37S79_PLACEMENT_APPROVAL: ${{ inputs.placement_approval }}
+      SCREEPS_TOKEN_WORLD: ${{ secrets.SCREEPS_TOKEN_WORLD }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Require exact main and explicit one-time placement authorization
+        env:
+          EXPECTED_SHA: ${{ inputs.expected_main_sha }}
+        run: |
+          set -euo pipefail
+          test "${{ github.ref }}" = refs/heads/main
+          test "$WORLD_W37S79_PLACEMENT_APPROVAL" = PLACE_W37S79_37_26_ONLY
+          [[ "$EXPECTED_SHA" =~ ^[a-f0-9]{40}$ ]]
+          git fetch origin main --quiet
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          test "$(git rev-parse origin/main)" = "$EXPECTED_SHA"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Full regressions and P3 benchmark
+        run: |
+          npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+          npm test
+          npm run bench:p3
+      - name: Fresh readiness twice then place one Spawn1 without activation
+        run: node world-next-place-spawn.mjs
