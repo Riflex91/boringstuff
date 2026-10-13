@@ -391,4 +391,64 @@ assert.deepEqual(result.criticalGapActionStates,[],
   assert.deepEqual(broken.patterns,[],
     'Malformed intent snapshot must break an otherwise consecutive pattern');
 }
+// A selected underfilled rescue hauler is not a regular ready guard.
+// Its selection must be visible as distinct, post-intent, non-settled
+// evidence; historical action samples have no implicit rescue zeroes.
+{
+  const rescue = (tick, decisionsOverride = {}) => {
+    const e=sample(tick);
+    e.x.haulers={live:3,readyByGuardRule:1,
+      energyPositive:3,zeroEnergy:0,
+      collectingEmpty:0,collectingPartialBelowThreshold:2};
+    e.x.decisions={
+      guardChecks:1,guardSelected:0,uniqueGuardHaulers:0,
+      rescueChecks:2,rescueSelected:1,uniqueRescueHaulers:1,
+      ...decisionsOverride
+    };
+    e.x.consumerTransfers={attempted:1,accepted:0,notInRange:1,other:0};
+    e.x.infrastructureTransfers={attempted:1,accepted:0,notInRange:1,other:0};
+    e.x.haulerAcquisitions={attempted:1,accepted:0,notInRange:1,other:0};
+    return e;
+  };
+  const report=summarizeSupplyJournal({...bot,telemetryJournal:{
+    events:[rescue(100),rescue(125)]
+  }},id);
+  assert.equal(report.state,'OBSERVATIONS_AVAILABLE');
+  assert.equal(report.observedHaulerActionSamples,2);
+  assert.deepEqual(report.haulerActionStates.map(x=>[
+    x.rescueChecks,x.rescueSelected,x.uniqueRescueHaulers
+  ]),[[2,1,1],[2,1,1]]);
+  assert.deepEqual(report.criticalGapActionStates.map(x=>x.tick),[100,125]);
+  assert.equal(report.criticalGapActionStates[0].consumerTransferIntents.notInRange,1);
+  assert.equal(report.criticalGapActionStates[0].settledDeliveryProof,false);
+  const mixed=rescue(125);
+  delete mixed.x.decisions.rescueChecks;
+  delete mixed.x.decisions.rescueSelected;
+  delete mixed.x.decisions.uniqueRescueHaulers;
+  const legacy=summarizeSupplyJournal({...bot,telemetryJournal:{
+    events:[rescue(100),mixed]
+  }},id);
+  assert.equal(legacy.state,'OBSERVATIONS_AVAILABLE');
+  assert.equal(legacy.observedHaulerActionSamples,2);
+  assert.equal(Object.hasOwn(legacy.haulerActionStates[1],'rescueSelected'),false,
+    'older action samples without rescue evidence must not report rescueSelected=0');
+  for (const patch of [
+    {rescueChecks:0,rescueSelected:1},
+    {rescueSelected:3},
+    {rescueChecks:3,rescueSelected:2,uniqueRescueHaulers:3},
+    {rescueChecks:4,rescueSelected:4,uniqueRescueHaulers:4},
+    {rescueSelected:-1},
+    {uniqueRescueHaulers:NaN},
+    {rescueChecks:undefined}
+  ]) {
+    const invalid=summarizeSupplyJournal({...bot,telemetryJournal:{
+      events:[rescue(100,patch)]
+    }},id);
+    assert.equal(invalid.state,'REVIEW_REQUIRED',JSON.stringify(patch));
+    assert.equal(invalid.invalidSamples,1);
+    assert.equal(invalid.observedHaulerActionSamples,0);
+    assert.equal(invalid.observedHaulerLoadStateSamples,0);
+    assert.deepEqual(invalid.criticalGapActionStates,[]);
+  }
+}
 console.log('World supply evidence tests: PASS');
