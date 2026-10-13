@@ -101,7 +101,8 @@ assert.equal(stability.observe(Array(21).fill(state),game,memory).status,'UNVERI
 
 game.time=1108;
 s=stability.observe([state],game,memory);
-assert.equal(s.rooms[0].consecutiveSupportTicks,2);
+assert.equal(s.rooms[0].consecutiveSupportTicks,4,
+  'rejected input does not interrupt a legitimately consecutive room record');
 game.time=1106;
 s=stability.observe([state],game,memory);
 assert.equal(s.rooms[0].consecutiveSupportTicks,1,
