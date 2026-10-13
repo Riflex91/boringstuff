@@ -83,6 +83,13 @@ Game.getObjectById = id => objects.get(id) || null;
 assert.equal(energy._test.haulerReadyToDeliver(partial), false);
 assert.equal(energy._test.haulerReadyToDeliver(ready), true);
 assert.equal(energy._test.rescueInfrastructureSafe(r), true);
+// The exact selected low-load rescuer must retain its sticky critical request
+// while full spawn/extensions and the tower reserve authorize its mission.
+partial.memory.consumerTargetId = urgent.id;
+assert.equal(energy._test.selectConsumerTarget(ready,true), null,
+  'never steal a live selected partial rescuer\'s critical reservation');
+assert.equal(partial.memory.consumerTargetId, urgent.id);
+
 assert.deepEqual(energy._test.selectConsumerGuardHaulers(r).map(c => c.id), ['partial']);
 assert.equal(energy.shouldRescueConsumer(partial), true);
 assert.equal(energy.shouldRescueConsumer(ready), false);
@@ -136,6 +143,10 @@ try {
   // A spawn refill event must immediately abort new rescue work.
   r.energyAvailable = 750;
   Game.time++;
+  assert.equal(energy._test.selectConsumerTarget(ready,true).id,urgent.id,
+    'a pending partial rescue may not monopolize a consumer once infrastructure is underfilled');
+  assert.equal(partial.memory.consumerTargetId,undefined,
+    'recover stale sticky before an alternative ready hauler runs');
   assert.equal(energy.shouldRescueConsumer(partial), false);
   role.run(partial);
   assert.equal(partial.memory.consumerTargetId, undefined,

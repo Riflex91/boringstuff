@@ -305,9 +305,10 @@ const energy = require('../game/energy.js');
   assert.equal(trapped.memory.consumerTargetId, starved.id);
 }
 
-// A partially loaded hauler may still become an emergency rescuer. Preserve
-// its claim even below the normal ready threshold: duplicate hauling is
-// worse than a one-tick conservative wait, and rescue will re-evaluate.
+// A positive but UNDER-threshold hauler cannot hold a critical consumer
+// hostage after the conditions for its emergency rescue disappear. The
+// caller may run before the collector has an opportunity to clear its own
+// stale reservation, so reclaim at target-selection time.
 {
   const critical = makeConsumer('worker-live-underfilled-sticky', 'worker', 0, 5, true);
   const partial = makeHauler('hauler-live-underfilled');
@@ -318,9 +319,24 @@ const energy = require('../game/energy.js');
   ready.memory.delivering = true;
   room.creeps = [critical, partial, ready];
 
-  assert.equal(energy._test.selectConsumerTarget(ready, true), null);
+  assert.equal(energy._test.selectConsumerTarget(ready, true).id, critical.id,
+    'a partial carrier with no current rescue authorization must not block a loaded hauler');
+  assert.equal(partial.memory.consumerTargetId, undefined,
+    'reclaim an unserviceable positive-CARRY reservation immediately');
+  assert.equal(energy.deliverToConsumer(ready,true), true);
+  assert.equal(ready.memory.consumerTargetId, critical.id);
+  assert.equal(critical.store.energy, 0,
+    'transfer movement is not evidence of engine-settled energy');
+
+  // An explicitly delivering hauler with any positive CARRY remains ready
+  // under the existing guard rule, even below the ordinary 50% threshold.
+  partial.memory.delivering = true;
+  partial.store.energy = 30;
+  partial.memory.consumerTargetId = critical.id;
+  delete ready.memory.consumerTargetId;
+  assert.equal(energy._test.selectConsumerTarget(ready,true), null);
   assert.equal(partial.memory.consumerTargetId, critical.id,
-    'nonzero CARRY is a potentially serviceable reservation and stays sticky');
+    'a delivery-ready carrier keeps its still-serviceable sticky target');
 }
 
 // A selected emergency guard can have a sticky reservation for a *fresh*
