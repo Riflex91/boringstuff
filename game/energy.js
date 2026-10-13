@@ -390,8 +390,14 @@ function shouldPrioritizeConsumer(creep) {
 function shouldRescueConsumer(creep) {
   if (!creep || !creep.memory || creep.memory.role !== 'hauler' ||
       creep.memory.delivering || !creep.room) return false;
-  return selectConsumerGuardHaulers(creep.room)
+  const selected = selectConsumerGuardHaulers(creep.room)
     .some(guard => guard.id === creep.id);
+  // Read-only diagnostic: a selected partial-load rescuer is intentionally
+  // NOT delivery-ready under the regular >=50% guard. Report the selection
+  // separately so post-intent gaps cannot be assumed to mean no rescue was
+  // attempted. This never changes selection or creep intents.
+  consumerSupplyObserver.recordRescue(creep, selected);
+  return selected;
 }
 
 function consumerEnergyRatio(creep) {
