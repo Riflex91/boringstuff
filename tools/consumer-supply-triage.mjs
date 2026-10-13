@@ -7,6 +7,7 @@ const GAP_CODES = Object.freeze([
   'EMPTY_ENERGY_STICKY',
   'STICKY_NOT_DELIVERY_READY',
   'READY_HAULER_WITHOUT_CRITICAL_ASSIGNMENT',
+  'NO_SPARE_GUARD_CAPACITY',
   'NO_READY_HAULERS',
   'CRITICAL_READY_COVERAGE_GAP'
 ]);
@@ -58,8 +59,18 @@ export function triageSupplySample(sample) {
   if (v.criticalWithSticky > v.criticalWithReadySticky)
     reasons.push('STICKY_NOT_DELIVERY_READY');
   if (v.criticalWithoutReadySticky > 0 &&
-      v.readyHaulersWithoutSticky > 0)
-    reasons.push('READY_HAULER_WITHOUT_CRITICAL_ASSIGNMENT');
+      v.readyHaulersWithoutSticky > 0) {
+    // The production guard always keeps at least one ready hauler outside
+    // consumer-first service for spawn/extensions. A ready carrier without
+    // sticky assignment is not automatically a missed assignment when all
+    // consumer guard slots are already occupied (or only one is ready).
+    // This is a policy-capacity observation, not proof of infrastructure
+    // demand or of an attempted/settled consumer transfer.
+    const availableGuardSlots = Math.max(0, h.readyByGuardRule - 1);
+    reasons.push(v.criticalWithReadySticky >= availableGuardSlots ?
+      'NO_SPARE_GUARD_CAPACITY' :
+      'READY_HAULER_WITHOUT_CRITICAL_ASSIGNMENT');
+  }
   if (v.criticalWithoutReadySticky > 0 &&
       h.readyByGuardRule === 0)
     reasons.push('NO_READY_HAULERS');
