@@ -511,6 +511,7 @@ function deliverToConsumer(creep, criticalOnly = false) {
       reusePath: 5, maxOps: config.PATH_MAX_OPS,
       visualizePathStyle: { stroke: '#ffffff' }
     });
+    consumerSupplyObserver.recordConsumerTravel(creep, target, moveRc);
     // An impossible path cannot service the reserved consumer. Relinquish
     // this claim immediately so a different loaded hauler is not excluded
     // by an undeliverable sticky assignment. Do not treat transient fatigue,
