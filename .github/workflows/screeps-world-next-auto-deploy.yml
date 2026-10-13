@@ -53,14 +53,18 @@ jobs:
         run: node deploy-live.mjs
       - name: Verify 100 live ticks, fatal and CPU safeguards
         run: node ci-deployment-guard.mjs verify
-      - name: Analyze post-deployment consumer supply (read only)\n        if: success()\n        run: node world-supply-evidence.mjs\n      - name: Save backup and deployment evidence
+      - name: Analyze post-deployment consumer supply (read only)
+        if: success()
+        run: node world-supply-evidence.mjs
+      - name: Save backup and deployment evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: screeps-w37s79-auto-deploy-${{ github.event.workflow_run.head_sha }}
           path: |
             logs/deploy-backup-*.json
-            ${{ runner.temp }}/w37s79-auto-deploy-evidence/deployment-receipt-*.json\n            ${{ runner.temp }}/w37s79-auto-deploy-evidence/consumer-supply-world-report.json
+            ${{ runner.temp }}/w37s79-auto-deploy-evidence/deployment-receipt-*.json
+            ${{ runner.temp }}/w37s79-auto-deploy-evidence/consumer-supply-world-report.json
           if-no-files-found: warn
           retention-days: 14
       - name: Remove temporary credentials
