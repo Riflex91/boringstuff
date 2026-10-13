@@ -136,7 +136,7 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
         rescueKeys.every(key => goodInt(decisions[key])) &&
         decisions.rescueSelected <= decisions.rescueChecks &&
         decisions.uniqueRescueHaulers <= decisions.rescueSelected &&
-        decisions.uniqueRescueHaulers <= h.live);
+        decisions.uniqueRescueHaulers <= h?.live);
       const transferKinds = ['consumerTransfers',
         'infrastructureTransfers', 'haulerAcquisitions'];
       const validTransfer = row => row && ['attempted', 'accepted',
