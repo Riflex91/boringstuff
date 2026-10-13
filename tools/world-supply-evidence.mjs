@@ -26,6 +26,7 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
     // Newly added load counters are optional for older journal entries.
     // Distinguish absent evidence from malformed/inconsistent evidence; never
     // infer that unobserved collecting haulers were empty or ready.
+    let malformedLoadState = false;
     const h = x.haulers;
     const hasEmpty = h && Object.hasOwn(h, 'collectingEmpty');
     const hasPartial = h && Object.hasOwn(h, 'collectingPartialBelowThreshold');
@@ -40,7 +41,7 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
           h.collectingPartialBelowThreshold > h.energyPositive ||
           h.collectingEmpty + h.collectingPartialBelowThreshold +
             h.readyByGuardRule > h.live) {
-        invalid++;
+        malformedLoadState = true;
       } else {
         haulerLoadStates.push({ tick: e.t, live: h.live,
           readyByGuardRule: h.readyByGuardRule,
@@ -51,7 +52,7 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
     const sample = {tick: e.t, consumers: x.consumers, haulers: x.haulers,
       reservationCoverage: x.reservationCoverage};
     sample.triage = triageSupplySample(sample);
-    if (sample.triage.classification === 'UNKNOWN') invalid++;
+    if (malformedLoadState || sample.triage.classification === 'UNKNOWN') invalid++;
     samples.push(sample);
   }
   samples.sort((a,b) => a.tick-b.tick);
