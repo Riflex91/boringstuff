@@ -5,6 +5,12 @@ import {ScreepsHttpClient} from './screeps-client.mjs';
 import {buildWorldConfig} from './world-deployment-profile.mjs';
 import {verifyStagedWorldCode} from './world-target-preflight.mjs';
 import {assessPreActivationWorldBranches} from './world-first-spawn.mjs';
+export function summarizeWorldBranchActivation(branches) {
+  const list=Array.isArray(branches?.list)?branches.list:[];
+  return {reportedActiveWorld:typeof branches?.activeWorld==='string'?branches.activeWorld:null,
+    branches:list.map(b=>({name:b?.branch||null,activeWorld:b?.activeWorld===true,
+      activeWorldFieldPresent:Object.hasOwn(b||{},'activeWorld')}))};
+}
 export async function inspectWorldBranchState(api,expected) {
   if(api?.defaultShard!=='shard0')throw new Error('EXACT_SHARD_REQUIRED');
   const [branches,status]=await Promise.all([api.userBranches(),api.userWorldStatus()]);
@@ -13,6 +19,7 @@ export async function inspectWorldBranchState(api,expected) {
   const code=await verifyStagedWorldCode(api,list,expected);
   return {mode:'GET_ONLY',worldEmpty:status?.status==='empty',
     branchNames:list.map(b=>b?.branch).filter(Boolean).sort(),
+    activationDetails:summarizeWorldBranchActivation(branches),
     defaultSoleActive:state.defaultSoleActive,
     chatgptUniqueInactive:state.stagedUniqueInactive,
     branchGatePass:state.ok,
