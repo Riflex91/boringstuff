@@ -1,0 +1,21 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import vm from 'node:vm';
+const source = fs.readFileSync(new URL('../game/spawn.manager.js', import.meta.url), 'utf8');
+const ctx = { module: { exports: {} }, require(name) {
+  if (name === 'config') return {};
+  return {};
+} };
+vm.runInNewContext(source, ctx);
+const demand = ctx.module.exports._test.defenderDemand;
+const enemy = (...parts) => ({ body: parts.map(type => ({ type, hits: 100 })) });
+assert.equal(demand([]), 0);
+assert.equal(demand([enemy('move', 'carry')]), 0);
+assert.equal(demand([enemy('attack')]), 1);
+assert.equal(demand([enemy('attack', 'attack', 'attack', 'attack', 'attack')]), 2);
+assert.equal(demand([enemy('heal', 'heal', 'ranged_attack', 'attack', 'attack')]), 2);
+assert.equal(demand([enemy(...Array(30).fill('attack'))]), 3);
+assert.equal(demand([{}]), 1, 'unknown body uses conservative fallback');
+const disabled = enemy('attack'); disabled.body[0].hits = 0;
+assert.equal(demand([disabled]), 0);
+console.log('D1 defender capacity tests PASS');
