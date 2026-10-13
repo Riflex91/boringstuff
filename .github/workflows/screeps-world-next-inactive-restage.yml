@@ -1,0 +1,51 @@
+name: Screeps World W37S79 restage inactive code
+on:
+  workflow_dispatch:
+    inputs:
+      expected_main_sha:
+        description: Exact tested main commit (40 lowercase hex)
+        required: true
+        type: string
+      approval:
+        description: Type RESTAGE_INACTIVE_WORLD_CODE
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: screeps-world-chatgpt
+  cancel-in-progress: false
+jobs:
+  restage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: tools
+    env:
+      WORLD_RESTAGE_CONFIRM: ${{ inputs.approval }}
+      SCREEPS_TOKEN_WORLD: ${{ secrets.SCREEPS_TOKEN_WORLD }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Require explicit confirmation and exact main
+        env:
+          EXPECTED_SHA: ${{ inputs.expected_main_sha }}
+        run: |
+          test "$WORLD_RESTAGE_CONFIRM" = RESTAGE_INACTIVE_WORLD_CODE
+          [[ "$EXPECTED_SHA" =~ ^[a-f0-9]{40}$ ]]
+          git fetch origin main --quiet
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          test "$(git rev-parse origin/main)" = "$EXPECTED_SHA"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Full regression and P3 benchmark
+        run: |
+          npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+          npm test
+          npm run bench:p3
+      - name: One-shot inactive chatgpt code upload with exact readback
+        run: node world-next-inactive-restage.mjs

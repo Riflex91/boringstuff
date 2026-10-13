@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import {assessRestageGate} from './world-next-inactive-restage.mjs';
+const branches={list:[{branch:'default',activeWorld:true},{branch:'chatgpt',activeWorld:false}],activeWorld:'default'};
+const mismatch={status:'INCOMPLETE_OR_MISMATCHED_CODE',exactSourceMatch:false};
+const confirm='RESTAGE_INACTIVE_WORLD_CODE';
+assert.equal(assessRestageGate(branches,{status:'empty'},mismatch,confirm).ok,true);
+assert.equal(assessRestageGate(branches,{status:'empty'},mismatch,'').ok,false);
+assert.equal(assessRestageGate(branches,{status:'normal'},mismatch,confirm).ok,false);
+assert.equal(assessRestageGate(branches,{status:'empty'},{status:'EXACT_INACTIVE_CODE',exactSourceMatch:true},confirm).ok,false);
+assert.equal(assessRestageGate({list:[{branch:'default',activeWorld:true}]},{status:'empty'},mismatch,confirm).ok,false);
+assert.equal(assessRestageGate({list:[{branch:'default',activeWorld:true},{branch:'chatgpt',activeWorld:true}]},{status:'empty'},mismatch,confirm).ok,false);
+console.log('W37S79 inactive World restage gate: PASS');
