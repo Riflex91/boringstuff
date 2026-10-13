@@ -160,7 +160,8 @@ function statusSnapshot(roomStates, tickCpu) {
   const expansionParent = roomStates.find(state => state?.room?.name ===
     expansionOperation.parentRoom) || null;
   const expansionBootstrapBudget = expansionBootstrapBudgetShadow.assess(
-    expansionReadiness,expansionOperation,expansionParent);
+    expansionReadiness,expansionOperation,expansionParent,
+    expansionParentStability,Game.time);
   const schedulerState = processScheduler.snapshot();
   const worldIntelState = worldIntel.snapshot();
   const transitEvidence = defenseTransitEvidence.snapshot(Game, Memory);
