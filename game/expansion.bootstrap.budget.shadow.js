@@ -5,6 +5,7 @@
 // Positive affordability is NOT expansion authorization: building costs,
 // creep lifetime, route travel time, defense and CPU remain unverified.
 const parentSupport=require('expansion.parent.support.shadow');
+const parentStability=require('expansion.parent.stability.shadow');
 const SCHEMA_VERSION=1;
 const CREW=Object.freeze([
   {role:'claimer',count:1,body:['move','claim']},
@@ -42,7 +43,7 @@ function costData() {
     return null;
   return {prices,ticks};
 }
-function assess(readiness,operation,parent){
+function assess(readiness,operation,parent,continuity,tick){
   const out=base('EXPANSION_GEOMETRY_OR_BUDGET_UNVERIFIED');
   if(!readiness||readiness.authority!=='SHADOW'||
      readiness.claimActionEnabled!==false||
@@ -65,6 +66,11 @@ function assess(readiness,operation,parent){
   const support=parentSupport.assess(parent);
   if(support.status!=='ADVISORY_OK')
     return {...out,reason:support.reason||'PARENT_SUPPORT_UNVERIFIED'};
+  // A positive one-tick affordability calculation cannot stand on its own
+  // after I4 site proof: require the exact current, independently observed
+  // 100-tick parent support window. This grants no spending authority.
+  if(!parentStability.qualifies(continuity,parent.room.name,tick))
+    return {...out,reason:'PARENT_SUPPORT_CONTINUITY_UNVERIFIED'};
   const data=costData();
   if(!data)return {...out,status:'UNVERIFIED',reason:'BODY_COST_OR_SPAWN_RATE_UNVERIFIED'};
   const capacity=parent.energyCapacityAvailable;
