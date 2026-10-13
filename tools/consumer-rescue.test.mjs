@@ -24,6 +24,7 @@ global.ERR_BUSY = -4;
 global.Game = { time: 2000, getObjectById: () => null };
 
 const energy = require('../game/energy.js');
+const supplyObserver = require('../game/consumer.supply.observer.js');
 const role = require('../game/role.hauler.js');
 const config = require('../game/config.js');
 
@@ -87,6 +88,13 @@ assert.equal(energy.shouldRescueConsumer(partial), true);
 assert.equal(energy.shouldRescueConsumer(ready), false);
 assert.equal(energy.shouldPrioritizeConsumer(ready), false,
   'infrastructure-ready hauler must remain outside consumer guards');
+const rescueRecord = supplyObserver._test.getRoomCounters(r.name);
+assert.equal(rescueRecord.rescueChecks, 1);
+assert.equal(rescueRecord.rescueSelected, 1);
+assert.deepEqual(Object.keys(rescueRecord.selectedRescueHaulers), ['partial'],
+  'the selected partial hauler is counted without making it a regular ready guard');
+assert.equal(energy._test.haulerReadyToDeliver(partial), false,
+  'recording selected rescue must not change the normal readiness threshold');
 
 const regularDeliver = energy.deliver;
 const regularConsumer = energy.deliverToConsumer;

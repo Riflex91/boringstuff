@@ -128,6 +128,15 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
     if (hasActions) {
       const goodInt = value => Number.isSafeInteger(value) && value >= 0;
       const decisions = x.decisions;
+      const rescueKeys = ['rescueChecks', 'rescueSelected',
+        'uniqueRescueHaulers'];
+      const hasRescue = decisions && rescueKeys.some(key =>
+        Object.hasOwn(decisions, key));
+      const validRescue = !hasRescue || (
+        rescueKeys.every(key => goodInt(decisions[key])) &&
+        decisions.rescueSelected <= decisions.rescueChecks &&
+        decisions.uniqueRescueHaulers <= decisions.rescueSelected &&
+        decisions.uniqueRescueHaulers <= h?.live);
       const transferKinds = ['consumerTransfers',
         'infrastructureTransfers', 'haulerAcquisitions'];
       const validTransfer = row => row && ['attempted', 'accepted',
@@ -139,6 +148,7 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
           decisions.guardSelected > decisions.guardChecks ||
           decisions.uniqueGuardHaulers > decisions.guardSelected ||
           decisions.uniqueGuardHaulers > h.live ||
+          !validRescue ||
           !transferKinds.every(key => validTransfer(x[key]))) {
         malformedLoadState = true;
       } else {
@@ -147,6 +157,11 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
           guardChecks:decisions.guardChecks,
           guardSelected:decisions.guardSelected,
           uniqueGuardHaulers:decisions.uniqueGuardHaulers,
+          ...(hasRescue ? {
+            rescueChecks:decisions.rescueChecks,
+            rescueSelected:decisions.rescueSelected,
+            uniqueRescueHaulers:decisions.uniqueRescueHaulers
+          } : {}),
           consumerTransferIntents:{...x.consumerTransfers},
           infrastructureTransferIntents:{...x.infrastructureTransfers},
           haulerAcquisitionIntents:{...x.haulerAcquisitions},

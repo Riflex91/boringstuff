@@ -46,6 +46,8 @@ function getRoomCounters(room, game) {
     perRoom[room] = {
       guardChecks: 0, guardSelected: 0,
       selectedHaulers: Object.create(null),
+      rescueChecks: 0, rescueSelected: 0,
+      selectedRescueHaulers: Object.create(null),
       consumer: { attempted: 0, accepted: 0, notInRange: 0, other: 0 },
       infrastructure: { attempted: 0, accepted: 0, notInRange: 0, other: 0 },
       haulerAcquisition: { attempted: 0, accepted: 0, notInRange: 0, other: 0 }
@@ -63,6 +65,17 @@ function recordGuard(creep, selected) {
     if (typeof id === 'string' && id) c.selectedHaulers[id] = true;
   }
 }
+function recordRescue(creep, selected) {
+  const c = getRoomCounters(roomName(creep));
+  if (!c) return;
+  c.rescueChecks++;
+  if (selected) {
+    c.rescueSelected++;
+    const id = creep && (creep.id || creep.name);
+    if (typeof id === 'string' && id) c.selectedRescueHaulers[id] = true;
+  }
+}
+
 function recordResult(creep, kind, rc) {
   const c = getRoomCounters(roomName(creep));
   if (!c || !c[kind]) return;
@@ -270,6 +283,7 @@ function flush(states, logger, game) {
     if (read.truncated) continue;
     const records = perRoom[room] || {
       guardChecks: 0, guardSelected: 0, selectedHaulers: {},
+      rescueChecks: 0, rescueSelected: 0, selectedRescueHaulers: {},
       consumer: { attempted: 0, accepted: 0, notInRange: 0, other: 0 },
       infrastructure: { attempted: 0, accepted: 0, notInRange: 0, other: 0 },
       haulerAcquisition: { attempted: 0, accepted: 0, notInRange: 0, other: 0 }
@@ -283,7 +297,10 @@ function flush(states, logger, game) {
       decisions: {
         guardChecks: records.guardChecks,
         guardSelected: records.guardSelected,
-        uniqueGuardHaulers: Object.keys(records.selectedHaulers).length
+        uniqueGuardHaulers: Object.keys(records.selectedHaulers).length,
+        rescueChecks: records.rescueChecks,
+        rescueSelected: records.rescueSelected,
+        uniqueRescueHaulers: Object.keys(records.selectedRescueHaulers).length
       },
       consumerTransfers: records.consumer,
       infrastructureTransfers: records.infrastructure,
@@ -297,6 +314,7 @@ function flush(states, logger, game) {
 
 module.exports = {
   recordGuard,
+  recordRescue,
   recordResult,
   flush,
   _test: { sampled, eligible, sampleRoomCreeps, haulerReadiness,

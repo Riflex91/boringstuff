@@ -61,6 +61,9 @@ assert.equal(observer._test.haulerReadiness(
 observer.recordGuard(loaded, true);
 observer.recordGuard(loaded, true);
 observer.recordGuard(collecting, false);
+observer.recordRescue(collecting, true);
+observer.recordRescue(collecting, true);
+observer.recordRescue(loaded, false);
 observer.recordResult(loaded, 'consumer', OK);
 observer.recordResult(loaded, 'consumer', ERR_NOT_IN_RANGE);
 observer.recordResult(loaded, 'consumer', -8);
@@ -86,7 +89,8 @@ assert.deepEqual(evt.ctx.haulers, {
 assert.deepEqual(evt.ctx.consumers,
   { live: 2, waiting: 1, fallback: 1, critical: 2, empty: 2 });
 assert.deepEqual(evt.ctx.decisions,
-  { guardChecks: 3, guardSelected: 2, uniqueGuardHaulers: 1 });
+  { guardChecks: 3, guardSelected: 2, uniqueGuardHaulers: 1,
+    rescueChecks: 3, rescueSelected: 2, uniqueRescueHaulers: 1 });
 assert.deepEqual(evt.ctx.consumerTransfers,
   { attempted: 3, accepted: 1, notInRange: 1, other: 1 });
 assert.deepEqual(evt.ctx.infrastructureTransfers,
@@ -139,6 +143,9 @@ g.time = 1001;
 observer.recordGuard(loaded, true);
 assert.equal(observer.flush([state], logger, g), 0,
   'off-cadence does not emit');
+observer.recordRescue(collecting,true);
+assert.equal(eventRows.length,1,
+  'off-cadence rescue selection must not create a diagnostic event');
 assert.equal(eventRows.length, 1);
 
 g.time = 1025;
