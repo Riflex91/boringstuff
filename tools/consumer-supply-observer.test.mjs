@@ -76,6 +76,27 @@ const evt = eventRows[0];
 assert.equal(evt.code, 'CONSUMER_SUPPLY_DIAG');
 assert.equal(evt.ctx.room, 'E8N1');
 assert.equal(evt.ctx.phase, 'AFTER_CREEP_INTENTS_BEFORE_RESOLUTION');
+assert.deepEqual(evt.ctx.roomEnergy,{
+  observed:false,available:null,capacity:null,full:null
+},'unknown room-manager capacity is not full or depleted room energy');
+assert.deepEqual(observer._test.snapshotRoomEnergy({
+  energyAvailable:550,energyCapacityAvailable:550
+}),{observed:true,available:550,capacity:550,full:true});
+assert.deepEqual(observer._test.snapshotRoomEnergy({
+  energyAvailable:451,energyCapacityAvailable:550
+}),{observed:true,available:451,capacity:550,full:false});
+for(const state of [
+  {energyAvailable:-1,energyCapacityAvailable:550},
+  {energyAvailable:551,energyCapacityAvailable:550},
+  {energyAvailable:550,energyCapacityAvailable:0},
+  {energyAvailable:12.5,energyCapacityAvailable:550},
+  {energyAvailable:null,energyCapacityAvailable:550},
+  {energyAvailable:550,energyCapacityAvailable:undefined}
+]) {
+  assert.deepEqual(observer._test.snapshotRoomEnergy(state),
+    {observed:false,available:null,capacity:null,full:null},
+    'invalid infrastructure state cannot be interpreted as available power');
+}
 assert.equal(evt.ctx.sampledCreepCount, 4);
 assert.deepEqual(evt.ctx.haulers, {
   live: 2, energyPositive: 2, deliveringFlag: 1,
