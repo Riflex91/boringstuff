@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import { candidateRingRooms } from './world-next-target-threat-ring.mjs';
+const rooms=candidateRingRooms();
+assert.equal(rooms.length,24);
+assert.equal(new Set(rooms.map(r=>r.room)).size,24);
+assert.equal(rooms.some(r=>r.room==='W37S79'),false);
+assert.equal(rooms.filter(r=>r.distance===1).length,8);
+assert.equal(rooms.filter(r=>r.distance===2).length,16);
+assert.ok(rooms.every(r=>/^W(?:35|36|37|38|39)S(?:77|78|79|80|81)$/.test(r.room)));
+assert.deepEqual(candidateRingRooms('W37S79'),rooms);
+assert.throws(()=>candidateRingRooms('W0S0'),/RING_CROSSES_QUADRANT/);
+assert.equal(candidateRingRooms('W37N11').length,24);
+console.log('W37S79 24-room ring geometry: PASS');
