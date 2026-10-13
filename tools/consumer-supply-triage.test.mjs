@@ -30,6 +30,54 @@ assert.equal(current.settledDeliveryProof,false);
 assert.equal(current.actionAuthority,'NONE');
 assert.equal(JSON.stringify(base),old,'Offline classifier is immutable');
 
+// Guard slots are limited to ready haulers minus one infrastructure
+// reserve. A ready carrier left unassigned under this policy is not proof
+// of an avoidable assignment gap.
+{
+  const oneReady=triageSupplySample({
+    ...base,
+    haulers:{live:3,readyByGuardRule:1},
+    reservationCoverage:{...base.reservationCoverage,
+      criticalWithSticky:0,criticalWithReadySticky:0,
+      criticalWithoutSticky:2,criticalWithoutReadySticky:2,
+      stickyAssignments:0,readyHaulersWithoutSticky:1}
+  });
+  assert.deepEqual(oneReady.reasonCodes,[
+    'NO_SPARE_GUARD_CAPACITY','CRITICAL_READY_COVERAGE_GAP'
+  ]);
+  const oneSticky=triageSupplySample({
+    ...base,
+    haulers:{live:3,readyByGuardRule:2},
+    reservationCoverage:{...base.reservationCoverage,
+      criticalWithSticky:1,criticalWithReadySticky:1,
+      criticalWithoutSticky:1,criticalWithoutReadySticky:1,
+      stickyAssignments:1,readyHaulersWithoutSticky:1}
+  });
+  assert.deepEqual(oneSticky.reasonCodes,[
+    'NO_SPARE_GUARD_CAPACITY','CRITICAL_READY_COVERAGE_GAP'
+  ]);
+  const spareReady=triageSupplySample({
+    ...base,
+    haulers:{live:3,readyByGuardRule:3},
+    reservationCoverage:{...base.reservationCoverage,
+      readyHaulersWithoutSticky:2}
+  });
+  assert.deepEqual(spareReady.reasonCodes,[
+    'READY_HAULER_WITHOUT_CRITICAL_ASSIGNMENT',
+    'CRITICAL_READY_COVERAGE_GAP'
+  ]);
+  const saturatedSamples=[100,125,150].map(tick=>({tick,
+    ...structuredClone(oneSticky),haulers:{live:3,readyByGuardRule:2},
+    consumers:{critical:2},reservationCoverage:{
+      ...base.reservationCoverage
+    }}));
+  assert.deepEqual(repeatedSupplyObservations(saturatedSamples),[
+    {reasonCode:'NO_SPARE_GUARD_CAPACITY',startTick:100,
+      endTick:150,sampleCount:3,maximumUncoveredCritical:1,
+      classification:'REPEATED_ASSOCIATION_NOT_CAUSAL',
+      actionAuthority:'NONE',causalProof:false,settledDeliveryProof:false}
+  ]);
+}
 const noCritical=triageSupplySample({
   ...base,consumers:{critical:0}
 });
