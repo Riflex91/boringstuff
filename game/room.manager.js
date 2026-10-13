@@ -45,15 +45,49 @@ function status(state) {
   };
 }
 
-function maybeSafeMode(state) {
-  if (!config.AUTO_SAFE_MODE || !state.room.controller || !state.room.controller.my) return;
-  const controller = state.room.controller;
-  if (!state.hostileCreeps.length || controller.safeMode || !controller.safeModeAvailable) return;
-  const critical = state.structures.some(s => (s.structureType === STRUCTURE_SPAWN || s.structureType === STRUCTURE_STORAGE) && s.hits < s.hitsMax * 0.35);
-  if (critical) {
-    const rc = controller.activateSafeMode();
-    logger.warn('SAFE_MODE_ATTEMPT', 'Automatic safe mode attempted', { room: state.room.name, rc, hostiles: state.hostileCreeps.length }, { force: true, persist: true, dedupeTicks: 0 });
+function safeModeDecision(state) {
+  const controller = state.room && state.room.controller;
+  if (!controller || !controller.my || !state.hostileCreeps.length ||
+      controller.safeMode || !controller.safeModeAvailable) return null;
+  const core = (state.structures || []).filter(s =>
+    s && (s.structureType === STRUCTURE_SPAWN ||
+      s.structureType === STRUCTURE_STORAGE) &&
+    Number.isFinite(s.hits) && Number.isFinite(s.hitsMax) && s.hitsMax > 0);
+  for (const structure of core) {
+    if (structure.hits < structure.hitsMax * 0.35) {
+      return { reason: 'CRITICAL_CORE_DAMAGE', structure };
+    }
   }
+  // Predict imminent loss only when a combat-capable hostile is within
+  // immediate strike range of an already damaged protected asset.
+  // Avoid burning Safe Mode for harmless scouts or distant threats.
+  for (const hostile of state.hostileCreeps) {
+    if (!hostile || !hostile.pos || !Array.isArray(hostile.body)) continue;
+    const active = type => hostile.body.some(p => p.type === type && p.hits > 0);
+    const melee = active('attack') || active('work');
+    const ranged = active('ranged_attack');
+    if (!melee && !ranged) continue;
+    for (const structure of core) {
+      if (!structure.pos || typeof hostile.pos.getRangeTo !== 'function') continue;
+      const range = hostile.pos.getRangeTo(structure);
+      const criticalRange = melee && range <= 1 || ranged && range <= 3;
+      if (criticalRange && structure.hits < structure.hitsMax * 0.75) {
+        return { reason: 'IMMINENT_CORE_ATTACK', structure };
+      }
+    }
+  }
+  return null;
+}
+
+function maybeSafeMode(state) {
+  if (!config.AUTO_SAFE_MODE) return;
+  const decision = safeModeDecision(state);
+  if (!decision) return;
+  const rc = state.room.controller.activateSafeMode();
+  logger.warn('SAFE_MODE_ATTEMPT', 'Automatic safe mode attempted', {
+    room: state.room.name, rc, hostiles: state.hostileCreeps.length,
+    reason: decision.reason, structureId: decision.structure.id
+  }, { force: true, persist: true, dedupeTicks: 0 });
 }
 
 function maybeWarnUpgraderStall(state) {
@@ -251,4 +285,4 @@ function run(room, lowCpu) {
   return state;
 }
 
-module.exports = { run, _test: { status, shadowCpuHeadroom } };
+module.exports = { run, _test: { status, shadowCpuHeadroom, safeModeDecision } };
