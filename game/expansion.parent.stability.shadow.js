@@ -73,6 +73,32 @@ function summarize(root, tick) {
     rooms: evidence
   };
 }
+// Fail closed when an I4 operation consumes a stale, partial or fabricated
+// continuity summary. Even verified continuity is advisory, NEVER permission
+// to claim/spawn/build. Require a witness for the exact current game tick.
+function qualifies(snapshot, parentRoom, tick) {
+  if (!safeRoomName(parentRoom) || !validTick(tick) || !snapshot ||
+      snapshot.schemaVersion !== SCHEMA_VERSION ||
+      snapshot.authority !== 'SHADOW_EVIDENCE' ||
+      snapshot.actionAuthority !== 'NONE' ||
+      snapshot.claimActionEnabled !== false ||
+      snapshot.status !== 'OBSERVATIONS_AVAILABLE' ||
+      snapshot.lastTick !== tick ||
+      snapshot.requiredTicks !== REQUIRED_TICKS ||
+      !Array.isArray(snapshot.rooms) ||
+      snapshot.rooms.length > MAX_OBSERVED_ROOMS) return false;
+  const matching = snapshot.rooms.filter(row => row && row.room === parentRoom);
+  if (matching.length !== 1) return false;
+  const row = matching[0];
+  return row.status === 'CONTINUOUS_SUPPORT_OBSERVED' &&
+    row.actionAuthority === 'NONE' && row.claimActionEnabled === false &&
+    row.reason === null && row.requiredTicks === REQUIRED_TICKS &&
+    row.lastTick === tick && validTick(row.firstTick) &&
+    validTick(row.consecutiveSupportTicks) &&
+    row.consecutiveSupportTicks >= REQUIRED_TICKS &&
+    tick - row.firstTick + 1 >= REQUIRED_TICKS;
+}
+
 function observe(roomStates, game, memoryRoot) {
   const tick = game && game.time;
   if (!validTick(tick) || !Array.isArray(roomStates) ||
@@ -129,4 +155,4 @@ function observe(roomStates, game, memoryRoot) {
   return summarize(memoryRoot,tick);
 }
 module.exports = {SCHEMA_VERSION,REQUIRED_TICKS,MAX_OBSERVED_ROOMS,
-  observe,snapshot:summarize};
+  observe,snapshot:summarize,qualifies};
