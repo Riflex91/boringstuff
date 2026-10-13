@@ -6,8 +6,9 @@ import {inspectCandidateRing} from './world-next-target-threat-ring.mjs';
 import {verifyInitialSpawnTarget} from './spawn-safety.mjs';
 import {ScreepsHttpClient} from './screeps-client.mjs';
 import {buildWorldConfig} from './world-deployment-profile.mjs';
+import {inspectW37S79ExactCode} from './world-next-exact-code-gate.mjs';
 
-export function assessNextSpawnReadiness(ring,check) {
+export function assessNextSpawnReadiness(ring,check,exactCode) {
   const failures=[];
   if(ring?.target?.room!==target.room||ring?.target?.shard!==target.shard||
      ring?.target?.x!==target.x||ring?.target?.y!==target.y||
@@ -36,6 +37,8 @@ export function assessNextSpawnReadiness(ring,check) {
   }
   if(check?.evidence?.placementEndpointCalled!==false)
     failures.push('PRECHECK_MUST_NOT_PLACE_SPAWN');
+  if(exactCode?.ok!==true||exactCode?.exactInactiveCode!==true)
+    failures.push('EXACT_INACTIVE_WORLD_CODE_NOT_VERIFIED');
   return {ok:failures.length===0,failures,mode:'GET_ONLY',
     target:{shard:target.shard,room:target.room,x:target.x,y:target.y},
     placementAuthorized:false,activationAuthorized:false,
@@ -51,9 +54,10 @@ export async function inspectNextSpawnReadiness(api) {
     y:target.y,name:target.spawnName,myUserId:id,branch:target.branch,
     requireNormalStatus:true,requireUniqueName:true,
     requireBranchPresent:true,requireWorldCodeReady:true});
-  const gate=assessNextSpawnReadiness(ring,check);
+  const exactCode=await inspectW37S79ExactCode(api);
+  const gate=assessNextSpawnReadiness(ring,check,exactCode);
   return {...gate,ringRisk:ring.risk,ringVerifiedRooms:ring.verifiedRooms,
-    finalCheckPassed:check.ok===true};
+    finalCheckPassed:check.ok===true,exactInactiveCode:exactCode.ok===true};
 }
 async function main() {
   if(!process.env.RUNNER_TEMP)throw new Error('RUNNER_TEMP_REQUIRED');
