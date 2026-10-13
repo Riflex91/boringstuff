@@ -19,6 +19,8 @@ const ready={authority:'SHADOW',claimActionEnabled:false,
 const route={authority:'SHADOW',claimActionEnabled:false,
   spawnActionEnabled:false,readyForClaim:false,
   phase:'SITE_VERIFIED_ADVISORY',spawnTileVerified:true,
+  tilePathVerified:true,routeLevel:'ROOM_LEVEL_ONLY',
+  candidateRoom:'E2N3',siteCandidatesChecked:1,pathCost:40,
   spawnSite:{x:25,y:25,roomName:'E2N3'},
   routeHops:1,parentRoom:'E2N2'};
 const parent=()=>({room:{name:'E2N2',controller:{my:true}},
@@ -135,6 +137,44 @@ assert.equal(assess({...ready,status:'HOLD'},route,p).status,'HOLD');
   const mainText=fs.readFileSync(path.resolve(here,'../game/main.js'),'utf8');
   assert.ok(mainText.includes('expansionParentStability,Game.time);'),
     'status snapshot must pass the current actual observed window and tick');
+}
+
+// A route-level score, an arbitrary spawn-position object or a mismatched
+// candidate cannot be promoted to an "affordable" I4 operation.
+{
+  const invalidSites=[
+    {candidateRoom:'E9N9'},
+    {candidateRoom:'not-a-room'},
+    {candidateRoom:'E2N2'},
+    {spawnSite:{x:25,y:25,roomName:'E2N4'}},
+    {spawnSite:{x:NaN,y:25,roomName:'E2N3'}},
+    {spawnSite:{x:25.5,y:25,roomName:'E2N3'}},
+    {spawnSite:{x:1,y:25,roomName:'E2N3'}},
+    {spawnSite:{x:48,y:25,roomName:'E2N3'}},
+    {spawnSite:{x:25,y:49,roomName:'E2N3'}},
+    {spawnSite:{}},
+    {tilePathVerified:false},
+    {routeLevel:'UNVERIFIED'},
+    {pathCost:null},
+    {pathCost:-1},
+    {pathCost:Infinity},
+    {siteCandidatesChecked:-1},
+    {siteCandidatesChecked:16},
+    {siteCandidatesChecked:null}
+  ];
+  for(const changes of invalidSites) {
+    const blocked=assess(ready,{...route,...changes},p);
+    assert.equal(blocked.status,'HOLD',JSON.stringify(changes));
+    assert.equal(blocked.reason,'EXPANSION_GEOMETRY_OR_BUDGET_UNVERIFIED',
+      JSON.stringify(changes));
+    assert.equal(blocked.totalCrewEnergy,null);
+    assert.equal(blocked.readyForClaim,false);
+    assert.equal(blocked.actionAuthority,'NONE');
+  }
+  assert.equal(assess(ready,{...route,siteCandidatesChecked:0},p).status,
+    'COST_ESTIMATE_ONLY','first possible site candidate may be index zero');
+  assert.equal(assess(ready,{...route,siteCandidatesChecked:15},p).status,
+    'COST_ESTIMATE_ONLY','last bounded site candidate remains valid');
 }
 
 // All cost components MUST be discovered from the actual server's table;
