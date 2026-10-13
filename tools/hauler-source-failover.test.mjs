@@ -37,7 +37,7 @@ const room = {
     return opts?.filter ? a.filter(opts.filter) : a;
   }
 };
-let pickupRc = OK, moveRc = OK, withdrawRc = OK;
+let pickupRc = OK, moveRc = OK, withdrawRc = OK, tombWithdrawRc = null;
 let calls = [];
 const carrier = {
   room, memory: {role: 'hauler'}, store: {energy: 0},
@@ -57,7 +57,8 @@ const carrier = {
   withdraw(target, resource) {
     assert.equal(resource, RESOURCE_ENERGY);
     calls.push(['withdraw', target]);
-    return withdrawRc;
+    return target === tomb && tombWithdrawRc !== null
+      ? tombWithdrawRc : withdrawRc;
   },
   moveTo(target, opts) {
     calls.push(['move', target]);
@@ -66,7 +67,8 @@ const carrier = {
   }
 };
 function reset() {
-  calls = []; pickupRc = OK; withdrawRc = OK; moveRc = OK;
+  calls = []; pickupRc = OK; withdrawRc = OK;
+  tombWithdrawRc = null; moveRc = OK;
   present = {drop: true, container: true, tomb: true};
 }
 
@@ -151,6 +153,7 @@ assert.deepEqual(calls,[['withdraw',container],['move',container]],
 // intent and never exceed the bounded sequence of three attempted sources.
 reset(); pickupRc = ERR_NOT_ENOUGH_RESOURCES;
 withdrawRc = ERR_NOT_ENOUGH_RESOURCES;
+tombWithdrawRc = OK;
 assert.equal(energy.acquireForHauler(carrier),true);
 assert.deepEqual(calls,[
   ['pickup',drop],['withdraw',container],['withdraw',tomb]
