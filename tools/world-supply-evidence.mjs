@@ -12,6 +12,7 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
   if (!Number.isSafeInteger(markerTick) || !Array.isArray(entries))
     return { state: 'UNKNOWN', reason: 'DEPLOYMENT_OR_JOURNAL_UNAVAILABLE', sampleCount: 0, patterns: [] };
   const samples = [];
+  const patternEligibleSamples = [];
   const ticks = new Set();
   const haulerLoadStates = [];
   const haulerLifetimeStates = [];
@@ -106,6 +107,7 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
     } else {
       if (pendingLoad) haulerLoadStates.push(pendingLoad);
       if (pendingLifetime) haulerLifetimeStates.push(pendingLifetime);
+      patternEligibleSamples.push(sample);
     }
     samples.push(sample);
   }
@@ -120,7 +122,8 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
       missingSampleTicks.push(tick);
   }
   const observedCadenceComplete = missingSampleTicks.length === 0;
-  const patterns = repeatedSupplyObservations(samples);
+  // Invalid cross-field telemetry cannot constitute a consecutive pattern.
+  const patterns = repeatedSupplyObservations(patternEligibleSamples);
   // Correlate only observations from the exact same tick. A waiting consumer
   // and an underfilled hauler at different ticks cannot be paired into an
   // invented causal narrative or delivery outcome.
