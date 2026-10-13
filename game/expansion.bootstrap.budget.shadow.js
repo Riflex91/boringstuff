@@ -63,7 +63,8 @@ function assess(readiness,operation,parent,continuity,tick){
      !/^[WE][0-9]+[NS][0-9]+$/.test(operation.candidateRoom)||
      !operation.spawnSite||
      operation.spawnSite.roomName!==operation.candidateRoom||
-     !siteEvidence._test.validPos(operation.spawnSite,operation.candidateRoom)||
+     !Number.isSafeInteger(operation.spawnSite.x)||
+     !Number.isSafeInteger(operation.spawnSite.y)||
      operation.spawnSite.x<5||operation.spawnSite.x>44||
      operation.spawnSite.y<5||operation.spawnSite.y>44||
      !Number.isFinite(operation.pathCost)||operation.pathCost<0||
