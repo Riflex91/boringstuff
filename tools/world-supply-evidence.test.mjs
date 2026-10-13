@@ -31,6 +31,8 @@ assert.deepEqual(result.missingSampleTicks,[]);
 // Missing values must not be interpreted as zero collecting haulers.
 assert.equal(result.observedHaulerLoadStateSamples,0);
 assert.deepEqual(result.haulerLoadStates,[]);
+assert.deepEqual(result.criticalGapLoadStates,[],
+  'Historical samples without load-state counters cannot be correlated');
 {
   const load = (tick, overrides={}) => {
     const e=sample(tick);
@@ -51,6 +53,23 @@ assert.deepEqual(result.haulerLoadStates,[]);
     {tick:150,live:3,readyByGuardRule:1,
       collectingEmpty:1,collectingPartialBelowThreshold:1}
   ]);
+  assert.deepEqual(report.criticalGapLoadStates,[
+    {tick:100,live:3,readyByGuardRule:1,
+      collectingEmpty:1,collectingPartialBelowThreshold:1,
+      uncoveredCriticalCount:1,reasonCodes:['CRITICAL_READY_COVERAGE_GAP']},
+    {tick:150,live:3,readyByGuardRule:1,
+      collectingEmpty:1,collectingPartialBelowThreshold:1,
+      uncoveredCriticalCount:1,reasonCodes:['CRITICAL_READY_COVERAGE_GAP']}
+  ]);
+  const healthy=load(125);
+  healthy.x.consumers={critical:0};
+  healthy.x.reservationCoverage=null;
+  const mixed=summarizeSupplyJournal({...bot,telemetryJournal:{
+    events:[load(100),healthy,load(150)]
+  }},id);
+  assert.equal(mixed.observedHaulerLoadStateSamples,3);
+  assert.deepEqual(mixed.criticalGapLoadStates,report.criticalGapLoadStates,
+    'Ready load-state samples without critical gaps must not be called gaps');
   for (const bad of [
     {collectingPartialBelowThreshold:-1},
     {collectingEmpty:2},
@@ -65,6 +84,8 @@ assert.deepEqual(result.haulerLoadStates,[]);
     assert.equal(invalid.state,'REVIEW_REQUIRED');
     assert.equal(invalid.invalidSamples,1);
     assert.equal(invalid.observedHaulerLoadStateSamples,0);
+    assert.deepEqual(invalid.criticalGapLoadStates,[],
+      'Invalid load-state counters must never appear in gap correlations');
   }
 }
 console.log('World supply evidence tests: PASS');
