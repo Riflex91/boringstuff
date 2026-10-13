@@ -49,6 +49,19 @@ assert.equal(s.rooms[0].consecutiveSupportTicks,100);
 assert.equal(s.rooms[0].status,'CONTINUOUS_SUPPORT_OBSERVED');
 assert.equal(s.rooms[0].firstTick,1000);
 assert.equal(s.rooms[0].lastTick,1099);
+assert.equal(stability.qualifies(s,'E2N2',game.time),true,
+  'the exact current 100-tick parent witness is a valid advisory input');
+assert.equal(stability.qualifies(s,'E2N3',game.time),false,
+  'another parent must not borrow this room continuity');
+assert.equal(stability.qualifies(s,'E2N2',game.time+1),false,
+  'one missing game tick invalidates the witness');
+assert.equal(stability.qualifies({...s,status:'STALE'},'E2N2',game.time),false);
+assert.equal(stability.qualifies({...s,claimActionEnabled:true},'E2N2',game.time),false);
+assert.equal(stability.qualifies({...s,rooms:[s.rooms[0],s.rooms[0]]},
+  'E2N2',game.time),false,'duplicate parent evidence cannot be authoritative');
+assert.equal(stability.qualifies({...s,rooms:[{
+  ...s.rooms[0],consecutiveSupportTicks:99
+}]},'E2N2',game.time),false,'99 ticks is never 100');
 assert.equal(s.rooms[0].claimActionEnabled,false,
   '100 consecutive parent support observations cannot authorize claiming');
 assert.equal(stability.snapshot(memory,1100).status,'STALE',
