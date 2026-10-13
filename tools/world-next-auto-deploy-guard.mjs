@@ -11,7 +11,8 @@ export function assessAutoDeployGate(input){
   const objects=input?.room?.objects;
   const me=input?.me?._id||input?.me?.id;
   const controller=Array.isArray(objects)?objects.find(o=>o?.type==='controller'):null;
-  if(!controller||String(controller.user||'')!==String(me))failures.push('CONTROLLER_NOT_OWNED');
+  if(!controller)failures.push('CONTROLLER_NOT_OBSERVED');
+  if(controller?.user!=null&&String(controller.user)!==String(me))failures.push('CONTROLLER_OWNERSHIP_MISMATCH');
   if(!input?.code?.modules||typeof input.code.modules!=='object'||Array.isArray(input.code.modules)||
      Object.keys(input.code.modules).length<8)failures.push('BACKUP_MODULES_UNAVAILABLE');
   return {ok:failures.length===0,failures,spawnVerified:runtime.spawnVerified,
