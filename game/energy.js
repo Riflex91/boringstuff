@@ -425,15 +425,30 @@ function consumerReservations(creep) {
   const haulers = creep.room.find(FIND_MY_CREEPS, {
     filter: c => c.id !== creep.id && !c.spawning && c.memory && c.memory.role === 'hauler' && c.memory.consumerTargetId
   });
+  let authorizedPartialRescuers = null;
   for (const hauler of haulers) {
-    // A depleted hauler cannot honor a sticky delivery reservation. Creep
-    // execution order may let a different ready hauler run before the empty
-    // carrier clears its own target in role.hauler. Reclaim the stale claim
-    // now, before assigning an actual deliverable hauler; never allow two
-    // live energy-carrying haulers to reserve the same consumer.
+    // Zero CARRY cannot honor a reservation, regardless of execution order.
+    // A positive but underfilled collecting carrier also cannot honor one
+    // UNLESS it is currently the selected partial-load rescue guard. Its
+    // rescue eligibility may have disappeared since the previous tick when
+    // spawn/extensions or tower reserves fell. Reclaim that obsolete claim
+    // before an actually ready hauler chooses an urgent consumer.
     if (energyAmount(hauler) <= 0) {
       delete hauler.memory.consumerTargetId;
       continue;
+    }
+    if (!haulerReadyToDeliver(hauler)) {
+      if (authorizedPartialRescuers === null) {
+        authorizedPartialRescuers = new Set(
+          selectConsumerGuardHaulers(creep.room)
+            .filter(guard => !haulerReadyToDeliver(guard))
+            .map(guard => guard.id)
+        );
+      }
+      if (!authorizedPartialRescuers.has(hauler.id)) {
+        delete hauler.memory.consumerTargetId;
+        continue;
+      }
     }
     reserved[hauler.memory.consumerTargetId] = true;
   }
