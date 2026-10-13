@@ -122,8 +122,9 @@ for (const code of [ERR_NO_PATH,ERR_INVALID_TARGET]) {
   withdrawRc = ERR_NOT_IN_RANGE; moveRc = code;
   assert.equal(energy.acquireForHauler(carrier),true);
   assert.deepEqual(calls,[
-    ['withdraw',container],['move',container],['withdraw',tomb]
-  ],'terminally blocked container route cannot monopolize the hauler');
+    ['withdraw',container],['move',container],
+    ['withdraw',tomb],['move',tomb]
+  ],'terminally blocked container route can instead approach the tombstone');
 }
 for (const code of [OK,ERR_BUSY]) {
   reset(); present.drop = false;
