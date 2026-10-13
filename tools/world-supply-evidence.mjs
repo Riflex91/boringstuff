@@ -176,12 +176,17 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
     if (Object.hasOwn(x,'roomEnergy')) {
       const roomEnergy = x.roomEnergy;
       const good = value => Number.isSafeInteger(value) && value >= 0;
-      const known = roomEnergy && roomEnergy.observed === true &&
+      const schemaValid = roomEnergy &&
+        typeof roomEnergy === 'object' && !Array.isArray(roomEnergy) &&
+        Object.keys(roomEnergy).length === 4 &&
+        ['observed','available','capacity','full']
+          .every(key => Object.hasOwn(roomEnergy,key));
+      const known = schemaValid && roomEnergy.observed === true &&
         good(roomEnergy.available) &&
         good(roomEnergy.capacity) && roomEnergy.capacity > 0 &&
         roomEnergy.available <= roomEnergy.capacity &&
         roomEnergy.full === (roomEnergy.available === roomEnergy.capacity);
-      const unknownEnergy = roomEnergy && roomEnergy.observed === false &&
+      const unknownEnergy = schemaValid && roomEnergy.observed === false &&
         roomEnergy.available === null && roomEnergy.capacity === null &&
         roomEnergy.full === null;
       if (!known && !unknownEnergy) malformedLoadState = true;
