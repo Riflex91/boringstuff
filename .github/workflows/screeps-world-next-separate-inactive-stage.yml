@@ -1,0 +1,51 @@
+name: Screeps World W37S79 stage separate inactive branch
+on:
+  workflow_dispatch:
+    inputs:
+      expected_main_sha:
+        required: true
+        type: string
+        description: Exact tested main SHA
+      approval:
+        required: true
+        type: string
+        description: Type STAGE_SEPARATE_INACTIVE_CODE
+permissions:
+  contents: read
+concurrency:
+  group: screeps-world-chatgpt
+  cancel-in-progress: false
+jobs:
+  stage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: tools
+    env:
+      WORLD_SEPARATE_STAGE_CONFIRM: ${{ inputs.approval }}
+      SCREEPS_TOKEN_WORLD: ${{ secrets.SCREEPS_TOKEN_WORLD }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Verify exact main and approval
+        env:
+          EXPECTED_SHA: ${{ inputs.expected_main_sha }}
+        run: |
+          test "$WORLD_SEPARATE_STAGE_CONFIRM" = STAGE_SEPARATE_INACTIVE_CODE
+          [[ "$EXPECTED_SHA" =~ ^[a-f0-9]{40}$ ]]
+          git fetch origin main --quiet
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          test "$(git rev-parse origin/main)" = "$EXPECTED_SHA"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Full offline tests and P3 benchmark
+        run: |
+          npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+          npm test
+          npm run bench:p3
+      - name: Clone and stage new inactive branch only
+        run: node world-next-separate-inactive-stage.mjs

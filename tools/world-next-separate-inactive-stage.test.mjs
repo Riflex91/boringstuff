@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import {assessSeparateStage,TARGET_BRANCH} from './world-next-separate-inactive-stage.mjs';
+const approval='STAGE_SEPARATE_INACTIVE_CODE';
+const active={list:[{branch:'chatgpt',activeWorld:true},{branch:'default',activeWorld:false}]};
+assert.equal(assessSeparateStage(active,{status:'empty'},approval).ok,true);
+assert.equal(assessSeparateStage(active,{status:'empty'},'').ok,false);
+assert.equal(assessSeparateStage(active,{status:'normal'},approval).ok,false);
+assert.equal(assessSeparateStage({list:[{branch:'default',activeWorld:true}]},{status:'empty'},approval).ok,false);
+const staged={list:[...active.list,{branch:TARGET_BRANCH,activeWorld:false}]};
+assert.equal(assessSeparateStage(staged,{status:'empty'},approval,true).ok,true);
+assert.equal(assessSeparateStage(staged,{status:'empty'},approval).ok,false);
+assert.equal(assessSeparateStage({list:[...active.list,{branch:TARGET_BRANCH,activeWorld:true}]},{status:'empty'},approval,true).ok,false);
+console.log('World separate inactive stage gate: PASS');
