@@ -66,6 +66,18 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
   }
   const observedCadenceComplete = missingSampleTicks.length === 0;
   const patterns = repeatedSupplyObservations(samples);
+  // Correlate only observations from the exact same tick. A waiting consumer
+  // and an underfilled hauler at different ticks cannot be paired into an
+  // invented causal narrative or delivery outcome.
+  const loadByTick = new Map(haulerLoadStates.map(s => [s.tick, s]));
+  const criticalGapLoadStates = samples
+    .filter(s => s.triage.classification === 'CRITICAL_COVERAGE_GAP_OBSERVED' &&
+      loadByTick.has(s.tick))
+    .map(s => ({
+      ...loadByTick.get(s.tick),
+      uncoveredCriticalCount: s.triage.uncoveredCriticalCount,
+      reasonCodes: s.triage.reasonCodes
+    }));
   return {state: invalid ? 'REVIEW_REQUIRED' : samples.length ? 'OBSERVATIONS_AVAILABLE' : 'UNKNOWN',
     reason: invalid ? 'INVALID_DIAGNOSTIC_SAMPLES' : samples.length ?
       'POST_INTENT_OBSERVATIONS_ONLY' : 'NO_POST_DEPLOYMENT_DIAGNOSTICS',
@@ -75,6 +87,7 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
     missingSampleTicks, observedCadenceComplete,
     observedHaulerLoadStateSamples: haulerLoadStates.length,
     haulerLoadStates,
+    criticalGapLoadStates,
     classifications: samples.map(s => ({tick:s.tick, classification:s.triage.classification,
       reasonCodes:s.triage.reasonCodes})), patterns,
     settledDeliveryProof:false, actionAuthority:'NONE'};
@@ -106,6 +119,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(new URL(im
     missingSampleTicks:report.missingSampleTicks,
     observedHaulerLoadStateSamples:report.observedHaulerLoadStateSamples,
     haulerLoadStates:report.haulerLoadStates,
+    criticalGapLoadStates:report.criticalGapLoadStates,
     classifications:report.classifications,
     settledDeliveryProof:false}));
 }
