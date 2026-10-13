@@ -106,6 +106,56 @@ present.container = false;
 assert.equal(energy.acquireForHauler(carrier), true);
 assert.deepEqual(calls, [['pickup', drop], ['withdraw', tomb]]);
 
+// Stale, just-emptied source containers and permanently unreachable
+// container routes must not hold an empty hauler idle. Fall through to a
+// tombstone only after a terminal outcome, never after an accepted intent.
+for (const code of [ERR_NOT_ENOUGH_RESOURCES, ERR_INVALID_TARGET]) {
+  reset(); present.drop = false; withdrawRc = code;
+  assert.equal(energy.acquireForHauler(carrier),true);
+  assert.deepEqual(calls,[['withdraw',container],['withdraw',tomb]],
+    'terminal source container withdrawal can retry a distinct energy source');
+}
+for (const code of [ERR_NO_PATH,ERR_INVALID_TARGET]) {
+  reset(); present.drop = false;
+  withdrawRc = ERR_NOT_IN_RANGE; moveRc = code;
+  assert.equal(energy.acquireForHauler(carrier),true);
+  assert.deepEqual(calls,[
+    ['withdraw',container],['move',container],['withdraw',tomb]
+  ],'terminally blocked container route cannot monopolize the hauler');
+}
+for (const code of [OK,ERR_BUSY]) {
+  reset(); present.drop = false;
+  withdrawRc = ERR_NOT_IN_RANGE; moveRc = code;
+  assert.equal(energy.acquireForHauler(carrier),true);
+  assert.deepEqual(calls,[['withdraw',container],['move',container]],
+    'accepted or transient movement must never create a second action');
+}
+reset(); present.drop = false;
+assert.equal(energy.acquireForHauler(carrier),true);
+assert.deepEqual(calls,[['withdraw',container]],
+  'accepted container withdraw blocks all competing same-tick actions');
+
+reset(); present.drop = false; present.tomb = false;
+withdrawRc = ERR_NOT_ENOUGH_RESOURCES;
+assert.equal(energy.acquireForHauler(carrier),false);
+assert.deepEqual(calls,[['withdraw',container]],
+  'terminal empty container with no alternate source permits role-level fallback');
+
+reset(); present.drop = false; present.tomb = false;
+withdrawRc = ERR_NOT_IN_RANGE; moveRc = ERR_NO_PATH;
+assert.equal(energy.acquireForHauler(carrier),false);
+assert.deepEqual(calls,[['withdraw',container],['move',container]],
+  'unreachable container and no alternate permits role-level repositioning');
+
+// Even if an earlier dropped pile failed, stop after a successful tombstone
+// intent and never exceed the bounded sequence of three attempted sources.
+reset(); pickupRc = ERR_NOT_ENOUGH_RESOURCES;
+withdrawRc = ERR_NOT_ENOUGH_RESOURCES;
+assert.equal(energy.acquireForHauler(carrier),true);
+assert.deepEqual(calls,[
+  ['pickup',drop],['withdraw',container],['withdraw',tomb]
+]);
+
 // No viable resource: report false and let the established role-level
 // harvester/container positioning fallback run.
 reset();
