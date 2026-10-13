@@ -5,10 +5,30 @@ const logger = require('logger');
 const config = require('config');
 const workPriority = require('work.priority');
 
+function defenderDemand(hostiles) {
+  if (!Array.isArray(hostiles) || !hostiles.length) return 0;
+  let combatParts = 0;
+  let healParts = 0;
+  let unknown = 0;
+  for (const hostile of hostiles) {
+    if (!hostile || !Array.isArray(hostile.body)) { unknown += 1; continue; }
+    for (const part of hostile.body) {
+      if (!part || !(part.hits > 0)) continue;
+      if (part.type === 'attack' || part.type === 'ranged_attack' ||
+          part.type === 'work') combatParts += 1;
+      if (part.type === 'heal') healParts += 1;
+    }
+  }
+  // Do not spend scarce bootstrap energy on known harmless scouts.
+  // Scale bounded defender demand with active hostile combat capacity.
+  const pressure = combatParts + 2 * healParts + unknown * 2;
+  return pressure > 0 ? Math.min(3, Math.max(1, Math.ceil(pressure / 4))) : 0;
+}
+
 function desired(state) {
   const constructionHeavy = state.sites.length > 5;
   const damaged = state.structures.some(s => s.hits !== undefined && s.hits < s.hitsMax * 0.6 && s.structureType !== STRUCTURE_WALL && s.structureType !== STRUCTURE_RAMPART);
-  const hostiles = state.hostileCreeps.length;
+  const defendersNeeded = defenderDemand(state.hostileCreeps);
   const baseHarvesters = Math.max(1, state.sources.length);
   let desiredHarvesters = baseHarvesters;
 
@@ -66,7 +86,7 @@ function desired(state) {
     builder: state.sites.length ? Math.min(config.MAX_BUILDERS, constructionHeavy ? 2 : 1) : 0,
     repairer: damaged && state.rcl >= 2 ? 1 : 0,
     upgrader: desiredUpgraders,
-    defender: hostiles ? Math.min(3, Math.max(1, hostiles)) : 0,
+    defender: defendersNeeded,
     scout: state.rcl >= config.SCOUTS_AFTER_RCL ? 1 : 0
   };
 
@@ -321,4 +341,4 @@ function spawnOne(state) {
   return false;
 }
 
-module.exports = { desired, spawnOne, _test: { countRole, baseUpgraderTarget, productivePrespawnHorizon, countRoleAvailable, countRoleForDesired, productivePrespawnShortfall } };
+module.exports = { desired, spawnOne, _test: { countRole, baseUpgraderTarget, productivePrespawnHorizon, countRoleAvailable, countRoleForDesired, productivePrespawnShortfall, defenderDemand } };
