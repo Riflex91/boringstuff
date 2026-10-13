@@ -885,3 +885,29 @@ const energy = require('../game/energy.js');
 }
 
 console.log('consumer supply tests passed');
+
+
+// With two critical requests and three ready haulers, a sticky guard already
+// covers the nearer request. The remaining guard must be selected by distance
+// to the uncovered critical consumer, not distance to any critical consumer.
+{
+  const covered = makeConsumer('critical-covered-distance', 'worker', 0, 8, true);
+  const uncovered = makeConsumer('critical-uncovered-distance', 'upgrader', 0, 8, true);
+  const sticky = makeHauler('hauler-distance-sticky');
+  sticky.memory.delivering = true;
+  sticky.memory.consumerTargetId = covered.id;
+  const nearCovered = makeHauler('hauler-distance-near-covered', {
+    [covered.id]: 1, [uncovered.id]: 15
+  });
+  const nearUncovered = makeHauler('hauler-distance-near-uncovered', {
+    [covered.id]: 9, [uncovered.id]: 2
+  });
+  nearCovered.memory.delivering = true;
+  nearUncovered.memory.delivering = true;
+  room.creeps = [covered, uncovered, sticky, nearCovered, nearUncovered];
+  assert.equal(energy.shouldPrioritizeConsumer(sticky), true);
+  assert.equal(energy.shouldPrioritizeConsumer(nearUncovered), true,
+    'second guard should favor the critical request without ready sticky coverage');
+  assert.equal(energy.shouldPrioritizeConsumer(nearCovered), false,
+    'keep the third ready hauler for infrastructure');
+}
