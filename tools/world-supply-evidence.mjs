@@ -123,7 +123,7 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
     // infer end-of-tick receipts, transfers or missing decisions. Older
     // releases lacking all three groups remain UNKNOWN, not zero attempts.
     const actionKeys = ['decisions', 'consumerTransfers',
-      'infrastructureTransfers', 'haulerAcquisitions'];
+      'infrastructureTransfers', 'haulerAcquisitions', 'consumerTravel'];
     const hasActions = actionKeys.some(key => Object.hasOwn(x, key));
     let pendingActions = null;
     if (hasActions) {
@@ -143,13 +143,30 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
       const validTransfer = row => row && ['attempted', 'accepted',
         'notInRange', 'other'].every(key => goodInt(row[key])) &&
         row.attempted === row.accepted + row.notInRange + row.other;
+      const travel = x.consumerTravel;
+      const hasTravel = Object.hasOwn(x,'consumerTravel');
+      const travelKeys = ['moveAttempts','rangeAtMost5','range6to10',
+        'rangeOver10','rangeUnknown','moveAccepted','moveNoPath',
+        'moveInvalidTarget','moveTemporarilyBlocked','moveOther'];
+      const validTravel = !hasTravel || (
+        travel && typeof travel === 'object' && !Array.isArray(travel) &&
+        Object.keys(travel).length === travelKeys.length &&
+        travelKeys.every(key => Object.hasOwn(travel,key) &&
+          goodInt(travel[key])) &&
+        travel.moveAttempts === x.consumerTransfers?.notInRange &&
+        travel.rangeAtMost5 + travel.range6to10 + travel.rangeOver10 +
+          travel.rangeUnknown === travel.moveAttempts &&
+        travel.moveAccepted + travel.moveNoPath + travel.moveInvalidTarget +
+          travel.moveTemporarilyBlocked + travel.moveOther ===
+          travel.moveAttempts
+      );
       if (!decisions || !goodInt(h?.live) ||
           !['guardChecks', 'guardSelected', 'uniqueGuardHaulers']
             .every(key => goodInt(decisions[key])) ||
           decisions.guardSelected > decisions.guardChecks ||
           decisions.uniqueGuardHaulers > decisions.guardSelected ||
           decisions.uniqueGuardHaulers > h.live ||
-          !validRescue ||
+          !validRescue || !validTravel ||
           !transferKinds.every(key => validTransfer(x[key]))) {
         malformedLoadState = true;
       } else {
@@ -166,6 +183,7 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
           consumerTransferIntents:{...x.consumerTransfers},
           infrastructureTransferIntents:{...x.infrastructureTransfers},
           haulerAcquisitionIntents:{...x.haulerAcquisitions},
+          ...(hasTravel ? {consumerTravel:{...travel}} : {}),
           settledDeliveryProof:false
         };
       }
