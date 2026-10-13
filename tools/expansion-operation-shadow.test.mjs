@@ -295,7 +295,9 @@ const evaluate=(f,r=readiness,a=advisory,states=[owned()],continuity=parentConti
   assert.equal(evaluate(f,readiness,advisory,[owned()],null).phase,'SUPPORT_CHECK',
     'lost proof during site scanning resets geometry checks too');
   const main=fs.readFileSync(path.resolve(here,'../game/main.js'),'utf8');
-  assert.ok(main.includes('expansionReadiness,expansionCandidates,roomStates,Game,Memory,\\n    expansionParentStability'.replace('\\n','\\n')));
+  assert.ok(main.includes('expansionReadiness,expansionCandidates,roomStates,Game,Memory,'));
+  assert.ok(main.includes('    expansionParentStability);'),
+    'I4 operation receives independent continuity proof from main snapshot');
 }
 
 const source=fs.readFileSync(path.resolve(here,
