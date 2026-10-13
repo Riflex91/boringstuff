@@ -34,8 +34,21 @@ const parent=()=>({room:{name:'E2N2',controller:{my:true}},
       logisticsFallback:false}}
   ]});
 const p=parent();
-const snapshot=JSON.stringify({ready,route,p});
-const a=budget.assess(ready,route,p);
+const tick=1050;
+const continuity={
+  schemaVersion:1,authority:'SHADOW_EVIDENCE',actionAuthority:'NONE',
+  claimActionEnabled:false,status:'OBSERVATIONS_AVAILABLE',
+  requiredTicks:100,lastTick:tick,rooms:[{
+    room:'E2N2',status:'CONTINUOUS_SUPPORT_OBSERVED',reason:null,
+    firstTick:tick-99,lastTick:tick,
+    consecutiveSupportTicks:100,requiredTicks:100,
+    actionAuthority:'NONE',claimActionEnabled:false
+  }]
+};
+const assess=(r,o,source,proof=continuity,at=tick)=>
+  budget.assess(r,o,source,proof,at);
+const snapshot=JSON.stringify({ready,route,p,continuity});
+const a=assess(ready,route,p);
 assert.equal(a.status,'COST_ESTIMATE_ONLY');
 assert.equal(a.authority,'SHADOW');
 assert.equal(a.actionAuthority,'NONE');
@@ -53,26 +66,26 @@ assert.equal(a.parentReserveFloor,3150);
 assert.equal(a.hypotheticalStoredEnergyAfterCrew,4800);
 assert.ok(a.unverified.includes('actualCreepRouteTravelTime'));
 assert.ok(a.unverified.includes('constructionEnergyBudget'));
-assert.equal(JSON.stringify({ready,route,p}),snapshot,
+assert.equal(JSON.stringify({ready,route,p,continuity}),snapshot,
   'budget must never mutate parent, readiness or operation');
 
 // A reserve that passes the old support preflight must still be rejected
 // when future expansion crew costs would consume that reserve.
-const drained=budget.assess(ready,route,{...p,energyStored:3700});
+const drained=assess(ready,route,{...p,energyStored:3700});
 assert.equal(drained.status,'HOLD');
 assert.equal(drained.reason,'PARENT_CREW_COST_WOULD_EXHAUST_RESERVE');
 assert.equal(drained.hypotheticalStoredEnergyAfterCrew,2500);
 assert.equal(drained.readyForClaim,false);
-assert.equal(budget.assess(ready,route,{...p,energyAvailable:53}).reason,
+assert.equal(assess(ready,route,{...p,energyAvailable:53}).reason,
   'PARENT_INFRASTRUCTURE_REFILL_PRESSURE');
-assert.equal(budget.assess(ready,route,{...p,
+assert.equal(assess(ready,route,{...p,
   creeps:p.creeps.slice(0,3)}).reason,
   'PARENT_MINING_OR_HAULING_REDUNDANCY_LOW');
-assert.equal(budget.assess(ready,route,{...p,
+assert.equal(assess(ready,route,{...p,
   creeps:p.creeps.map((c,i)=>i===4?{
     memory:{...c.memory,logisticsFallback:true}}:c)}).reason,
   'PARENT_CONSUMER_SUPPLY_PRESSURE');
-assert.equal(budget.assess(ready,route,{...p,energyStored:3000}).status,
+assert.equal(assess(ready,route,{...p,energyStored:3000}).status,
   'HOLD');
 
 // The component is not permission to claim even if the source room can
@@ -84,13 +97,45 @@ for(const blocked of [
   {...route,claimActionEnabled:true},
   {...route,readyForClaim:true}
 ]) {
-  const x=budget.assess(ready,blocked,p);
+  const x=assess(ready,blocked,p);
   assert.equal(x.status,'HOLD');
   assert.equal(x.readyForClaim,false);
 }
-assert.equal(budget.assess({...ready,availableClaimSlots:0},route,p).status,
+assert.equal(assess({...ready,availableClaimSlots:0},route,p).status,
   'HOLD');
-assert.equal(budget.assess({...ready,status:'HOLD'},route,p).status,'HOLD');
+assert.equal(assess({...ready,status:'HOLD'},route,p).status,'HOLD');
+
+// The I4 operation itself is read-only, and its geometry is not an
+// independent continuity witness. Fail closed on absent/stale/foreign proof.
+{
+  const cases=[
+    [null,tick],
+    [{...continuity,status:'STALE'},tick],
+    [{...continuity,lastTick:tick-1},tick],
+    [{...continuity,claimActionEnabled:true},tick],
+    [{...continuity,actionAuthority:'CLAIM'},tick],
+    [{...continuity,rooms:[]},tick],
+    [{...continuity,rooms:[{...continuity.rooms[0],room:'E2N4'}]},tick],
+    [{...continuity,rooms:[{...continuity.rooms[0],consecutiveSupportTicks:99}]},tick],
+    [{...continuity,rooms:[{...continuity.rooms[0],firstTick:tick-98}]},tick],
+    [{...continuity,rooms:continuity.rooms.concat(continuity.rooms)},tick],
+    [continuity,tick+1]
+  ];
+  for(const [proof,at] of cases) {
+    const blocked=assess(ready,route,p,proof,at);
+    assert.equal(blocked.status,'HOLD');
+    assert.equal(blocked.reason,'PARENT_SUPPORT_CONTINUITY_UNVERIFIED');
+    assert.equal(blocked.totalCrewEnergy,null);
+    assert.deepEqual(blocked.crew,[]);
+    assert.equal(blocked.actionAuthority,'NONE');
+    assert.equal(blocked.readyForClaim,false);
+  }
+  assert.equal(assess(ready,route,p).status,'COST_ESTIMATE_ONLY',
+    'fresh 100-tick proof permits only passive affordability estimate');
+  const mainText=fs.readFileSync(path.resolve(here,'../game/main.js'),'utf8');
+  assert.ok(mainText.includes('expansionParentStability,Game.time);'),
+    'status snapshot must pass the current actual observed window and tick');
+}
 
 // All cost components MUST be discovered from the actual server's table;
 // never use a hard-coded 650/200 guess for missing capability values.
@@ -98,14 +143,14 @@ const originalCost=global.BODYPART_COST;
 const originalRate=global.CREEP_SPAWN_TIME;
 try {
   global.BODYPART_COST={...originalCost,claim:undefined};
-  assert.equal(budget.assess(ready,route,p).reason,
+  assert.equal(assess(ready,route,p).reason,
     'BODY_COST_OR_SPAWN_RATE_UNVERIFIED');
   global.BODYPART_COST={...originalCost,claim:800};
-  const expensive=budget.assess(ready,route,p);
+  const expensive=assess(ready,route,p);
   assert.equal(expensive.totalCrewEnergy,1400);
   assert.equal(expensive.readyForClaim,false);
   global.CREEP_SPAWN_TIME=undefined;
-  assert.equal(budget.assess(ready,route,p).status,'UNVERIFIED');
+  assert.equal(assess(ready,route,p).status,'UNVERIFIED');
 } finally {
   global.BODYPART_COST=originalCost;
   global.CREEP_SPAWN_TIME=originalRate;
