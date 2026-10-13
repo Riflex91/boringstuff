@@ -3,15 +3,15 @@
 export const WORLD_TARGET = Object.freeze({
   server: 'world',
   shard: 'shard0',
-  room: 'W37N11',
-  x: 12,
-  y: 13,
+  room: 'W37S79',
+  x: 37,
+  y: 26,
   spawnName: 'Spawn1',
   branch: 'chatgpt',
-  knownRivalRooms: Object.freeze(['W35N11','W36N13']),
-  sourceScoutingRun: 38153270573,
+  knownRivalRooms: Object.freeze(['W35S79','W36S79']),
+  sourceScoutingRun: 38420637372,
   decisionIssue: 172,
-  operatorSelected: true,
+  operatorSelected: false,
   placementApproved: false,
   deploymentApproved: false
 });
