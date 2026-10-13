@@ -114,9 +114,9 @@ assert.deepEqual(result.criticalGapLifetimeStates,[]);
   ]);
   assert.deepEqual(report.criticalGapLifetimeStates,[
     {...report.haulerLifetimeStates[0],uncoveredCriticalCount:1,
-      reasonCodes:['NO_SPARE_GUARD_CAPACITY','CRITICAL_READY_COVERAGE_GAP']},
+      reasonCodes:['CRITICAL_READY_COVERAGE_GAP']},
     {...report.haulerLifetimeStates[1],uncoveredCriticalCount:1,
-      reasonCodes:['NO_SPARE_GUARD_CAPACITY','CRITICAL_READY_COVERAGE_GAP']}
+      reasonCodes:['CRITICAL_READY_COVERAGE_GAP']}
   ]);
   const healthy=lifetime(125);
   healthy.x.consumers={critical:0};
