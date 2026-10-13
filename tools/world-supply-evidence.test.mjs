@@ -27,4 +27,44 @@ assert.equal(gap.observedCadenceComplete,false);
 assert.equal(gap.patterns.length,0);
 assert.equal(result.observedCadenceComplete,true);
 assert.deepEqual(result.missingSampleTicks,[]);
+// New load-state telemetry is strictly optional for historical deployments.
+// Missing values must not be interpreted as zero collecting haulers.
+assert.equal(result.observedHaulerLoadStateSamples,0);
+assert.deepEqual(result.haulerLoadStates,[]);
+{
+  const load = (tick, overrides={}) => {
+    const e=sample(tick);
+    e.x.haulers={live:3,readyByGuardRule:1,zeroEnergy:1,
+      energyPositive:2,collectingEmpty:1,collectingPartialBelowThreshold:1,
+      ...overrides};
+    return e;
+  };
+  const report=summarizeSupplyJournal({...bot,telemetryJournal:{
+    events:[load(100),sample(125),load(150)]
+  }},id);
+  assert.equal(report.state,'OBSERVATIONS_AVAILABLE');
+  assert.equal(report.sampleCount,3);
+  assert.equal(report.observedHaulerLoadStateSamples,2);
+  assert.deepEqual(report.haulerLoadStates,[
+    {tick:100,live:3,readyByGuardRule:1,
+      collectingEmpty:1,collectingPartialBelowThreshold:1},
+    {tick:150,live:3,readyByGuardRule:1,
+      collectingEmpty:1,collectingPartialBelowThreshold:1}
+  ]);
+  for (const bad of [
+    {collectingPartialBelowThreshold:-1},
+    {collectingEmpty:2},
+    {collectingPartialBelowThreshold:3},
+    {live:2},
+    {collectingPartialBelowThreshold:undefined},
+    {readyByGuardRule:NaN}
+  ]) {
+    const invalid=summarizeSupplyJournal({...bot,telemetryJournal:{
+      events:[load(100,bad)]
+    }},id);
+    assert.equal(invalid.state,'REVIEW_REQUIRED');
+    assert.equal(invalid.invalidSamples,1);
+    assert.equal(invalid.observedHaulerLoadStateSamples,0);
+  }
+}
 console.log('World supply evidence tests: PASS');

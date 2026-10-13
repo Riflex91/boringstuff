@@ -13,6 +13,7 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
     return { state: 'UNKNOWN', reason: 'DEPLOYMENT_OR_JOURNAL_UNAVAILABLE', sampleCount: 0, patterns: [] };
   const samples = [];
   const ticks = new Set();
+  const haulerLoadStates = [];
   let invalid = 0;
   for (const e of entries) {
     if (e?.c !== 'CONSUMER_SUPPLY_DIAG' || !Number.isSafeInteger(e.t) ||
@@ -22,13 +23,40 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
     const x = e.x;
     if (x?.phase !== 'AFTER_CREEP_INTENTS_BEFORE_RESOLUTION' ||
         x?.acceptedIsIntentNotSettled !== true) { invalid++; continue; }
+    // Newly added load counters are optional for older journal entries.
+    // Distinguish absent evidence from malformed/inconsistent evidence; never
+    // infer that unobserved collecting haulers were empty or ready.
+    let malformedLoadState = false;
+    const h = x.haulers;
+    const hasEmpty = h && Object.hasOwn(h, 'collectingEmpty');
+    const hasPartial = h && Object.hasOwn(h, 'collectingPartialBelowThreshold');
+    if (hasEmpty || hasPartial) {
+      const integer = value => Number.isSafeInteger(value) && value >= 0;
+      if (!hasEmpty || !hasPartial ||
+          !['live', 'zeroEnergy', 'energyPositive', 'readyByGuardRule']
+            .every(key => integer(h[key])) ||
+          !integer(h.collectingEmpty) ||
+          !integer(h.collectingPartialBelowThreshold) ||
+          h.collectingEmpty > h.zeroEnergy ||
+          h.collectingPartialBelowThreshold > h.energyPositive ||
+          h.collectingEmpty + h.collectingPartialBelowThreshold +
+            h.readyByGuardRule > h.live) {
+        malformedLoadState = true;
+      } else {
+        haulerLoadStates.push({ tick: e.t, live: h.live,
+          readyByGuardRule: h.readyByGuardRule,
+          collectingEmpty: h.collectingEmpty,
+          collectingPartialBelowThreshold: h.collectingPartialBelowThreshold });
+      }
+    }
     const sample = {tick: e.t, consumers: x.consumers, haulers: x.haulers,
       reservationCoverage: x.reservationCoverage};
     sample.triage = triageSupplySample(sample);
-    if (sample.triage.classification === 'UNKNOWN') invalid++;
+    if (malformedLoadState || sample.triage.classification === 'UNKNOWN') invalid++;
     samples.push(sample);
   }
   samples.sort((a,b) => a.tick-b.tick);
+  haulerLoadStates.sort((a,b) => a.tick-b.tick);
   // A journal is a bounded rolling buffer. Never interpret a missing tick as
   // healthy supply, and never call an incomplete series continuous evidence.
   const missingSampleTicks = [];
@@ -45,6 +73,8 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
     latestSampleTick: samples.at(-1)?.tick ?? null,
     firstSampleTick: samples[0]?.tick ?? null,
     missingSampleTicks, observedCadenceComplete,
+    observedHaulerLoadStateSamples: haulerLoadStates.length,
+    haulerLoadStates,
     classifications: samples.map(s => ({tick:s.tick, classification:s.triage.classification,
       reasonCodes:s.triage.reasonCodes})), patterns,
     settledDeliveryProof:false, actionAuthority:'NONE'};
@@ -74,6 +104,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(new URL(im
       endTick:p.endTick,sampleCount:p.sampleCount,maximumUncoveredCritical:p.maximumUncoveredCritical})),
     observedCadenceComplete:report.observedCadenceComplete,
     missingSampleTicks:report.missingSampleTicks,
+    observedHaulerLoadStateSamples:report.observedHaulerLoadStateSamples,
+    haulerLoadStates:report.haulerLoadStates,
     classifications:report.classifications,
     settledDeliveryProof:false}));
 }
