@@ -55,10 +55,26 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
     const ttlKeys = ['knownTtl', 'unknownTtl', 'withinSpawnHorizon',
       'minimumKnownTtl', 'spawnHorizonTicks'];
     const hasAnyTtl = h && ttlKeys.some(k => Object.hasOwn(h, k));
+    const policyKeys = ['prespawnPolicyEligible', 'eligibleExpiringHaulers'];
+    const hasAnyPolicy = h && policyKeys.some(k => Object.hasOwn(h, k));
+    if (hasAnyPolicy && !hasAnyTtl) malformedLoadState = true;
     if (hasAnyTtl) {
       const validCount = v => Number.isSafeInteger(v) && v >= 0;
       const min = h.minimumKnownTtl, horizon = h.spawnHorizonTicks;
-      if (!ttlKeys.every(k => Object.hasOwn(h, k)) ||
+      const eligible = h.prespawnPolicyEligible;
+      const expiring = h.eligibleExpiringHaulers;
+      const policyValid = !hasAnyPolicy || (
+        policyKeys.every(k => Object.hasOwn(h, k)) &&
+        (eligible === true || eligible === false || eligible === null) &&
+        (eligible === null || (eligible === true && h.live > 0 &&
+            horizon === null)
+          ? expiring === null : validCount(expiring)) &&
+        (eligible !== false || expiring === 0) &&
+        (eligible !== true || horizon === null || expiring === h.withinSpawnHorizon) &&
+        (eligible !== true || horizon !== null || h.live > 0 || expiring === 0)
+      );
+      if (!policyValid ||
+          !ttlKeys.every(k => Object.hasOwn(h, k)) ||
           !validCount(h.live) || !validCount(h.knownTtl) ||
           !validCount(h.unknownTtl) ||
           !validCount(h.withinSpawnHorizon) ||
@@ -72,7 +88,11 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
       } else haulerLifetimeStates.push({
         tick: e.t, live: h.live, knownTtl: h.knownTtl,
         unknownTtl: h.unknownTtl, withinSpawnHorizon: h.withinSpawnHorizon,
-        minimumKnownTtl: min, spawnHorizonTicks: horizon
+        minimumKnownTtl: min, spawnHorizonTicks: horizon,
+        ...(hasAnyPolicy ? {
+          prespawnPolicyEligible: eligible,
+          eligibleExpiringHaulers: expiring
+        } : {})
       });
     }
     const sample = {tick: e.t, consumers: x.consumers, haulers: x.haulers,
