@@ -17,6 +17,7 @@ const expansionReadinessShadow = require('expansion.readiness.shadow');
 const expansionCandidatesShadow = require('expansion.candidates.shadow');
 const expansionOperationShadow = require('expansion.operation.shadow');
 const expansionBootstrapBudgetShadow = require('expansion.bootstrap.budget.shadow');
+const expansionParentStabilityShadow = require('expansion.parent.stability.shadow');
 const serverProfile = require('server.profile');
 const processScheduler = require('process.scheduler');
 const worldIntel = require('world.intel');
@@ -154,6 +155,8 @@ function statusSnapshot(roomStates, tickCpu) {
     expansionOperation.parentRoom) || null;
   const expansionBootstrapBudget = expansionBootstrapBudgetShadow.assess(
     expansionReadiness,expansionOperation,expansionParent);
+  const expansionParentStability = expansionParentStabilityShadow.snapshot(
+    Memory, Game.time);
   const schedulerState = processScheduler.snapshot();
   const worldIntelState = worldIntel.snapshot();
   const transitEvidence = defenseTransitEvidence.snapshot(Game, Memory);
@@ -222,6 +225,7 @@ function statusSnapshot(roomStates, tickCpu) {
     expansionCandidates,
     expansionOperation,
     expansionBootstrapBudget,
+    expansionParentStability,
     serverProfile: profile,
     scheduler: schedulerState,
     worldIntel: worldIntelState,
@@ -303,6 +307,18 @@ module.exports.loop = function() {
         }
       });
     }, schedulerContext);
+
+    // Low-cost, optional I4 parent continuity witness. Each healthy tick is
+    // individually observed; a skipped/low-CPU tick breaks the next streak.
+    // Never let expansion diagnostics delay or interrupt authoritative creeps.
+    if (!lowCpu && roomStates.length > 0 &&
+        roomStates.length <= expansionParentStabilityShadow.MAX_OBSERVED_ROOMS &&
+        Game.cpu.limit - Game.cpu.getUsed() >
+          config.SHADOW_CPU_RESERVE + 2) {
+      try {
+        expansionParentStabilityShadow.observe(roomStates, Game, Memory);
+      } catch (_) { /* advisory only: absence means UNKNOWN, not stable */ }
+    }
 
     processScheduler.run({
       id: 'creeps',
