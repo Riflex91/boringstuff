@@ -1,0 +1,69 @@
+name: Screeps World W37S79 auto-deploy (after main CI)
+on:
+  workflow_run:
+    workflows: [npm test]
+    types: [completed]
+permissions:
+  contents: read
+concurrency:
+  group: screeps-world-chatgpt
+  cancel-in-progress: false
+jobs:
+  deploy:
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 28
+    defaults:
+      run:
+        working-directory: tools
+    env:
+      SCREEPS_SERVER: world
+      SCREEPS_BRANCH: chatgpt-w37s79-stage
+      SCREEPS_SHARD: shard0
+      SCREEPS_ROOM: W37S79
+      SCREEPS_TOKEN_WORLD: ${{ secrets.SCREEPS_TOKEN_WORLD }}
+    steps:
+      - name: Checkout exact CI-tested main
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+      - name: Prevent stale main deployment
+        shell: bash
+        run: |
+          git fetch origin main --quiet
+          test "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Install dependencies and verify P3 benchmark
+        run: |
+          npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+          npm run bench:p3
+      - name: Prepare isolated API configuration
+        working-directory: .
+        run: |
+          echo "SCREEPS_CONFIG=$RUNNER_TEMP/w37s79-auto-deploy.json" >> "$GITHUB_ENV"
+          echo "SCREEPS_LOG_DIR=$RUNNER_TEMP/w37s79-auto-deploy-evidence" >> "$GITHUB_ENV"
+      - name: Verify pinned owned spawn and active branch (GET only)
+        run: node world-next-auto-deploy-guard.mjs
+      - name: Verify exact active branch and backup access
+        run: node ci-deployment-guard.mjs preflight
+      - name: Upload exact tested game modules
+        run: node deploy-live.mjs
+      - name: Verify 100 live ticks, fatal and CPU safeguards
+        run: node ci-deployment-guard.mjs verify
+      - name: Save backup and deployment evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screeps-w37s79-auto-deploy-${{ github.event.workflow_run.head_sha }}
+          path: |
+            logs/deploy-backup-*.json
+            ${{ runner.temp }}/w37s79-auto-deploy-evidence/deployment-receipt-*.json
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Remove temporary credentials
+        if: always()
+        working-directory: .
+        run: rm -f "$SCREEPS_CONFIG"
