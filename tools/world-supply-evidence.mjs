@@ -23,6 +23,7 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
   const haulerLoadStates = [];
   const haulerLifetimeStates = [];
   const haulerActionStates = [];
+  const roomEnergyStates = [];
   let invalid = 0;
   for (const e of entries) {
     if (e?.c !== 'CONSUMER_SUPPLY_DIAG' || !Number.isSafeInteger(e.t) ||
@@ -36,7 +37,7 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
     // Distinguish absent evidence from malformed/inconsistent evidence; never
     // infer that unobserved collecting haulers were empty or ready.
     let malformedLoadState = false;
-    let pendingLoad = null, pendingLifetime = null;
+    let pendingLoad = null, pendingLifetime = null, pendingRoomEnergy = null;
     const h = x.haulers;
     const hasEmpty = h && Object.hasOwn(h, 'collectingEmpty');
     const hasPartial = h && Object.hasOwn(h, 'collectingPartialBelowThreshold');
@@ -169,6 +170,27 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
         };
       }
     }
+    // Room infrastructure supply is a same-tick snapshot, but not evidence
+    // that a rescue decision passed every tower or consumer safety gate.
+    // Older releases lacking this field must remain UNKNOWN, not "empty".
+    if (Object.hasOwn(x,'roomEnergy')) {
+      const roomEnergy = x.roomEnergy;
+      const good = value => Number.isSafeInteger(value) && value >= 0;
+      const known = roomEnergy && roomEnergy.observed === true &&
+        good(roomEnergy.available) &&
+        good(roomEnergy.capacity) && roomEnergy.capacity > 0 &&
+        roomEnergy.available <= roomEnergy.capacity &&
+        roomEnergy.full === (roomEnergy.available === roomEnergy.capacity);
+      const unknownEnergy = roomEnergy && roomEnergy.observed === false &&
+        roomEnergy.available === null && roomEnergy.capacity === null &&
+        roomEnergy.full === null;
+      if (!known && !unknownEnergy) malformedLoadState = true;
+      else pendingRoomEnergy = {
+        tick:e.t, observed:roomEnergy.observed,
+        available:roomEnergy.available, capacity:roomEnergy.capacity,
+        full:roomEnergy.full
+      };
+    }
     const sample = {tick: e.t, consumers: x.consumers, haulers: x.haulers,
       reservationCoverage: x.reservationCoverage};
     sample.triage = triageSupplySample(sample);
@@ -180,6 +202,7 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
       if (pendingLoad) haulerLoadStates.push(pendingLoad);
       if (pendingLifetime) haulerLifetimeStates.push(pendingLifetime);
       if (pendingActions) haulerActionStates.push(pendingActions);
+      if (pendingRoomEnergy) roomEnergyStates.push(pendingRoomEnergy);
       patternEligibleSamples.push(sample);
     }
     samples.push(sample);
@@ -188,6 +211,7 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
   haulerLoadStates.sort((a,b) => a.tick-b.tick);
   haulerLifetimeStates.sort((a,b) => a.tick-b.tick);
   haulerActionStates.sort((a,b) => a.tick-b.tick);
+  roomEnergyStates.sort((a,b) => a.tick-b.tick);
   // A journal is a bounded rolling buffer. Never interpret a missing tick as
   // healthy supply, and never call an incomplete series continuous evidence.
   const missingSampleTicks = [];
@@ -219,6 +243,15 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
       uncoveredCriticalCount: s.triage.uncoveredCriticalCount,
       reasonCodes: s.triage.reasonCodes
     }));
+  const energyByTick = new Map(roomEnergyStates.map(s => [s.tick, s]));
+  const criticalGapRoomEnergyStates = samples
+    .filter(s => s.triage.classification === 'CRITICAL_COVERAGE_GAP_OBSERVED' &&
+      energyByTick.has(s.tick))
+    .map(s => ({
+      ...energyByTick.get(s.tick),
+      uncoveredCriticalCount:s.triage.uncoveredCriticalCount,
+      reasonCodes:s.triage.reasonCodes
+    }));
   const lifetimeByTick = new Map(haulerLifetimeStates.map(s => [s.tick, s]));
   const criticalGapLifetimeStates = samples
     .filter(s => s.triage.classification === 'CRITICAL_COVERAGE_GAP_OBSERVED' &&
@@ -241,6 +274,9 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
     observedHaulerActionSamples: haulerActionStates.length,
     haulerActionStates,
     criticalGapActionStates,
+    observedRoomEnergySamples:roomEnergyStates.length,
+    roomEnergyStates,
+    criticalGapRoomEnergyStates,
     observedHaulerLifetimeSamples: haulerLifetimeStates.length,
     haulerLifetimeStates,
     criticalGapLifetimeStates,
@@ -279,6 +315,9 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(new URL(im
     observedHaulerActionSamples:report.observedHaulerActionSamples,
     haulerActionStates:report.haulerActionStates,
     criticalGapActionStates:report.criticalGapActionStates,
+    observedRoomEnergySamples:report.observedRoomEnergySamples,
+    roomEnergyStates:report.roomEnergyStates,
+    criticalGapRoomEnergyStates:report.criticalGapRoomEnergyStates,
     observedHaulerLifetimeSamples:report.observedHaulerLifetimeSamples,
     haulerLifetimeStates:report.haulerLifetimeStates,
     criticalGapLifetimeStates:report.criticalGapLifetimeStates,
