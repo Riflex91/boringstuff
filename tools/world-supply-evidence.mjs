@@ -36,7 +36,7 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
     for (let tick = samples[i-1].tick + 25; tick < samples[i].tick; tick += 25)
       missingSampleTicks.push(tick);
   }
-  const continuousSampleCount = samples.length - missingSampleTicks.length;
+  const observedCadenceComplete = missingSampleTicks.length === 0;
   const patterns = repeatedSupplyObservations(samples);
   return {state: invalid ? 'REVIEW_REQUIRED' : samples.length ? 'OBSERVATIONS_AVAILABLE' : 'UNKNOWN',
     reason: invalid ? 'INVALID_DIAGNOSTIC_SAMPLES' : samples.length ?
@@ -44,7 +44,7 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
     markerTick, sampleCount: samples.length, invalidSamples: invalid,
     latestSampleTick: samples.at(-1)?.tick ?? null,
     firstSampleTick: samples[0]?.tick ?? null,
-    missingSampleTicks, continuousSampleCount: Math.max(0, continuousSampleCount),
+    missingSampleTicks, observedCadenceComplete,
     classifications: samples.map(s => ({tick:s.tick, classification:s.triage.classification,
       reasonCodes:s.triage.reasonCodes})), patterns,
     settledDeliveryProof:false, actionAuthority:'NONE'};
