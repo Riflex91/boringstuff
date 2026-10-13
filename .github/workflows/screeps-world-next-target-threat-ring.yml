@@ -1,0 +1,37 @@
+name: Screeps World W37S79 threat ring (GET only)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: screeps-world-w37s79-threat-ring
+  cancel-in-progress: false
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: tools
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Install dependencies
+        run: npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+      - name: Syntax check
+        run: node --check world-next-target-threat-ring.mjs
+      - name: GET-only 24-room threat ring
+        env:
+          SCREEPS_TOKEN_WORLD: ${{ secrets.SCREEPS_TOKEN_WORLD }}
+          WORLD_NEXT_RING_OUTPUT_DIR: ${{ runner.temp }}/world-w37s79-ring
+        run: node world-next-target-threat-ring.mjs
+      - name: Preserve sanitized risk evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screeps-world-W37S79-ring-${{ github.sha }}
+          path: ${{ runner.temp }}/world-w37s79-ring/W37S79-ring.json
+          if-no-files-found: warn
+          retention-days: 14
