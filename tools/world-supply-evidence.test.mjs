@@ -516,4 +516,90 @@ assert.deepEqual(result.criticalGapRoomEnergyStates,[],
   assert.deepEqual(interrupted.patterns,[],
     'invalid intermediate room-energy snapshot breaks repeated evidence');
 }
+// A NOT_IN_RANGE transfer attempt can mean a normal walk, a terminal
+// path failure, or temporarily blocked movement. Preserve the distance
+// histogram and the move return codes separately, never as delivery proof.
+{
+  const make=(tick,changes={})=>{
+    const event=sample(tick);
+    event.x.haulers={live:3,readyByGuardRule:2,zeroEnergy:1,
+      energyPositive:2,collectingEmpty:1,collectingPartialBelowThreshold:0};
+    event.x.decisions={guardChecks:2,guardSelected:1,uniqueGuardHaulers:1};
+    event.x.consumerTransfers={attempted:2,accepted:0,notInRange:2,other:0};
+    event.x.infrastructureTransfers={attempted:1,accepted:0,notInRange:1,other:0};
+    event.x.haulerAcquisitions={attempted:1,accepted:1,notInRange:0,other:0};
+    event.x.consumerTravel={
+      moveAttempts:2,rangeAtMost5:0,range6to10:1,rangeOver10:1,
+      rangeUnknown:0,moveAccepted:1,moveNoPath:1,
+      moveInvalidTarget:0,moveTemporarilyBlocked:0,moveOther:0
+    };
+    Object.assign(event.x,changes);
+    return event;
+  };
+  const healthy=make(125);
+  healthy.x.consumers={critical:0};
+  healthy.x.reservationCoverage=null;
+  const report=summarizeSupplyJournal({...bot,telemetryJournal:{
+    events:[make(100),healthy,make(150)]
+  }},id);
+  assert.equal(report.state,'OBSERVATIONS_AVAILABLE');
+  assert.equal(report.observedHaulerActionSamples,3);
+  assert.deepEqual(report.haulerActionStates.map(x=>x.consumerTravel.moveAttempts),
+    [2,2,2]);
+  assert.deepEqual(report.criticalGapActionStates.map(x=>x.tick),[100,150]);
+  assert.deepEqual(report.criticalGapActionStates[0].consumerTravel,{
+    moveAttempts:2,rangeAtMost5:0,range6to10:1,rangeOver10:1,
+    rangeUnknown:0,moveAccepted:1,moveNoPath:1,
+    moveInvalidTarget:0,moveTemporarilyBlocked:0,moveOther:0
+  });
+  assert.equal(report.criticalGapActionStates[0].settledDeliveryProof,false);
+  const historical=make(100);
+  delete historical.x.consumerTravel;
+  const older=summarizeSupplyJournal({...bot,telemetryJournal:{
+    events:[historical,make(125)]
+  }},id);
+  assert.equal(older.state,'OBSERVATIONS_AVAILABLE');
+  assert.equal(Object.hasOwn(older.haulerActionStates[0],'consumerTravel'),false,
+    'older action schemas must not imply distance zero or movement success');
+  const invalid=[
+    {moveAttempts:1},
+    {moveAttempts:3},
+    {rangeOver10:0},
+    {rangeUnknown:1},
+    {moveAccepted:2},
+    {moveNoPath:2},
+    {moveOther:-1},
+    {range6to10:1.5},
+    {moveInvalidTarget:undefined},
+    {unexpected:1}
+  ];
+  for(const changes of invalid) {
+    const e=make(100);
+    e.x.consumerTravel={...e.x.consumerTravel,...changes};
+    const bad=summarizeSupplyJournal({...bot,telemetryJournal:{
+      events:[e]
+    }},id);
+    assert.equal(bad.state,'REVIEW_REQUIRED',JSON.stringify(changes));
+    assert.equal(bad.invalidSamples,1);
+    assert.equal(bad.observedHaulerActionSamples,0);
+    assert.equal(bad.observedHaulerLoadStateSamples,0);
+    assert.deepEqual(bad.criticalGapActionStates,[]);
+  }
+  const mismatch=make(100,{
+    consumerTransfers:{attempted:2,accepted:1,notInRange:1,other:0}
+  });
+  const invalidLink=summarizeSupplyJournal({...bot,telemetryJournal:{
+    events:[mismatch]
+  }},id);
+  assert.equal(invalidLink.state,'REVIEW_REQUIRED');
+  assert.equal(invalidLink.observedHaulerActionSamples,0);
+  const interrupted=summarizeSupplyJournal({...bot,telemetryJournal:{
+    events:[make(100),make(125,{consumerTravel:{...make(125).x.consumerTravel,
+      moveAttempts:0}}),make(150)]
+  }},id);
+  assert.equal(interrupted.invalidSamples,1);
+  assert.deepEqual(interrupted.haulerActionStates.map(x=>x.tick),[100,150]);
+  assert.deepEqual(interrupted.patterns,[],
+    'invalid movement evidence cannot complete an observed three-sample pattern');
+}
 console.log('World supply evidence tests: PASS');
