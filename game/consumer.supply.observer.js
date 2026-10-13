@@ -233,8 +233,9 @@ function sampleRoomCreeps(game, room, state = null) {
   // Count only short-TTL haulers for which the current spawn-manager policy
   // actually allows early replacement. Null means policy state unavailable.
   const h = summary.haulers;
-  h.eligibleExpiringHaulers = h.prespawnPolicyEligible === null ? null :
-    h.prespawnPolicyEligible ? h.withinSpawnHorizon : 0;
+  h.eligibleExpiringHaulers = h.prespawnPolicyEligible === null ||
+    (h.prespawnPolicyEligible && h.live > 0 && h.spawnHorizonTicks === null)
+    ? null : h.prespawnPolicyEligible ? h.withinSpawnHorizon : 0;
   summary.reservationCoverage = snapshotReservationCoverage(criticalConsumers, liveHaulers);
   return summary;
 }
