@@ -53,7 +53,12 @@ function summarize(root, tick) {
         !validTick(row.lastTick) || !validTick(row.streak) ||
         row.streak > REQUIRED_TICKS ||
         (row.firstTick !== null && !validTick(row.firstTick)) ||
-        (row.reason !== null && typeof row.reason !== 'string'))
+        (row.reason !== null && typeof row.reason !== 'string') ||
+        (row.reason === null && (row.streak < 1 ||
+          !validTick(row.firstTick) || row.firstTick > row.lastTick ||
+          row.lastTick - row.firstTick + 1 < row.streak)) ||
+        (row.reason !== null && (row.streak !== 0 ||
+          row.firstTick !== null)))
       return unknown('CONTINUITY_JOURNAL_INVALID');
     evidence.push(publicRow(name,row));
   }
