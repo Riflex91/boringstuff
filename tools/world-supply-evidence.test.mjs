@@ -40,6 +40,10 @@ assert.equal(result.observedHaulerActionSamples,0);
 assert.deepEqual(result.haulerActionStates,[]);
 assert.deepEqual(result.criticalGapActionStates,[],
   'Legacy samples without guarded transfer intent counters remain unknown');
+assert.equal(result.observedRoomEnergySamples,0);
+assert.deepEqual(result.roomEnergyStates,[]);
+assert.deepEqual(result.criticalGapRoomEnergyStates,[],
+  'Historical missing room energy must not imply that spawn is full');
 {
   const load = (tick, overrides={}) => {
     const e=sample(tick);
@@ -450,5 +454,66 @@ assert.deepEqual(result.criticalGapActionStates,[],
     assert.equal(invalid.observedHaulerLoadStateSamples,0);
     assert.deepEqual(invalid.criticalGapActionStates,[]);
   }
+}
+// RoomManager's infrastructure energy evidence explains why a partial-load
+// rescue cannot automatically be inferred from an underfilled hauler.
+// It is a point-in-time observation, not permission to divert infrastructure.
+{
+  const make=(tick,roomEnergy)=>{
+    const e=sample(tick);
+    if(roomEnergy!==undefined)e.x.roomEnergy=roomEnergy;
+    return e;
+  };
+  const full={observed:true,available:550,capacity:550,full:true};
+  const partial={observed:true,available:451,capacity:550,full:false};
+  const unknown={observed:false,available:null,capacity:null,full:null};
+  const healthy=make(125,partial);
+  healthy.x.consumers={critical:0};
+  healthy.x.reservationCoverage=null;
+  const report=summarizeSupplyJournal({...bot,telemetryJournal:{
+    events:[make(100,full),healthy,make(150,unknown)]
+  }},id);
+  assert.equal(report.state,'OBSERVATIONS_AVAILABLE');
+  assert.equal(report.observedRoomEnergySamples,3);
+  assert.deepEqual(report.roomEnergyStates,[
+    {tick:100,...full},{tick:125,...partial},{tick:150,...unknown}
+  ]);
+  assert.deepEqual(report.criticalGapRoomEnergyStates,[
+    {tick:100,...full,uncoveredCriticalCount:1,
+      reasonCodes:['NO_READY_HAULERS','CRITICAL_READY_COVERAGE_GAP']},
+    {tick:150,...unknown,uncoveredCriticalCount:1,
+      reasonCodes:['NO_READY_HAULERS','CRITICAL_READY_COVERAGE_GAP']}
+  ]);
+  const legacy=summarizeSupplyJournal({...bot,telemetryJournal:{
+    events:[make(100,full),make(125)]
+  }},id);
+  assert.equal(legacy.observedRoomEnergySamples,1);
+  assert.deepEqual(legacy.roomEnergyStates.map(s=>s.tick),[100]);
+  for(const invalidEnergy of [
+    null,{observed:true,available:-1,capacity:550,full:false},
+    {observed:true,available:551,capacity:550,full:false},
+    {observed:true,available:500,capacity:550,full:true},
+    {observed:true,available:500,capacity:550,full:false,extra:1},
+    {observed:true,available:1.5,capacity:550,full:false},
+    {observed:true,available:0,capacity:0,full:true},
+    {observed:false,available:0,capacity:null,full:null},
+    {observed:false,available:null,capacity:null,full:false},
+    {observed:null,available:null,capacity:null,full:null}
+  ]) {
+    const invalid=summarizeSupplyJournal({...bot,telemetryJournal:{
+      events:[make(100,invalidEnergy)]
+    }},id);
+    assert.equal(invalid.state,'REVIEW_REQUIRED');
+    assert.equal(invalid.invalidSamples,1);
+    assert.equal(invalid.observedRoomEnergySamples,0);
+    assert.deepEqual(invalid.criticalGapRoomEnergyStates,[]);
+  }
+  const interrupted=summarizeSupplyJournal({...bot,telemetryJournal:{
+    events:[make(100,full),make(125,{...partial,full:true}),make(150,full)]
+  }},id);
+  assert.equal(interrupted.invalidSamples,1);
+  assert.deepEqual(interrupted.roomEnergyStates.map(s=>s.tick),[100,150]);
+  assert.deepEqual(interrupted.patterns,[],
+    'invalid intermediate room-energy snapshot breaks repeated evidence');
 }
 console.log('World supply evidence tests: PASS');
