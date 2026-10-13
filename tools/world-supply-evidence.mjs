@@ -28,6 +28,7 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
     // Distinguish absent evidence from malformed/inconsistent evidence; never
     // infer that unobserved collecting haulers were empty or ready.
     let malformedLoadState = false;
+    let pendingLoad = null, pendingLifetime = null;
     const h = x.haulers;
     const hasEmpty = h && Object.hasOwn(h, 'collectingEmpty');
     const hasPartial = h && Object.hasOwn(h, 'collectingPartialBelowThreshold');
@@ -44,10 +45,10 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
             h.readyByGuardRule > h.live) {
         malformedLoadState = true;
       } else {
-        haulerLoadStates.push({ tick: e.t, live: h.live,
+        pendingLoad = { tick: e.t, live: h.live,
           readyByGuardRule: h.readyByGuardRule,
           collectingEmpty: h.collectingEmpty,
-          collectingPartialBelowThreshold: h.collectingPartialBelowThreshold });
+          collectingPartialBelowThreshold: h.collectingPartialBelowThreshold };
       }
     }
     // Optional lifetime evidence is descriptive, not proof of the reason
@@ -85,7 +86,7 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
           (h.withinSpawnHorizon > 0 && (horizon === null ||
             min > horizon))) {
         malformedLoadState = true;
-      } else haulerLifetimeStates.push({
+      } else pendingLifetime = {
         tick: e.t, live: h.live, knownTtl: h.knownTtl,
         unknownTtl: h.unknownTtl, withinSpawnHorizon: h.withinSpawnHorizon,
         minimumKnownTtl: min, spawnHorizonTicks: horizon,
@@ -93,12 +94,19 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
           prespawnPolicyEligible: eligible,
           eligibleExpiringHaulers: expiring
         } : {})
-      });
+      };
     }
     const sample = {tick: e.t, consumers: x.consumers, haulers: x.haulers,
       reservationCoverage: x.reservationCoverage};
     sample.triage = triageSupplySample(sample);
-    if (malformedLoadState || sample.triage.classification === 'UNKNOWN') invalid++;
+    if (malformedLoadState || sample.triage.classification === 'UNKNOWN') {
+      // Reject ALL derived evidence for this tick atomically. A valid-looking
+      // subset of a malformed sample must not drive a same-tick correlation.
+      invalid++;
+    } else {
+      if (pendingLoad) haulerLoadStates.push(pendingLoad);
+      if (pendingLifetime) haulerLifetimeStates.push(pendingLifetime);
+    }
     samples.push(sample);
   }
   samples.sort((a,b) => a.tick-b.tick);
