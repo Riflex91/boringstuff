@@ -139,7 +139,7 @@ function sampleRoomCreeps(game, room) {
     sampledCreepCount: 0, truncated: false,
     haulers: { live: 0, energyPositive: 0, deliveringFlag: 0,
       readyByGuardRule: 0, zeroEnergy: 0, totalCarriedEnergy: 0,
-      capacityUnknown: 0 },
+      capacityUnknown: 0, collectingEmpty: 0, collectingPartialBelowThreshold: 0 },
     consumers: { live: 0, waiting: 0, fallback: 0, critical: 0, empty: 0 },
     reservationCoverage: null
   };
@@ -164,6 +164,10 @@ function sampleRoomCreeps(game, room) {
       else h.zeroEnergy++;
       if (creep.memory.delivering) h.deliveringFlag++;
       if (status.ready) h.readyByGuardRule++;
+      if (!creep.memory.delivering && !status.ready) {
+        if (status.carried === 0) h.collectingEmpty++;
+        else h.collectingPartialBelowThreshold++;
+      }
       if (status.capacity === null) h.capacityUnknown++;
     } else if (role === 'worker' || role === 'builder' ||
                role === 'repairer' || role === 'upgrader') {

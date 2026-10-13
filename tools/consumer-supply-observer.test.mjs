@@ -73,7 +73,7 @@ assert.equal(evt.ctx.sampledCreepCount, 4);
 assert.deepEqual(evt.ctx.haulers, {
   live: 2, energyPositive: 2, deliveringFlag: 1,
   readyByGuardRule: 1, zeroEnergy: 0, totalCarriedEnergy: 325,
-  capacityUnknown: 0
+  capacityUnknown: 0, collectingEmpty: 0, collectingPartialBelowThreshold: 1
 });
 assert.deepEqual(evt.ctx.consumers,
   { live: 2, waiting: 1, fallback: 1, critical: 2, empty: 2 });
@@ -155,6 +155,7 @@ unknownCapacity.store.getCapacity = () => undefined;
 g.creeps = { unknownCapacity };
 assert.equal(observer.flush([state], logger, g), 1);
 assert.equal(eventRows[2].ctx.haulers.capacityUnknown, 1);
+assert.equal(eventRows[2].ctx.haulers.collectingPartialBelowThreshold, 0);
 assert.equal(eventRows[2].ctx.haulers.readyByGuardRule, 1,
   'unknown capacity is distinct from actual legacy guard readiness');
 g.time = 1075;
@@ -225,6 +226,7 @@ const parsed = JSON.parse(consoleLines[0].replace(/^\[BOTLOG\]/, ''));
 assert.equal(parsed.code, 'CONSUMER_SUPPLY_DIAG');
 assert.equal(parsed.ctx.consumerTransfers.accepted, 1);
 assert.equal(parsed.ctx.haulers.readyByGuardRule, 1);
+assert.equal(parsed.ctx.haulers.collectingPartialBelowThreshold, 1);
 assert.equal(parsed.ctx.acceptedIsIntentNotSettled, true);
 assert.equal(parsed.jseq, 1);
 assert.equal(parsed.ctx.consumers.fallback, 1);
@@ -234,5 +236,18 @@ const stored = telemetryJournal.recent(1)[0];
 assert.equal(stored.c, 'CONSUMER_SUPPLY_DIAG');
 assert.equal(stored.x.consumerTransfers.accepted, 1);
 assert.equal(stored.x.haulers.readyByGuardRule, 1);
+assert.equal(stored.x.haulers.collectingPartialBelowThreshold, 1);
 
 console.log('post-creep observer: read-only guard and intent diagnostics PASS');
+
+// Distinguish an empty collector from a positive but below-threshold collector.
+{
+  const empty = creep('empty-collector','hauler',0,300,{delivering:false});
+  const partial = creep('partial-collector','hauler',75,300,{delivering:false});
+  const ready = creep('ready-collector','hauler',150,300,{delivering:false});
+  const sample = observer._test.sampleRoomCreeps({creeps:{empty,partial,ready}},'E8N1');
+  assert.equal(sample.haulers.collectingEmpty,1);
+  assert.equal(sample.haulers.collectingPartialBelowThreshold,1);
+  assert.equal(sample.haulers.readyByGuardRule,1);
+  assert.equal(sample.haulers.zeroEnergy,1);
+}
