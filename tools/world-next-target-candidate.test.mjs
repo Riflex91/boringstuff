@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import { WORLD_TARGET } from './world-target-selection.mjs';
+import { WORLD_NEXT_TARGET_CANDIDATE as candidate } from './world-next-target-candidate.mjs';
+assert.equal(candidate.shard, 'shard0');
+assert.equal(candidate.room, 'W37S79');
+assert.deepEqual([candidate.x,candidate.y],[37,26]);
+assert.equal(candidate.sourceScoutingRun,38420637372);
+assert.equal(candidate.placementApproved,false);
+assert.equal(candidate.deploymentApproved,false);
+assert.equal(candidate.fullThreatCoverageVerified,false);
+assert.equal(candidate.remoteRoutingNeedsReview,true);
+assert.equal(WORLD_TARGET.room,'W37N11');
+assert.equal(WORLD_TARGET.placementApproved,false);
+assert.notEqual(candidate.room,WORLD_TARGET.room);
+console.log('World candidate isolation and fail-closed policy: PASS');
