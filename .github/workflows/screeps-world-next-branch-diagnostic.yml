@@ -1,0 +1,28 @@
+name: Screeps World W37S79 branch diagnostic (GET only)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: tools
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Diagnose World branches without mutations
+        env:
+          SCREEPS_TOKEN_WORLD: ${{ secrets.SCREEPS_TOKEN_WORLD }}
+        run: node world-next-branch-diagnostic.mjs
+      - name: Preserve sanitized diagnostic
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screeps-world-W37S79-branch-diagnostic
+          path: ${{ runner.temp }}/world-branch-diagnostic/branch-diagnostic.json
+          if-no-files-found: warn
