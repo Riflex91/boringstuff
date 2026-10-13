@@ -12,6 +12,10 @@ const require = createRequire(import.meta.url);
 global.RESOURCE_ENERGY = 'energy';
 global.OK = 0;
 global.ERR_NOT_IN_RANGE = -9;
+global.CARRY = 'carry';
+global.MOVE = 'move';
+global.BODYPART_COST = { carry: 50, move: 50 };
+global.CREEP_SPAWN_TIME = 3;
 
 const observer = require('../game/consumer.supply.observer.js');
 const config = require('../game/config.js');
@@ -73,7 +77,9 @@ assert.equal(evt.ctx.sampledCreepCount, 4);
 assert.deepEqual(evt.ctx.haulers, {
   live: 2, energyPositive: 2, deliveringFlag: 1,
   readyByGuardRule: 1, zeroEnergy: 0, totalCarriedEnergy: 325,
-  capacityUnknown: 0, collectingEmpty: 0, collectingPartialBelowThreshold: 1
+  capacityUnknown: 0, collectingEmpty: 0, collectingPartialBelowThreshold: 1,
+  knownTtl: 0, unknownTtl: 2, withinSpawnHorizon: 0,
+  minimumKnownTtl: null, spawnHorizonTicks: null
 });
 assert.deepEqual(evt.ctx.consumers,
   { live: 2, waiting: 1, fallback: 1, critical: 2, empty: 2 });
@@ -238,6 +244,34 @@ assert.equal(stored.x.consumerTransfers.accepted, 1);
 assert.equal(stored.x.haulers.readyByGuardRule, 1);
 assert.equal(stored.x.haulers.collectingPartialBelowThreshold, 1);
 
+// Compare lifetime observation against the production hauler body size at
+// RCL2 550-energy capacity. No identifiers leave aggregate diagnostics.
+{
+  const liveRoom = { name: 'E8N1', energyCapacityAvailable: 550 };
+  const expiring = creep('expiring-hauler','hauler',150,300,{delivering:true});
+  const healthy = creep('healthy-hauler','hauler',150,300,{delivering:true});
+  const noTtl = creep('unknown-ttl-hauler','hauler',0,300);
+  for (const h of [expiring,healthy,noTtl]) h.room = liveRoom;
+  expiring.ticksToLive=30;
+  healthy.ticksToLive=31;
+  assert.equal(observer._test.haulerReplacementHorizon(expiring),30);
+  const sample=observer._test.sampleRoomCreeps({
+    creeps: {expiring,healthy,noTtl}
+  },'E8N1');
+  assert.equal(sample.haulers.knownTtl,2);
+  assert.equal(sample.haulers.unknownTtl,1);
+  assert.equal(sample.haulers.withinSpawnHorizon,1);
+  assert.equal(sample.haulers.minimumKnownTtl,30);
+  assert.equal(sample.haulers.spawnHorizonTicks,30);
+  liveRoom.energyCapacityAvailable=undefined;
+  assert.equal(observer._test.haulerReplacementHorizon(expiring),null);
+  const missing=observer._test.sampleRoomCreeps({
+    creeps: {expiring,healthy,noTtl}
+  },'E8N1');
+  assert.equal(missing.haulers.spawnHorizonTicks,null);
+  assert.equal(missing.haulers.withinSpawnHorizon,0,
+    'missing room capacity cannot fabricate a prespawn risk count');
+}
 console.log('post-creep observer: read-only guard and intent diagnostics PASS');
 
 // Distinguish an empty collector from a positive but below-threshold collector.
