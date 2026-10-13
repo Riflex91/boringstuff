@@ -105,7 +105,16 @@ const evaluate=f=>operation.evaluate({
   authority:'SHADOW',status:'ADVISORY_ONLY',
   claimActionEnabled:false,placementEnabled:false,
   topCandidates:[{roomName:'E2N3',parentRoom:'E2N2',hops:1}]
-},[f.parent],f.game,f.memory);
+},[f.parent],f.game,f.memory,{
+  schemaVersion:1,authority:'SHADOW_EVIDENCE',actionAuthority:'NONE',
+  claimActionEnabled:false,status:'OBSERVATIONS_AVAILABLE',
+  lastTick:f.game.time,requiredTicks:100,rooms:[{
+    room:'E2N2',status:'CONTINUOUS_SUPPORT_OBSERVED',
+    reason:null,actionAuthority:'NONE',claimActionEnabled:false,
+    firstTick:f.game.time-99,lastTick:f.game.time,
+    consecutiveSupportTicks:100,requiredTicks:100
+  }]
+});
 
 {
   const f=fixture();
