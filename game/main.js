@@ -149,14 +149,18 @@ function statusSnapshot(roomStates, tickCpu) {
   const expansionReadiness = expansionReadinessShadow.evaluate(capabilities,roomStates,tickCpu);
   const expansionCandidates = expansionCandidatesShadow.evaluate(
     expansionReadiness,roomStates,Game,Memory);
+  // The I4 site advisory must never progress on an isolated healthy
+  // snapshot. Validate a fresh 100-consecutive-tick parent support witness
+  // before accepting geometry or retaining a previously verified site.
+  const expansionParentStability = expansionParentStabilityShadow.snapshot(
+    Memory, Game.time);
   const expansionOperation = expansionOperationShadow.evaluate(
-    expansionReadiness,expansionCandidates,roomStates,Game,Memory);
+    expansionReadiness,expansionCandidates,roomStates,Game,Memory,
+    expansionParentStability);
   const expansionParent = roomStates.find(state => state?.room?.name ===
     expansionOperation.parentRoom) || null;
   const expansionBootstrapBudget = expansionBootstrapBudgetShadow.assess(
     expansionReadiness,expansionOperation,expansionParent);
-  const expansionParentStability = expansionParentStabilityShadow.snapshot(
-    Memory, Game.time);
   const schedulerState = processScheduler.snapshot();
   const worldIntelState = worldIntel.snapshot();
   const transitEvidence = defenseTransitEvidence.snapshot(Game, Memory);
