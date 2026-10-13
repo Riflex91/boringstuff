@@ -195,4 +195,56 @@ assert.deepEqual(result.criticalGapLifetimeStates,[]);
     assert.equal(invalid.observedHaulerLifetimeSamples,0);
   }
 }
+// A sample is one integrity unit: valid load numbers must not be retained
+// when its TTL, policy, or coverage data is malformed, or vice versa.
+{
+  const combined = (tick, hauler = {}, coverage = {}) => {
+    const e = sample(tick);
+    e.x.haulers = {
+      live: 2, readyByGuardRule: 1, energyPositive: 1, zeroEnergy: 1,
+      collectingEmpty: 1, collectingPartialBelowThreshold: 0,
+      knownTtl: 2, unknownTtl: 0, withinSpawnHorizon: 1,
+      minimumKnownTtl: 29, spawnHorizonTicks: 30,
+      prespawnPolicyEligible: true, eligibleExpiringHaulers: 1,
+      ...hauler
+    };
+    e.x.reservationCoverage = { ...e.x.reservationCoverage, ...coverage };
+    return e;
+  };
+  const good = summarizeSupplyJournal({...bot,telemetryJournal:{
+    events:[combined(100),combined(125),combined(150)]
+  }}, id);
+  assert.equal(good.state,'OBSERVATIONS_AVAILABLE');
+  assert.equal(good.observedHaulerLoadStateSamples,3);
+  assert.equal(good.observedHaulerLifetimeSamples,3);
+  assert.equal(good.criticalGapLoadStates.length,3);
+  assert.equal(good.criticalGapLifetimeStates.length,3);
+  const malformedCases = [
+    combined(100,{knownTtl:3}),
+    combined(100,{collectingEmpty:2}),
+    combined(100,{eligibleExpiringHaulers:2}),
+    combined(100,{}, {acceptedDeliveryProof:true})
+  ];
+  for (const event of malformedCases) {
+    const invalid = summarizeSupplyJournal({...bot,telemetryJournal:{
+      events:[event]
+    }}, id);
+    assert.equal(invalid.state,'REVIEW_REQUIRED');
+    assert.equal(invalid.invalidSamples,1);
+    assert.equal(invalid.observedHaulerLoadStateSamples,0);
+    assert.equal(invalid.observedHaulerLifetimeSamples,0);
+    assert.deepEqual(invalid.criticalGapLoadStates,[]);
+    assert.deepEqual(invalid.criticalGapLifetimeStates,[]);
+  }
+  const interrupted=summarizeSupplyJournal({...bot,telemetryJournal:{
+    events:[combined(100),combined(125,{knownTtl:3}),combined(150)]
+  }},id);
+  assert.equal(interrupted.state,'REVIEW_REQUIRED');
+  assert.equal(interrupted.observedHaulerLoadStateSamples,2);
+  assert.equal(interrupted.observedHaulerLifetimeSamples,2);
+  assert.deepEqual(interrupted.haulerLoadStates.map(s=>s.tick),[100,150]);
+  assert.deepEqual(interrupted.haulerLifetimeStates.map(s=>s.tick),[100,150]);
+  assert.deepEqual(interrupted.patterns,[],
+    'Malformed middle tick breaks a repeated-association pattern');
+}
 console.log('World supply evidence tests: PASS');
