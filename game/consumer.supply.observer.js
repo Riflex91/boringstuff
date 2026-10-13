@@ -148,7 +148,23 @@ function haulerReplacementHorizon(creep) {
   return parts.length * spawnTime + 3;
 }
 
-function sampleRoomCreeps(game, room) {
+// Observing a short TTL does not mean the live spawn policy permits
+// prespawn. Mirror only its bounded eligibility gates, without selecting
+// or requesting any creep action. Missing model fields remain UNKNOWN.
+function haulerPrespawnPolicyEligible(state) {
+  const m = state && state.economyModel;
+  if (!state || !Number.isSafeInteger(state.rcl) ||
+      typeof state.emergency !== 'boolean' ||
+      !Array.isArray(state.sources) || !m ||
+      !Number.isSafeInteger(m.sourceContainersReady) ||
+      !Number.isSafeInteger(m.recommendedHaulerCount)) return null;
+  return state.rcl >= 2 && !state.emergency &&
+    state.sources.length > 0 &&
+    m.sourceContainersReady === state.sources.length &&
+    m.recommendedHaulerCount >= 2;
+}
+
+function sampleRoomCreeps(game, room, state = null) {
   const items = Object.values(game.creeps || {});
   const summary = {
     phase: 'AFTER_CREEP_INTENTS_BEFORE_RESOLUTION',
@@ -157,7 +173,9 @@ function sampleRoomCreeps(game, room) {
       readyByGuardRule: 0, zeroEnergy: 0, totalCarriedEnergy: 0,
       capacityUnknown: 0, collectingEmpty: 0, collectingPartialBelowThreshold: 0,
       knownTtl: 0, unknownTtl: 0, withinSpawnHorizon: 0,
-      minimumKnownTtl: null, spawnHorizonTicks: null },
+      minimumKnownTtl: null, spawnHorizonTicks: null,
+      prespawnPolicyEligible: haulerPrespawnPolicyEligible(state),
+      eligibleExpiringHaulers: null },
     consumers: { live: 0, waiting: 0, fallback: 0, critical: 0, empty: 0 },
     reservationCoverage: null
   };
@@ -212,6 +230,12 @@ function sampleRoomCreeps(game, room) {
       if (energyAmount(creep) <= 0) c.empty++;
     }
   }
+  // Count only short-TTL haulers for which the current spawn-manager policy
+  // actually allows early replacement. Null means policy state unavailable.
+  const h = summary.haulers;
+  h.eligibleExpiringHaulers = h.prespawnPolicyEligible === null ||
+    (h.prespawnPolicyEligible && h.live > 0 && h.spawnHorizonTicks === null)
+    ? null : h.prespawnPolicyEligible ? h.withinSpawnHorizon : 0;
   summary.reservationCoverage = snapshotReservationCoverage(criticalConsumers, liveHaulers);
   return summary;
 }
@@ -228,7 +252,8 @@ function flush(states, logger, game) {
   let emitted = 0;
   for (const room of rooms) {
     if (!eligible(g)) break;
-    const read = sampleRoomCreeps(g, room);
+    const state = states.find(s => s && s.room && s.room.name === room);
+    const read = sampleRoomCreeps(g, room, state);
     if (read.truncated) continue;
     const records = perRoom[room] || {
       guardChecks: 0, guardSelected: 0, selectedHaulers: {},
@@ -263,5 +288,5 @@ module.exports = {
   flush,
   _test: { sampled, eligible, sampleRoomCreeps, haulerReadiness,
     reset, getRoomCounters, snapshotReservationCoverage,
-    haulerReplacementHorizon }
+    haulerReplacementHorizon, haulerPrespawnPolicyEligible }
 };

@@ -145,4 +145,54 @@ assert.deepEqual(result.criticalGapLifetimeStates,[]);
     assert.deepEqual(invalid.criticalGapLifetimeStates,[]);
   }
 }
+// Optional policy eligibility is separate from geometric TTL proximity.
+// Historical entries without these fields keep their earlier schema.
+{
+  const policySample = (tick, policy = {}, state = {}) => {
+    const e=sample(tick);
+    e.x.haulers={
+      live:2,readyByGuardRule:1,energyPositive:1,zeroEnergy:1,
+      knownTtl:2,unknownTtl:0,withinSpawnHorizon:1,
+      minimumKnownTtl:29,spawnHorizonTicks:30,
+      prespawnPolicyEligible:true,eligibleExpiringHaulers:1,
+      ...policy,...state
+    };
+    return e;
+  };
+  const report=summarizeSupplyJournal({...bot,telemetryJournal:{
+    events:[
+      policySample(100),
+      policySample(125,{prespawnPolicyEligible:false,eligibleExpiringHaulers:0}),
+      policySample(150,{prespawnPolicyEligible:null,eligibleExpiringHaulers:null})
+    ]
+  }},id);
+  assert.equal(report.state,'OBSERVATIONS_AVAILABLE');
+  assert.equal(report.observedHaulerLifetimeSamples,3);
+  assert.deepEqual(report.haulerLifetimeStates.map(x=>[
+    x.prespawnPolicyEligible,x.eligibleExpiringHaulers
+  ]),[[true,1],[false,0],[null,null]]);
+  assert.equal(report.criticalGapLifetimeStates.length,3);
+  assert.equal(report.criticalGapLifetimeStates[0].eligibleExpiringHaulers,1);
+  const absentHorizon=summarizeSupplyJournal({...bot,telemetryJournal:{
+    events:[policySample(100,{eligibleExpiringHaulers:null},{
+      withinSpawnHorizon:0,spawnHorizonTicks:null})]
+  }},id);
+  assert.equal(absentHorizon.state,'OBSERVATIONS_AVAILABLE');
+  assert.equal(absentHorizon.haulerLifetimeStates[0].eligibleExpiringHaulers,null);
+  for(const overrides of [
+    {prespawnPolicyEligible:false,eligibleExpiringHaulers:1},
+    {prespawnPolicyEligible:true,eligibleExpiringHaulers:0},
+    {prespawnPolicyEligible:null,eligibleExpiringHaulers:0},
+    {prespawnPolicyEligible:true,eligibleExpiringHaulers:3},
+    {eligibleExpiringHaulers:undefined},
+    {prespawnPolicyEligible:'true'}
+  ]) {
+    const invalid=summarizeSupplyJournal({...bot,telemetryJournal:{
+      events:[policySample(100,overrides)]
+    }},id);
+    assert.equal(invalid.state,'REVIEW_REQUIRED');
+    assert.equal(invalid.invalidSamples,1);
+    assert.equal(invalid.observedHaulerLifetimeSamples,0);
+  }
+}
 console.log('World supply evidence tests: PASS');
