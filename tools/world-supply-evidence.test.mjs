@@ -33,6 +33,9 @@ assert.equal(result.observedHaulerLoadStateSamples,0);
 assert.deepEqual(result.haulerLoadStates,[]);
 assert.deepEqual(result.criticalGapLoadStates,[],
   'Historical samples without load-state counters cannot be correlated');
+assert.equal(result.observedHaulerLifetimeSamples,0);
+assert.deepEqual(result.haulerLifetimeStates,[]);
+assert.deepEqual(result.criticalGapLifetimeStates,[]);
 {
   const load = (tick, overrides={}) => {
     const e=sample(tick);
@@ -86,6 +89,60 @@ assert.deepEqual(result.criticalGapLoadStates,[],
     assert.equal(invalid.observedHaulerLoadStateSamples,0);
     assert.deepEqual(invalid.criticalGapLoadStates,[],
       'Invalid load-state counters must never appear in gap correlations');
+  }
+}
+// Life-cycle evidence must be tick-matched, complete and bounded. It is
+// strictly observational: a soon-expiring TTL is not a proven death reason.
+{
+  const lifetime = (tick, overrides={}) => {
+    const e=sample(tick);
+    e.x.haulers={live:2,readyByGuardRule:1,energyPositive:1,zeroEnergy:1,
+      knownTtl:2,unknownTtl:0,withinSpawnHorizon:1,
+      minimumKnownTtl:29,spawnHorizonTicks:30,...overrides};
+    return e;
+  };
+  const report=summarizeSupplyJournal({...bot,telemetryJournal:{
+    events:[lifetime(100),sample(125),lifetime(150)]
+  }},id);
+  assert.equal(report.state,'OBSERVATIONS_AVAILABLE');
+  assert.equal(report.observedHaulerLifetimeSamples,2);
+  assert.deepEqual(report.haulerLifetimeStates,[
+    {tick:100,live:2,knownTtl:2,unknownTtl:0,withinSpawnHorizon:1,
+      minimumKnownTtl:29,spawnHorizonTicks:30},
+    {tick:150,live:2,knownTtl:2,unknownTtl:0,withinSpawnHorizon:1,
+      minimumKnownTtl:29,spawnHorizonTicks:30}
+  ]);
+  assert.deepEqual(report.criticalGapLifetimeStates,[
+    {...report.haulerLifetimeStates[0],uncoveredCriticalCount:1,
+      reasonCodes:['NO_SPARE_GUARD_CAPACITY','CRITICAL_READY_COVERAGE_GAP']},
+    {...report.haulerLifetimeStates[1],uncoveredCriticalCount:1,
+      reasonCodes:['NO_SPARE_GUARD_CAPACITY','CRITICAL_READY_COVERAGE_GAP']}
+  ]);
+  const healthy=lifetime(125);
+  healthy.x.consumers={critical:0};
+  healthy.x.reservationCoverage=null;
+  const mixed=summarizeSupplyJournal({...bot,telemetryJournal:{
+    events:[lifetime(100),healthy,lifetime(150)]
+  }},id);
+  assert.equal(mixed.observedHaulerLifetimeSamples,3);
+  assert.deepEqual(mixed.criticalGapLifetimeStates,report.criticalGapLifetimeStates,
+    'healthy tick must not enter the critical-gap correlation');
+  for (const bad of [
+    {knownTtl:3},
+    {unknownTtl:-1},
+    {withinSpawnHorizon:3},
+    {minimumKnownTtl:null},
+    {spawnHorizonTicks:0},
+    {spawnHorizonTicks:null},
+    {minimumKnownTtl:40}
+  ]) {
+    const invalid=summarizeSupplyJournal({...bot,telemetryJournal:{
+      events:[lifetime(100,bad)]
+    }},id);
+    assert.equal(invalid.state,'REVIEW_REQUIRED');
+    assert.equal(invalid.invalidSamples,1);
+    assert.equal(invalid.observedHaulerLifetimeSamples,0);
+    assert.deepEqual(invalid.criticalGapLifetimeStates,[]);
   }
 }
 console.log('World supply evidence tests: PASS');
