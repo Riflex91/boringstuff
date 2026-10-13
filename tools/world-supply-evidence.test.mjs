@@ -247,4 +247,62 @@ assert.deepEqual(result.criticalGapLifetimeStates,[]);
   assert.deepEqual(interrupted.patterns,[],
     'Malformed middle tick breaks a repeated-association pattern');
 }
+// Explain why a modeled prespawn gate is closed without treating a short
+// TTL or an unknown economy field as proof of a missed spawn.
+{
+  const withBlockers = (tick, overrides = {}) => {
+    const e=sample(tick);
+    e.x.haulers={
+      live:2,readyByGuardRule:1,zeroEnergy:1,energyPositive:1,
+      knownTtl:2,unknownTtl:0,withinSpawnHorizon:0,
+      minimumKnownTtl:746,spawnHorizonTicks:30,
+      prespawnPolicyEligible:false,eligibleExpiringHaulers:0,
+      prespawnPolicyBlockers:['SOURCE_CONTAINER_COVERAGE_MISMATCH'],
+      ...overrides
+    };
+    return e;
+  };
+  const report=summarizeSupplyJournal({...bot,telemetryJournal:{
+    events:[
+      withBlockers(100),
+      withBlockers(125,{prespawnPolicyEligible:true,
+        prespawnPolicyBlockers:[]}),
+      withBlockers(150,{prespawnPolicyEligible:null,
+        eligibleExpiringHaulers:null,prespawnPolicyBlockers:null})
+    ]
+  }},id);
+  assert.equal(report.state,'OBSERVATIONS_AVAILABLE');
+  assert.equal(report.observedHaulerLifetimeSamples,3);
+  assert.deepEqual(report.haulerLifetimeStates.map(x =>
+    x.prespawnPolicyBlockers),[
+      ['SOURCE_CONTAINER_COVERAGE_MISMATCH'],[],null
+    ]);
+  assert.deepEqual(report.criticalGapLifetimeStates[0].prespawnPolicyBlockers,
+    ['SOURCE_CONTAINER_COVERAGE_MISMATCH']);
+  const multiple=summarizeSupplyJournal({...bot,telemetryJournal:{
+    events:[withBlockers(100,{prespawnPolicyBlockers:[
+      'SOURCE_CONTAINER_COVERAGE_MISMATCH',
+      'MODELED_HAULER_DEMAND_BELOW_TWO'
+    ]})]
+  }},id);
+  assert.equal(multiple.state,'OBSERVATIONS_AVAILABLE');
+  assert.equal(multiple.haulerLifetimeStates[0].prespawnPolicyBlockers.length,2);
+  for(const overrides of [
+    {prespawnPolicyEligible:true,prespawnPolicyBlockers:['COLONY_EMERGENCY']},
+    {prespawnPolicyBlockers:[]},
+    {prespawnPolicyBlockers:['INVENTED_REASON']},
+    {prespawnPolicyBlockers:['NO_SOURCES','NO_SOURCES']},
+    {prespawnPolicyBlockers:'SOURCE_CONTAINER_COVERAGE_MISMATCH'},
+    {prespawnPolicyEligible:null,eligibleExpiringHaulers:null,
+      prespawnPolicyBlockers:[]},
+    {prespawnPolicyBlockers:undefined}
+  ]) {
+    const invalid=summarizeSupplyJournal({...bot,telemetryJournal:{
+      events:[withBlockers(100,overrides)]
+    }},id);
+    assert.equal(invalid.state,'REVIEW_REQUIRED');
+    assert.equal(invalid.invalidSamples,1);
+    assert.equal(invalid.observedHaulerLifetimeSamples,0);
+  }
+}
 console.log('World supply evidence tests: PASS');
