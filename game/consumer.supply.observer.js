@@ -189,11 +189,25 @@ function haulerPrespawnPolicyEligible(state) {
   return blockers === null ? null : blockers.length === 0;
 }
 
+// RoomManager observes spawn/extension energy in the same game tick before
+// creep intents settle. Missing state or malformed capacity is UNKNOWN,
+// never treated as a refilled spawn or as zero available energy.
+function snapshotRoomEnergy(state) {
+  const available = state && state.energyAvailable;
+  const capacity = state && state.energyCapacityAvailable;
+  if (!Number.isSafeInteger(available) || available < 0 ||
+      !Number.isSafeInteger(capacity) || capacity <= 0 ||
+      available > capacity)
+    return {observed:false,available:null,capacity:null,full:null};
+  return {observed:true,available,capacity,full:available === capacity};
+}
+
 function sampleRoomCreeps(game, room, state = null) {
   const items = Object.values(game.creeps || {});
   const summary = {
     phase: 'AFTER_CREEP_INTENTS_BEFORE_RESOLUTION',
     sampledCreepCount: 0, truncated: false,
+    roomEnergy: snapshotRoomEnergy(state),
     haulers: { live: 0, energyPositive: 0, deliveringFlag: 0,
       readyByGuardRule: 0, zeroEnergy: 0, totalCarriedEnergy: 0,
       capacityUnknown: 0, collectingEmpty: 0, collectingPartialBelowThreshold: 0,
@@ -293,6 +307,7 @@ function flush(states, logger, game) {
     logger.info('CONSUMER_SUPPLY_DIAG', 'Post-hauler-intent supply observations', {
       room, phase: read.phase, sampledCreepCount: read.sampledCreepCount,
       haulers: read.haulers, consumers: read.consumers,
+      roomEnergy: read.roomEnergy,
       reservationCoverage: read.reservationCoverage,
       decisions: {
         guardChecks: records.guardChecks,
@@ -320,5 +335,5 @@ module.exports = {
   _test: { sampled, eligible, sampleRoomCreeps, haulerReadiness,
     reset, getRoomCounters, snapshotReservationCoverage,
     haulerReplacementHorizon, haulerPrespawnPolicyEligible,
-    haulerPrespawnPolicyBlockers }
+    haulerPrespawnPolicyBlockers, snapshotRoomEnergy }
 };
