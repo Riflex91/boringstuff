@@ -22,6 +22,7 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
   const ticks = new Set();
   const haulerLoadStates = [];
   const haulerLifetimeStates = [];
+  const haulerActionStates = [];
   let invalid = 0;
   for (const e of entries) {
     if (e?.c !== 'CONSUMER_SUPPLY_DIAG' || !Number.isSafeInteger(e.t) ||
@@ -116,6 +117,43 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
         } : {})
       };
     }
+    // The live observer already records attempts/return codes and guard
+    // selections. Preserve them as post-intent observations only, never
+    // infer end-of-tick receipts, transfers or missing decisions. Older
+    // releases lacking all three groups remain UNKNOWN, not zero attempts.
+    const actionKeys = ['decisions', 'consumerTransfers',
+      'infrastructureTransfers', 'haulerAcquisitions'];
+    const hasActions = actionKeys.some(key => Object.hasOwn(x, key));
+    let pendingActions = null;
+    if (hasActions) {
+      const goodInt = value => Number.isSafeInteger(value) && value >= 0;
+      const decisions = x.decisions;
+      const transferKinds = ['consumerTransfers',
+        'infrastructureTransfers', 'haulerAcquisitions'];
+      const validTransfer = row => row && ['attempted', 'accepted',
+        'notInRange', 'other'].every(key => goodInt(row[key])) &&
+        row.attempted === row.accepted + row.notInRange + row.other;
+      if (!decisions || !goodInt(h?.live) ||
+          !['guardChecks', 'guardSelected', 'uniqueGuardHaulers']
+            .every(key => goodInt(decisions[key])) ||
+          decisions.guardSelected > decisions.guardChecks ||
+          decisions.uniqueGuardHaulers > decisions.guardSelected ||
+          decisions.uniqueGuardHaulers > h.live ||
+          !transferKinds.every(key => validTransfer(x[key]))) {
+        malformedLoadState = true;
+      } else {
+        pendingActions = {
+          tick:e.t, live:h.live,
+          guardChecks:decisions.guardChecks,
+          guardSelected:decisions.guardSelected,
+          uniqueGuardHaulers:decisions.uniqueGuardHaulers,
+          consumerTransferIntents:{...x.consumerTransfers},
+          infrastructureTransferIntents:{...x.infrastructureTransfers},
+          haulerAcquisitionIntents:{...x.haulerAcquisitions},
+          settledDeliveryProof:false
+        };
+      }
+    }
     const sample = {tick: e.t, consumers: x.consumers, haulers: x.haulers,
       reservationCoverage: x.reservationCoverage};
     sample.triage = triageSupplySample(sample);
@@ -126,6 +164,7 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
     } else {
       if (pendingLoad) haulerLoadStates.push(pendingLoad);
       if (pendingLifetime) haulerLifetimeStates.push(pendingLifetime);
+      if (pendingActions) haulerActionStates.push(pendingActions);
       patternEligibleSamples.push(sample);
     }
     samples.push(sample);
@@ -133,6 +172,7 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
   samples.sort((a,b) => a.tick-b.tick);
   haulerLoadStates.sort((a,b) => a.tick-b.tick);
   haulerLifetimeStates.sort((a,b) => a.tick-b.tick);
+  haulerActionStates.sort((a,b) => a.tick-b.tick);
   // A journal is a bounded rolling buffer. Never interpret a missing tick as
   // healthy supply, and never call an incomplete series continuous evidence.
   const missingSampleTicks = [];
@@ -155,6 +195,15 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
       uncoveredCriticalCount: s.triage.uncoveredCriticalCount,
       reasonCodes: s.triage.reasonCodes
     }));
+  const actionByTick = new Map(haulerActionStates.map(s => [s.tick, s]));
+  const criticalGapActionStates = samples
+    .filter(s => s.triage.classification === 'CRITICAL_COVERAGE_GAP_OBSERVED' &&
+      actionByTick.has(s.tick))
+    .map(s => ({
+      ...actionByTick.get(s.tick),
+      uncoveredCriticalCount: s.triage.uncoveredCriticalCount,
+      reasonCodes: s.triage.reasonCodes
+    }));
   const lifetimeByTick = new Map(haulerLifetimeStates.map(s => [s.tick, s]));
   const criticalGapLifetimeStates = samples
     .filter(s => s.triage.classification === 'CRITICAL_COVERAGE_GAP_OBSERVED' &&
@@ -174,6 +223,9 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
     observedHaulerLoadStateSamples: haulerLoadStates.length,
     haulerLoadStates,
     criticalGapLoadStates,
+    observedHaulerActionSamples: haulerActionStates.length,
+    haulerActionStates,
+    criticalGapActionStates,
     observedHaulerLifetimeSamples: haulerLifetimeStates.length,
     haulerLifetimeStates,
     criticalGapLifetimeStates,
@@ -209,6 +261,9 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(new URL(im
     observedHaulerLoadStateSamples:report.observedHaulerLoadStateSamples,
     haulerLoadStates:report.haulerLoadStates,
     criticalGapLoadStates:report.criticalGapLoadStates,
+    observedHaulerActionSamples:report.observedHaulerActionSamples,
+    haulerActionStates:report.haulerActionStates,
+    criticalGapActionStates:report.criticalGapActionStates,
     observedHaulerLifetimeSamples:report.observedHaulerLifetimeSamples,
     haulerLifetimeStates:report.haulerLifetimeStates,
     criticalGapLifetimeStates:report.criticalGapLifetimeStates,
