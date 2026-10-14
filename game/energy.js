@@ -125,8 +125,11 @@ function acquireForHauler(creep) {
   if (tomb) {
     const rc = creep.withdraw(tomb, RESOURCE_ENERGY);
     consumerSupplyObserver.recordResult(creep, 'haulerAcquisition', rc);
-    if (rc === ERR_NOT_IN_RANGE) creep.moveTo(tomb, { reusePath: 8, maxOps: config.PATH_MAX_OPS });
-    return true;
+    if (rc === ERR_NOT_IN_RANGE) {
+      const moveRc = creep.moveTo(tomb, { reusePath: 8, maxOps: config.PATH_MAX_OPS });
+      return moveRc !== ERR_NO_PATH && moveRc !== ERR_INVALID_TARGET;
+    }
+    return rc !== ERR_NOT_ENOUGH_RESOURCES && rc !== ERR_INVALID_TARGET;
   }
   return false;
 }

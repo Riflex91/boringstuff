@@ -113,6 +113,7 @@ assert.deepEqual(calls, [['pickup', drop], ['withdraw', tomb]]);
 // tombstone only after a terminal outcome, never after an accepted intent.
 for (const code of [ERR_NOT_ENOUGH_RESOURCES, ERR_INVALID_TARGET]) {
   reset(); present.drop = false; withdrawRc = code;
+  tombWithdrawRc = OK;
   assert.equal(energy.acquireForHauler(carrier),true);
   assert.deepEqual(calls,[['withdraw',container],['withdraw',tomb]],
     'terminal source container withdrawal can retry a distinct energy source');
@@ -120,7 +121,8 @@ for (const code of [ERR_NOT_ENOUGH_RESOURCES, ERR_INVALID_TARGET]) {
 for (const code of [ERR_NO_PATH,ERR_INVALID_TARGET]) {
   reset(); present.drop = false;
   withdrawRc = ERR_NOT_IN_RANGE; moveRc = code;
-  assert.equal(energy.acquireForHauler(carrier),true);
+  assert.equal(energy.acquireForHauler(carrier),false,
+    'terminal alternate tombstone route must permit role-level repositioning');
   assert.deepEqual(calls,[
     ['withdraw',container],['move',container],
     ['withdraw',tomb],['move',tomb]
@@ -159,6 +161,33 @@ assert.equal(energy.acquireForHauler(carrier),true);
 assert.deepEqual(calls,[
   ['pickup',drop],['withdraw',container],['withdraw',tomb]
 ]);
+
+// The final tombstone candidate is not a successful collection when its
+// energy disappeared, the target became invalid, or routing is terminal.
+for (const code of [ERR_NOT_ENOUGH_RESOURCES, ERR_INVALID_TARGET]) {
+  reset();
+  present.drop = false; present.container = false;
+  tombWithdrawRc = code;
+  assert.equal(energy.acquireForHauler(carrier), false,
+    'terminal tombstone withdrawal allows role-level positioning fallback');
+  assert.deepEqual(calls, [['withdraw', tomb]]);
+}
+for (const code of [ERR_NO_PATH, ERR_INVALID_TARGET]) {
+  reset();
+  present.drop = false; present.container = false;
+  tombWithdrawRc = ERR_NOT_IN_RANGE; moveRc = code;
+  assert.equal(energy.acquireForHauler(carrier), false,
+    'terminal tombstone route permits role-level positioning fallback');
+  assert.deepEqual(calls, [['withdraw', tomb], ['move', tomb]]);
+}
+for (const code of [OK, ERR_BUSY]) {
+  reset();
+  present.drop = false; present.container = false;
+  tombWithdrawRc = ERR_NOT_IN_RANGE; moveRc = code;
+  assert.equal(energy.acquireForHauler(carrier), true,
+    'accepted or transient tombstone movement remains in progress');
+  assert.deepEqual(calls, [['withdraw', tomb], ['move', tomb]]);
+}
 
 // No viable resource: report false and let the established role-level
 // harvester/container positioning fallback run.
