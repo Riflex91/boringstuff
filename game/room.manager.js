@@ -303,4 +303,4 @@ function run(room, lowCpu) {
   return state;
 }
 
-module.exports = { run, _test: { status, shadowCpuHeadroom, safeModeDecision } };
+module.exports = { run, _test: { status, shadowCpuHeadroom, safeModeDecision, maybeSafeMode } };
