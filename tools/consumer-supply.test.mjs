@@ -30,6 +30,7 @@ global.ERR_FULL = -8;
 global.ERR_NO_PATH = -2;
 global.ERR_INVALID_TARGET = -7;
 global.ERR_BUSY = -4;
+global.ERR_TIRED = -11;
 
 const objects = new Map();
 global.Game = {
@@ -300,6 +301,15 @@ const energy = require('../game/energy.js');
   assert.equal(trapped.memory.consumerTargetId, starved.id);
   assert.equal(energy._test.selectConsumerTarget(backup, true), null,
     'a still viable sticky reservation remains exclusive');
+  // Fatigue can block movement for a tick; it is not a pathfinding failure
+  // and must not release a valid sticky assignment to a competing hauler.
+  rc = ERR_TIRED;
+  assert.equal(energy.deliverToConsumer(trapped, true), true);
+  assert.equal(trapped.memory.consumerTargetId, starved.id);
+  assert.equal(energy._test.selectConsumerTarget(backup, true), null,
+    'fatigued carrier keeps its claim until it can move again');
+  assert.equal(starved.store.energy, 0,
+    'temporary movement failure never proves settled delivery');
   rc = OK;
   assert.equal(energy.deliverToConsumer(trapped, true), true);
   assert.equal(trapped.memory.consumerTargetId, starved.id);
