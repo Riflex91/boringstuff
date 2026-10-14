@@ -295,7 +295,7 @@ function selectConsumerRescueHauler(room, haulers, ready, critical) {
     requests: urgent.filter(c => !haulers.some(other =>
       other.id !== h.id && other.memory &&
       other.memory.consumerTargetId === c.id &&
-      energyAmount(other) > 0))
+      haulerReadyToDeliver(other)))
   })).filter(x => x.requests.length);
   viable.sort((a, b) => {
     const sticky = x => x.requests.some(c => c.id === x.h.memory.consumerTargetId) ? 1 : 0;
