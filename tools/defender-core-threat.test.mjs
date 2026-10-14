@@ -53,6 +53,7 @@ moves=[];
 enemies=[dead,scout];
 role.run(creep);
 assert.deepEqual(attacks,[]);
+moves=[];
 enemies=[distantHealer,striker,scout,distantRanged];
 role.run(creep);
 assert.deepEqual(ordered,['striker','healer','ranged'],
