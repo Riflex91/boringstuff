@@ -649,6 +649,40 @@ assert.deepEqual(result.criticalGapRoomEnergyStates,[],
       JSON.stringify(badChoice));
     assert.equal(invalidChoice.observedHaulerActionSamples,0);
   }
+  // Accepted pickup/withdraw intents can occur in range without moveTo.
+  // Keep the accepted source histogram distinct from movement counters and
+  // unknown in journals that predate this extension.
+  const acceptedKinds={drop:0,container:1,tomb:0};
+  const acceptedEvent=make(250,{
+    haulerAcquisitions:{attempted:1,accepted:1,notInRange:0,other:0},
+    acceptedAcquisitionKinds:acceptedKinds
+  });
+  const acceptedReport=summarizeSupplyJournal({...bot,telemetryJournal:{
+    events:[acceptedEvent]
+  }},id);
+  assert.equal(acceptedReport.state,'OBSERVATIONS_AVAILABLE');
+  assert.deepEqual(acceptedReport.haulerActionStates[0].acceptedAcquisitionKinds,
+    acceptedKinds);
+  assert.equal(acceptedReport.haulerActionStates[0].settledDeliveryProof,false);
+  for(const invalidAccepted of [
+    {drop:1,container:1,tomb:0},
+    {drop:0,container:0,tomb:0},
+    {drop:0,container:0,tomb:2},
+    {drop:0,container:-1,tomb:2},
+    {drop:0,container:1.5,tomb:0},
+    {drop:1,container:0},
+    {drop:0,container:1,tomb:0,unexpected:1}
+  ]) {
+    const invalidReport=summarizeSupplyJournal({...bot,telemetryJournal:{
+      events:[make(250,{
+        haulerAcquisitions:{attempted:1,accepted:1,notInRange:0,other:0},
+        acceptedAcquisitionKinds:invalidAccepted
+      })]
+    }},id);
+    assert.equal(invalidReport.state,'REVIEW_REQUIRED',
+      JSON.stringify(invalidAccepted));
+    assert.equal(invalidReport.observedHaulerActionSamples,0);
+  }
   const historical=make(100);
   delete historical.x.consumerTravel;
   const older=summarizeSupplyJournal({...bot,telemetryJournal:{
