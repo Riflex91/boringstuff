@@ -32,6 +32,11 @@ function start(readiness,operation,budget,continuity,states,game,memory) {
      check.route.at(-1)!==check.candidateRoom)
     return reject('SPAWN_OR_MISSION_UNVERIFIED');
 
+  // Never issue a second spawn into an already committed mission. A
+  // previous CLAIMED room also requires explicit follow-up settlement.
+  if(['CLAIMING','CLAIMED'].includes(memory.bot.expansionClaim?.phase))
+    return reject('ACTIVE_EXPANSION_COMMITMENT');
+
   // Real engine constants, no guessed body pricing.
   if(typeof MOVE==='undefined' || typeof CLAIM==='undefined' ||
      typeof BODYPART_COST==='undefined' ||
@@ -53,11 +58,16 @@ function start(readiness,operation,budget,continuity,states,game,memory) {
   // itinerary to the post-spawn mission. No mission may be written before OK.
   const id='claim-'+check.parentRoom+'-'+check.candidateRoom+'-'+game.time;
   const name='clm-'+check.parentRoom+'-'+game.time;
-  const rc=spawn.spawnCreep(body,name,{memory:{
-    role:'claimer',home:check.parentRoom,
-    targetRoom:check.candidateRoom,
-    claimMissionId:id,born:game.time
-  }});
+  let rc;
+  try {
+    rc=spawn.spawnCreep(body,name,{memory:{
+      role:'claimer',home:check.parentRoom,
+      targetRoom:check.candidateRoom,
+      claimMissionId:id,born:game.time
+    }});
+  } catch (_) {
+    return reject('CLAIMER_SPAWN_EXCEPTION');
+  }
   if(rc!==OK)
     return {status:'SPAWN_REJECTED',reason:'CLAIMER_SPAWN_RC_'+String(rc),
       spawnIntentAccepted:false,missionId:null};
