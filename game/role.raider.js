@@ -23,25 +23,12 @@ function missionFor(creep,memory,game) {
      ['Invader','Source Keeper'].includes(m.aggressor) ||
      !Number.isSafeInteger(m.createdTick) || m.createdTick<0 ||
      !Number.isSafeInteger(tick) || tick<m.createdTick ||
-     tick-m.createdTick>900 ||
-     !Number.isSafeInteger(m.targetOwnerSeenTick) ||
-     m.targetOwnerSeenTick>tick ||
-     tick-m.targetOwnerSeenTick>150 ||
+     tick-m.createdTick>1500 ||
      !Array.isArray(m.route) || m.route.length<2 ||
      m.route.length>4 || m.route[0]!==m.parent ||
      m.route.at(-1)!==m.target ||
      new Set(m.route).size!==m.route.length ||
      m.route.some(x=>!ROOM.test(x)))
-    return null;
-  // The actual named player must previously have been seen entering OUR
-  // home room with live attack, ranged, dismantle or healer body parts.
-  // Counterattack missions cannot be fabricated against unrelated players.
-  const journal=memory?.bot?.combatAggressionEvidence;
-  if(journal?.schemaVersion!==1 || !Array.isArray(journal.records) ||
-     !journal.records.some(row=>row?.player===m.aggressor &&
-       row.room===m.parent && Number.isSafeInteger(row.tick) &&
-       Number.isSafeInteger(row.armedParts) && row.armedParts>0 &&
-       row.tick<=tick && tick-row.tick<=2000))
     return null;
   return m;
 }
@@ -94,7 +81,24 @@ function selectEnemy(creep,enemies,player) {
 function run(creep) {
   const m=missionFor(creep,Memory,Game);
   if(!m || !creep?.room || !creep.pos) return;
+  // Once the attack authorization expires, force withdrawal. RETREAT
+  // remains executable without fresh enemy intel: lost reconnaissance must
+  // never strand surviving troops behind enemy lines.
   if(m.phase==='RETREAT') {retreat(creep,m);return;}
+  const journal=Memory.bot?.combatAggressionEvidence;
+  const stillWitnessed=journal?.schemaVersion===1 &&
+    Array.isArray(journal.records) &&
+    journal.records.some(row=>row?.player===m.aggressor &&
+      row.room===m.parent && Number.isSafeInteger(row.tick) &&
+      Number.isSafeInteger(row.armedParts) && row.armedParts>0 &&
+      row.tick<=Game.time && Game.time-row.tick<=2000);
+  if(Game.time-m.createdTick>900 ||
+     !Number.isSafeInteger(m.targetOwnerSeenTick) ||
+     m.targetOwnerSeenTick>Game.time ||
+     Game.time-m.targetOwnerSeenTick>150 || !stillWitnessed) {
+    recall(m,'RAID_AUTHORIZATION_EXPIRED');
+    retreat(creep,m);return;
+  }
   const parent=Game.rooms?.[m.parent];
   const homeHostiles=hostileCreeps(parent);
   if(!parent?.controller?.my ||
