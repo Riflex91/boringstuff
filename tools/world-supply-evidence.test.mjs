@@ -624,6 +624,31 @@ assert.deepEqual(result.criticalGapRoomEnergyStates,[],
   }},id);
   assert.equal(rejected.invalidSamples,1,
     'acquisition movement attempts cannot outnumber out-of-range pickups');
+  // Override opportunity is a decision, not a verified local withdrawal.
+  const localChoice={evaluated:2,preferredLocalContainer:1,noLocalContainer:1};
+  const choiceEvent=make(225,{longDropChoice:localChoice});
+  const choiceReport=summarizeSupplyJournal({...bot,telemetryJournal:{
+    events:[choiceEvent]
+  }},id);
+  assert.equal(choiceReport.state,'OBSERVATIONS_AVAILABLE');
+  assert.deepEqual(choiceReport.haulerActionStates[0].longDropChoice,localChoice);
+  assert.equal(choiceReport.haulerActionStates[0].settledDeliveryProof,false);
+  for (const badChoice of [
+    {evaluated:2,preferredLocalContainer:0,noLocalContainer:1},
+    {evaluated:2,preferredLocalContainer:2,noLocalContainer:1},
+    {evaluated:4,preferredLocalContainer:3,noLocalContainer:1},
+    {evaluated:1,preferredLocalContainer:-1,noLocalContainer:2},
+    {evaluated:1.5,preferredLocalContainer:1,noLocalContainer:0.5},
+    {evaluated:1,preferredLocalContainer:1},
+    {...localChoice,untrusted:1}
+  ]) {
+    const invalidChoice=summarizeSupplyJournal({...bot,telemetryJournal:{
+      events:[make(225,{longDropChoice:badChoice})]
+    }},id);
+    assert.equal(invalidChoice.state,'REVIEW_REQUIRED',
+      JSON.stringify(badChoice));
+    assert.equal(invalidChoice.observedHaulerActionSamples,0);
+  }
   const historical=make(100);
   delete historical.x.consumerTravel;
   const older=summarizeSupplyJournal({...bot,telemetryJournal:{

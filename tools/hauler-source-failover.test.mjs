@@ -328,6 +328,30 @@ for (const code of [OK, ERR_BUSY]) {
     assert.equal(snapshots.at(-1).haulerAcquisitions.notInRange, 1);
     assert.equal(snapshots.at(-1).acceptedIsIntentNotSettled, true);
   }
+  // Real selector: distinguish eligible local-source preference from the
+  // ordinary fallback route even when no movement was necessary.
+  const originalEnergy = container.store.energy;
+  for (const scenario of [
+    {tick:2075,energy:250,dropRange:12,preferred:1,noLocal:0,action:'withdraw'},
+    {tick:2100,energy:80,dropRange:12,preferred:0,noLocal:1,action:'pickup'},
+    {tick:2125,energy:250,dropRange:5,preferred:0,noLocal:0,action:'pickup'}
+  ]) {
+    reset();
+    global.Game.time=scenario.tick;
+    container.store.energy=scenario.energy;
+    carrier.pos={...previousPos,getRangeTo(target) {
+      return target === drop ? scenario.dropRange : target === container ? 2 : 4;
+    }};
+    energy.acquireForHauler(carrier);
+    assert.equal(calls[0][0],scenario.action);
+    assert.equal(observer.flush([{room}],logger,global.Game),1);
+    assert.deepEqual(snapshots.at(-1).longDropChoice,{
+      evaluated:scenario.preferred+scenario.noLocal,
+      preferredLocalContainer:scenario.preferred,
+      noLocalContainer:scenario.noLocal
+    },'only a strictly distant drop counts as a choice opportunity');
+  }
+  container.store.energy=originalEnergy;
   carrier.pos = previousPos;
   global.Game = previousGame;
 }

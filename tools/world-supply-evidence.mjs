@@ -123,7 +123,8 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
     // infer end-of-tick receipts, transfers or missing decisions. Older
     // releases lacking all three groups remain UNKNOWN, not zero attempts.
     const actionKeys = ['decisions', 'consumerTransfers',
-      'infrastructureTransfers', 'haulerAcquisitions', 'consumerTravel', 'acquisitionTravel'];
+      'infrastructureTransfers', 'haulerAcquisitions', 'consumerTravel', 'acquisitionTravel',
+      'longDropChoice'];
     const hasActions = actionKeys.some(key => Object.hasOwn(x, key));
     let pendingActions = null;
     if (hasActions) {
@@ -192,6 +193,19 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
           acquisitionTravel.moveTemporarilyBlocked +
           acquisitionTravel.moveOther === acquisitionTravel.moveAttempts
       );
+      const hasLongDropChoice = Object.hasOwn(x,'longDropChoice');
+      const longDropChoice = x.longDropChoice;
+      const choiceKeys = ['evaluated','preferredLocalContainer','noLocalContainer'];
+      const validLongDropChoice = !hasLongDropChoice || (
+        longDropChoice && typeof longDropChoice === 'object' &&
+        !Array.isArray(longDropChoice) &&
+        Object.keys(longDropChoice).length === choiceKeys.length &&
+        choiceKeys.every(key => Object.hasOwn(longDropChoice,key) &&
+          goodInt(longDropChoice[key])) &&
+        longDropChoice.evaluated === longDropChoice.preferredLocalContainer +
+          longDropChoice.noLocalContainer &&
+        longDropChoice.evaluated <= h?.live
+      );
       if (!decisions || !goodInt(h?.live) ||
           !['guardChecks', 'guardSelected', 'uniqueGuardHaulers']
             .every(key => goodInt(decisions[key])) ||
@@ -199,6 +213,7 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
           decisions.uniqueGuardHaulers > decisions.guardSelected ||
           decisions.uniqueGuardHaulers > h.live ||
           !validRescue || !validTravel || !validAcquisitionTravel ||
+          !validLongDropChoice ||
           !transferKinds.every(key => validTransfer(x[key]))) {
         malformedLoadState = true;
       } else {
@@ -217,6 +232,7 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
           haulerAcquisitionIntents:{...x.haulerAcquisitions},
           ...(hasTravel ? {consumerTravel:{...travel}} : {}),
           ...(hasAcquisitionTravel ? {acquisitionTravel:{...acquisitionTravel}} : {}),
+          ...(hasLongDropChoice ? {longDropChoice:{...longDropChoice}} : {}),
           settledDeliveryProof:false
         };
       }
