@@ -42,6 +42,16 @@ function assess(state) {
       state.economyModel.haulerCarryDeficit > 0)
     return {...base,reason:'PARENT_NOT_STABLE'};
 
+  // U8 safety: a parent that recently needed emergency protection must
+  // complete a fresh consecutive support window after protection and
+  // cooldown end, even if today's economy/creeps look temporarily healthy.
+  // This advisory never activates safe mode or issues expansion intents.
+  const controller = state.room.controller;
+  if ((Number.isFinite(controller.safeMode) && controller.safeMode > 0) ||
+      (Number.isFinite(controller.safeModeCooldown) &&
+       controller.safeModeCooldown > 0))
+    return {...base,reason:'PARENT_DEFENSE_RECOVERY_INCOMPLETE'};
+
   const capacity = state.energyCapacityAvailable;
   const stored = state.energyStored;
   if (!validEnergy(capacity) || capacity < 650)
