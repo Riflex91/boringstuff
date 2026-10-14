@@ -553,6 +553,32 @@ assert.deepEqual(result.criticalGapRoomEnergyStates,[],
     moveInvalidTarget:0,moveTemporarilyBlocked:0,moveOther:0
   });
   assert.equal(report.criticalGapActionStates[0].settledDeliveryProof,false);
+  // Acquisition movement outcomes are intent diagnostics, not settled
+  // collected energy. Older journal events remain valid without this field.
+  const acquisitionTravel={
+    moveAttempts:1,rangeAtMost5:0,range6to10:1,rangeOver10:0,
+    rangeUnknown:0,moveAccepted:0,moveNoPath:1,
+    moveInvalidTarget:0,moveTemporarilyBlocked:0,moveOther:0
+  };
+  const acquisitionSample=make(175,{
+    haulerAcquisitions:{attempted:2,accepted:0,notInRange:1,other:1},
+    acquisitionTravel
+  });
+  const acquireReport=summarizeSupplyJournal({...bot,telemetryJournal:{
+    events:[acquisitionSample]
+  }},id);
+  assert.deepEqual(acquireReport.haulerActionStates[0].acquisitionTravel,
+    acquisitionTravel);
+  assert.equal(acquireReport.haulerActionStates[0].settledDeliveryProof,false);
+  const invalidAcquire=make(175,{
+    haulerAcquisitions:{attempted:1,accepted:1,notInRange:0,other:0},
+    acquisitionTravel
+  });
+  const rejected=summarizeSupplyJournal({...bot,telemetryJournal:{
+    events:[invalidAcquire]
+  }},id);
+  assert.equal(rejected.invalidSamples,1,
+    'acquisition movement attempts cannot outnumber out-of-range pickups');
   const historical=make(100);
   delete historical.x.consumerTravel;
   const older=summarizeSupplyJournal({...bot,telemetryJournal:{
