@@ -73,7 +73,8 @@ function hostileCreeps(room) {
 function selectEnemy(creep,enemies,player) {
   const candidates=enemies.filter(h=>h?.owner?.username===player &&
     h.pos && Array.isArray(h.body) &&
-    h.body.some(p=>p && p.hits>0));
+    h.body.some(p=>p && p.hits>0 &&
+      ['attack','ranged_attack','work','heal'].includes(p.type)));
   const weight=h=>{
     let heal=0,ranged=0,melee=0;
     for(const p of h.body) {
