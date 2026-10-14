@@ -51,6 +51,7 @@ function getRoomCounters(room, game) {
       consumer: { attempted: 0, accepted: 0, notInRange: 0, other: 0 },
       infrastructure: { attempted: 0, accepted: 0, notInRange: 0, other: 0 },
       haulerAcquisition: { attempted: 0, accepted: 0, notInRange: 0, other: 0 },
+      acceptedAcquisitionKinds: { drop:0, container:0, tomb:0 },
       consumerTravel: { moveAttempts:0, rangeAtMost5:0, range6to10:0,
         rangeOver10:0, rangeUnknown:0, moveAccepted:0,
         moveNoPath:0, moveInvalidTarget:0, moveTemporarilyBlocked:0,
@@ -94,6 +95,15 @@ function recordResult(creep, kind, rc) {
   if (rc === OK) target.accepted++;
   else if (rc === ERR_NOT_IN_RANGE) target.notInRange++;
   else target.other++;
+}
+// This is a positive engine RETURN CODE, not end-of-tick settled energy.
+// Every successful acquisition stops later fallback acquisition intents.
+function recordHaulerAcquisition(creep, kind, rc) {
+  recordResult(creep, 'haulerAcquisition', rc);
+  if (rc !== OK || (kind !== 'drop' && kind !== 'container' &&
+                      kind !== 'tomb')) return;
+  const c = getRoomCounters(roomName(creep));
+  if (c) c.acceptedAcquisitionKinds[kind]++;
 }
 // Called exactly after the existing ERR_NOT_IN_RANGE -> moveTo branch.
 // Range is an inexpensive Chebyshev distance, NOT path length or ETA.
@@ -385,6 +395,7 @@ function flush(states, logger, game) {
       consumer: { attempted: 0, accepted: 0, notInRange: 0, other: 0 },
       infrastructure: { attempted: 0, accepted: 0, notInRange: 0, other: 0 },
       haulerAcquisition: { attempted: 0, accepted: 0, notInRange: 0, other: 0 },
+      acceptedAcquisitionKinds: { drop:0, container:0, tomb:0 },
       consumerTravel: { moveAttempts:0, rangeAtMost5:0, range6to10:0,
         rangeOver10:0, rangeUnknown:0, moveAccepted:0,
         moveNoPath:0, moveInvalidTarget:0, moveTemporarilyBlocked:0,
@@ -414,6 +425,7 @@ function flush(states, logger, game) {
       consumerTransfers: records.consumer,
       infrastructureTransfers: records.infrastructure,
       haulerAcquisitions: records.haulerAcquisition,
+      acceptedAcquisitionKinds: records.acceptedAcquisitionKinds,
       consumerTravel: records.consumerTravel,
       acquisitionTravel: records.acquisitionTravel,
       longDropChoice: records.longDropChoice,
@@ -428,6 +440,7 @@ module.exports = {
   recordGuard,
   recordRescue,
   recordResult,
+  recordHaulerAcquisition,
   recordConsumerTravel,
   recordAcquisitionTravel,
   recordLongDropChoice,

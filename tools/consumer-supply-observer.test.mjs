@@ -71,6 +71,7 @@ observer.recordConsumerTravel(loaded, waiting, OK);
 observer.recordResult(loaded, 'consumer', -8);
 observer.recordResult(loaded, 'infrastructure', OK);
 observer.recordResult(collecting, 'haulerAcquisition', ERR_NOT_IN_RANGE);
+observer.recordHaulerAcquisition(loaded, 'container', OK);
 const locatedCollecting = { ...collecting, pos: { getRangeTo() { return 9; } } };
 observer.recordAcquisitionTravel(locatedCollecting, { id:'source' }, OK, 'drop');
 observer.recordAcquisitionTravel(locatedCollecting, { id:'source' }, ERR_NO_PATH, 'container');
@@ -129,7 +130,10 @@ assert.deepEqual(evt.ctx.consumerTravel,{
 assert.deepEqual(evt.ctx.infrastructureTransfers,
   { attempted: 1, accepted: 1, notInRange: 0, other: 0 });
 assert.deepEqual(evt.ctx.haulerAcquisitions,
-  { attempted: 1, accepted: 0, notInRange: 1, other: 0 });
+  { attempted: 2, accepted: 1, notInRange: 1, other: 0 });
+assert.deepEqual(evt.ctx.acceptedAcquisitionKinds,
+  { drop:0, container:1, tomb:0 },
+  'only OK returns count as accepted acquisition intents');
 assert.deepEqual(evt.ctx.acquisitionTravel, {
   moveAttempts: 2, rangeAtMost5: 0, range6to10: 2,
   rangeOver10: 0, rangeUnknown: 0, moveAccepted: 1,
@@ -204,6 +208,9 @@ g.cpu.getUsed = () => 10;
 assert.equal(observer.flush([state], logger, g), 1);
 assert.equal(eventRows[1].ctx.decisions.guardChecks, 1);
 assert.equal(eventRows[1].ctx.decisions.guardSelected, 1);
+assert.deepEqual(eventRows[1].ctx.acceptedAcquisitionKinds,
+  {drop:0,container:0,tomb:0},
+  'accepted pickup source histogram must reset on new sample');
 assert.equal(eventRows[1].ctx.longDropChoice.evaluated, 0,
   'long-drop choices must reset between sampled ticks');
 assert.equal(eventRows[1].ctx.acquisitionTravel.moveAttempts, 0,
@@ -281,6 +288,7 @@ try {
   observer.recordResult(loaded, 'consumer', OK);
   observer.recordLongDropChoice(collecting, true);
   observer.recordLongDropChoice(loaded, false);
+  observer.recordHaulerAcquisition(loaded,'drop',OK);
   assert.equal(observer.flush([state], actualLogger, g), 1);
 } finally {
   console.log = originalLog;
@@ -289,6 +297,9 @@ assert.equal(consoleLines.length, 1);
 const parsed = JSON.parse(consoleLines[0].replace(/^\[BOTLOG\]/, ''));
 assert.equal(parsed.code, 'CONSUMER_SUPPLY_DIAG');
 assert.equal(parsed.ctx.consumerTransfers.accepted, 1);
+assert.deepEqual(parsed.ctx.acceptedAcquisitionKinds,
+  {drop:1,container:0,tomb:0},
+  'serialised diagnostics retain pickup source attribution');
 assert.equal(parsed.ctx.haulers.readyByGuardRule, 1);
 assert.equal(parsed.ctx.haulers.collectingPartialBelowThreshold, 1);
 assert.deepEqual(parsed.ctx.longDropChoice,
@@ -302,6 +313,9 @@ assert.equal(JSON.stringify(parsed.ctx).includes('loaded'), false,
 const stored = telemetryJournal.recent(1)[0];
 assert.equal(stored.c, 'CONSUMER_SUPPLY_DIAG');
 assert.equal(stored.x.consumerTransfers.accepted, 1);
+assert.deepEqual(stored.x.acceptedAcquisitionKinds,
+  {drop:1,container:0,tomb:0},
+  'durable journal retains accepted pickup source attribution');
 assert.equal(stored.x.haulers.readyByGuardRule, 1);
 assert.equal(stored.x.haulers.collectingPartialBelowThreshold, 1);
 assert.deepEqual(stored.x.longDropChoice,

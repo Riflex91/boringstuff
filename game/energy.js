@@ -114,7 +114,7 @@ function acquireForHauler(creep) {
   let preferredContainerFailed = false;
   if (preferredContainer) {
     const rc = creep.withdraw(preferredContainer, RESOURCE_ENERGY);
-    consumerSupplyObserver.recordResult(creep, 'haulerAcquisition', rc);
+    consumerSupplyObserver.recordHaulerAcquisition(creep, 'container', rc);
     if (rc === ERR_NOT_IN_RANGE) {
       const moveRc = creep.moveTo(preferredContainer, {
         reusePath: 8, maxOps: config.PATH_MAX_OPS,
@@ -132,7 +132,7 @@ function acquireForHauler(creep) {
   }
   if (dropped) {
     const rc = creep.pickup(dropped);
-    consumerSupplyObserver.recordResult(creep, 'haulerAcquisition', rc);
+    consumerSupplyObserver.recordHaulerAcquisition(creep, 'drop', rc);
     if (rc === ERR_NOT_IN_RANGE) {
       const moveRc = creep.moveTo(dropped, {
         reusePath: 8, maxOps: config.PATH_MAX_OPS,
@@ -157,7 +157,7 @@ function acquireForHauler(creep) {
   const container = creep.pos.findClosestByPath(containers, { maxOps: config.PATH_MAX_OPS });
   if (container) {
     const rc = creep.withdraw(container, RESOURCE_ENERGY);
-    consumerSupplyObserver.recordResult(creep, 'haulerAcquisition', rc);
+    consumerSupplyObserver.recordHaulerAcquisition(creep, 'container', rc);
     if (rc === ERR_NOT_IN_RANGE) {
       const moveRc = creep.moveTo(container, {
         reusePath: 8, maxOps: config.PATH_MAX_OPS,
@@ -179,7 +179,7 @@ function acquireForHauler(creep) {
   const tomb = creep.pos.findClosestByPath(FIND_TOMBSTONES, { maxOps: config.PATH_MAX_OPS, filter: t => (t.store[RESOURCE_ENERGY] || 0) > 0 });
   if (tomb) {
     const rc = creep.withdraw(tomb, RESOURCE_ENERGY);
-    consumerSupplyObserver.recordResult(creep, 'haulerAcquisition', rc);
+    consumerSupplyObserver.recordHaulerAcquisition(creep, 'tomb', rc);
     if (rc === ERR_NOT_IN_RANGE) {
       const moveRc = creep.moveTo(tomb, { reusePath: 8, maxOps: config.PATH_MAX_OPS });
       consumerSupplyObserver.recordAcquisitionTravel(creep, tomb, moveRc, 'tomb');
