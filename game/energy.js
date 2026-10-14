@@ -73,11 +73,61 @@ function acquire(creep, allowHarvest) {
   return false;
 }
 
+// Only override a distant dropped-energy trip when a source container
+// nearby can supply at least half a normal load (minimum 100 energy).
+// Compare cheap tile ranges, not an additional expensive path search.
+// This is a bounded optimization: if the preferred container is stale or
+// unreachable, regular drop/alternate-source failover still applies.
+function nearbyFundedSourceContainer(creep, dropped) {
+  if (!dropped || !creep || !creep.pos ||
+      typeof creep.pos.getRangeTo !== 'function') return null;
+  const dropRange = creep.pos.getRangeTo(dropped);
+  if (!Number.isSafeInteger(dropRange) || dropRange <= 10) return null;
+  const store = creep.store;
+  const capacity = store && typeof store.getCapacity === 'function'
+    ? Number(store.getCapacity(RESOURCE_ENERGY)) : 0;
+  const minimum = Math.max(100,
+    Number.isFinite(capacity) && capacity > 0 ? Math.floor(capacity * 0.5) : 0);
+  const containers = creep.room.find(FIND_STRUCTURES, {
+    filter: s => energyAmount(s) >= minimum && isSourceContainer(creep.room,s)
+  });
+  let chosen = null;
+  let nearest = 6;
+  for (const candidate of containers) {
+    const range = creep.pos.getRangeTo(candidate);
+    if (Number.isSafeInteger(range) && range < nearest) {
+      chosen = candidate;
+      nearest = range;
+    }
+  }
+  return chosen;
+}
+
 function acquireForHauler(creep) {
   const dropped = creep.pos.findClosestByPath(FIND_DROPPED_RESOURCES, {
     maxOps: config.PATH_MAX_OPS,
     filter: r => r.resourceType === RESOURCE_ENERGY && r.amount > 0
   });
+  const preferredContainer = nearbyFundedSourceContainer(creep, dropped);
+  let preferredContainerFailed = false;
+  if (preferredContainer) {
+    const rc = creep.withdraw(preferredContainer, RESOURCE_ENERGY);
+    consumerSupplyObserver.recordResult(creep, 'haulerAcquisition', rc);
+    if (rc === ERR_NOT_IN_RANGE) {
+      const moveRc = creep.moveTo(preferredContainer, {
+        reusePath: 8, maxOps: config.PATH_MAX_OPS,
+        visualizePathStyle: { stroke: '#ffaa00' }
+      });
+      consumerSupplyObserver.recordAcquisitionTravel(
+        creep, preferredContainer, moveRc, 'container');
+      if (moveRc !== ERR_NO_PATH && moveRc !== ERR_INVALID_TARGET)
+        return true;
+    } else if (rc !== ERR_NOT_ENOUGH_RESOURCES &&
+               rc !== ERR_INVALID_TARGET) {
+      return true;
+    }
+    preferredContainerFailed = true;
+  }
   if (dropped) {
     const rc = creep.pickup(dropped);
     consumerSupplyObserver.recordResult(creep, 'haulerAcquisition', rc);
@@ -99,7 +149,8 @@ function acquireForHauler(creep) {
   }
 
   const containers = creep.room.find(FIND_STRUCTURES, {
-    filter: s => isSourceContainer(creep.room, s) && energyAmount(s) > 0
+    filter: s => (!preferredContainerFailed || s !== preferredContainer) &&
+      isSourceContainer(creep.room, s) && energyAmount(s) > 0
   });
   const container = creep.pos.findClosestByPath(containers, { maxOps: config.PATH_MAX_OPS });
   if (container) {
