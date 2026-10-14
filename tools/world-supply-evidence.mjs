@@ -123,7 +123,7 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
     // infer end-of-tick receipts, transfers or missing decisions. Older
     // releases lacking all three groups remain UNKNOWN, not zero attempts.
     const actionKeys = ['decisions', 'consumerTransfers',
-      'infrastructureTransfers', 'haulerAcquisitions', 'consumerTravel'];
+      'infrastructureTransfers', 'haulerAcquisitions', 'consumerTravel', 'acquisitionTravel'];
     const hasActions = actionKeys.some(key => Object.hasOwn(x, key));
     let pendingActions = null;
     if (hasActions) {
@@ -145,6 +145,8 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
         row.attempted === row.accepted + row.notInRange + row.other;
       const travel = x.consumerTravel;
       const hasTravel = Object.hasOwn(x,'consumerTravel');
+      const acquisitionTravel = x.acquisitionTravel;
+      const hasAcquisitionTravel = Object.hasOwn(x,'acquisitionTravel');
       const travelKeys = ['moveAttempts','rangeAtMost5','range6to10',
         'rangeOver10','rangeUnknown','moveAccepted','moveNoPath',
         'moveInvalidTarget','moveTemporarilyBlocked','moveOther'];
@@ -160,13 +162,28 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
           travel.moveTemporarilyBlocked + travel.moveOther ===
           travel.moveAttempts
       );
+      const validAcquisitionTravel = !hasAcquisitionTravel || (
+        acquisitionTravel && typeof acquisitionTravel === 'object' &&
+        !Array.isArray(acquisitionTravel) &&
+        Object.keys(acquisitionTravel).length === travelKeys.length &&
+        travelKeys.every(key => Object.hasOwn(acquisitionTravel,key) &&
+          goodInt(acquisitionTravel[key])) &&
+        acquisitionTravel.moveAttempts <= x.haulerAcquisitions?.notInRange &&
+        acquisitionTravel.rangeAtMost5 + acquisitionTravel.range6to10 +
+          acquisitionTravel.rangeOver10 + acquisitionTravel.rangeUnknown ===
+          acquisitionTravel.moveAttempts &&
+        acquisitionTravel.moveAccepted + acquisitionTravel.moveNoPath +
+          acquisitionTravel.moveInvalidTarget +
+          acquisitionTravel.moveTemporarilyBlocked +
+          acquisitionTravel.moveOther === acquisitionTravel.moveAttempts
+      );
       if (!decisions || !goodInt(h?.live) ||
           !['guardChecks', 'guardSelected', 'uniqueGuardHaulers']
             .every(key => goodInt(decisions[key])) ||
           decisions.guardSelected > decisions.guardChecks ||
           decisions.uniqueGuardHaulers > decisions.guardSelected ||
           decisions.uniqueGuardHaulers > h.live ||
-          !validRescue || !validTravel ||
+          !validRescue || !validTravel || !validAcquisitionTravel ||
           !transferKinds.every(key => validTransfer(x[key]))) {
         malformedLoadState = true;
       } else {
@@ -184,6 +201,7 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
           infrastructureTransferIntents:{...x.infrastructureTransfers},
           haulerAcquisitionIntents:{...x.haulerAcquisitions},
           ...(hasTravel ? {consumerTravel:{...travel}} : {}),
+          ...(hasAcquisitionTravel ? {acquisitionTravel:{...acquisitionTravel}} : {}),
           settledDeliveryProof:false
         };
       }
