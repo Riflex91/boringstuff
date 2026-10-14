@@ -101,6 +101,7 @@ function nearbyFundedSourceContainer(creep, dropped) {
       nearest = range;
     }
   }
+  consumerSupplyObserver.recordLongDropChoice(creep, !!chosen);
   return chosen;
 }
 
