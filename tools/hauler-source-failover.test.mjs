@@ -237,6 +237,30 @@ for (const code of [OK, ERR_BUSY]) {
     'poorly funded source container cannot displace distant drop');
 
   reset();
+  carrier.pos = { ...originalPos, getRangeTo(target) {
+    return target === drop ? 10 : target === container ? 5 : 4;
+  } };
+  assert.equal(energy.acquireForHauler(carrier),true);
+  assert.deepEqual(calls,[['pickup',drop]],
+    '10-tile drop remains inside strict original drop-first boundary');
+
+  reset();
+  carrier.pos = { ...originalPos, getRangeTo(target) {
+    return target === drop ? 11 : target === container ? 5 : 4;
+  } };
+  assert.equal(energy.acquireForHauler(carrier),true);
+  assert.deepEqual(calls,[['withdraw',container]],
+    '11-tile drop with source container exactly 5 tiles away qualifies');
+
+  reset();
+  carrier.pos = { ...originalPos, getRangeTo(target) {
+    return target === drop ? 11 : target === container ? 6 : 4;
+  } };
+  assert.equal(energy.acquireForHauler(carrier),true);
+  assert.deepEqual(calls,[['pickup',drop]],
+    'source container at 6 tiles cannot override even a distant drop');
+
+  reset();
   container.store.energy=250;
   carrier.store.getCapacity=()=>700;
   assert.equal(energy.acquireForHauler(carrier),true);
