@@ -139,7 +139,7 @@ function bodyFor(role, energy, state) {
     case 'harvester': return body.harvester(energy, state.economyModel && state.economyModel.sourceContainersReady === state.sources.length);
     case 'hauler': return body.hauler(energy);
     case 'upgrader': return body.upgrader(energy);
-    case 'defender': return body.defender(energy);
+    case 'defender': return body.defender(energy, state.hostileCreeps);
     case 'scout': return body.scout();
     default: return body.worker(energy, state.emergency);
   }
