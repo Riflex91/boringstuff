@@ -162,4 +162,28 @@ for(const forbidden of ['.claimController(','.spawnCreep(',
   assert.equal(claimLaunchAuditSource.includes(forbidden),false,
     'launcher AUDIT may not issue a gameplay intent: '+forbidden);
 
+// I4 staged execution wiring is present but fail-closed in actual config.
+const safeConfig=fs.readFileSync(path.resolve(here,'../game/config.js'),'utf8');
+assert.match(safeConfig,/AUTO_EXPANSION_CLAIM:\s*false\s*,/,
+  'automatic claim must stay OFF until dedicated live release');
+assert.match(safeConfig,/AUTO_EXPANSION_BOOTSTRAP:\s*false\s*,/,
+  'pioneer production must stay OFF until post-claim bootstrap proof');
+assert.match(mainSource,
+  /const\s+expansionClaimLaunchExecutor\s*=\s*require\(['"]expansion\.claim\.launch\.executor['"]\)/,
+  'main imports only the existing exact-identity protected launcher');
+assert.match(mainSource,
+  /const\s+expansionPioneerProvisioner\s*=\s*require\(['"]expansion\.pioneer\.provisioner['"]\)/,
+  'main imports the bounded pioneer order gate');
+assert.match(mainSource,
+  /if\s*\(config\.AUTO_EXPANSION_CLAIM\s*===\s*true\)\s*\{[\s\S]*?expansionClaimLaunchExecutor\.start\(/,
+  'claim launch must be under explicit true flag, not merely a review candidate');
+assert.match(mainSource,
+  /if\s*\(config\.AUTO_EXPANSION_CLAIM\s*===\s*true\s*&&\s*config\.AUTO_EXPANSION_BOOTSTRAP\s*===\s*true\)\s*\{[\s\S]*?expansionPioneerProvisioner\.provision\(/,
+  'pioneer launch requires BOTH explicit claim and bootstrap flags');
+assert.match(mainSource,
+  /Memory\.bot\?\.expansionClaim\?\.phase\s*===\s*['"]CLAIMING['"][\s\S]*?expansionClaimLaunchExecutor\.supervise\(Game,Memory\)/,
+  'orphaned launch mission must be supervised on every game tick');
+assert.ok(mainSource.includes('    expansionClaimLaunch,') &&
+  mainSource.includes('    expansionPioneerProvision,'),
+  'status logs must distinguish disabled, blocked and accepted actions');
 console.log('main runtime wiring tests passed');
