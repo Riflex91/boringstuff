@@ -19,9 +19,15 @@ function provision(states,game,memory,continuity) {
   const tick=game?.time;
   const m=memory?.bot?.expansionClaim;
   if(!Number.isSafeInteger(tick) || !m || m.schemaVersion!==1 ||
-     m.phase!=='CLAIMED' || !ROOM.test(m.parent||'') ||
+     m.phase!=='CLAIMED' ||
+     !Number.isSafeInteger(m.createdTick) ||
+     m.createdTick<0 || m.createdTick>tick ||
+     typeof m.id!=='string' ||
+     m.id!==('claim-'+m.parent+'-'+m.target+'-'+m.createdTick) ||
+     !ROOM.test(m.parent||'') ||
      !ROOM.test(m.target||'') || m.parent===m.target ||
      !Number.isSafeInteger(m.confirmedTick) ||
+     m.confirmedTick<m.createdTick ||
      m.confirmedTick>tick || tick-m.confirmedTick>2000 ||
      !Array.isArray(m.route) || m.route.length<2 ||
      m.route.length>4 || m.route[0]!==m.parent ||
