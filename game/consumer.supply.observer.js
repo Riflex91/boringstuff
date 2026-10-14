@@ -58,7 +58,8 @@ function getRoomCounters(room, game) {
       acquisitionTravel: { moveAttempts:0, rangeAtMost5:0, range6to10:0,
         rangeOver10:0, rangeUnknown:0, moveAccepted:0,
         moveNoPath:0, moveInvalidTarget:0, moveTemporarilyBlocked:0,
-        moveOther:0, drop:0, container:0, tomb:0 }
+        moveOther:0, drop:0, container:0, tomb:0,
+        longDrop:0, longContainer:0, longTomb:0 }
     };
   }
   return perRoom[room];
@@ -139,7 +140,12 @@ function recordAcquisitionTravel(creep, target, moveRc, kind) {
   if (range === null) t.rangeUnknown++;
   else if (range <= 5) t.rangeAtMost5++;
   else if (range <= 10) t.range6to10++;
-  else t.rangeOver10++;
+  else {
+    t.rangeOver10++;
+    if (kind === 'drop') t.longDrop++;
+    else if (kind === 'container') t.longContainer++;
+    else if (kind === 'tomb') t.longTomb++;
+  }
   if (moveRc === OK) t.moveAccepted++;
   else if (typeof ERR_NO_PATH !== 'undefined' && moveRc === ERR_NO_PATH)
     t.moveNoPath++;
@@ -374,7 +380,8 @@ function flush(states, logger, game) {
       acquisitionTravel: { moveAttempts:0, rangeAtMost5:0, range6to10:0,
         rangeOver10:0, rangeUnknown:0, moveAccepted:0,
         moveNoPath:0, moveInvalidTarget:0, moveTemporarilyBlocked:0,
-        moveOther:0, drop:0, container:0, tomb:0 }
+        moveOther:0, drop:0, container:0, tomb:0,
+        longDrop:0, longContainer:0, longTomb:0 }
     };
     // The only output side effect is an ordinary, version-stamped,
     // journaled BOTLOG entry once per 25 ticks per owned room.
