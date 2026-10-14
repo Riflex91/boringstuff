@@ -58,7 +58,7 @@ function getRoomCounters(room, game) {
       acquisitionTravel: { moveAttempts:0, rangeAtMost5:0, range6to10:0,
         rangeOver10:0, rangeUnknown:0, moveAccepted:0,
         moveNoPath:0, moveInvalidTarget:0, moveTemporarilyBlocked:0,
-        moveOther:0 }
+        moveOther:0, drop:0, container:0, tomb:0 }
     };
   }
   return perRoom[room];
@@ -101,6 +101,7 @@ function recordConsumerTravel(creep, target, moveRc) {
   if (!c) return;
   const t = c.consumerTravel;
   t.moveAttempts++;
+  if (kind === 'drop' || kind === 'container' || kind === 'tomb') t[kind]++;
   let range = null;
   try {
     if (creep && creep.pos && typeof creep.pos.getRangeTo === 'function') {
@@ -125,7 +126,7 @@ function recordConsumerTravel(creep, target, moveRc) {
 
 // Acquisition travel is diagnostic only. An accepted move is an intent,
 // not a confirmed change of position or collected energy.
-function recordAcquisitionTravel(creep, target, moveRc) {
+function recordAcquisitionTravel(creep, target, moveRc, kind) {
   const c = getRoomCounters(roomName(creep));
   if (!c) return;
   const t = c.acquisitionTravel;
@@ -373,7 +374,7 @@ function flush(states, logger, game) {
       acquisitionTravel: { moveAttempts:0, rangeAtMost5:0, range6to10:0,
         rangeOver10:0, rangeUnknown:0, moveAccepted:0,
         moveNoPath:0, moveInvalidTarget:0, moveTemporarilyBlocked:0,
-        moveOther:0 }
+        moveOther:0, drop:0, container:0, tomb:0 }
     };
     // The only output side effect is an ordinary, version-stamped,
     // journaled BOTLOG entry once per 25 ticks per owned room.
