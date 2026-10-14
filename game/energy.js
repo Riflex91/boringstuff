@@ -89,7 +89,8 @@ function nearbyFundedSourceContainer(creep, dropped) {
   const minimum = Math.max(100,
     Number.isFinite(capacity) && capacity > 0 ? Math.floor(capacity * 0.5) : 0);
   const containers = creep.room.find(FIND_STRUCTURES, {
-    filter: s => energyAmount(s) >= minimum && isSourceContainer(creep.room,s)
+    filter: s => s.structureType === STRUCTURE_CONTAINER &&
+      energyAmount(s) >= minimum && isSourceContainer(creep.room,s)
   });
   let chosen = null;
   let nearest = 6;
