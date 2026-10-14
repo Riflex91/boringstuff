@@ -30,6 +30,8 @@ const defenseRequestsShadow = require('defense.requests.shadow');
 const defenseRegistryPreview = require('defense.registry.preview');
 const regionalDefenseShadow = require('defense.reinforcement.shadow');
 const defenseTransitEvidence = require('defense.transit.evidence');
+const combatAggressionEvidence = require('combat.aggression.evidence');
+const combatCounterattackShadow = require('combat.counterattack.shadow');
 
 function bootstrapMemory() {
   if (!Memory.bot) Memory.bot = { version: config.VERSION, born: Game.time };
@@ -164,6 +166,9 @@ function statusSnapshot(roomStates, tickCpu) {
     expansionParentStability,Game.time);
   const schedulerState = processScheduler.snapshot();
   const worldIntelState = worldIntel.snapshot();
+  const combatCounterattack = combatCounterattackShadow.evaluate(
+    roomStates, Memory.bot?.worldIntel?.rooms || {},
+    Memory.bot?.combatAggressionEvidence,Game);
   const transitEvidence = defenseTransitEvidence.snapshot(Game, Memory);
   // D2 is computed only for bounded snapshot evidence, never used by
   // legacy defense or spawn executors. No observed inter-room transit
@@ -235,6 +240,7 @@ function statusSnapshot(roomStates, tickCpu) {
     scheduler: schedulerState,
     worldIntel: worldIntelState,
     regionalDefense: regionalDefenseShadow.telemetrySummary(regionalDefense),
+    combatCounterattack,
     regionalTransit: transitEvidence.summary,
     memoryFootprint: memoryFootprintSnapshot(),
     rooms
@@ -312,6 +318,13 @@ module.exports.loop = function() {
         }
       });
     }, schedulerContext);
+
+    // Observe armed incursions by player for U11 shadow reconnaissance.
+    // This never grants combat authority or slows critical creep work.
+    if (!criticalCpu && roomStates.length) {
+      try { combatAggressionEvidence.observe(roomStates,Game,Memory); }
+      catch (_) { /* missing evidence means no counterattack candidate */ }
+    }
 
     // Low-cost, optional I4 parent continuity witness. Each healthy tick is
     // individually observed; a skipped/low-CPU tick breaks the next streak.
