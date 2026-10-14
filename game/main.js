@@ -17,6 +17,7 @@ const expansionReadinessShadow = require('expansion.readiness.shadow');
 const expansionCandidatesShadow = require('expansion.candidates.shadow');
 const expansionOperationShadow = require('expansion.operation.shadow');
 const expansionBootstrapBudgetShadow = require('expansion.bootstrap.budget.shadow');
+const expansionClaimLaunchPreflight = require('expansion.claim.launch.preflight');
 const expansionParentStabilityShadow = require('expansion.parent.stability.shadow');
 const serverProfile = require('server.profile');
 const processScheduler = require('process.scheduler');
@@ -162,6 +163,20 @@ function statusSnapshot(roomStates, tickCpu) {
   const expansionBootstrapBudget = expansionBootstrapBudgetShadow.assess(
     expansionReadiness,expansionOperation,expansionParent,
     expansionParentStability,Game.time);
+  // I4 final-readiness evidence is strictly observational and performed
+  // only at the status cadence (with its own 25-tick CPU/bucket guards).
+  // Never turn a positive result into permission to spawn or claim.
+  let expansionLaunchAudit;
+  try {
+    expansionLaunchAudit = expansionClaimLaunchPreflight.audit(
+      expansionReadiness,expansionOperation,expansionBootstrapBudget,
+      expansionParentStability,roomStates,Game,Memory);
+  } catch (_) {
+    expansionLaunchAudit = {status:'HOLD',
+      reason:'CLAIM_LAUNCH_AUDIT_EXCEPTION',actionAuthority:'NONE',
+      readyForAutonomousLaunch:false,spawnActionEnabled:false,
+      claimActionEnabled:false};
+  }
   const schedulerState = processScheduler.snapshot();
   const worldIntelState = worldIntel.snapshot();
   const transitEvidence = defenseTransitEvidence.snapshot(Game, Memory);
@@ -230,6 +245,7 @@ function statusSnapshot(roomStates, tickCpu) {
     expansionCandidates,
     expansionOperation,
     expansionBootstrapBudget,
+    expansionLaunchAudit,
     expansionParentStability,
     serverProfile: profile,
     scheduler: schedulerState,
