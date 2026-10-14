@@ -52,7 +52,31 @@ function upgrader(energy) {
   return worker(energy, false);
 }
 
-function defender(energy) {
+// D1: buy actual ranged capacity only when live hostile ranged parts
+// dominate in this room. Harmless scouts, disabled parts and unknown intel
+// never justify the more expensive template.
+function defender(energy, hostiles) {
+  let ranged=0, melee=0;
+  if(Array.isArray(hostiles)) {
+    for(const hostile of hostiles) {
+      if(!Array.isArray(hostile?.body))continue;
+      for(const part of hostile.body) {
+        if(!part || !(part.hits>0))continue;
+        if(part.type==='ranged_attack')ranged++;
+        if(part.type==='attack' || part.type==='work')melee++;
+      }
+    }
+  }
+  if(ranged>0 && ranged>=melee &&
+     typeof RANGED_ATTACK!=='undefined' &&
+     Number.isSafeInteger(BODYPART_COST[RANGED_ATTACK])) {
+    const pattern=[TOUGH,MOVE,RANGED_ATTACK,MOVE];
+    const cost=pattern.reduce((sum,p)=>sum+BODYPART_COST[p],0);
+    if(Number.isSafeInteger(cost) && cost>0 && energy>=cost) {
+      const body=repeatPattern(pattern,energy,20);
+      if(body.length)return body;
+    }
+  }
   if (energy >= 390) {
     const body = repeatPattern([TOUGH, MOVE, ATTACK, MOVE], energy, 20);
     if (body.length) return body;
