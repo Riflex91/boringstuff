@@ -71,9 +71,9 @@ observer.recordConsumerTravel(loaded, waiting, OK);
 observer.recordResult(loaded, 'consumer', -8);
 observer.recordResult(loaded, 'infrastructure', OK);
 observer.recordResult(collecting, 'haulerAcquisition', ERR_NOT_IN_RANGE);
-collecting.pos = { getRangeTo() { return 9; } };
-observer.recordAcquisitionTravel(collecting, { id:'source' }, OK);
-observer.recordAcquisitionTravel(collecting, { id:'source' }, -2);
+const locatedCollecting = { ...collecting, pos: { getRangeTo() { return 9; } } };
+observer.recordAcquisitionTravel(locatedCollecting, { id:'source' }, OK);
+observer.recordAcquisitionTravel(locatedCollecting, { id:'source' }, ERR_NO_PATH);
 
 assert.equal(observer.flush([state], logger, g), 1);
 assert.equal(eventRows.length, 1);
