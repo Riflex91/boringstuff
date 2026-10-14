@@ -279,6 +279,8 @@ const consoleLines = [];
 try {
   console.log = line => { consoleLines.push(line); };
   observer.recordResult(loaded, 'consumer', OK);
+  observer.recordLongDropChoice(collecting, true);
+  observer.recordLongDropChoice(loaded, false);
   assert.equal(observer.flush([state], actualLogger, g), 1);
 } finally {
   console.log = originalLog;
@@ -289,6 +291,9 @@ assert.equal(parsed.code, 'CONSUMER_SUPPLY_DIAG');
 assert.equal(parsed.ctx.consumerTransfers.accepted, 1);
 assert.equal(parsed.ctx.haulers.readyByGuardRule, 1);
 assert.equal(parsed.ctx.haulers.collectingPartialBelowThreshold, 1);
+assert.deepEqual(parsed.ctx.longDropChoice,
+  {evaluated:2,preferredLocalContainer:1,noLocalContainer:1},
+  'serialized BOTLOG must retain the observed override decisions');
 assert.equal(parsed.ctx.acceptedIsIntentNotSettled, true);
 assert.equal(parsed.jseq, 1);
 assert.equal(parsed.ctx.consumers.fallback, 1);
@@ -299,6 +304,9 @@ assert.equal(stored.c, 'CONSUMER_SUPPLY_DIAG');
 assert.equal(stored.x.consumerTransfers.accepted, 1);
 assert.equal(stored.x.haulers.readyByGuardRule, 1);
 assert.equal(stored.x.haulers.collectingPartialBelowThreshold, 1);
+assert.deepEqual(stored.x.longDropChoice,
+  {evaluated:2,preferredLocalContainer:1,noLocalContainer:1},
+  'durable telemetry journal must preserve the exact numeric choice counts');
 
 // Compare lifetime observation against the production hauler body size at
 // RCL2 550-energy capacity. No identifiers leave aggregate diagnostics.
