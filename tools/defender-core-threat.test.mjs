@@ -79,4 +79,27 @@ enemies=[scout];
 role.run(creep);
 assert.deepEqual(attacks,['healer'],'harmless creep excluded after raid');
 assert.deepEqual(moves.map(x=>x[0]),['base']);
+// A defender with surviving RANGED_ATTACK parts must issue actual ranged
+// intents, never melee-only attack calls from an incompatible body.
+moves=[];attacks=[];enemies=[distantRanged];rc=0;
+const rangedAttacks=[];
+creep.body=[{type:'ranged_attack',hits:100}];
+creep.rangedAttack=target=>{rangedAttacks.push(target.id);return rc;};
+role.run(creep);
+assert.deepEqual(rangedAttacks,['ranged']);
+assert.deepEqual(attacks,[]);
+rc=-9;
+role.run(creep);
+assert.equal(moves.at(-1)[0],'ranged');
+assert.equal(moves.at(-1)[1].maxRooms,1);
+assert.equal(moves.at(-1)[1].maxOps,200);
+creep.body=[{type:'ranged_attack',hits:0},{type:'attack',hits:100}];
+rc=0;
+role.run(creep);
+assert.deepEqual(attacks,['ranged'],
+  'disabled ranged part must not be treated as armed');
+enemies=[scout];
+const before=rangedAttacks.length;
+role.run(creep);
+assert.equal(rangedAttacks.length,before,'never fire at an unarmed scout');
 console.log('D1 active defender core-threat targeting PASS');
