@@ -120,6 +120,37 @@ game.time=1106;
 s=stability.observe([state],game,memory);
 assert.equal(s.rooms[0].consecutiveSupportTicks,1,
   'time rollback cannot preserve a prior streak');
+// Military crisis and subsequent Safe Mode cooldown must both invalidate
+// any 100-tick support witness, including an otherwise healthy economy.
+const parentSupport=require('../game/expansion.parent.support.shadow.js');
+game.time=1107;
+const protectedParent=parent('E2N2',{room:{
+  name:'E2N2',controller:{my:true,safeMode:45}
+}});
+assert.equal(parentSupport.assess(protectedParent).reason,
+  'PARENT_DEFENSE_RECOVERY_INCOMPLETE');
+s=stability.observe([protectedParent],game,memory);
+assert.equal(s.rooms[0].status,'HOLD');
+assert.equal(s.rooms[0].consecutiveSupportTicks,0);
+assert.equal(stability.qualifies(s,'E2N2',game.time),false);
+game.time=1108;
+const coolingParent=parent('E2N2',{room:{
+  name:'E2N2',controller:{my:true,safeModeCooldown:400}
+}});
+assert.equal(parentSupport.assess(coolingParent).reason,
+  'PARENT_DEFENSE_RECOVERY_INCOMPLETE');
+s=stability.observe([coolingParent],game,memory);
+assert.equal(s.rooms[0].consecutiveSupportTicks,0);
+game.time=1109;
+s=stability.observe([state],game,memory);
+assert.equal(s.rooms[0].consecutiveSupportTicks,1,
+  'defense recovery clears old support streak instead of continuing it');
+game.time=1110;
+s=stability.observe([state],game,memory);
+assert.equal(s.rooms[0].consecutiveSupportTicks,2);
+assert.equal(stability.qualifies(s,'E2N2',game.time),false,
+  'two fresh safe ticks do not authorize a claim');
+
 memory.bot.expansionParentStabilityShadow.rooms.E2N2={
   streak:100,lastTick:game.time,firstTick:999999,reason:null
 };
