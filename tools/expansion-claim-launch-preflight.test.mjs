@@ -87,7 +87,8 @@ assert.equal(first.remainingClaimerTicks,524);
 assert.equal(pathCalls,1);
 assert.equal(JSON.stringify(f),snapshot,'audit must never alter gameplay state');
 function blocked(expected,change) {
-  const x=fixture();change(x);returnedPath=null;
+  returnedPath=null;
+  const x=fixture();change(x);
   const out=run(x);
   assert.equal(out.status,'HOLD',expected);
   assert.equal(out.reason,expected);
