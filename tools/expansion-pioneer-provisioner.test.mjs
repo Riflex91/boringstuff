@@ -125,7 +125,7 @@ assert.equal(spawns.length,2,'at most two pioneer orders for one claim');
 reset();game.creeps={bad:{memory:{role:'pioneer',claimMissionId:mission().id,
   home:'WRONG'}}};
 assert.equal(execute().reason,'FOREIGN_OR_CORRUPT_PIONEER');
-reset();game.creeps={a:{memory:{role:'pioneer',claimMissionId:mission().id}},
-  b:{memory:{role:'pioneer',claimMissionId:mission().id}}};
+reset();game.creeps={a:{memory:{role:'pioneer',claimMissionId:mission().id,home:'E1N1'}},
+  b:{memory:{role:'pioneer',claimMissionId:mission().id,home:'E1N1'}}};
 assert.equal(execute().reason,'EXISTING_PIONEER_CAP');
 console.log('I4 bounded pioneer provisioning, reserves and mission exclusivity PASS');
