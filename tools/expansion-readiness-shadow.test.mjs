@@ -99,4 +99,14 @@ const observed=(overrides={})=>({
   assert.equal(r.claimActionEnabled,false,
     'Capacity is not claim authorization even with strong parent and CPU');
 }
+// The parent cannot be offered for expansion while Safe Mode is active
+// or the emergency cooldown is running, even with healthy economy and GCL.
+for(const controllerChange of [{safeMode:75},{safeModeCooldown:300}]) {
+  const source=owned();
+  source.room.controller={...source.room.controller,...controllerChange};
+  const result=readiness.evaluate(observed(),[source],12);
+  assert.equal(result.status,'HOLD');
+  assert.ok(result.reasons.includes('NO_HEALTHY_SUPPORTING_PARENT'));
+  assert.equal(result.claimActionEnabled,false);
+}
 console.log('read-only expansion readiness (GCL 2 / CPU 40) tests passed');
