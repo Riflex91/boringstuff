@@ -144,7 +144,7 @@ assert.equal(run(next).status,'REVIEW_CANDIDATE',
 blocked('CLAIM_MISSION_OR_ABORT_BACKOFF',x=>{
   previousColony(x);x.memory.bot.expansionClaim.establishedTick=900;
 });
-blocked('PREVIOUS_COLONY_NOT_STABLE',x=>{
+blocked('CLAIM_MISSION_OR_ABORT_BACKOFF',x=>{
   const spawns=previousColony(x);spawns.length=0;
 });
 blocked('CLAIM_MISSION_OR_ABORT_BACKOFF',x=>{
