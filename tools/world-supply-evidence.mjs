@@ -124,7 +124,7 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
     // releases lacking all three groups remain UNKNOWN, not zero attempts.
     const actionKeys = ['decisions', 'consumerTransfers',
       'infrastructureTransfers', 'haulerAcquisitions', 'consumerTravel', 'acquisitionTravel',
-      'longDropChoice'];
+      'longDropChoice', 'acceptedAcquisitionKinds'];
     const hasActions = actionKeys.some(key => Object.hasOwn(x, key));
     let pendingActions = null;
     if (hasActions) {
@@ -206,6 +206,19 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
           longDropChoice.noLocalContainer &&
         longDropChoice.evaluated <= h?.live
       );
+      const hasAcceptedKinds = Object.hasOwn(x,'acceptedAcquisitionKinds');
+      const acceptedKinds = x.acceptedAcquisitionKinds;
+      const sourceKinds = ['drop','container','tomb'];
+      const validAcceptedKinds = !hasAcceptedKinds || (
+        acceptedKinds && typeof acceptedKinds === 'object' &&
+        !Array.isArray(acceptedKinds) &&
+        Object.keys(acceptedKinds).length === sourceKinds.length &&
+        sourceKinds.every(key => Object.hasOwn(acceptedKinds,key) &&
+          goodInt(acceptedKinds[key])) &&
+        acceptedKinds.drop + acceptedKinds.container + acceptedKinds.tomb ===
+          x.haulerAcquisitions?.accepted &&
+        x.haulerAcquisitions.accepted <= h?.live
+      );
       if (!decisions || !goodInt(h?.live) ||
           !['guardChecks', 'guardSelected', 'uniqueGuardHaulers']
             .every(key => goodInt(decisions[key])) ||
@@ -214,6 +227,7 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
           decisions.uniqueGuardHaulers > h.live ||
           !validRescue || !validTravel || !validAcquisitionTravel ||
           !validLongDropChoice ||
+          !validAcceptedKinds ||
           !transferKinds.every(key => validTransfer(x[key]))) {
         malformedLoadState = true;
       } else {
@@ -233,6 +247,7 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
           ...(hasTravel ? {consumerTravel:{...travel}} : {}),
           ...(hasAcquisitionTravel ? {acquisitionTravel:{...acquisitionTravel}} : {}),
           ...(hasLongDropChoice ? {longDropChoice:{...longDropChoice}} : {}),
+          ...(hasAcceptedKinds ? {acceptedAcquisitionKinds:{...acceptedKinds}} : {}),
           settledDeliveryProof:false
         };
       }
