@@ -59,7 +59,8 @@ function getRoomCounters(room, game) {
         rangeOver10:0, rangeUnknown:0, moveAccepted:0,
         moveNoPath:0, moveInvalidTarget:0, moveTemporarilyBlocked:0,
         moveOther:0, drop:0, container:0, tomb:0,
-        longDrop:0, longContainer:0, longTomb:0 }
+        longDrop:0, longContainer:0, longTomb:0 },
+      longDropChoice: { evaluated:0, preferredLocalContainer:0, noLocalContainer:0 }
     };
   }
   return perRoom[room];
@@ -155,6 +156,17 @@ function recordAcquisitionTravel(creep, target, moveRc, kind) {
            (typeof ERR_TIRED !== 'undefined' && moveRc === ERR_TIRED))
     t.moveTemporarilyBlocked++;
   else t.moveOther++;
+}
+
+// Only called when the existing pickup selector considered a >10-tile
+// dropped-energy target. This records a candidate decision, never a verified
+// withdraw, movement, or end-of-tick energy receipt.
+function recordLongDropChoice(creep, hasPreferredLocalContainer) {
+  const c = getRoomCounters(roomName(creep));
+  if (!c || typeof hasPreferredLocalContainer !== 'boolean') return;
+  c.longDropChoice.evaluated++;
+  if (hasPreferredLocalContainer) c.longDropChoice.preferredLocalContainer++;
+  else c.longDropChoice.noLocalContainer++;
 }
 
 function energyAmount(creep) {
@@ -381,7 +393,8 @@ function flush(states, logger, game) {
         rangeOver10:0, rangeUnknown:0, moveAccepted:0,
         moveNoPath:0, moveInvalidTarget:0, moveTemporarilyBlocked:0,
         moveOther:0, drop:0, container:0, tomb:0,
-        longDrop:0, longContainer:0, longTomb:0 }
+        longDrop:0, longContainer:0, longTomb:0 },
+      longDropChoice: { evaluated:0, preferredLocalContainer:0, noLocalContainer:0 }
     };
     // The only output side effect is an ordinary, version-stamped,
     // journaled BOTLOG entry once per 25 ticks per owned room.
@@ -403,6 +416,7 @@ function flush(states, logger, game) {
       haulerAcquisitions: records.haulerAcquisition,
       consumerTravel: records.consumerTravel,
       acquisitionTravel: records.acquisitionTravel,
+      longDropChoice: records.longDropChoice,
       acceptedIsIntentNotSettled: true
     }, { force: true, journal: true, dedupeTicks: 0 });
     emitted++;
@@ -416,6 +430,7 @@ module.exports = {
   recordResult,
   recordConsumerTravel,
   recordAcquisitionTravel,
+  recordLongDropChoice,
   flush,
   _test: { sampled, eligible, sampleRoomCreeps, haulerReadiness,
     reset, getRoomCounters, snapshotReservationCoverage,
