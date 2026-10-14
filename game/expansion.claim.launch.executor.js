@@ -136,4 +136,56 @@ function supervise(game,memory) {
     return abort('CLAIMER_MISSING_AFTER_SPAWN_GRACE');
   return {status:'CLAIMING',changed:false};
 }
-module.exports={start,supervise};
+// Act on observed post-claim state, not on a construction-site intent.
+// A confirmed owned spawn ends the bootstrap mission; the existing room and
+// spawn managers then take over normal local economy and creep production.
+// Missing visibility cannot be interpreted as a lost colony.
+function superviseBootstrap(game,memory) {
+  const m=memory?.bot?.expansionClaim;
+  if(!m || m.schemaVersion!==1 || m.phase!=='CLAIMED')
+    return {status:'NO_ACTIVE_BOOTSTRAP',changed:false};
+  const tick=game?.time;
+  if(!Number.isSafeInteger(tick) ||
+     !Number.isSafeInteger(m.confirmedTick) ||
+     m.confirmedTick>tick || !game?.rooms)
+    return {status:'BOOTSTRAP_RUNTIME_UNVERIFIED',changed:false};
+  const room=game.rooms[m.target];
+  if(!room || room.name!==m.target || !room.controller)
+    return {status:'TARGET_VISION_UNAVAILABLE',changed:false};
+  if(room.controller.my!==true) {
+    m.phase='LOST';
+    m.reason='CLAIMED_ROOM_OWNERSHIP_LOST';
+    m.abortTick=tick;
+    return {status:'LOST',reason:m.reason,changed:true};
+  }
+  if(typeof FIND_MY_SPAWNS==='undefined' || typeof room.find!=='function')
+    return {status:'SPAWN_OBSERVATION_UNAVAILABLE',changed:false};
+  let spawns;
+  try { spawns=room.find(FIND_MY_SPAWNS); }
+  catch (_) { return {status:'SPAWN_OBSERVATION_FAILED',changed:false}; }
+  if(!Array.isArray(spawns))
+    return {status:'SPAWN_OBSERVATION_FAILED',changed:false};
+  if(spawns.length) {
+    const site=m.verifiedSpawnSite;
+    const built=spawns.find(s=>s?.my!==false &&
+      s?.pos?.roomName===m.target &&
+      s.pos.x===site?.x && s.pos.y===site?.y);
+    if(!built)
+      return {status:'SPAWN_LOCATION_UNVERIFIED',changed:false};
+    m.phase='ESTABLISHED';
+    m.establishedTick=tick;
+    m.firstSpawnId=built.id||null;
+    m.reason=null;
+    return {status:'ESTABLISHED',reason:null,changed:true,
+      firstSpawnId:m.firstSpawnId};
+  }
+  if(tick-m.confirmedTick>2000) {
+    m.phase='BOOTSTRAP_BLOCKED';
+    m.reason='FIRST_SPAWN_NOT_OBSERVED_BY_DEADLINE';
+    m.blockedTick=tick;
+    return {status:'BOOTSTRAP_BLOCKED',reason:m.reason,changed:true};
+  }
+  return {status:'BOOTSTRAPPING',changed:false};
+}
+
+module.exports={start,supervise,superviseBootstrap};
