@@ -90,4 +90,50 @@ function start(readiness,operation,budget,continuity,states,game,memory) {
   // A successful spawnCreep RETURN CODE is not confirmed birth/arrival,
   // and the claimer itself confirms ownership only from controller.my.
 }
-module.exports={start};
+
+// A mission cannot remain CLAIMING forever if a claimer dies, spawning
+// fails to materialize, ownership was confirmed, or home defense collapses.
+// This is only a ledger observer: never calls spawn/claim/move and never
+// treats an accepted intent as a confirmed new colony.
+function supervise(game,memory) {
+  const m=memory?.bot?.expansionClaim;
+  if(!m || m.schemaVersion!==1 || m.phase!=='CLAIMING')
+    return {status:'NO_ACTIVE_CLAIM',changed:false};
+  const tick=game?.time;
+  if(!Number.isSafeInteger(tick) || tick<0 ||
+     !Number.isSafeInteger(m.createdTick) ||
+     m.createdTick>tick || !game?.rooms || !game?.creeps)
+    return {status:'RUNTIME_UNVERIFIED',changed:false};
+  const abort=reason=>{
+    m.phase='ABORTED';
+    m.reason=reason;
+    m.abortTick=tick;
+    return {status:'ABORTED',reason,changed:true};
+  };
+  const objective=game.rooms[m.target];
+  if(objective?.controller?.my===true) {
+    m.phase='CLAIMED';
+    m.confirmedTick=tick;
+    m.reason=null;
+    return {status:'CLAIMED',changed:true};
+  }
+  const parent=game.rooms[m.parent];
+  if(!parent?.controller?.my ||
+     (Number(parent.controller.safeMode)||0)>0 ||
+     (Number(parent.controller.safeModeCooldown)||0)>0)
+    return abort('PARENT_DEFENSE_OR_VISION_UNSAFE');
+  if(typeof FIND_HOSTILE_CREEPS!=='undefined' &&
+     typeof parent.find==='function') {
+    const enemies=parent.find(FIND_HOSTILE_CREEPS);
+    if(!Array.isArray(enemies) || enemies.length)
+      return abort('PARENT_UNDER_ATTACK');
+  }
+  if(tick-m.createdTick>900)
+    return abort('CLAIMER_MISSION_EXPIRED');
+  if(tick-m.createdTick>20 &&
+     !Object.values(game.creeps).some(c=>c?.memory?.role==='claimer' &&
+       c.memory.claimMissionId===m.id))
+    return abort('CLAIMER_MISSING_AFTER_SPAWN_GRACE');
+  return {status:'CLAIMING',changed:false};
+}
+module.exports={start,supervise};
