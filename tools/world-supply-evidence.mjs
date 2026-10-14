@@ -162,12 +162,26 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
           travel.moveTemporarilyBlocked + travel.moveOther ===
           travel.moveAttempts
       );
+      // Old source-kind counters are usable but do not reveal which kind
+      // caused a long journey. New samples require a complete joint breakdown.
+      const longKindKeys = ['longDrop','longContainer','longTomb'];
+      const acquisitionBaseKeys = travelKeys.concat(['drop','container','tomb']);
+      const hasLongKinds = hasAcquisitionTravel &&
+        longKindKeys.some(key => Object.hasOwn(acquisitionTravel || {},key));
       const validAcquisitionTravel = !hasAcquisitionTravel || (
         acquisitionTravel && typeof acquisitionTravel === 'object' &&
         !Array.isArray(acquisitionTravel) &&
-        Object.keys(acquisitionTravel).length === travelKeys.length + 3 &&
-        travelKeys.concat(['drop','container','tomb']).every(key =>
+        Object.keys(acquisitionTravel).length === acquisitionBaseKeys.length +
+          (hasLongKinds ? longKindKeys.length : 0) &&
+        acquisitionBaseKeys.concat(hasLongKinds ? longKindKeys : []).every(key =>
           Object.hasOwn(acquisitionTravel,key) && goodInt(acquisitionTravel[key])) &&
+        (!hasLongKinds || (
+          acquisitionTravel.longDrop + acquisitionTravel.longContainer +
+            acquisitionTravel.longTomb === acquisitionTravel.rangeOver10 &&
+          acquisitionTravel.longDrop <= acquisitionTravel.drop &&
+          acquisitionTravel.longContainer <= acquisitionTravel.container &&
+          acquisitionTravel.longTomb <= acquisitionTravel.tomb
+        )) &&
         acquisitionTravel.drop + acquisitionTravel.container + acquisitionTravel.tomb === acquisitionTravel.moveAttempts &&
         acquisitionTravel.moveAttempts <= x.haulerAcquisitions?.notInRange &&
         acquisitionTravel.rangeAtMost5 + acquisitionTravel.range6to10 +
