@@ -132,7 +132,8 @@ assert.deepEqual(evt.ctx.acquisitionTravel, {
   moveAttempts: 2, rangeAtMost5: 0, range6to10: 2,
   rangeOver10: 0, rangeUnknown: 0, moveAccepted: 1,
   moveNoPath: 1, moveInvalidTarget: 0,
-  moveTemporarilyBlocked: 0, moveOther: 0, drop:1, container:1, tomb:0
+  moveTemporarilyBlocked: 0, moveOther: 0, drop:1, container:1, tomb:0,
+  longDrop:0, longContainer:0, longTomb:0
 }, 'acquisition movement returns are not successful energy receipts');
 assert.equal(evt.ctx.acceptedIsIntentNotSettled, true);
 assert.deepEqual(evt.ctx.reservationCoverage, {
