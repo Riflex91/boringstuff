@@ -68,6 +68,13 @@ clear();
 creep.memory.claimMissionId='wrong';role.run(creep);
 assert.equal(attemptedSite,0);
 assert.equal(moved.length,0);
+clear();delete memory.bot.expansionClaim.id;
+creep.memory.claimMissionId=undefined;role.run(creep);
+assert.equal(attemptedSite,0,
+  'missing both mission identifiers cannot authorize a construction');
+clear();memory.bot.expansionClaim.id='bad';
+creep.memory.claimMissionId='bad';role.run(creep);
+assert.equal(attemptedSite,0,'malformed matching IDs are not authority');
 clear();memory.bot.expansionClaim.phase='CLAIMING';
 role.run(creep);assert.equal(attemptedSite,0,
   'claim-intent accepted is not confirmed settlement');
