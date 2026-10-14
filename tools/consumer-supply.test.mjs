@@ -972,6 +972,35 @@ console.log('consumer supply tests passed');
   assert.equal(energy._test.haulerReadyToDeliver(hauler), false);
 }
 
+// World RCL3: two loaded consumer guards may still be travelling while the
+// third ready hauler remains reserved for infrastructure. Accepted movement
+// cannot be counted as a completed consumer energy transfer.
+{
+  const first = makeConsumer('travel-dual-first', 'worker', 0, 8, true);
+  const second = makeConsumer('travel-dual-second', 'upgrader', 0, 7, true);
+  const near = makeHauler('travel-dual-near', { [first.id]: 8, [second.id]: 16 });
+  const far = makeHauler('travel-dual-far', { [first.id]: 16, [second.id]: 12 });
+  const infra = makeHauler('travel-dual-infrastructure', { [first.id]: 25, [second.id]: 25 });
+  near.memory.delivering = far.memory.delivering = infra.memory.delivering = true;
+  const movements = [];
+  for (const hauler of [near, far]) {
+    hauler.moveTo = target => { movements.push([hauler.id, target.id]); return OK; };
+  }
+  room.creeps = [first, second, near, far, infra];
+  assert.deepEqual(energy._test.selectConsumerGuardHaulers(room).map(h => h.id),
+    [near.id, far.id], 'leave one delivery-ready infrastructure carrier');
+  assert.equal(energy.shouldPrioritizeConsumer(infra), false);
+  assert.equal(energy.deliverToConsumer(near, true), true);
+  assert.equal(energy.deliverToConsumer(far, true), true);
+  assert.deepEqual(movements, [[near.id, first.id], [far.id, second.id]]);
+  assert.equal(near.memory.consumerTargetId, first.id);
+  assert.equal(far.memory.consumerTargetId, second.id);
+  assert.equal(first.store.energy, 0);
+  assert.equal(second.store.energy, 0);
+  assert.equal(energy.isCriticalConsumerRequest(first), true);
+  assert.equal(energy.isCriticalConsumerRequest(second), true);
+}
+
 // End-to-end: consumer transfer stays unfulfilled on ERR_NOT_IN_RANGE, but
 // the observer classifies the accompanying move return and geometric range.
 {
