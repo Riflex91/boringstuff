@@ -73,7 +73,8 @@ module.exports = {
   CONSUMER_HAULER_WAIT_TICKS: 12,
 
   // Conservative safety defaults. Turn on only after reviewing logs.
-  AUTO_SAFE_MODE: false,
+  // D1 survival: use the bounded core-loss guard, never lone scouts.
+  AUTO_SAFE_MODE: true,
   ENABLE_REMOTE_MINING: false,
 
   // Construction planning is staged. Critical energy infrastructure is placed
