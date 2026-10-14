@@ -237,6 +237,7 @@ for (const code of [OK, ERR_BUSY]) {
     'poorly funded source container cannot displace distant drop');
 
   reset();
+  container.store.energy=250;
   carrier.pos = { ...originalPos, getRangeTo(target) {
     return target === drop ? 10 : target === container ? 5 : 4;
   } };
