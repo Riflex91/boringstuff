@@ -74,6 +74,8 @@ observer.recordResult(collecting, 'haulerAcquisition', ERR_NOT_IN_RANGE);
 const locatedCollecting = { ...collecting, pos: { getRangeTo() { return 9; } } };
 observer.recordAcquisitionTravel(locatedCollecting, { id:'source' }, OK, 'drop');
 observer.recordAcquisitionTravel(locatedCollecting, { id:'source' }, ERR_NO_PATH, 'container');
+observer.recordLongDropChoice(collecting, true);
+observer.recordLongDropChoice(collecting, false);
 
 assert.equal(observer.flush([state], logger, g), 1);
 assert.equal(eventRows.length, 1);
@@ -135,6 +137,9 @@ assert.deepEqual(evt.ctx.acquisitionTravel, {
   moveTemporarilyBlocked: 0, moveOther: 0, drop:1, container:1, tomb:0,
   longDrop:0, longContainer:0, longTomb:0
 }, 'acquisition movement returns are not successful energy receipts');
+assert.deepEqual(evt.ctx.longDropChoice,
+  { evaluated:2, preferredLocalContainer:1, noLocalContainer:1 },
+  'far-drop override is an observed choice, not acquired energy');
 assert.equal(evt.ctx.acceptedIsIntentNotSettled, true);
 assert.deepEqual(evt.ctx.reservationCoverage, {
   criticalWithSticky: 0, criticalWithReadySticky: 0,
@@ -199,6 +204,8 @@ g.cpu.getUsed = () => 10;
 assert.equal(observer.flush([state], logger, g), 1);
 assert.equal(eventRows[1].ctx.decisions.guardChecks, 1);
 assert.equal(eventRows[1].ctx.decisions.guardSelected, 1);
+assert.equal(eventRows[1].ctx.longDropChoice.evaluated, 0,
+  'long-drop choices must reset between sampled ticks');
 assert.equal(eventRows[1].ctx.acquisitionTravel.moveAttempts, 0,
   'acquisition travel counters must reset between sampling ticks');
 assert.equal(eventRows[1].ctx.consumerTransfers.attempted, 0,
