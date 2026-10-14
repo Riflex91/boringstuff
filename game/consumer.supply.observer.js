@@ -54,6 +54,10 @@ function getRoomCounters(room, game) {
       consumerTravel: { moveAttempts:0, rangeAtMost5:0, range6to10:0,
         rangeOver10:0, rangeUnknown:0, moveAccepted:0,
         moveNoPath:0, moveInvalidTarget:0, moveTemporarilyBlocked:0,
+        moveOther:0 },
+      acquisitionTravel: { moveAttempts:0, rangeAtMost5:0, range6to10:0,
+        rangeOver10:0, rangeUnknown:0, moveAccepted:0,
+        moveNoPath:0, moveInvalidTarget:0, moveTemporarilyBlocked:0,
         moveOther:0 }
     };
   }
@@ -104,6 +108,33 @@ function recordConsumerTravel(creep, target, moveRc) {
       if (Number.isSafeInteger(value) && value >= 0) range = value;
     }
   } catch (_) { /* Unknown distance is not a zero-distance observation. */ }
+  if (range === null) t.rangeUnknown++;
+  else if (range <= 5) t.rangeAtMost5++;
+  else if (range <= 10) t.range6to10++;
+  else t.rangeOver10++;
+  if (moveRc === OK) t.moveAccepted++;
+  else if (typeof ERR_NO_PATH !== 'undefined' && moveRc === ERR_NO_PATH)
+    t.moveNoPath++;
+  else if (typeof ERR_INVALID_TARGET !== 'undefined' &&
+           moveRc === ERR_INVALID_TARGET) t.moveInvalidTarget++;
+  else if ((typeof ERR_BUSY !== 'undefined' && moveRc === ERR_BUSY) ||
+           (typeof ERR_TIRED !== 'undefined' && moveRc === ERR_TIRED))
+    t.moveTemporarilyBlocked++;
+  else t.moveOther++;
+}
+
+// Acquisition travel is diagnostic only. An accepted move is an intent,
+// not a confirmed change of position or collected energy.
+function recordAcquisitionTravel(creep, target, moveRc) {
+  const c = getRoomCounters(roomName(creep));
+  if (!c) return;
+  const t = c.acquisitionTravel;
+  t.moveAttempts++;
+  let range = null;
+  try {
+    const value = creep?.pos?.getRangeTo?.(target);
+    if (Number.isSafeInteger(value) && value >= 0) range = value;
+  } catch (_) { /* Distances unavailable without altering gameplay. */ }
   if (range === null) t.rangeUnknown++;
   else if (range <= 5) t.rangeAtMost5++;
   else if (range <= 10) t.range6to10++;
@@ -338,6 +369,10 @@ function flush(states, logger, game) {
       consumerTravel: { moveAttempts:0, rangeAtMost5:0, range6to10:0,
         rangeOver10:0, rangeUnknown:0, moveAccepted:0,
         moveNoPath:0, moveInvalidTarget:0, moveTemporarilyBlocked:0,
+        moveOther:0 },
+      acquisitionTravel: { moveAttempts:0, rangeAtMost5:0, range6to10:0,
+        rangeOver10:0, rangeUnknown:0, moveAccepted:0,
+        moveNoPath:0, moveInvalidTarget:0, moveTemporarilyBlocked:0,
         moveOther:0 }
     };
     // The only output side effect is an ordinary, version-stamped,
@@ -359,6 +394,7 @@ function flush(states, logger, game) {
       infrastructureTransfers: records.infrastructure,
       haulerAcquisitions: records.haulerAcquisition,
       consumerTravel: records.consumerTravel,
+      acquisitionTravel: records.acquisitionTravel,
       acceptedIsIntentNotSettled: true
     }, { force: true, journal: true, dedupeTicks: 0 });
     emitted++;
@@ -371,6 +407,7 @@ module.exports = {
   recordRescue,
   recordResult,
   recordConsumerTravel,
+  recordAcquisitionTravel,
   flush,
   _test: { sampled, eligible, sampleRoomCreeps, haulerReadiness,
     reset, getRoomCounters, snapshotReservationCoverage,
