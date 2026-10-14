@@ -6,6 +6,7 @@ const hauler = require('role.hauler');
 const worker = require('role.worker');
 const defender = require('role.defender');
 const scout = require('role.scout');
+const claimer = require('role.claimer');
 const profiler = require('profiler');
 
 const handlers = {
@@ -16,6 +17,7 @@ const handlers = {
   repairer: worker,
   upgrader: worker,
   defender,
+  claimer,
   scout
 };
 
