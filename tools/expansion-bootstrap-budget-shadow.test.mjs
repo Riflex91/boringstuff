@@ -71,6 +71,17 @@ assert.ok(a.unverified.includes('constructionEnergyBudget'));
 assert.equal(JSON.stringify({ready,route,p,continuity}),snapshot,
   'budget must never mutate parent, readiness or operation');
 
+// A fully funded expedition must still be held after a defensive emergency;
+// an old positive 100-tick witness cannot override the current parent state.
+for(const defensiveState of [{safeMode:120},{safeModeCooldown:450}]) {
+  const crisis={...p,room:{name:'E2N2',controller:{my:true,...defensiveState}}};
+  const result=assess(ready,route,crisis);
+  assert.equal(result.status,'HOLD');
+  assert.equal(result.reason,'PARENT_DEFENSE_RECOVERY_INCOMPLETE');
+  assert.equal(result.readyForClaim,false);
+  assert.equal(result.claimActionEnabled,false);
+}
+
 // A reserve that passes the old support preflight must still be rejected
 // when future expansion crew costs would consume that reserve.
 const drained=assess(ready,route,{...p,energyStored:3700});
