@@ -39,6 +39,11 @@ function provision(states,game,memory,continuity) {
      m.verifiedSpawnSite.y<5 || m.verifiedSpawnSite.y>44)
     return hold('CONFIRMED_CLAIM_OR_ROUTE_UNVERIFIED');
 
+  if(m.lastPioneerSpawnIntentTick!==undefined &&
+     (!Number.isSafeInteger(m.lastPioneerSpawnIntentTick) ||
+      m.lastPioneerSpawnIntentTick>tick ||
+      tick-m.lastPioneerSpawnIntentTick<25))
+    return hold('PIONEER_ORDER_COOLDOWN');
   const count=m.pioneerOrders===undefined?0:m.pioneerOrders;
   if(!Number.isSafeInteger(count) ||
      count<0 || count>=MAX_PIONEER_ORDERS)
@@ -100,7 +105,7 @@ function provision(states,game,memory,continuity) {
     return hold('FIRST_SPAWN_ALREADY_PRESENT');
 
   if(typeof WORK==='undefined' || typeof CARRY==='undefined' ||
-     typeof MOVE==='undefined' || !BODYPART_COST ||
+     typeof MOVE==='undefined' || typeof BODYPART_COST==='undefined' || !BODYPART_COST ||
      !Number.isSafeInteger(BODYPART_COST[WORK]) ||
      !Number.isSafeInteger(BODYPART_COST[CARRY]) ||
      !Number.isSafeInteger(BODYPART_COST[MOVE]))
