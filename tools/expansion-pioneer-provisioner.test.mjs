@@ -142,7 +142,7 @@ assert.equal(lastReplacement.pioneerOrders,4);
 game.time=1500;
 assert.equal(execute().reason,'PIONEER_ORDER_LIMIT_REACHED');
 assert.equal(spawns.length,4,'maximum four total orders, never unbounded respawns');
-reset();game.time=1800;
+reset();game.time=2775;
 memory.bot.expansionClaim.pioneerOrders=2;
 memory.bot.expansionClaim.lastPioneerSpawnIntentTick=1600;
 assert.equal(execute().reason,'PIONEER_REPLACEMENT_COOLDOWN_OR_DEADLINE',
