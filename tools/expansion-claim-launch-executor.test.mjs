@@ -8,6 +8,7 @@ let enabled=false,approved=true,issued=[],spawnRc=0,throwSpawn=false;
 const ctx={
   module:{exports:{}}, MOVE:'move',CLAIM:'claim',OK:0,
   BODYPART_COST:{move:50,claim:600},
+  FIND_HOSTILE_CREEPS:1,
   require(name){
     if(name==='config')return {get AUTO_EXPANSION_CLAIM(){return enabled;}};
     if(name==='expansion.claim.launch.preflight')return {
@@ -102,4 +103,58 @@ out=execute(p);
 assert.equal(out.reason,'SPAWN_OR_MISSION_UNVERIFIED',
   'forged preflight cannot authorize missing site geometry');
 assert.equal(issued.length,0);
+// Long-running autonomous missions must self-recover, rather than holding
+// the only GCL/claimer slot indefinitely after a death, cancelled spawn,
+// defensive emergency or true confirmed ownership.
+const supervise=ctx.module.exports.supervise;
+function supervisorFixture() {
+  const mission={schemaVersion:1,id:'claim-E1N1-E1N2-1000',
+    phase:'CLAIMING',parent:'E1N1',target:'E1N2',
+    route:['E1N1','E1N2'],createdTick:1000};
+  const home={controller:{my:true,safeMode:0,safeModeCooldown:0},
+    find(){return [];}};
+  const target={controller:{my:false}};
+  const game={time:1001,
+    rooms:{E1N1:home,E1N2:target},
+    creeps:{cla:{memory:{role:'claimer',claimMissionId:mission.id}}}};
+  const memory={bot:{expansionClaim:mission}};
+  return {mission,home,target,game,memory};
+}
+let sup=supervisorFixture();
+assert.equal(supervise(sup.game,sup.memory).status,'CLAIMING');
+assert.equal(sup.mission.phase,'CLAIMING');
+sup.target.controller.my=true;
+assert.equal(supervise(sup.game,sup.memory).status,'CLAIMED');
+assert.equal(sup.mission.confirmedTick,1001);
+assert.equal(sup.mission.phase,'CLAIMED');
+sup=supervisorFixture();
+sup.game.creeps={};sup.game.time=1020;
+assert.equal(supervise(sup.game,sup.memory).status,'CLAIMING',
+  'spawn grace protects transient missing creep');
+sup.game.time=1021;
+let verdict=supervise(sup.game,sup.memory);
+assert.equal(verdict.status,'ABORTED');
+assert.equal(verdict.reason,'CLAIMER_MISSING_AFTER_SPAWN_GRACE');
+assert.equal(sup.mission.abortTick,1021);
+sup=supervisorFixture();
+sup.home.controller.safeMode=50;
+assert.equal(supervise(sup.game,sup.memory).reason,
+  'PARENT_DEFENSE_OR_VISION_UNSAFE');
+sup=supervisorFixture();
+sup.home.controller.safeModeCooldown=100;
+assert.equal(supervise(sup.game,sup.memory).reason,
+  'PARENT_DEFENSE_OR_VISION_UNSAFE');
+sup=supervisorFixture();
+sup.home.find=()=>[{id:'armed'}];
+assert.equal(supervise(sup.game,sup.memory).reason,'PARENT_UNDER_ATTACK');
+sup=supervisorFixture();
+sup.game.time=1901;
+assert.equal(supervise(sup.game,sup.memory).reason,
+  'CLAIMER_MISSION_EXPIRED');
+sup=supervisorFixture();
+sup.game.time=999;
+assert.equal(supervise(sup.game,sup.memory).status,'RUNTIME_UNVERIFIED');
+assert.equal(sup.mission.phase,'CLAIMING',
+  'invalid time cannot rewrite mission ledger');
+
 console.log('I4 gated single-claimer spawning and mission-commit transaction PASS');
