@@ -86,7 +86,7 @@ function acquireForHauler(creep) {
         reusePath: 8, maxOps: config.PATH_MAX_OPS,
         visualizePathStyle: { stroke: '#ffaa00' }
       });
-      consumerSupplyObserver.recordAcquisitionTravel(creep, dropped, moveRc);
+      consumerSupplyObserver.recordAcquisitionTravel(creep, dropped, moveRc, 'drop');
       if (moveRc !== ERR_NO_PATH && moveRc !== ERR_INVALID_TARGET)
         return true;
     } else if (rc !== ERR_NOT_ENOUGH_RESOURCES &&
@@ -110,7 +110,7 @@ function acquireForHauler(creep) {
         reusePath: 8, maxOps: config.PATH_MAX_OPS,
         visualizePathStyle: { stroke: '#ffaa00' }
       });
-      consumerSupplyObserver.recordAcquisitionTravel(creep, container, moveRc);
+      consumerSupplyObserver.recordAcquisitionTravel(creep, container, moveRc, 'container');
       if (moveRc !== ERR_NO_PATH && moveRc !== ERR_INVALID_TARGET)
         return true;
     } else if (rc !== ERR_NOT_ENOUGH_RESOURCES &&
@@ -129,7 +129,7 @@ function acquireForHauler(creep) {
     consumerSupplyObserver.recordResult(creep, 'haulerAcquisition', rc);
     if (rc === ERR_NOT_IN_RANGE) {
       const moveRc = creep.moveTo(tomb, { reusePath: 8, maxOps: config.PATH_MAX_OPS });
-      consumerSupplyObserver.recordAcquisitionTravel(creep, tomb, moveRc);
+      consumerSupplyObserver.recordAcquisitionTravel(creep, tomb, moveRc, 'tomb');
       return moveRc !== ERR_NO_PATH && moveRc !== ERR_INVALID_TARGET;
     }
     return rc !== ERR_NOT_ENOUGH_RESOURCES && rc !== ERR_INVALID_TARGET;

@@ -219,6 +219,9 @@ for (const code of [OK, ERR_BUSY]) {
     assert.equal(observer.flush([{ room }], logger, global.Game), 1);
     const travel = snapshots.at(-1).acquisitionTravel;
     assert.equal(travel.moveAttempts, 1);
+    assert.equal(travel.drop, scenario.kind === 'drop' ? 1 : 0);
+    assert.equal(travel.container, scenario.kind === 'container' ? 1 : 0);
+    assert.equal(travel.tomb, scenario.kind === 'tomb' ? 1 : 0);
     assert.equal(travel.range6to10, 1);
     assert.equal(travel.moveAccepted, scenario.code === OK ? 1 : 0);
     assert.equal(travel.moveNoPath, scenario.code === ERR_NO_PATH ? 1 : 0);

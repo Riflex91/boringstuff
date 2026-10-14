@@ -72,8 +72,8 @@ observer.recordResult(loaded, 'consumer', -8);
 observer.recordResult(loaded, 'infrastructure', OK);
 observer.recordResult(collecting, 'haulerAcquisition', ERR_NOT_IN_RANGE);
 const locatedCollecting = { ...collecting, pos: { getRangeTo() { return 9; } } };
-observer.recordAcquisitionTravel(locatedCollecting, { id:'source' }, OK);
-observer.recordAcquisitionTravel(locatedCollecting, { id:'source' }, ERR_NO_PATH);
+observer.recordAcquisitionTravel(locatedCollecting, { id:'source' }, OK, 'drop');
+observer.recordAcquisitionTravel(locatedCollecting, { id:'source' }, ERR_NO_PATH, 'container');
 
 assert.equal(observer.flush([state], logger, g), 1);
 assert.equal(eventRows.length, 1);
@@ -132,7 +132,7 @@ assert.deepEqual(evt.ctx.acquisitionTravel, {
   moveAttempts: 2, rangeAtMost5: 0, range6to10: 2,
   rangeOver10: 0, rangeUnknown: 0, moveAccepted: 1,
   moveNoPath: 1, moveInvalidTarget: 0,
-  moveTemporarilyBlocked: 0, moveOther: 0
+  moveTemporarilyBlocked: 0, moveOther: 0, drop:1, container:1, tomb:0
 }, 'acquisition movement returns are not successful energy receipts');
 assert.equal(evt.ctx.acceptedIsIntentNotSettled, true);
 assert.deepEqual(evt.ctx.reservationCoverage, {

@@ -558,7 +558,8 @@ assert.deepEqual(result.criticalGapRoomEnergyStates,[],
   const acquisitionTravel={
     moveAttempts:1,rangeAtMost5:0,range6to10:1,rangeOver10:0,
     rangeUnknown:0,moveAccepted:0,moveNoPath:1,
-    moveInvalidTarget:0,moveTemporarilyBlocked:0,moveOther:0
+    moveInvalidTarget:0,moveTemporarilyBlocked:0,moveOther:0,
+    drop:0,container:1,tomb:0
   };
   const acquisitionSample=make(175,{
     haulerAcquisitions:{attempted:2,accepted:0,notInRange:1,other:1},
