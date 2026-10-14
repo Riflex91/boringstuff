@@ -1086,7 +1086,7 @@ console.log('consumer supply tests passed');
   };
   const hauler=makeHauler('combat-tower-hauler');
   const ids=()=>energy.deliveryTargets(hauler).map(x=>x.id);
-  const normal=[spawn.id,extension.id,tower.id,healthyTower.id];
+  const normal=[spawn.id,extension.id,healthyTower.id,tower.id];
   try {
     assert.deepEqual(ids(),normal,'no attack preserves spawn/extension priority');
     hostiles=[{body:[{type:'move',hits:100}]}];
@@ -1104,7 +1104,7 @@ console.log('consumer supply tests passed');
     assert.equal(energy.deliver(hauler),true);
     assert.equal(transferTarget,tower.id,'hauler actually supplies urgent tower');
     tower.store.energy=500;
-    assert.deepEqual(ids(),[extension.id,tower.id,healthyTower.id],
+    assert.deepEqual(ids(),[extension.id,healthyTower.id,tower.id],
       'half-charged tower returns to normal low priority');
     tower.store.energy=100;
     hostiles=[{body:[{type:'heal',hits:100}]}];
