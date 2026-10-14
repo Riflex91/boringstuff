@@ -113,6 +113,7 @@ assert.deepEqual(calls, [['pickup', drop], ['withdraw', tomb]]);
 // tombstone only after a terminal outcome, never after an accepted intent.
 for (const code of [ERR_NOT_ENOUGH_RESOURCES, ERR_INVALID_TARGET]) {
   reset(); present.drop = false; withdrawRc = code;
+  tombWithdrawRc = OK;
   assert.equal(energy.acquireForHauler(carrier),true);
   assert.deepEqual(calls,[['withdraw',container],['withdraw',tomb]],
     'terminal source container withdrawal can retry a distinct energy source');
@@ -120,7 +121,8 @@ for (const code of [ERR_NOT_ENOUGH_RESOURCES, ERR_INVALID_TARGET]) {
 for (const code of [ERR_NO_PATH,ERR_INVALID_TARGET]) {
   reset(); present.drop = false;
   withdrawRc = ERR_NOT_IN_RANGE; moveRc = code;
-  assert.equal(energy.acquireForHauler(carrier),true);
+  assert.equal(energy.acquireForHauler(carrier),false,
+    'terminal alternate tombstone route must permit role-level repositioning');
   assert.deepEqual(calls,[
     ['withdraw',container],['move',container],
     ['withdraw',tomb],['move',tomb]
