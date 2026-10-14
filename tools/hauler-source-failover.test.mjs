@@ -351,6 +351,36 @@ for (const code of [OK, ERR_BUSY]) {
       noLocalContainer:scenario.noLocal
     },'only a strictly distant drop counts as a choice opportunity');
   }
+  // An in-range OK is invisible in movement telemetry, yet it is vital
+  // for assessing whether nearby-container preference serves real pickup
+  // intents. Verify each existing acquisition path and intent exclusivity.
+  for (const scenario of [
+    {tick:2150,kind:'drop',preferred:false},
+    {tick:2175,kind:'container',preferred:false},
+    {tick:2200,kind:'container',preferred:true},
+    {tick:2225,kind:'tomb',preferred:false}
+  ]) {
+    reset();
+    global.Game.time=scenario.tick;
+    present.drop=scenario.kind==='drop' || scenario.preferred;
+    present.container=scenario.kind==='container';
+    present.tomb=scenario.kind==='tomb';
+    carrier.pos={...previousPos,getRangeTo(target) {
+      return target===drop ? 12 : target===container ? 2 : 3;
+    }};
+    assert.equal(energy.acquireForHauler(carrier),true);
+    assert.equal(calls.length,1,'accepted energy intent precludes second source');
+    assert.equal(observer.flush([{room}],logger,global.Game),1);
+    const sample=snapshots.at(-1);
+    assert.deepEqual(sample.acceptedAcquisitionKinds,{
+      drop:scenario.kind==='drop'?1:0,
+      container:scenario.kind==='container'?1:0,
+      tomb:scenario.kind==='tomb'?1:0
+    },'accepted acquisition is attributed even without moveTo');
+    assert.equal(sample.haulerAcquisitions.accepted,1);
+    assert.equal(sample.acquisitionTravel.moveAttempts,0);
+    assert.equal(sample.acceptedIsIntentNotSettled,true);
+  }
   container.store.energy=originalEnergy;
   carrier.pos = previousPos;
   global.Game = previousGame;
