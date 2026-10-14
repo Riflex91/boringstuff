@@ -75,6 +75,11 @@ module.exports = {
   // Conservative safety defaults. Turn on only after reviewing logs.
   // D1 survival: use the bounded core-loss guard, never lone scouts.
   AUTO_SAFE_MODE: true,
+  // U8 I4 execution remains OFF until its own real-bot release gates pass:
+  // full route+TTL/parent military+economy preflight, claim settlement,
+  // pioneer-first-spawn and operational rollback proof.
+  AUTO_EXPANSION_CLAIM: false,
+  AUTO_EXPANSION_BOOTSTRAP: false,
   ENABLE_REMOTE_MINING: false,
 
   // Construction planning is staged. Critical energy infrastructure is placed
