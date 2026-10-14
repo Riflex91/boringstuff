@@ -3,7 +3,8 @@
 const config=require('config');
 const parentStability=require('expansion.parent.stability.shadow');
 
-const MAX_PIONEER_ORDERS=2;
+const MAX_CONCURRENT_PIONEERS=2;
+const MAX_TOTAL_PIONEER_ORDERS=4; // bounded replacements after lost original crew
 const ROOM=/^[WE][0-9]+[NS][0-9]+$/;
 function hold(reason) {
   return {status:'HOLD',reason,spawnIntentAccepted:false};
@@ -52,8 +53,16 @@ function provision(states,game,memory,continuity) {
     return hold('PIONEER_ORDER_COOLDOWN');
   const count=m.pioneerOrders===undefined?0:m.pioneerOrders;
   if(!Number.isSafeInteger(count) ||
-     count<0 || count>=MAX_PIONEER_ORDERS)
+     count<0 || count>=MAX_TOTAL_PIONEER_ORDERS)
     return hold('PIONEER_ORDER_LIMIT_REACHED');
+  // A dead original pair may be replenished, but never endlessly. Require
+  // an actual observation gap plus 150 ticks after its last accepted order;
+  // near bootstrap expiry no new creep can reasonably finish the spawn.
+  if(count>=MAX_CONCURRENT_PIONEERS &&
+     (!Number.isSafeInteger(m.lastPioneerSpawnIntentTick) ||
+      tick-m.lastPioneerSpawnIntentTick<150 ||
+      tick-m.confirmedTick>1750))
+    return hold('PIONEER_REPLACEMENT_COOLDOWN_OR_DEADLINE');
 
   const parent=Array.isArray(states)?states.find(s=>s?.room?.name===m.parent):null;
   const home=game?.rooms?.[m.parent],target=game?.rooms?.[m.target];
@@ -78,10 +87,13 @@ function provision(states,game,memory,continuity) {
       c.memory.claimMissionId===m.id &&
       c.memory.home!==m.parent))
     return hold('FOREIGN_OR_CORRUPT_PIONEER');
-  if(Object.values(game.creeps).filter(c=>
-      c?.memory?.role==='pioneer' &&
-      c.memory.claimMissionId===m.id).length>=MAX_PIONEER_ORDERS)
+  const activePioneers=Object.values(game.creeps).filter(c=>
+    c?.memory?.role==='pioneer' &&
+    c.memory.claimMissionId===m.id).length;
+  if(activePioneers>=MAX_CONCURRENT_PIONEERS)
     return hold('EXISTING_PIONEER_CAP');
+  if(count>=MAX_CONCURRENT_PIONEERS && activePioneers!==0)
+    return hold('PIONEER_REPLACEMENT_NOT_NEEDED');
 
   if(typeof FIND_HOSTILE_CREEPS==='undefined' ||
      typeof FIND_HOSTILE_STRUCTURES==='undefined')

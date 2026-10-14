@@ -122,11 +122,41 @@ function audit(readiness,operation,budget,continuity,states,game,memory) {
     return hold('GCL_OR_EXISTING_CLAIMER_COMMITMENT');
 
   const prior=memory.bot.expansionClaim;
-  if(prior && (prior.phase==='CLAIMING' ||
-     prior.phase==='CLAIMED' ||
-     !Number.isSafeInteger(prior.abortTick) ||
-     tick-prior.abortTick<500))
-    return hold('CLAIM_MISSION_OR_ABORT_BACKOFF');
+  if(prior) {
+    if(prior.phase==='CLAIMING' || prior.phase==='CLAIMED')
+      return hold('CLAIM_MISSION_OR_ABORT_BACKOFF');
+    // After an actual first spawn was observed, a future independent claim
+    // may be considered. Do not unlock on an accepted construction intent
+    // or an unchecked Memory phase: verify room ownership, original site and
+    // the existing spawn again, with a 500-tick stabilization window.
+    const settled=prior.phase==='ESTABLISHED' &&
+      validRoom(prior.target) &&
+      prior.target!==target &&
+      Number.isSafeInteger(prior.establishedTick) &&
+      prior.establishedTick>=0 &&
+      prior.establishedTick<=tick &&
+      tick-prior.establishedTick>=500;
+    const oldRoom=settled?game.rooms[prior.target]:null;
+    let verifiedSpawn=false;
+    if(oldRoom?.controller?.my===true &&
+       typeof FIND_MY_SPAWNS!=='undefined' &&
+       typeof oldRoom.find==='function') {
+      try {
+        const sites=oldRoom.find(FIND_MY_SPAWNS);
+        verifiedSpawn=Array.isArray(sites) &&
+          sites.some(s=>s?.my!==false && s?.pos?.roomName===prior.target &&
+            s.pos.x===prior.verifiedSpawnSite?.x &&
+            s.pos.y===prior.verifiedSpawnSite?.y);
+      } catch (_) { verifiedSpawn=false; }
+    }
+    if(!verifiedSpawn && (!Number.isSafeInteger(prior.abortTick) ||
+        prior.abortTick>tick || tick-prior.abortTick<500))
+      return hold('CLAIM_MISSION_OR_ABORT_BACKOFF');
+    // An established-but-lost colony is a recovery obligation, never a
+    // signal to spend the next claim slot on a new expansion.
+    if(prior.phase==='ESTABLISHED' && !verifiedSpawn)
+      return hold('PREVIOUS_COLONY_NOT_STABLE');
+  }
 
   if(!Number.isSafeInteger(state.energyCapacityAvailable) ||
      state.energyCapacityAvailable<650 ||

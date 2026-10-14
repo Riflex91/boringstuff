@@ -330,6 +330,20 @@ module.exports.loop = function() {
       } catch (_) { /* supervisor must never interrupt legacy creep work */ }
     }
 
+    // Once ownership is verified, complete the handoff only after the
+    // first SPAWN exists in the actual owned room, not after a build intent.
+    // This observer issues no gameplay intents and runs despite flags OFF.
+    if (Memory.bot?.expansionClaim?.phase === 'CLAIMED') {
+      try {
+        const result=expansionClaimLaunchExecutor.superviseBootstrap(Game,Memory);
+        if (result?.changed) logger.info('I4_BOOTSTRAP_MISSION_RESOLVED',
+          'Observed first spawn, lost ownership or exceeded bootstrap deadline', {
+            ...result,missionId:Memory.bot.expansionClaim.id,
+            target:Memory.bot.expansionClaim.target
+          }, {force:true,persist:true,dedupeTicks:0});
+      } catch (_) { /* settlement watcher cannot interrupt survival */ }
+    }
+
     measureMainDetail('main.commands', function() { commands.install(); });
     measureMainDetail('main.logger-prune', function() { logger.prune(); });
     measureMainDetail('main.cleanup', cleanupMemory);

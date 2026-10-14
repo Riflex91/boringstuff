@@ -157,4 +157,49 @@ assert.equal(supervise(sup.game,sup.memory).status,'RUNTIME_UNVERIFIED');
 assert.equal(sup.mission.phase,'CLAIMING',
   'invalid time cannot rewrite mission ledger');
 
+// Post-claim handoff needs a real owned spawn at the verified tile; an OK
+// build intent or an unseen room cannot authorize later expansion.
+ctx.FIND_MY_SPAWNS=3;
+const superviseBootstrap=ctx.module.exports.superviseBootstrap;
+function settledFixture() {
+  const m={schemaVersion:1,id:'claim-E1N1-E1N2-1000',
+    phase:'CLAIMED',parent:'E1N1',target:'E1N2',
+    createdTick:1000,confirmedTick:1100,
+    verifiedSpawnSite:{roomName:'E1N2',x:25,y:25}};
+  const sites=[];
+  const target={name:'E1N2',controller:{my:true},
+    find(type){return sites;}};
+  const game={time:1400,rooms:{E1N2:target}};
+  return {m,sites,target,game,memory:{bot:{expansionClaim:m}}};
+}
+let hand=settledFixture();
+assert.equal(superviseBootstrap(hand.game,hand.memory).status,'BOOTSTRAPPING');
+assert.equal(hand.m.phase,'CLAIMED','no spawn must not hand off');
+hand.sites.push({id:'wrong',my:true,pos:{roomName:'E1N2',x:26,y:25}});
+assert.equal(superviseBootstrap(hand.game,hand.memory).status,'SPAWN_LOCATION_UNVERIFIED');
+hand.sites[0]={id:'Spawn1',my:true,pos:{roomName:'E1N2',x:25,y:25}};
+const complete=superviseBootstrap(hand.game,hand.memory);
+assert.equal(complete.status,'ESTABLISHED');
+assert.equal(complete.changed,true);
+assert.equal(hand.m.phase,'ESTABLISHED');
+assert.equal(hand.m.establishedTick,1400);
+assert.equal(hand.m.firstSpawnId,'Spawn1');
+assert.equal(superviseBootstrap(hand.game,hand.memory).changed,false,
+  'established mission must never hand off twice');
+hand=settledFixture();
+delete hand.game.rooms.E1N2;
+assert.equal(superviseBootstrap(hand.game,hand.memory).status,'TARGET_VISION_UNAVAILABLE');
+assert.equal(hand.m.phase,'CLAIMED','no vision must not invent ownership loss');
+hand=settledFixture();
+hand.target.controller.my=false;
+const lost=superviseBootstrap(hand.game,hand.memory);
+assert.equal(lost.status,'LOST');
+assert.equal(hand.m.abortTick,1400);
+assert.equal(hand.m.phase,'LOST');
+hand=settledFixture();
+hand.game.time=3101;
+assert.equal(superviseBootstrap(hand.game,hand.memory).status,'BOOTSTRAP_BLOCKED');
+assert.equal(hand.m.phase,'BOOTSTRAP_BLOCKED');
+assert.equal(hand.m.reason,'FIRST_SPAWN_NOT_OBSERVED_BY_DEADLINE');
+
 console.log('I4 gated single-claimer spawning and mission-commit transaction PASS');
