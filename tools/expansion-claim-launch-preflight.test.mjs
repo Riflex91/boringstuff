@@ -123,6 +123,33 @@ blocked('CLAIM_MISSION_OR_ABORT_BACKOFF',f=>{
   f.memory.bot.expansionClaim={phase:'CLAIMING'};});
 blocked('CLAIM_MISSION_OR_ABORT_BACKOFF',f=>{
   f.memory.bot.expansionClaim={phase:'ABORTED',abortTick:700};});
+// The previous real colony must survive a verified first-spawn handoff
+// before a separate subsequent claim can be evaluated.
+ctx.FIND_MY_SPAWNS=3;
+function previousColony(f) {
+  f.game.gcl.level=3;
+  const spawns=[{my:true,id:'SpawnOld',
+    pos:{roomName:'E1N3',x:18,y:19}}];
+  f.game.rooms.E1N3={name:'E1N3',controller:{my:true},
+    find(type){return spawns;}};
+  f.memory.bot.expansionClaim={schemaVersion:1,phase:'ESTABLISHED',
+    target:'E1N3',establishedTick:500,
+    verifiedSpawnSite:{roomName:'E1N3',x:18,y:19}};
+  return spawns;
+}
+let next=fixture();
+previousColony(next);
+assert.equal(run(next).status,'REVIEW_CANDIDATE',
+  'a stable actually spawned colony may hand off to existing preflight');
+blocked('CLAIM_MISSION_OR_ABORT_BACKOFF',x=>{
+  previousColony(x);x.memory.bot.expansionClaim.establishedTick=900;
+});
+blocked('PREVIOUS_COLONY_NOT_STABLE',x=>{
+  const spawns=previousColony(x);spawns.length=0;
+});
+blocked('CLAIM_MISSION_OR_ABORT_BACKOFF',x=>{
+  previousColony(x);x.memory.bot.expansionClaim.phase='CLAIMED';
+});
 blocked('HOME_RESERVE_OR_SPAWN_ENERGY_LOW',f=>{
   f.states[0].energyStored=3500;});
 blocked('HOME_RESERVE_OR_SPAWN_ENERGY_LOW',f=>{
