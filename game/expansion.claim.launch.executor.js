@@ -29,7 +29,13 @@ function start(readiness,operation,budget,continuity,states,game,memory) {
      !Array.isArray(check.route) || check.route.length<2 ||
      check.route.length>4 ||
      check.route[0]!==check.parentRoom ||
-     check.route.at(-1)!==check.candidateRoom)
+     check.route.at(-1)!==check.candidateRoom ||
+     !operation?.spawnSite ||
+     operation.spawnSite.roomName!==check.candidateRoom ||
+     !Number.isSafeInteger(operation.spawnSite.x) ||
+     !Number.isSafeInteger(operation.spawnSite.y) ||
+     operation.spawnSite.x<5 || operation.spawnSite.x>44 ||
+     operation.spawnSite.y<5 || operation.spawnSite.y>44)
     return reject('SPAWN_OR_MISSION_UNVERIFIED');
 
   // Never issue a second spawn into an already committed mission. A
