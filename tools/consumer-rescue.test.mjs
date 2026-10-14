@@ -335,4 +335,34 @@ try {
   assert.equal(moveCalls.length, 2);
 }
 
+// A stale sticky claim held by a collecting, below-minimum-energy hauler
+// must not block a different authorized partial rescue. A delivery-ready
+// competing sticky claim, however, must still block rescue.
+{
+  const safe = room();
+  const urgentRequest = consumer('stale-partial-rescue-request', safe, 8, true);
+  const infrastructure = makeHauler('stale-partial-infra-ready', safe, 220);
+  infrastructure.memory.delivering = true;
+  const stale = makeHauler('stale-partial-ineligible', safe, 10);
+  stale.memory.consumerTargetId = urgentRequest.id;
+  const candidate = makeHauler('stale-partial-eligible', safe, 75);
+  safe.creeps = [urgentRequest, infrastructure, stale, candidate];
+  assert.deepEqual(energy._test.selectConsumerGuardHaulers(safe).map(h => h.id),
+    [candidate.id],
+    'positive energy below rescue minimum cannot monopolize urgent demand');
+  assert.equal(energy.shouldRescueConsumer(candidate), true);
+  assert.equal(energy.shouldRescueConsumer(stale), false);
+  assert.equal(energy.shouldPrioritizeConsumer(infrastructure), false,
+    'sole ready hauler remains protected for infrastructure');
+  assert.equal(energy._test.selectConsumerTarget(candidate, true).id, urgentRequest.id);
+  assert.equal(stale.memory.consumerTargetId, undefined,
+    'obsolete competing sticky claim is reclaimed at target selection');
+
+  // The same reservation becomes authoritative when the competing hauler
+  // can actually deliver; no partial rescue may steal it.
+  infrastructure.memory.consumerTargetId = urgentRequest.id;
+  assert.deepEqual(energy._test.selectConsumerGuardHaulers(safe), []);
+  assert.equal(energy.shouldRescueConsumer(candidate), false);
+}
+
 console.log('active consumer rescue behavior and infrastructure interlocks PASS');
