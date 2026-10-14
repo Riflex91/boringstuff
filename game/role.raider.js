@@ -15,6 +15,7 @@ function missionFor(creep,memory,game) {
      !['ATTACKING','RETREAT'].includes(m.phase) ||
      typeof m.id!=='string' || m.id.length>100 ||
      !/^raid-[WE][0-9]+[NS][0-9]+-[WE][0-9]+[NS][0-9]+-[0-9]+$/.test(m.id) ||
+     m.id!==('raid-'+m.parent+'-'+m.target+'-'+m.createdTick) ||
      m.id!==creep.memory.combatMissionId ||
      !ROOM.test(m.parent||'') || !ROOM.test(m.target||'') ||
      m.parent===m.target ||
@@ -31,6 +32,16 @@ function missionFor(creep,memory,game) {
      m.route.at(-1)!==m.target ||
      new Set(m.route).size!==m.route.length ||
      m.route.some(x=>!ROOM.test(x)))
+    return null;
+  // The actual named player must previously have been seen entering OUR
+  // home room with live attack, ranged, dismantle or healer body parts.
+  // Counterattack missions cannot be fabricated against unrelated players.
+  const journal=memory?.bot?.combatAggressionEvidence;
+  if(journal?.schemaVersion!==1 || !Array.isArray(journal.records) ||
+     !journal.records.some(row=>row?.player===m.aggressor &&
+       row.room===m.parent && Number.isSafeInteger(row.tick) &&
+       Number.isSafeInteger(row.armedParts) && row.armedParts>0 &&
+       row.tick<=tick && tick-row.tick<=2000))
     return null;
   return m;
 }
