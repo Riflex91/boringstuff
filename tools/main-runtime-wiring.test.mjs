@@ -186,4 +186,7 @@ assert.match(mainSource,
 assert.ok(mainSource.includes('    expansionClaimLaunch,') &&
   mainSource.includes('    expansionPioneerProvision,'),
   'status logs must distinguish disabled, blocked and accepted actions');
+assert.match(mainSource,
+  /Memory\\.bot\\?\\.expansionClaim\\?\\.phase\\s*===\\s*['\"]CLAIMED['\"][\\s\\S]*?expansionClaimLaunchExecutor\\.superviseBootstrap\\(Game,Memory\\)/,
+  'actual owned-spawn settlement must be supervised every tick after verified claim');
 console.log('main runtime wiring tests passed');
