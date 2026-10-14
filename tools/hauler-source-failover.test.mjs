@@ -202,7 +202,9 @@ for (const code of [OK, ERR_BUSY]) {
     creeps: { carrier },
     cpu: { bucket: 10000, limit: 30, getUsed() { return 1; } }
   };
-  carrier.pos = { ...previousPos, getRangeTo() { return 9; } };
+  carrier.pos = { ...previousPos, getRangeTo(target) {
+    return target === drop ? 3 : target === container ? 12 : 14;
+  } };
   for (const scenario of [
     { tick: 2000, kind: 'drop', code: OK },
     { tick: 2025, kind: 'container', code: ERR_NO_PATH },
@@ -222,7 +224,12 @@ for (const code of [OK, ERR_BUSY]) {
     assert.equal(travel.drop, scenario.kind === 'drop' ? 1 : 0);
     assert.equal(travel.container, scenario.kind === 'container' ? 1 : 0);
     assert.equal(travel.tomb, scenario.kind === 'tomb' ? 1 : 0);
-    assert.equal(travel.range6to10, 1);
+    assert.equal(travel.rangeAtMost5, scenario.kind === 'drop' ? 1 : 0);
+    assert.equal(travel.range6to10, 0);
+    assert.equal(travel.rangeOver10, scenario.kind !== 'drop' ? 1 : 0);
+    assert.equal(travel.longDrop, 0);
+    assert.equal(travel.longContainer, scenario.kind === 'container' ? 1 : 0);
+    assert.equal(travel.longTomb, scenario.kind === 'tomb' ? 1 : 0);
     assert.equal(travel.moveAccepted, scenario.code === OK ? 1 : 0);
     assert.equal(travel.moveNoPath, scenario.code === ERR_NO_PATH ? 1 : 0);
     assert.equal(travel.moveTemporarilyBlocked, scenario.code === ERR_BUSY ? 1 : 0);
