@@ -57,6 +57,10 @@ function evaluate(capabilities, roomStates, tickCpu) {
   }
   const suitableParent = states.some(state => state && state.room &&
     state.room.controller && state.room.controller.my &&
+    !(Number.isFinite(state.room.controller.safeMode) &&
+      state.room.controller.safeMode > 0) &&
+    !(Number.isFinite(state.room.controller.safeModeCooldown) &&
+      state.room.controller.safeModeCooldown > 0) &&
     !!state.spawn && !state.emergency &&
     Number.isFinite(state.rcl) && state.rcl >= 4 &&
     state.health && state.health.status === 'HEALTHY' &&
