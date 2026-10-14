@@ -120,8 +120,33 @@ game.time=1050;const second=execute();
 assert.equal(second.status,'SPAWN_INTENT_ACCEPTED');
 assert.equal(second.pioneerOrders,2);
 assert.equal(spawns.length,2);
-game.time=1075;assert.equal(execute().reason,'PIONEER_ORDER_LIMIT_REACHED');
-assert.equal(spawns.length,2,'at most two pioneer orders for one claim');
+game.time=1075;
+assert.equal(execute().reason,'PIONEER_REPLACEMENT_COOLDOWN_OR_DEADLINE');
+assert.equal(spawns.length,2,'no premature third pioneer order');
+game.time=1200;
+game.creeps={alive:{memory:{role:'pioneer',
+  claimMissionId:memory.bot.expansionClaim.id,home:'E1N1'}}};
+assert.equal(execute().reason,'PIONEER_REPLACEMENT_NOT_NEEDED',
+  'never replace a surviving pioneer merely because two orders were issued');
+game.creeps={};
+const replacement=execute();
+assert.equal(replacement.status,'SPAWN_INTENT_ACCEPTED');
+assert.equal(replacement.pioneerOrders,3);
+assert.equal(spawns.length,3);
+game.time=1225;
+assert.equal(execute().reason,'PIONEER_REPLACEMENT_COOLDOWN_OR_DEADLINE');
+game.time=1350;
+const lastReplacement=execute();
+assert.equal(lastReplacement.status,'SPAWN_INTENT_ACCEPTED');
+assert.equal(lastReplacement.pioneerOrders,4);
+game.time=1500;
+assert.equal(execute().reason,'PIONEER_ORDER_LIMIT_REACHED');
+assert.equal(spawns.length,4,'maximum four total orders, never unbounded respawns');
+reset();game.time=1800;
+memory.bot.expansionClaim.pioneerOrders=2;
+memory.bot.expansionClaim.lastPioneerSpawnIntentTick=1600;
+assert.equal(execute().reason,'PIONEER_REPLACEMENT_COOLDOWN_OR_DEADLINE',
+  'do not attempt replacement after bootstrap horizon');
 reset();game.creeps={bad:{memory:{role:'pioneer',claimMissionId:mission().id,
   home:'WRONG'}}};
 assert.equal(execute().reason,'FOREIGN_OR_CORRUPT_PIONEER');
