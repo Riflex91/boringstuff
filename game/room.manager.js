@@ -46,35 +46,53 @@ function status(state) {
 }
 
 function safeModeDecision(state) {
-  const controller = state.room && state.room.controller;
-  if (!controller || !controller.my || !state.hostileCreeps.length ||
-      controller.safeMode || !controller.safeModeAvailable) return null;
+  const controller = state && state.room && state.room.controller;
+  const hostiles = state && state.hostileCreeps;
+  if (!controller || !controller.my || !Array.isArray(hostiles) ||
+      !hostiles.length || controller.safeMode ||
+      !controller.safeModeAvailable || controller.safeModeCooldown) return null;
+  const coreTypes = [STRUCTURE_SPAWN, STRUCTURE_STORAGE, STRUCTURE_TOWER];
   const core = (state.structures || []).filter(s =>
-    s && (s.structureType === STRUCTURE_SPAWN ||
-      s.structureType === STRUCTURE_STORAGE) &&
-    Number.isFinite(s.hits) && Number.isFinite(s.hitsMax) && s.hitsMax > 0);
+    s && s.my !== false && coreTypes.includes(s.structureType) &&
+    Number.isFinite(s.hits) && Number.isFinite(s.hitsMax) &&
+    s.hitsMax > 0 && s.hits >= 0 && s.hits <= s.hitsMax && s.pos);
+
+  // D1 release: protect core assets only on observed immediate armed danger.
+  // Inactive body parts, unarmed scouts and distant hostiles cannot trigger
+  // Safe Mode, even when a structure was damaged earlier.
   for (const structure of core) {
-    if (structure.hits < structure.hitsMax * 0.35) {
-      return { reason: 'CRITICAL_CORE_DAMAGE', structure };
-    }
-  }
-  // Predict imminent loss only when a combat-capable hostile is within
-  // immediate strike range of an already damaged protected asset.
-  // Avoid burning Safe Mode for harmless scouts or distant threats.
-  for (const hostile of state.hostileCreeps) {
-    if (!hostile || !hostile.pos || !Array.isArray(hostile.body)) continue;
-    const active = type => hostile.body.some(p => p.type === type && p.hits > 0);
-    const melee = active('attack') || active('work');
-    const ranged = active('ranged_attack');
-    if (!melee && !ranged) continue;
-    for (const structure of core) {
-      if (!structure.pos || typeof hostile.pos.getRangeTo !== 'function') continue;
-      const range = hostile.pos.getRangeTo(structure);
-      const criticalRange = melee && range <= 1 || ranged && range <= 3;
-      if (criticalRange && structure.hits < structure.hitsMax * 0.75) {
-        return { reason: 'IMMINENT_CORE_ATTACK', structure };
+    let nextTickDamage = 0;
+    let armedInRange = false;
+    for (const hostile of hostiles) {
+      if (!hostile || !hostile.pos ||
+          typeof hostile.pos.getRangeTo !== 'function' ||
+          !Array.isArray(hostile.body)) continue;
+      const distance = hostile.pos.getRangeTo(structure);
+      if (!Number.isSafeInteger(distance) || distance < 0) continue;
+      for (const part of hostile.body) {
+        if (!part || !(part.hits > 0)) continue;
+        const close = distance <= 1;
+        let baseDamage = 0;
+        if (close && part.type === 'attack') baseDamage = 30;
+        else if (close && part.type === 'work') baseDamage = 50;
+        else if (distance <= 3 && part.type === 'ranged_attack')
+          baseDamage = 10;
+        if (!baseDamage) continue;
+        armedInRange = true;
+        // Conservative upper bound for a boosted part when boost metadata
+        // is present; no dependence on optional BOOSTS runtime constants.
+        nextTickDamage += baseDamage * (part.boost ? 4 : 1);
       }
     }
+    if (!armedInRange) continue;
+    if (structure.hits < structure.hitsMax * 0.35)
+      return { reason: 'CRITICAL_CORE_DAMAGE', structure };
+    if (structure.hits < structure.hitsMax * 0.75)
+      return { reason: 'IMMINENT_CORE_ATTACK', structure };
+    // Even a healthy spawn needs protection if the observed attackers can
+    // destroy it within three consecutive in-range strikes.
+    if (nextTickDamage > 0 && nextTickDamage * 3 >= structure.hits)
+      return { reason: 'PREDICTED_CORE_LOSS', structure };
   }
   return null;
 }
@@ -285,4 +303,4 @@ function run(room, lowCpu) {
   return state;
 }
 
-module.exports = { run, _test: { status, shadowCpuHeadroom, safeModeDecision } };
+module.exports = { run, _test: { status, shadowCpuHeadroom, safeModeDecision, maybeSafeMode } };
