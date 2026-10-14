@@ -217,6 +217,25 @@ const energy = require('../game/energy.js');
   assert.equal(energy._test.selectConsumerTarget(hauler).id, upgrader.id);
 }
 
+// Emergency guards avoid unnecessary travel when two requests have identical
+// urgency, without overriding the older request or normal role priorities.
+{
+  const farBuilder = makeConsumer('critical-locality-far-builder', 'builder', 0, 7, true, 16);
+  const nearUpgrader = makeConsumer('critical-locality-near-upgrader', 'upgrader', 0, 7, true, 3);
+  const hauler = makeHauler('hauler-critical-locality', {
+    [farBuilder.id]: 16, [nearUpgrader.id]: 3
+  });
+  room.creeps = [farBuilder, nearUpgrader, hauler];
+  assert.equal(energy._test.selectConsumerTarget(hauler, true).id, nearUpgrader.id,
+    'equally urgent critical requests should prefer shorter travel');
+  assert.equal(energy._test.selectConsumerTarget(hauler, false).id, farBuilder.id,
+    'ordinary non-guard deliveries preserve static role priority');
+
+  farBuilder.memory.waitingEnergyTicks = 8;
+  assert.equal(energy._test.selectConsumerTarget(hauler, true).id, farBuilder.id,
+    'an older critical request must outrank proximity');
+}
+
 // Fallback means the request already exceeded the normal wait threshold. It
 // remains urgent even though role.worker resets waitingEnergyTicks to zero when
 // fallback begins.
