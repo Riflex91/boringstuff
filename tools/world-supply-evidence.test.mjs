@@ -571,6 +571,50 @@ assert.deepEqual(result.criticalGapRoomEnergyStates,[],
   assert.deepEqual(acquireReport.haulerActionStates[0].acquisitionTravel,
     acquisitionTravel);
   assert.equal(acquireReport.haulerActionStates[0].settledDeliveryProof,false);
+  assert.equal(Object.hasOwn(
+    acquireReport.haulerActionStates[0].acquisitionTravel,'longContainer'),false,
+    'legacy source-kind schema must remain UNKNOWN on long-range attribution');
+  const longAcquisition={
+    ...acquisitionTravel,range6to10:0,rangeOver10:1,
+    longDrop:0,longContainer:1,longTomb:0
+  };
+  const longSample=make(200,{
+    haulerAcquisitions:{attempted:1,accepted:0,notInRange:1,other:0},
+    acquisitionTravel:longAcquisition
+  });
+  const longReport=summarizeSupplyJournal({...bot,telemetryJournal:{
+    events:[longSample]
+  }},id);
+  assert.equal(longReport.state,'OBSERVATIONS_AVAILABLE');
+  assert.deepEqual(longReport.haulerActionStates[0].acquisitionTravel,longAcquisition,
+    'joint long distance and category counts must survive evidence parsing');
+  assert.equal(longReport.haulerActionStates[0].settledDeliveryProof,false);
+  for (const changes of [
+    {longContainer:2},
+    {longContainer:0},
+    {longDrop:1,longContainer:0},
+    {longDrop:-1,longContainer:2},
+    {longTomb:1},
+    {longContainer:1.5}
+  ]) {
+    const bad=make(200,{haulerAcquisitions:{
+      attempted:1,accepted:0,notInRange:1,other:0
+    },acquisitionTravel:{...longAcquisition,...changes}});
+    const invalidReport=summarizeSupplyJournal({...bot,telemetryJournal:{
+      events:[bad]
+    }},id);
+    assert.equal(invalidReport.state,'REVIEW_REQUIRED',JSON.stringify(changes));
+    assert.equal(invalidReport.observedHaulerActionSamples,0);
+  }
+  const incomplete=make(200,{
+    haulerAcquisitions:{attempted:1,accepted:0,notInRange:1,other:0},
+    acquisitionTravel:{...acquisitionTravel,longDrop:0}
+  });
+  const partialReport=summarizeSupplyJournal({...bot,telemetryJournal:{
+    events:[incomplete]
+  }},id);
+  assert.equal(partialReport.state,'REVIEW_REQUIRED',
+    'partial joint attribution may not pass as a complete source histogram');
   const invalidAcquire=make(175,{
     haulerAcquisitions:{attempted:1,accepted:1,notInRange:0,other:0},
     acquisitionTravel
