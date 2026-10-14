@@ -62,6 +62,12 @@ reset();boot=false;
 assert.equal(execute().reason,'AUTO_EXPANSION_BOOTSTRAP_DISABLED');
 reset();memory.bot.expansionClaim.phase='CLAIMING';
 assert.equal(execute().reason,'CONFIRMED_CLAIM_OR_ROUTE_UNVERIFIED');
+reset();delete memory.bot.expansionClaim.id;
+assert.equal(execute().reason,'CONFIRMED_CLAIM_OR_ROUTE_UNVERIFIED',
+  'missing exact mission id must never spawn a pioneer');
+reset();memory.bot.expansionClaim.confirmedTick=999;
+assert.equal(execute().reason,'CONFIRMED_CLAIM_OR_ROUTE_UNVERIFIED',
+  'confirmation cannot precede claim mission creation');
 reset();target.controller.my=false;
 assert.equal(execute().reason,'PARENT_DEFENSE_OR_SUPPORT_UNVERIFIED');
 reset();home.controller.safeMode=100;
