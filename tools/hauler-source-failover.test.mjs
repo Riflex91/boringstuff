@@ -189,6 +189,47 @@ for (const code of [OK, ERR_BUSY]) {
   assert.deepEqual(calls, [['withdraw', tomb], ['move', tomb]]);
 }
 
+// Integration: real acquisition paths must populate the sampled diagnostic
+// with the actual move return code, without generating new creep intents.
+{
+  const observer = require('../game/consumer.supply.observer.js');
+  const previousGame = global.Game;
+  const previousPos = carrier.pos;
+  const snapshots = [];
+  const logger = { info(_code, _msg, ctx) { snapshots.push(ctx); } };
+  global.Game = {
+    time: 2000,
+    creeps: { carrier },
+    cpu: { bucket: 10000, limit: 30, getUsed() { return 1; } }
+  };
+  carrier.pos = { ...previousPos, getRangeTo() { return 9; } };
+  for (const scenario of [
+    { tick: 2000, kind: 'drop', code: OK },
+    { tick: 2025, kind: 'container', code: ERR_NO_PATH },
+    { tick: 2050, kind: 'tomb', code: ERR_BUSY }
+  ]) {
+    reset();
+    global.Game.time = scenario.tick;
+    present.drop = scenario.kind === 'drop';
+    present.container = scenario.kind === 'container';
+    present.tomb = scenario.kind === 'tomb';
+    pickupRc = withdrawRc = tombWithdrawRc = ERR_NOT_IN_RANGE;
+    moveRc = scenario.code;
+    energy.acquireForHauler(carrier);
+    assert.equal(observer.flush([{ room }], logger, global.Game), 1);
+    const travel = snapshots.at(-1).acquisitionTravel;
+    assert.equal(travel.moveAttempts, 1);
+    assert.equal(travel.range6to10, 1);
+    assert.equal(travel.moveAccepted, scenario.code === OK ? 1 : 0);
+    assert.equal(travel.moveNoPath, scenario.code === ERR_NO_PATH ? 1 : 0);
+    assert.equal(travel.moveTemporarilyBlocked, scenario.code === ERR_BUSY ? 1 : 0);
+    assert.equal(snapshots.at(-1).haulerAcquisitions.notInRange, 1);
+    assert.equal(snapshots.at(-1).acceptedIsIntentNotSettled, true);
+  }
+  carrier.pos = previousPos;
+  global.Game = previousGame;
+}
+
 // No viable resource: report false and let the established role-level
 // harvester/container positioning fallback run.
 reset();
