@@ -89,6 +89,9 @@ reset();towers=[{id:'enemy-tower',structureType:'tower'}];
 role.run(creep);assert.equal(attacks.length,0);
 assert.equal(memory.bot.counterattackMission.reason,
   'ENEMY_TOWER_OR_UNVERIFIED_DEFENSE');
+reset();enemies=[enemy('enemy-scout','Enemy',['move'])];role.run(creep);
+assert.equal(attacks.length,0,'unarmed scout of an aggressor is not a combat target');
+assert.equal(memory.bot.counterattackMission.phase,'ATTACKING');
 reset();enemies=[neutral,healer];role.run(creep);
 assert.equal(attacks.length,0,'third party cannot be attacked');
 assert.equal(memory.bot.counterattackMission.reason,
