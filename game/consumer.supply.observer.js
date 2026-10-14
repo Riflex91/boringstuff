@@ -101,7 +101,6 @@ function recordConsumerTravel(creep, target, moveRc) {
   if (!c) return;
   const t = c.consumerTravel;
   t.moveAttempts++;
-  if (kind === 'drop' || kind === 'container' || kind === 'tomb') t[kind]++;
   let range = null;
   try {
     if (creep && creep.pos && typeof creep.pos.getRangeTo === 'function') {
@@ -131,6 +130,7 @@ function recordAcquisitionTravel(creep, target, moveRc, kind) {
   if (!c) return;
   const t = c.acquisitionTravel;
   t.moveAttempts++;
+  if (kind === 'drop' || kind === 'container' || kind === 'tomb') t[kind]++;
   let range = null;
   try {
     const value = creep?.pos?.getRangeTo?.(target);
