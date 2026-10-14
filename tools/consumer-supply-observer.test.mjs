@@ -12,6 +12,7 @@ const require = createRequire(import.meta.url);
 global.RESOURCE_ENERGY = 'energy';
 global.OK = 0;
 global.ERR_NOT_IN_RANGE = -9;
+global.ERR_NO_PATH = -2;
 global.CARRY = 'carry';
 global.MOVE = 'move';
 global.BODYPART_COST = { carry: 50, move: 50 };
@@ -70,6 +71,9 @@ observer.recordConsumerTravel(loaded, waiting, OK);
 observer.recordResult(loaded, 'consumer', -8);
 observer.recordResult(loaded, 'infrastructure', OK);
 observer.recordResult(collecting, 'haulerAcquisition', ERR_NOT_IN_RANGE);
+collecting.pos = { getRangeTo() { return 9; } };
+observer.recordAcquisitionTravel(collecting, { id:'source' }, OK);
+observer.recordAcquisitionTravel(collecting, { id:'source' }, -2);
 
 assert.equal(observer.flush([state], logger, g), 1);
 assert.equal(eventRows.length, 1);
@@ -124,6 +128,12 @@ assert.deepEqual(evt.ctx.infrastructureTransfers,
   { attempted: 1, accepted: 1, notInRange: 0, other: 0 });
 assert.deepEqual(evt.ctx.haulerAcquisitions,
   { attempted: 1, accepted: 0, notInRange: 1, other: 0 });
+assert.deepEqual(evt.ctx.acquisitionTravel, {
+  moveAttempts: 2, rangeAtMost5: 0, range6to10: 2,
+  rangeOver10: 0, rangeUnknown: 0, moveAccepted: 1,
+  moveNoPath: 1, moveInvalidTarget: 0,
+  moveTemporarilyBlocked: 0, moveOther: 0
+}, 'acquisition movement returns are not successful energy receipts');
 assert.equal(evt.ctx.acceptedIsIntentNotSettled, true);
 assert.deepEqual(evt.ctx.reservationCoverage, {
   criticalWithSticky: 0, criticalWithReadySticky: 0,
@@ -188,6 +198,8 @@ g.cpu.getUsed = () => 10;
 assert.equal(observer.flush([state], logger, g), 1);
 assert.equal(eventRows[1].ctx.decisions.guardChecks, 1);
 assert.equal(eventRows[1].ctx.decisions.guardSelected, 1);
+assert.equal(eventRows[1].ctx.acquisitionTravel.moveAttempts, 0,
+  'acquisition travel counters must reset between sampling ticks');
 assert.equal(eventRows[1].ctx.consumerTransfers.attempted, 0,
   'previous tick action counters must not leak');
 
