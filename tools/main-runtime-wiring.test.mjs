@@ -149,4 +149,17 @@ for (const forbidden of ['.claimController(','.reserveController(',
     'I4 site/path verification remains read-only');
 }
 
+assert.ok(mainSource.includes("require('expansion.claim.launch.preflight')"),
+  'I4 final claim-launch audit must load from active status runtime');
+assert.ok(mainSource.includes('expansionClaimLaunchPreflight.audit('),
+  'claim launcher audit must use real runtime proof rather than synthetic proposals');
+assert.ok(mainSource.includes('    expansionLaunchAudit,'),
+  'STATUS_SNAPSHOT must expose audit holds and measured travel constraints');
+const claimLaunchAuditSource=fs.readFileSync(path.resolve(here,
+  '../game/expansion.claim.launch.preflight.js'),'utf8');
+for(const forbidden of ['.claimController(','.spawnCreep(',
+  '.moveTo(','.attack(','.createConstructionSite('])
+  assert.equal(claimLaunchAuditSource.includes(forbidden),false,
+    'launcher AUDIT may not issue a gameplay intent: '+forbidden);
+
 console.log('main runtime wiring tests passed');
