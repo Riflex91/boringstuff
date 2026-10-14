@@ -56,7 +56,13 @@ function selectTarget(creep) {
 function run(creep) {
   const target = selectTarget(creep);
   if (target) {
-    const rc = creep.attack(target);
+    // Match the attack intent to the actually active body part. A ranged
+    // defender uses its 3-tile weapon; never issue a melee-only attack from a
+    // body with no ATTACK capacity. Existing all-melee behavior is unchanged.
+    const ranged=Array.isArray(creep.body) && creep.body.some(part=>
+      part?.type==='ranged_attack' && part.hits>0);
+    const rc=ranged && typeof creep.rangedAttack==='function'
+      ? creep.rangedAttack(target) : creep.attack(target);
     if (rc === ERR_NOT_IN_RANGE)
       creep.moveTo(target,{reusePath:3,maxRooms:1,maxOps:config.PATH_MAX_OPS});
     return;
