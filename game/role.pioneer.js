@@ -12,6 +12,8 @@ function validMission(creep, memory, game) {
   if (!creep?.memory || creep.memory.role !== 'pioneer' ||
       !m || m.schemaVersion !== 1 ||
       m.phase !== 'CLAIMED' ||
+      typeof m.id !== 'string' || m.id.length > 80 ||
+      !/^claim-[WE][0-9]+[NS][0-9]+-[WE][0-9]+[NS][0-9]+-[0-9]+$/.test(m.id) ||
       m.id !== creep.memory.claimMissionId ||
       !ROOM.test(m.parent || '') || !ROOM.test(m.target || '') ||
       m.parent === m.target ||
