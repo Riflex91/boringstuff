@@ -99,7 +99,7 @@ assert.equal(out.reason,'CLAIMER_WOULD_EXHAUST_PARENT_RESERVE');
 p=params();p.operation.spawnSite=null;
 spawnRc=0;issued=[];
 out=execute(p);
-assert.equal(out.status,'SPAWN_INTENT_ACCEPTED',
-  'executor accepts site evidence from audited preflight only');
-assert.equal(issued.length,1);
+assert.equal(out.reason,'SPAWN_OR_MISSION_UNVERIFIED',
+  'forged preflight cannot authorize missing site geometry');
+assert.equal(issued.length,0);
 console.log('I4 gated single-claimer spawning and mission-commit transaction PASS');
