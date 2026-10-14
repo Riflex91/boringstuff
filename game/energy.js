@@ -225,15 +225,43 @@ function acquireForConsumer(creep) {
   return false;
 }
 
+// During an armed room assault, refill an under-half-charged tower before
+// ordinary extensions. The spawn remains strictly first so defenders,
+// harvesters and recovery bodies can still be spawned. Harmless scouts cannot
+// change infrastructure priority, and this never bypasses infrastructure to
+// serve optional consumer work.
+function armedHostilePresent(room) {
+  if (!room || typeof room.find !== 'function' ||
+      typeof FIND_HOSTILE_CREEPS === 'undefined') return false;
+  const hostiles = room.find(FIND_HOSTILE_CREEPS);
+  return Array.isArray(hostiles) && hostiles.some(h =>
+    h && Array.isArray(h.body) &&
+    h.body.some(p => p && p.hits > 0 &&
+      (p.type === 'attack' || p.type === 'ranged_attack' ||
+       p.type === 'work' || p.type === 'heal')));
+}
+
+function needsCombatTowerRefill(structure) {
+  if (!structure || structure.structureType !== STRUCTURE_TOWER ||
+      !structure.store || typeof structure.store.getCapacity !== 'function')
+    return false;
+  const cap = Number(structure.store.getCapacity(RESOURCE_ENERGY));
+  const energy = Number(structure.store[RESOURCE_ENERGY]);
+  return Number.isFinite(cap) && cap > 0 &&
+    Number.isFinite(energy) && energy >= 0 && energy < cap * 0.5;
+}
+
 function deliveryTargets(creep) {
   const targets = creep.room.find(FIND_MY_STRUCTURES, {
     filter: s => (s.structureType === STRUCTURE_SPAWN || s.structureType === STRUCTURE_EXTENSION || s.structureType === STRUCTURE_TOWER) && freeEnergyCapacity(s) > 0
   });
-  targets.sort((a, b) => {
-    const pa = a.structureType === STRUCTURE_SPAWN ? 0 : a.structureType === STRUCTURE_EXTENSION ? 1 : 2;
-    const pb = b.structureType === STRUCTURE_SPAWN ? 0 : b.structureType === STRUCTURE_EXTENSION ? 1 : 2;
-    return pa - pb || creep.pos.getRangeTo(a) - creep.pos.getRangeTo(b);
-  });
+  const combatPressure = armedHostilePresent(creep.room);
+  const priority = s => s.structureType === STRUCTURE_SPAWN ? 0 :
+    combatPressure && needsCombatTowerRefill(s) ? 1 :
+    s.structureType === STRUCTURE_EXTENSION ? 2 : 3;
+  targets.sort((a, b) =>
+    priority(a) - priority(b) ||
+    creep.pos.getRangeTo(a) - creep.pos.getRangeTo(b));
   return targets;
 }
 
