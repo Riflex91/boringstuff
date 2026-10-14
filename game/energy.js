@@ -484,6 +484,13 @@ function selectConsumerTarget(creep, criticalOnly = false) {
     const ratioDelta = consumerEnergyRatio(a) - consumerEnergyRatio(b);
     if (ratioDelta !== 0) return ratioDelta;
 
+    // Emergency guards reduce travel time for equally urgent consumers.
+    // Preserve fallback, waiting age, emptiness and energy-ratio ordering;
+    // only use locality before static role priority for critical requests.
+    if (criticalOnly) {
+      const distanceDelta = creep.pos.getRangeTo(a) - creep.pos.getRangeTo(b);
+      if (distanceDelta !== 0) return distanceDelta;
+    }
     return consumerPriority(a) - consumerPriority(b) || creep.pos.getRangeTo(a) - creep.pos.getRangeTo(b);
   });
   return consumers[0] || null;
