@@ -1054,3 +1054,71 @@ console.log('consumer supply tests passed');
   if (oldName === undefined) delete room.name;
   else room.name=oldName;
 }
+
+
+// D1 active defense: conserve spawning as hard top priority while refilling
+// a below-half-energy tower before optional extension fill under armed threat.
+// This is a target-order and actual hauler-delivery regression; no extra
+// movement, attack, pathfinding or consumer-target authorization.
+{
+  const originalFind=room.find;
+  const hadHostile=Object.hasOwn(global,'FIND_HOSTILE_CREEPS');
+  const previousHostile=global.FIND_HOSTILE_CREEPS;
+  const hadOwnStructures=Object.hasOwn(global,'FIND_MY_STRUCTURES');
+  const previousOwnStructures=global.FIND_MY_STRUCTURES;
+  global.FIND_HOSTILE_CREEPS=111;
+  global.FIND_MY_STRUCTURES=112;
+  const spawn={id:'defense-spawn',structureType:STRUCTURE_SPAWN,
+    store:makeStore(300,200),pos:{range:8}};
+  const extension={id:'defense-ext',structureType:STRUCTURE_EXTENSION,
+    store:makeStore(50,0),pos:{range:2}};
+  const tower={id:'defense-tower',structureType:STRUCTURE_TOWER,
+    store:makeStore(1000,100),pos:{range:7}};
+  const healthyTower={id:'defense-full-tower',structureType:STRUCTURE_TOWER,
+    store:makeStore(1000,900),pos:{range:1}};
+  let hostiles=[];
+  const buildings=[spawn,extension,tower,healthyTower];
+  room.find=function(type,opts) {
+    if(type===FIND_MY_STRUCTURES)
+      return opts?.filter ? buildings.filter(opts.filter) : buildings.slice();
+    if(type===FIND_HOSTILE_CREEPS)return hostiles.slice();
+    return originalFind.call(this,type,opts);
+  };
+  const hauler=makeHauler('combat-tower-hauler');
+  const ids=()=>energy.deliveryTargets(hauler).map(x=>x.id);
+  const normal=[spawn.id,extension.id,tower.id,healthyTower.id];
+  try {
+    assert.deepEqual(ids(),normal,'no attack preserves spawn/extension priority');
+    hostiles=[{body:[{type:'move',hits:100}]}];
+    assert.deepEqual(ids(),normal,'harmless scout may not divert tower energy');
+    hostiles=[{body:[{type:'attack',hits:0}]}];
+    assert.deepEqual(ids(),normal,'destroyed combat parts are harmless');
+    hostiles=[{body:[{type:'attack',hits:100}]}];
+    assert.deepEqual(ids(),[spawn.id,tower.id,extension.id,healthyTower.id],
+      'defensive low tower outranks extension while spawn stays protected');
+    let transferTarget=null;
+    hauler.transfer=target=>{transferTarget=target.id;return OK;};
+    assert.equal(energy.deliver(hauler),true);
+    assert.equal(transferTarget,spawn.id,'spawn energy is still hard priority');
+    spawn.store.energy=300;
+    assert.equal(energy.deliver(hauler),true);
+    assert.equal(transferTarget,tower.id,'hauler actually supplies urgent tower');
+    tower.store.energy=500;
+    assert.deepEqual(ids(),[extension.id,tower.id,healthyTower.id],
+      'half-charged tower returns to normal low priority');
+    tower.store.energy=100;
+    hostiles=[{body:[{type:'heal',hits:100}]}];
+    assert.equal(ids()[0],tower.id,
+      'armed heal support also warrants defensive tower ammunition');
+    hostiles=[{body:[{type:'attack',hits:100}]}];
+    delete tower.store.getCapacity;
+    assert.equal(ids()[0],extension.id,
+      'unverified capacity cannot silently override extension priority');
+  } finally {
+    room.find=originalFind;
+    if(hadHostile)global.FIND_HOSTILE_CREEPS=previousHostile;
+    else delete global.FIND_HOSTILE_CREEPS;
+    if(hadOwnStructures)global.FIND_MY_STRUCTURES=previousOwnStructures;
+    else delete global.FIND_MY_STRUCTURES;
+  }
+}
