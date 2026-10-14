@@ -165,9 +165,10 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
       const validAcquisitionTravel = !hasAcquisitionTravel || (
         acquisitionTravel && typeof acquisitionTravel === 'object' &&
         !Array.isArray(acquisitionTravel) &&
-        Object.keys(acquisitionTravel).length === travelKeys.length &&
-        travelKeys.every(key => Object.hasOwn(acquisitionTravel,key) &&
-          goodInt(acquisitionTravel[key])) &&
+        Object.keys(acquisitionTravel).length === travelKeys.length + 3 &&
+        travelKeys.concat(['drop','container','tomb']).every(key =>
+          Object.hasOwn(acquisitionTravel,key) && goodInt(acquisitionTravel[key])) &&
+        acquisitionTravel.drop + acquisitionTravel.container + acquisitionTravel.tomb === acquisitionTravel.moveAttempts &&
         acquisitionTravel.moveAttempts <= x.haulerAcquisitions?.notInRange &&
         acquisitionTravel.rangeAtMost5 + acquisitionTravel.range6to10 +
           acquisitionTravel.rangeOver10 + acquisitionTravel.rangeUnknown ===
