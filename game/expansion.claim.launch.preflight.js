@@ -123,6 +123,8 @@ function audit(readiness,operation,budget,continuity,states,game,memory) {
 
   const prior=memory.bot.expansionClaim;
   if(prior) {
+    if(prior.phase==='CLAIMING' || prior.phase==='CLAIMED')
+      return hold('CLAIM_MISSION_OR_ABORT_BACKOFF');
     // After an actual first spawn was observed, a future independent claim
     // may be considered. Do not unlock on an accepted construction intent
     // or an unchecked Memory phase: verify room ownership, original site and
