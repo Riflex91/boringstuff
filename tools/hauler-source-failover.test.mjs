@@ -381,6 +381,29 @@ for (const code of [OK, ERR_BUSY]) {
     assert.equal(sample.acquisitionTravel.moveAttempts,0);
     assert.equal(sample.acceptedIsIntentNotSettled,true);
   }
+  // If an eligible local source is terminally blocked, fallback to an
+  // accepted drop must count ONLY the drop OK; the rejected withdraw is not
+  // a successful energy receipt and cannot inflate source-kind totals.
+  reset();
+  global.Game.time=2250;
+  carrier.pos={...previousPos,getRangeTo(target) {
+    return target===drop ? 12 : target===container ? 2 : 4;
+  }};
+  withdrawRc=ERR_NOT_IN_RANGE;
+  moveRc=ERR_NO_PATH;
+  assert.equal(energy.acquireForHauler(carrier),true);
+  assert.deepEqual(calls,[
+    ['withdraw',container],['move',container],['pickup',drop]
+  ]);
+  assert.equal(observer.flush([{room}],logger,global.Game),1);
+  assert.deepEqual(snapshots.at(-1).acceptedAcquisitionKinds,{
+    drop:1,container:0,tomb:0
+  },'only accepted fallback drop counts, never failed preferred container');
+  assert.equal(snapshots.at(-1).haulerAcquisitions.attempted,2);
+  assert.equal(snapshots.at(-1).haulerAcquisitions.accepted,1);
+  assert.equal(snapshots.at(-1).longDropChoice.preferredLocalContainer,1);
+  assert.equal(snapshots.at(-1).acquisitionTravel.moveNoPath,1);
+
   container.store.energy=originalEnergy;
   carrier.pos = previousPos;
   global.Game = previousGame;
