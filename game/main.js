@@ -18,6 +18,8 @@ const expansionCandidatesShadow = require('expansion.candidates.shadow');
 const expansionOperationShadow = require('expansion.operation.shadow');
 const expansionBootstrapBudgetShadow = require('expansion.bootstrap.budget.shadow');
 const expansionClaimLaunchPreflight = require('expansion.claim.launch.preflight');
+const expansionClaimLaunchExecutor = require('expansion.claim.launch.executor');
+const expansionPioneerProvisioner = require('expansion.pioneer.provisioner');
 const expansionParentStabilityShadow = require('expansion.parent.stability.shadow');
 const serverProfile = require('server.profile');
 const processScheduler = require('process.scheduler');
@@ -177,6 +179,29 @@ function statusSnapshot(roomStates, tickCpu) {
       readyForAutonomousLaunch:false,spawnActionEnabled:false,
       claimActionEnabled:false};
   }
+  // Release-gated I4: audit, then at most one guarded expedition action per
+  // existing 100-tick status cadence. Both flags default FALSE; a SHADOW
+  // advisory is never converted into an unconditional spawn.
+  let expansionClaimLaunch = {status:'DISABLED',reason:'AUTO_EXPANSION_CLAIM_OFF'};
+  let expansionPioneerProvision = {status:'DISABLED',reason:'AUTO_EXPANSION_BOOTSTRAP_OFF'};
+  if (config.AUTO_EXPANSION_CLAIM === true) {
+    try {
+      expansionClaimLaunch = expansionClaimLaunchExecutor.start(
+        expansionReadiness,expansionOperation,expansionBootstrapBudget,
+        expansionParentStability,roomStates,Game,Memory);
+    } catch (_) {
+      expansionClaimLaunch = {status:'HOLD',reason:'CLAIM_EXECUTOR_EXCEPTION'};
+    }
+  }
+  if (config.AUTO_EXPANSION_CLAIM === true &&
+      config.AUTO_EXPANSION_BOOTSTRAP === true) {
+    try {
+      expansionPioneerProvision = expansionPioneerProvisioner.provision(
+        roomStates,Game,Memory,expansionParentStability);
+    } catch (_) {
+      expansionPioneerProvision = {status:'HOLD',reason:'PIONEER_EXECUTOR_EXCEPTION'};
+    }
+  }
   const schedulerState = processScheduler.snapshot();
   const worldIntelState = worldIntel.snapshot();
   const transitEvidence = defenseTransitEvidence.snapshot(Game, Memory);
@@ -246,6 +271,8 @@ function statusSnapshot(roomStates, tickCpu) {
     expansionOperation,
     expansionBootstrapBudget,
     expansionLaunchAudit,
+    expansionClaimLaunch,
+    expansionPioneerProvision,
     expansionParentStability,
     serverProfile: profile,
     scheduler: schedulerState,
@@ -289,6 +316,20 @@ module.exports.loop = function() {
   const tickStart = Game.cpu.getUsed();
   try {
     measureMainDetail('main.bootstrap', bootstrapMemory);
+    // A previously accepted claimer spawn may vanish or discover an owned
+    // target. Resolve the bounded ledger every real game tick even if the
+    // launch flag is later disabled. Never mistake OK for verified ownership.
+    if (Memory.bot?.expansionClaim?.phase === 'CLAIMING') {
+      try {
+        const resolution = expansionClaimLaunchExecutor.supervise(Game,Memory);
+        if (resolution?.changed) logger.info('I4_CLAIM_MISSION_RESOLVED',
+          'Verified colony claim or aborted unsafe expedition', {
+            ...resolution,missionId:Memory.bot.expansionClaim.id,
+            target:Memory.bot.expansionClaim.target
+          }, {force:true,persist:true,dedupeTicks:0});
+      } catch (_) { /* supervisor must never interrupt legacy creep work */ }
+    }
+
     measureMainDetail('main.commands', function() { commands.install(); });
     measureMainDetail('main.logger-prune', function() { logger.prune(); });
     measureMainDetail('main.cleanup', cleanupMemory);
