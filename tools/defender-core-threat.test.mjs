@@ -5,8 +5,10 @@ import vm from 'node:vm';
 const source=fs.readFileSync(new URL('../game/role.defender.js',import.meta.url),'utf8');
 const context={
   module:{exports:{}},
+  Game:{},
   require(name) {
     if(name==='config')return {PATH_MAX_OPS:200};
+    if(name==='defense.regional.live')return {run(){return false;}};
     throw new Error('unexpected import: '+name);
   },
   FIND_HOSTILE_CREEPS:1,FIND_MY_STRUCTURES:2,FIND_MY_SPAWNS:3,
