@@ -22,7 +22,20 @@ const original={deploymentId:'exact-deployment-123',
     ],
     snapshots:[{c:'STATUS_SNAPSHOT',t:200,x:{
       spawnlessWorkerRescue:{last:{status:'COMPLETED'}}
-    }},{c:'STATUS_SNAPSHOT',t:300,x:{}}]
+    }},{c:'STATUS_SNAPSHOT',t:300,x:{
+      gcl:{level:1},
+      expansionReadiness:{
+        ownedRooms:1,availableClaimSlots:0,status:'AT_CAPACITY',
+        reasons:['NO_AVAILABLE_CLAIM_SLOT']
+      },
+      expansionCandidates:{status:'HOLD',
+        reason:'EXPANSION_BUDGET_NOT_READY',candidateCount:0},
+      expansionOperation:{phase:'NO_ACTIVE_SITE'},
+      expansionClaimLaunch:{status:'HOLD',
+        reason:'GCL_OR_EXISTING_CLAIMER_COMMITMENT'},
+      expansionBootstrapRecoveryResult:{status:'HOLD',
+        reason:'NO_VERIFIED_BLOCKED_BOOTSTRAP'}
+    }}]
   },
   ownedSpawnRecovery:{schemaVersion:1,rooms:{
     W37S79:{lastSpawnId:'owned-1',pos:{roomName:'W37S79'}},
@@ -50,6 +63,22 @@ assert.equal(evidence.rescue.last.completedTick,200);
 assert.equal(evidence.rescue.active,null);
 assert.equal(evidence.witnessedSpawnRoomCount,2);
 assert.equal(evidence.latestSnapshotTick,300);
+assert.equal(evidence.expansion.source,
+  'LIVE_STATUS_SNAPSHOT_NOT_CLAIM_AUTHORITY');
+assert.equal(evidence.expansion.tick,300);
+assert.equal(evidence.expansion.gclLevel,1);
+assert.equal(evidence.expansion.ownedRooms,1);
+assert.equal(evidence.expansion.availableClaimSlots,0);
+assert.equal(evidence.expansion.readinessStatus,'AT_CAPACITY');
+assert.deepEqual(evidence.expansion.readinessReasons,
+  ['NO_AVAILABLE_CLAIM_SLOT']);
+assert.equal(evidence.expansion.candidateCount,0);
+assert.equal(evidence.expansion.candidatesReason,'EXPANSION_BUDGET_NOT_READY');
+assert.equal(evidence.expansion.launchReason,
+  'GCL_OR_EXISTING_CLAIMER_COMMITMENT');
+assert.equal(evidence.expansion.bootstrapRecoveryReason,
+  'NO_VERIFIED_BLOCKED_BOOTSTRAP');
+
 assert.ok(!JSON.stringify(evidence).includes('exact-deployment-123'),
   'do not expose user memory contents or deployment identifiers');
 const compressed={data:'gz:'+gzipSync(
@@ -71,6 +100,26 @@ const empty=inspectWorldRecoveryEvidence({data:JSON.stringify({
 assert.equal(empty.observedEventCount,0);
 assert.equal(empty.rescue,null);
 assert.equal(empty.latestSnapshotTick,null);
+assert.equal(empty.expansion,null,
+  'no STATUS_SNAPSHOT does not equal absent expansion intent');
+const invalidStatus=structuredClone(original);
+invalidStatus.telemetryJournal.snapshots[1].x.expansionReadiness.reasons=[
+  'NORMAL_REASON', '<script>bad</script>',
+  'VERY_LONG_'+ 'X'.repeat(300)
+];
+invalidStatus.telemetryJournal.snapshots[1].x.expansionClaimLaunch.reason=
+  '<hostile arbitrary text>';
+const sanitized=inspectWorldRecoveryEvidence({
+  data:JSON.stringify(invalidStatus)
+});
+assert.deepEqual(sanitized.expansion.readinessReasons,['NORMAL_REASON'],
+  'untrusted long or dangerous text is never printed as live diagnostics');
+assert.equal(sanitized.expansion.launchReason,null);
+const delayed=structuredClone(original);
+delayed.telemetryJournal.snapshots[1].x={};
+const absent=inspectWorldRecoveryEvidence({data:JSON.stringify(delayed)});
+assert.equal(absent.expansion,null,
+  'a newer snapshot without readiness never inherits stale old claim reasons');
 const bounded=structuredClone(original);
 bounded.spawnlessWorkerRescueLedger.history.push(
   ...Array.from({length:7},()=>({status:'LOST'})));
