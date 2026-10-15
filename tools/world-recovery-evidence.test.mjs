@@ -28,6 +28,7 @@ const original={deploymentId:'exact-deployment-123',
       gcl:{level:1,progress:123456,progressTotal:1000000},
       rooms:{W37S79:{
         rcl:4,controllerProgress:180520,controllerProgressTotal:405000,
+        safeModeRemainingTicks:0,safeModeCooldownRemainingTicks:255,
         energyAvailable:780,energyCapacity:1100,energyStored:2500,
         constructionSites:1,
         economy:{last100:{controllerProgress:1000}},
@@ -93,6 +94,9 @@ assert.equal(evidence.expansion.observedGclProgressPerTick,10);
 assert.equal(evidence.expansion.suitableParent,false);
 assert.equal(evidence.expansion.home.room,'W37S79');
 assert.equal(evidence.expansion.home.rcl,4);
+assert.equal(evidence.expansion.home.safeModeRemainingTicks,0);
+assert.equal(evidence.expansion.home.safeModeCooldownRemainingTicks,255);
+assert.equal(evidence.expansion.home.parentDefenseGate,'SAFE_MODE_COOLDOWN_ACTIVE');
 assert.equal(evidence.expansion.home.observedControllerProgressPerTick,10);
 assert.equal(evidence.expansion.home.economyWindowControllerProgress,1000);
 assert.equal(evidence.expansion.home.healthStatus,'WATCH');
@@ -190,6 +194,32 @@ assert.equal(filteredHome.healthScore,null);
 assert.deepEqual(filteredHome.healthReasons,['HAULING_DEFICIT']);
 assert.equal(filteredHome.haulingDeficit,null,
   'missing numeric evidence cannot become an invented zero');
+const activeProtection=structuredClone(original);
+activeProtection.telemetryJournal.snapshots[1].x.rooms.W37S79.safeModeRemainingTicks=10;
+assert.equal(inspectWorldRecoveryEvidence({
+  data:JSON.stringify(activeProtection)
+}).expansion.home.parentDefenseGate,'SAFE_MODE_ACTIVE',
+  'active safe mode takes precedence over cooldown');
+const noProtection=structuredClone(original);
+noProtection.telemetryJournal.snapshots[1].x.rooms.W37S79.safeModeCooldownRemainingTicks=0;
+assert.equal(inspectWorldRecoveryEvidence({
+  data:JSON.stringify(noProtection)
+}).expansion.home.parentDefenseGate,'NO_ACTIVE_PROTECTION');
+const unknownProtection=structuredClone(original);
+delete unknownProtection.telemetryJournal.snapshots[1].x.rooms.W37S79.safeModeCooldownRemainingTicks;
+assert.equal(inspectWorldRecoveryEvidence({
+  data:JSON.stringify(unknownProtection)
+}).expansion.home.parentDefenseGate,'UNVERIFIED',
+  'missing cooldown evidence must not imply no active protection');
+const spoofedProtection=structuredClone(original);
+spoofedProtection.telemetryJournal.snapshots[1].x.rooms.W37S79.safeModeCooldownRemainingTicks='255';
+assert.equal(inspectWorldRecoveryEvidence({
+  data:JSON.stringify(spoofedProtection)
+}).expansion.home.safeModeCooldownRemainingTicks,null,
+  'stringified or tampered cooldown data is rejected');
+assert.equal(inspectWorldRecoveryEvidence({
+  data:JSON.stringify(spoofedProtection)
+}).expansion.home.parentDefenseGate,'UNVERIFIED');
 const resetGcl=structuredClone(original);
 resetGcl.telemetryJournal.snapshots[0].x.gcl.level=0;
 assert.equal(inspectWorldRecoveryEvidence({
