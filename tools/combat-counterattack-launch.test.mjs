@@ -76,7 +76,7 @@ assert.equal(start([home],game,memory).reason,
   'TOWER_OR_THIRD_PARTY_OR_TARGET_UNVERIFIED','real tower blocks all attacks');
 reset();enemyRoom.controller.owner.username='Other';
 assert.equal(start([home],game,memory).reason,'LIVE_OWNER_PARENT_OR_ROOM_UNVERIFIED');
-reset();home.energyStored=1000;
+reset();home.energyStored=10000;
 assert.equal(start([home],game,memory).reason,
   'LIVE_OWNER_PARENT_OR_ROOM_UNVERIFIED');
 reset();home.hostileCreeps=[enemy()];
