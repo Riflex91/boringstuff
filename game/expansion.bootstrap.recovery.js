@@ -142,7 +142,8 @@ function resume(states,game,memory,continuity) {
   let sites;
   try {sites=target.find(FIND_MY_CONSTRUCTION_SITES);}
   catch(_){return hold('FIRST_SPAWN_SITE_OBSERVATION_FAILED');}
-  if(!Array.isArray(sites) ||
+  if(typeof STRUCTURE_SPAWN==='undefined' ||
+     !Array.isArray(sites) ||
      sites.some(s=>s?.structureType===STRUCTURE_SPAWN &&
        (s.pos?.roomName!==m.target ||
         s.pos?.x!==site.x || s.pos?.y!==site.y)))
