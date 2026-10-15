@@ -20,6 +20,7 @@ const expansionBootstrapBudgetShadow = require('expansion.bootstrap.budget.shado
 const expansionClaimLaunchPreflight = require('expansion.claim.launch.preflight');
 const expansionClaimLaunchExecutor = require('expansion.claim.launch.executor');
 const expansionPioneerProvisioner = require('expansion.pioneer.provisioner');
+const expansionBootstrapRecovery = require('expansion.bootstrap.recovery');
 const expansionParentStabilityShadow = require('expansion.parent.stability.shadow');
 const serverProfile = require('server.profile');
 const processScheduler = require('process.scheduler');
@@ -161,6 +162,22 @@ function statusSnapshot(roomStates, tickCpu) {
   // before accepting geometry or retaining a previously verified site.
   const expansionParentStability = expansionParentStabilityShadow.snapshot(
     Memory, Game.time);
+  // Only an independently re-observed still-owned first-Spawn mission is
+  // recoverable; bounded rescue waves are not a second claim permission.
+  let expansionBootstrapRecoveryResult={status:'DISABLED'};
+  try {
+    expansionBootstrapRecoveryResult =
+      expansionBootstrapRecovery.resume(roomStates,Game,Memory,
+        expansionParentStability);
+    if(expansionBootstrapRecoveryResult.changed)
+      logger.info('I4_BOOTSTRAP_RECOVERY_RESOLVED',
+        'Verified first Spawn or bounded existing-claim crew rescue',
+        expansionBootstrapRecoveryResult,
+        {force:true,persist:true,dedupeTicks:0});
+  } catch (_) {
+    expansionBootstrapRecoveryResult={
+      status:'HOLD',reason:'BOOTSTRAP_RECOVERY_EXCEPTION'};
+  }
   const expansionOperation = expansionOperationShadow.evaluate(
     expansionReadiness,expansionCandidates,roomStates,Game,Memory,
     expansionParentStability);
@@ -298,6 +315,7 @@ function statusSnapshot(roomStates, tickCpu) {
     expansionLaunchAudit,
     expansionClaimLaunch,
     expansionPioneerProvision,
+    expansionBootstrapRecoveryResult,
     expansionParentStability,
     serverProfile: profile,
     scheduler: schedulerState,
