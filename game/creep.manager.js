@@ -5,6 +5,7 @@ const harvester = require('role.harvester');
 const hauler = require('role.hauler');
 const worker = require('role.worker');
 const defender = require('role.defender');
+const civilianEvacuation = require('defense.civilian.evacuate');
 const scout = require('role.scout');
 const claimer = require('role.claimer');
 const pioneer = require('role.pioneer');
@@ -33,6 +34,9 @@ function runCreep(creep) {
     return;
   }
   try {
+    // Short-circuit productive jobs only when an observed nearby armed enemy
+    // caused a successful real flee intent in our owned room.
+    if(civilianEvacuation.run(creep,Game))return;
     handler.run(creep);
   } catch (err) {
     logger.error('CREEP_EXCEPTION', 'Creep role threw an exception', err, { creep: creep.name, role, room: creep.room.name });
