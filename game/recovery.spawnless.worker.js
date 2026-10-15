@@ -42,6 +42,25 @@ function advance(memory,game,creep,status,reason=null) {
   }
   return true;
 }
+function reconcile(memory,game) {
+  const data=ledger(memory),mission=data?.active,tick=game?.time;
+  if(!mission || !Number.isSafeInteger(tick) ||
+     !game?.creeps || tick<=mission.assignedTick)
+    return {status:'NO_STALE_RESCUE'};
+  const c=game.creeps[mission.worker];
+  if(c && c.memory?.spawnRescueHome===mission.home &&
+     c.memory?.spawnRescueTarget===mission.target)
+    return {status:'ACTIVE'};
+  mission.status=c?'ABORTED':'LOST';
+  mission.reason=c?'CREW_MISSION_BINDING_CHANGED':'WORKER_NOT_IN_GAME_CREEPS';
+  mission.lastObservedTick=tick;
+  data.history.push({...mission});
+  if(data.history.length>HISTORY_MAX)
+    data.history.splice(0,data.history.length-HISTORY_MAX);
+  data.active=null;
+  return {status:mission.status,worker:mission.worker,
+    home:mission.home,target:mission.target,reason:mission.reason};
+}
 function summary(memory) {
   const data=memory?.bot?.spawnlessWorkerRescueLedger;
   if(data?.schemaVersion!==LEDGER_SCHEMA ||
@@ -103,6 +122,14 @@ function dispatch(states,game,memory) {
      !Number.isFinite(game.cpu.limit) ||
      typeof game.cpu.getUsed!=='function' ||
      game.cpu.limit-game.cpu.getUsed()<12)return hold('RESCUE_CADENCE_OR_CPU');
+  // A dead or reassigned rescuer must not occupy the singleton forever,
+  // nor be silently overwritten by a newly dispatched worker.
+  reconcile(memory,game);
+  const recentLoss=memory?.bot?.spawnlessWorkerRescueLedger?.history
+    ?.some(x=>x?.status==='LOST' &&
+      Number.isSafeInteger(x.lastObservedTick) &&
+      tick>=x.lastObservedTick && tick-x.lastObservedTick<500);
+  if(recentLoss)return hold('RECENT_RESCUER_LOSS_COOLDOWN');
   if(Object.values(game.creeps).some(c=>c?.memory?.spawnRescueTarget))
     return hold('RESCUER_ALREADY_ASSIGNED');
   // No second field economy mission while a claim or hostile operation
@@ -307,4 +334,4 @@ function travel(creep,game,destination) {
     maxOps:Math.min(300,config.PATH_MAX_OPS||300)});
   return true;
 }
-module.exports={dispatch,run,summary,_test:{labor,witness,adjacent,ledger,advance}};
+module.exports={dispatch,run,summary,reconcile,_test:{labor,witness,adjacent,ledger,advance}};
