@@ -151,13 +151,19 @@ function run(creep,game,memory) {
     return travel(creep,game,from);
   }
   if(typeof FIND_HOSTILE_CREEPS==='undefined' ||
-     typeof FIND_MY_SPAWNS==='undefined')return true;
-  let hostiles,spawns;
+     typeof FIND_HOSTILE_STRUCTURES==='undefined' ||
+     typeof FIND_MY_SPAWNS==='undefined' ||
+     typeof game.rooms[from]?.find!=='function')return true;
+  let hostiles,spawns,targetBuildings,homeEnemies;
   try{
     hostiles=target.find(FIND_HOSTILE_CREEPS);
     spawns=target.find(FIND_MY_SPAWNS);
+    targetBuildings=target.find(FIND_HOSTILE_STRUCTURES);
+    homeEnemies=game.rooms[from].find(FIND_HOSTILE_CREEPS);
   }catch(_){return true;}
-  if(!Array.isArray(hostiles) || !Array.isArray(spawns))return true;
+  if(!Array.isArray(hostiles) || !Array.isArray(spawns) ||
+     !Array.isArray(targetBuildings) ||
+     !Array.isArray(homeEnemies))return true;
   const verifiedSpawn=spawns.find(s=>s?.my===true &&
     s.pos?.roomName===to &&
     s.pos.x===record.pos.x && s.pos.y===record.pos.y);
@@ -172,7 +178,8 @@ function run(creep,game,memory) {
     now-creep.memory.spawnRescueAssignedTick>MISSION_TICKS ||
     !Number.isSafeInteger(creep.ticksToLive) ||
     creep.ticksToLive<150 ||
-    hostiles.length>0 ||
+    hostiles.length>0 || targetBuildings.length>0 ||
+    homeEnemies.length>0 ||
     !!home?.controller?.safeMode ||
     !!home?.controller?.safeModeCooldown ||
     spawns.length>0; // different-position Spawn must not fake success
