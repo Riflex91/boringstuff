@@ -75,6 +75,8 @@ module.exports = {
   // Conservative safety defaults. Turn on only after reviewing logs.
   // D1 survival: use the bounded core-loss guard, never lone scouts.
   AUTO_SAFE_MODE: true,
+  // D2: one safe preexisting defender across directly adjacent own rooms.
+  AUTO_REGIONAL_DEFENSE_SUPPORT: true,
   // U8 I4: automatic candidate -> guarded claim -> bounded bootstrap.
   // Can issue gameplay intents ONLY after original real-time GCL, verified
   // controller/route/TTL, 100-tick parent stability, CPU and reserve checks.
