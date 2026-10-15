@@ -9,6 +9,7 @@ const ROOM=/^[WE][0-9]+[NS][0-9]+$/;
 const MISSION_TICKS=900;
 const LEDGER_SCHEMA=1;
 const HISTORY_MAX=6;
+const OUTBOUND_STALL_TICKS=75;
 // Every receipt is backed by current Game observations, not by intentions
 // being interpreted as a completed Spawn or an achieved route.
 function ledger(memory) {
@@ -29,9 +30,13 @@ function advance(memory,game,creep,status,reason=null) {
      (creep.memory.spawnRescueHome!==mission.home ||
       creep.memory.spawnRescueTarget!==mission.target))return false;
   if(mission.status===status)return false;
+  const previousStatus=mission.status;
   mission.status=status;
   mission.lastObservedTick=tick;
-  if(reason)mission.reason=reason;
+  // A returned worker keeps the original observed trigger for the recall,
+  // rather than replacing it with a generic return reason.
+  if(reason && !(status==='RETURNED' && previousStatus==='RETREAT' &&
+      mission.reason))mission.reason=reason;
   if(status==='ARRIVED')mission.arrivedTick=tick;
   if(status==='COMPLETED')mission.completedTick=tick;
   if(['COMPLETED','RETURNED','ABORTED'].includes(status)) {
@@ -60,6 +65,30 @@ function reconcile(memory,game) {
   data.active=null;
   return {status:mission.status,worker:mission.worker,
     home:mission.home,target:mission.target,reason:mission.reason};
+}
+// Track ACTUAL observed tile changes, never successful-looking moveTo
+// return codes. If the worker cannot leave its own safe origin for 75 ticks,
+// free the reserve instead of suppressing ordinary work for 900 ticks.
+function outboundStalled(creep,game,memory) {
+  const mission=memory?.bot?.spawnlessWorkerRescueLedger?.active;
+  const tick=game?.time,pos=creep?.pos;
+  if(!mission || mission.worker!==creep?.name ||
+     mission.status!=='ASSIGNED' ||
+     creep?.room?.name!==mission.home ||
+     !Number.isSafeInteger(tick) ||
+     tick<mission.assignedTick ||
+     !Number.isInteger(pos?.x) || !Number.isInteger(pos?.y) ||
+     pos.x<0 || pos.x>49 || pos.y<0 || pos.y>49)
+    return false;
+  const location=mission.home+':'+pos.x+':'+pos.y;
+  if(mission.lastOutboundPos!==location ||
+     !Number.isSafeInteger(mission.lastOutboundMotionTick) ||
+     tick<mission.lastOutboundMotionTick) {
+    mission.lastOutboundPos=location;
+    mission.lastOutboundMotionTick=tick;
+    return false;
+  }
+  return tick-mission.lastOutboundMotionTick>=OUTBOUND_STALL_TICKS;
 }
 function summary(memory) {
   const data=memory?.bot?.spawnlessWorkerRescueLedger;
@@ -286,8 +315,8 @@ function run(creep,game,memory) {
     mission.home===from && mission.target===to &&
     typeof mission.oldSpawnId==='string' &&
     verifiedSpawn.id!==mission.oldSpawnId;
-  if(newSpawn && creep.room.name===to &&
-     hostiles.length===0 && targetBuildings.length===0 &&
+  if(newSpawn && mission.status!=='RETREAT' &&
+     creep.room.name===to && hostiles.length===0 && targetBuildings.length===0 &&
      homeEnemies.length===0 &&
      config.AUTO_SPAWNLESS_WORKER_RESCUE===true &&
      Number.isSafeInteger(creep.ticksToLive) &&
@@ -299,7 +328,8 @@ function run(creep,game,memory) {
     return false; // physical new Spawn, not a proposed construction site
   }
   const home=game.rooms[from];
-  const expired=config.AUTO_SPAWNLESS_WORKER_RESCUE!==true ||
+  const expired=mission?.status==='RETREAT' ||
+    config.AUTO_SPAWNLESS_WORKER_RESCUE!==true ||
     now-creep.memory.spawnRescueAssignedTick>MISSION_TICKS ||
     !Number.isSafeInteger(creep.ticksToLive) ||
     creep.ticksToLive<150 ||
@@ -322,6 +352,11 @@ function run(creep,game,memory) {
     advance(memory,game,creep,'ARRIVED');
     return false; // observed onsite: ordinary worker energy/build
   }
+  if(outboundStalled(creep,game,memory)) {
+    advance(memory,game,creep,'RETURNED','OUTBOUND_STALLED_75_TICKS');
+    clear(creep);
+    return false; // already home, resume normal worker economy
+  }
   return travel(creep,game,to);
 }
 function travel(creep,game,destination) {
@@ -334,4 +369,4 @@ function travel(creep,game,destination) {
     maxOps:Math.min(300,config.PATH_MAX_OPS||300)});
   return true;
 }
-module.exports={dispatch,run,summary,reconcile,_test:{labor,witness,adjacent,ledger,advance}};
+module.exports={dispatch,run,summary,reconcile,_test:{labor,witness,adjacent,ledger,advance,outboundStalled}};
