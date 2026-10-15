@@ -128,7 +128,8 @@ function start(states,game,memory) {
      damage*50>=ownHits || ownDps-heals<4*damage)
     return hold('REAL_COMBAT_VICTORY_MARGIN_UNPROVEN');
   if(typeof TOUGH==='undefined' || typeof ATTACK==='undefined' ||
-     typeof MOVE==='undefined' || !BODYPART_COST ||
+     typeof MOVE==='undefined' ||
+     typeof BODYPART_COST==='undefined' || !BODYPART_COST ||
      BODYPART_COST[TOUGH]!==10 ||
      BODYPART_COST[ATTACK]!==80 ||
      BODYPART_COST[MOVE]!==50 ||
