@@ -31,6 +31,41 @@ function receiptStatus(v) {
 // "NO_CLAIM_INTENT" and "GCL_AT_CAPACITY" are distinct operational states.
 const code=v=>typeof v==='string'&&/^[A-Z][A-Z0-9_]{0,70}$/.test(v)?v:null;
 const nint=v=>Number.isSafeInteger(v)&&v>=0&&v<=1000000?v:null;
+const progress=v=>Number.isSafeInteger(v)&&v>=0&&v<=100000000000000?v:null;
+const healthStatuses=new Set(['HEALTHY','WATCH','DEGRADED','CRITICAL']);
+function homeEvidence(x) {
+  // Exact operational World home. The diagnostic never guesses an unsafe
+  // parent from stale scout/SHADOW candidate room records.
+  const room=x?.rooms?.W37S79;
+  if(!room || typeof room!=='object' || Array.isArray(room))
+    return null;
+  const health=room.health;
+  const status=code(health?.status);
+  const validatedStatus=healthStatuses.has(status)?status:null;
+  const reasons=Array.isArray(health?.reasons)?
+    health.reasons.slice(0,12).map(code).filter(Boolean):null;
+  const model=room.economyModel;
+  const signed=v=>Number.isSafeInteger(v)&&v>=-10000&&v<=10000?v:null;
+  return {
+    room:'W37S79',rcl:nint(room.rcl),
+    controllerProgress:progress(room.controllerProgress),
+    controllerProgressTotal:progress(room.controllerProgressTotal),
+    energyAvailable:nint(room.energyAvailable),
+    energyCapacity:nint(room.energyCapacity),
+    energyStored:progress(room.energyStored),
+    healthStatus:validatedStatus,
+    healthScore:Number.isSafeInteger(health?.overallScore)&&
+      health.overallScore>=0&&health.overallScore<=100?
+      health.overallScore:null,
+    healthReasons:reasons,
+    haulingDeficit:signed(model?.haulerCarryDeficit),
+    miningDeficit:signed(model?.harvesterWorkDeficit),
+    haulerCount:nint(room.creeps?.hauler),
+    harvesterCount:nint(room.creeps?.harvester),
+    upgraderCount:nint(room.creeps?.upgrader),
+    source:'LATEST_LIVE_OWNED_ROOM_SNAPSHOT'
+  };
+}
 function expansionAt(snapshot) {
   const x=snapshot?.x;
   if(!x || typeof x!=='object')return null;
@@ -48,6 +83,9 @@ function expansionAt(snapshot) {
     source:'LIVE_STATUS_SNAPSHOT_NOT_CLAIM_AUTHORITY',
     tick:snapshot.t,
     gclLevel:nint(x.gcl?.level),
+    gclProgress:progress(x.gcl?.progress),
+    gclProgressTotal:progress(x.gcl?.progressTotal),
+    home:homeEvidence(x),
     ownedRooms:nint(readiness.ownedRooms),
     availableClaimSlots:nint(readiness.availableClaimSlots),
     readinessStatus:code(readiness.status),
