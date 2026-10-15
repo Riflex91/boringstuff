@@ -33,6 +33,7 @@ const defenseRequestsShadow = require('defense.requests.shadow');
 const defenseRegistryPreview = require('defense.registry.preview');
 const regionalDefenseShadow = require('defense.reinforcement.shadow');
 const defenseTransitEvidence = require('defense.transit.evidence');
+const regionalDefenseLive = require('defense.regional.live');
 
 function bootstrapMemory() {
   if (!Memory.bot) Memory.bot = { version: config.VERSION, born: Game.time };
@@ -384,6 +385,18 @@ module.exports.loop = function() {
         }
       });
     }, schedulerContext);
+
+    // D2 executable neighbor aid uses one existing spare fighter and keeps
+    // a verified home garrison. No enemy-owned or neutral transit rooms.
+    if (!criticalCpu && roomStates.length > 1) {
+      try {
+        const aid=regionalDefenseLive.assign(roomStates,Game);
+        if(aid?.status==='ASSIGNED')
+          logger.warn('D2_REGIONAL_DEFENDER_DISPATCH',
+            'Real regional neighbor defense assignment',aid,
+            {force:true,persist:true,dedupeTicks:0});
+      } catch (_) { /* local defense always wins over regional aid */ }
+    }
 
     // Low-cost, optional I4 parent continuity witness. Each healthy tick is
     // individually observed; a skipped/low-CPU tick breaks the next streak.

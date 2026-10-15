@@ -1,6 +1,7 @@
 'use strict';
 
 const config = require('config');
+const regionalSupport = require('defense.regional.live');
 
 // Bounded defensive targeting: a lone harmless scout cannot lure the only
 // melee defender away from home. Only active combat, dismantle or healer
@@ -54,6 +55,9 @@ function selectTarget(creep) {
 }
 
 function run(creep) {
+  // Existing defender attack logic remains authoritative in the threatened
+  // owned destination. A single mission-bound donor first travels/returns.
+  if (regionalSupport.run(creep,Game)) return;
   const target = selectTarget(creep);
   if (target) {
     // Match the attack intent to the actually active body part. A ranged
