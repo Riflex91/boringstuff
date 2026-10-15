@@ -6,7 +6,7 @@ const source=fs.readFileSync(new URL('../game/role.raider.js',import.meta.url),'
 const makeMission=()=>({schemaVersion:1,id:'raid-E1N1-E1N2-1000',
   phase:'ATTACKING',parent:'E1N1',target:'E1N2',aggressor:'Enemy',
   createdTick:1000,targetOwnerSeenTick:990,route:['E1N1','E1N2']});
-let enemies=[],towers=[],homeEnemies=[],attacks=[],moves=[],rc=0,parts=2;
+let enemies=[],towers=[],homeEnemies=[],attacks=[],moves=[],rc=0,parts=6;
 const home={name:'E1N1',controller:{my:true,safeMode:0,safeModeCooldown:0},
   find(type){return homeEnemies;}};
 const target={name:'E1N2',
@@ -55,7 +55,7 @@ function reset(){
   target.controller={my:false,owner:{username:'Enemy'},safeMode:0};
   creep.room=target;creep.hits=100;creep.ticksToLive=350;
   creep.memory={role:'raider',combatMissionId:makeMission().id};
-  enemies=[healer,striker];towers=[];attacks=[];moves=[];rc=0;parts=2;
+  enemies=[healer,striker];towers=[];attacks=[];moves=[];rc=0;parts=6;
 }
 reset();role.run(creep);
 assert.deepEqual(attacks,['enemy-healer'],
@@ -96,6 +96,18 @@ reset();enemies=[neutral,healer];role.run(creep);
 assert.equal(attacks.length,0,'third party cannot be attacked');
 assert.equal(memory.bot.counterattackMission.reason,
   'UNEXPECTED_THIRD_PARTY');
+reset();enemies=[enemy('boosted','Enemy',['attack','move'])];
+enemies[0].body[0].boost='UH2O';role.run(creep);
+assert.equal(attacks.length,0,'enemy boosts revoke the raid immediately');
+assert.equal(memory.bot.counterattackMission.reason,'LIVE_COMBAT_MARGIN_LOST');
+assert.equal(moves.length,1,'boosted defense causes actual retreat');
+reset();enemies=[enemy('reinforced','Enemy',Array(10).fill('attack'))];
+role.run(creep);
+assert.equal(attacks.length,0,'new overwhelming reinforcements block attacks');
+assert.equal(memory.bot.counterattackMission.reason,'LIVE_COMBAT_MARGIN_LOST');
+reset();parts=3;role.run(creep);
+assert.equal(attacks.length,0,'damaged offensive body parts cancel attack advantage');
+assert.equal(memory.bot.counterattackMission.reason,'LIVE_COMBAT_MARGIN_LOST');
 reset();homeEnemies=[neutral];role.run(creep);
 assert.equal(attacks.length,0);
 assert.equal(memory.bot.counterattackMission.reason,
