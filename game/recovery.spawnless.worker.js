@@ -250,6 +250,32 @@ function clear(c) {
   delete c.memory.spawnRescueTarget;
   delete c.memory.spawnRescueAssignedTick;
 }
+// An arbitrary Creep.memory tag is not authority to export a productive
+// worker. Match the one active, previously issued, exact-ID mission ledger.
+function boundMission(creep,memory) {
+  const data=memory?.bot?.spawnlessWorkerRescueLedger;
+  const m=data?.schemaVersion===LEDGER_SCHEMA?data.active:null;
+  const tags=creep?.memory;
+  const from=tags?.spawnRescueHome,to=tags?.spawnRescueTarget;
+  const tick=tags?.spawnRescueAssignedTick;
+  if(!m || !creep || typeof creep.name!=='string' ||
+     typeof from!=='string'||!ROOM.test(from) ||
+     typeof to!=='string'||!ROOM.test(to)||from===to ||
+     !Number.isSafeInteger(tick)||tick<0 ||
+     !['ASSIGNED','ARRIVED','RETREAT'].includes(m.status) ||
+     m.worker!==creep.name || m.home!==from || m.target!==to ||
+     m.assignedTick!==tick ||
+     m.id!=='r2-'+from+'-'+to+'-'+tick+'-'+creep.name ||
+     typeof m.oldSpawnId!=='string'||!m.oldSpawnId ||
+     m.oldSpawnId.length>64 ||
+     m.oldSite?.roomName!==to ||
+     !Number.isInteger(m.oldSite.x)||!Number.isInteger(m.oldSite.y)||
+     m.oldSite.x<3||m.oldSite.x>46 ||
+     m.oldSite.y<3||m.oldSite.y>46 ||
+     !Number.isSafeInteger(m.lastObservedTick) ||
+     m.lastObservedTick<tick)return null;
+  return m;
+}
 function run(creep,game,memory) {
   const to=creep?.memory?.spawnRescueTarget;
   if(!to)return false;
@@ -263,6 +289,19 @@ function run(creep,game,memory) {
      ![from,to].includes(creep.room.name) ||
      !game.rooms?.[from]?.controller?.my) {
     advance(memory,game,creep,'ABORTED','MISSION_BINDING_OR_HOME_UNVERIFIED');
+    clear(creep);
+    return true;
+  }
+  const mission=boundMission(creep,memory);
+  if(!mission) {
+    // Forged, stale or orphaned tags cannot authorize one more outward
+    // movement or a worker transfer. Return a stranded target worker home
+    // before removing the tags; do not let ordinary work run en route.
+    if(creep.room.name===from) {
+      clear(creep);return false;
+    }
+    if(creep.room.name===to && game.rooms?.[from]?.controller?.my)
+      return travel(creep,game,from);
     clear(creep);
     return true;
   }
@@ -304,7 +343,6 @@ function run(creep,game,memory) {
   const verifiedSpawn=spawns.find(s=>s?.my===true &&
     s.pos?.roomName===to &&
     s.pos.x===record.pos.x && s.pos.y===record.pos.y);
-  const mission=memory?.bot?.spawnlessWorkerRescueLedger?.active;
   // Require a NEW physical object. A stale original Spawn resurfacing in
   // incomplete room state must never be mislabelled as a completed rebuild.
   // The R1 witness may already have changed to the rebuilt ID earlier in
@@ -369,4 +407,4 @@ function travel(creep,game,destination) {
     maxOps:Math.min(300,config.PATH_MAX_OPS||300)});
   return true;
 }
-module.exports={dispatch,run,summary,reconcile,_test:{labor,witness,adjacent,ledger,advance,outboundStalled}};
+module.exports={dispatch,run,summary,reconcile,_test:{labor,witness,adjacent,ledger,advance,outboundStalled,boundMission}};
