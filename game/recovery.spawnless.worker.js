@@ -79,16 +79,23 @@ function dispatch(states,game,memory) {
     if(typeof target.room.find!=='function' ||
        typeof FIND_MY_SPAWNS==='undefined' ||
        typeof FIND_HOSTILE_CREEPS==='undefined' ||
-       typeof FIND_HOSTILE_STRUCTURES==='undefined')continue;
-    let spawns,hostiles,hostileBuildings;
+       typeof FIND_HOSTILE_STRUCTURES==='undefined' ||
+       typeof FIND_MY_CONSTRUCTION_SITES==='undefined' ||
+       typeof STRUCTURE_SPAWN==='undefined')continue;
+    let spawns,hostiles,hostileBuildings,sites;
     try{
       spawns=target.room.find(FIND_MY_SPAWNS);
       hostiles=target.room.find(FIND_HOSTILE_CREEPS);
       hostileBuildings=target.room.find(FIND_HOSTILE_STRUCTURES);
+      sites=target.room.find(FIND_MY_CONSTRUCTION_SITES);
     }catch(_){continue;}
     if(!Array.isArray(spawns) || spawns.length ||
        !Array.isArray(hostiles) || hostiles.length ||
-       !Array.isArray(hostileBuildings) || hostileBuildings.length)continue;
+       !Array.isArray(hostileBuildings) || hostileBuildings.length ||
+       !Array.isArray(sites) ||
+       sites.some(s=>s?.structureType===STRUCTURE_SPAWN &&
+         (s.pos?.roomName!==to ||
+          s.pos.x!==record.pos.x || s.pos.y!==record.pos.y)))continue;
     for(const donor of owned) {
       const from=donor.room.name;
       if(from===to || !adjacent(game,from,to) ||
@@ -145,8 +152,9 @@ function run(creep,game,memory) {
     if(creep.room.name===from) {clear(creep);return false;}
     return travel(creep,game,from);
   }
-  const record=memory?.bot?.ownedSpawnRecovery?.rooms?.[to];
-  if(!witness(record,to,now)) {
+  const registry=memory?.bot?.ownedSpawnRecovery;
+  const record=registry?.rooms?.[to];
+  if(registry?.schemaVersion!==1 || !witness(record,to,now)) {
     if(creep.room.name===from){clear(creep);return false;}
     return travel(creep,game,from);
   }
