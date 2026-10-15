@@ -135,12 +135,38 @@ function analyze(state) {
   const idealHarvesterCount = recommendedHarvesterWorkParts > 0
     ? Math.max(1, Math.ceil(recommendedHarvesterWorkParts / Math.max(1, nextHarvesterWorkParts)))
     : 0;
-  const recommendedHarvesterCount = harvesterWorkDeficit > 0
-    ? Math.max(
-      idealHarvesterCount,
-      harvesters.length + Math.ceil(harvesterWorkDeficit / Math.max(1, nextHarvesterWorkParts))
-    )
-    : idealHarvesterCount;
+  // Aggregate WORK can hide an empty source: two fully sized miners on the
+  // SAME source yield 10 modeled energy/tick, yet total 10 WORK is enough to
+  // produce a zero aggregate work deficit. Only when every existing miner has
+  // a verified local source assignment and no miner is waiting to be assigned,
+  // request ONE bounded additional miner per truly uncovered container source.
+  // The first unassigned recruit naturally selects that empty source; once
+  // assigned, the temporary extra count disappears. Bootstrap, emergencies,
+  // hostiles and unknown assignments retain the original planner.
+  const observedSourceIds = new Set(state.sources.map(s => s.id));
+  const verifiedSourceAssignments = allSourceContainersReady &&
+    state.sources.length >= 2 && state.sources.length <= 5 &&
+    !state.emergency && Array.isArray(state.hostileCreeps) &&
+    state.hostileCreeps.length === 0 &&
+    harvesters.length >= state.sources.length &&
+    unassignedWork === 0 &&
+    harvesters.every(c => !c.spawning &&
+      typeof c.memory.sourceId === 'string' &&
+      observedSourceIds.has(c.memory.sourceId));
+  const modeledUncoveredSources = verifiedSourceAssignments
+    ? state.sources.filter(source => (assignedWork[source.id] || 0) <= 0).length
+    : null;
+  const guardedCoverageRecovery = harvesterWorkDeficit === 0 &&
+    modeledUncoveredSources !== null ? modeledUncoveredSources : 0;
+  const recommendedHarvesterCount = Math.max(
+    harvesterWorkDeficit > 0
+      ? Math.max(
+        idealHarvesterCount,
+        harvesters.length + Math.ceil(harvesterWorkDeficit / Math.max(1, nextHarvesterWorkParts))
+      )
+      : idealHarvesterCount,
+    Math.min(5, harvesters.length + guardedCoverageRecovery)
+  );
   const consumers = state.creeps.filter(c =>
     c.memory.role === 'builder' || c.memory.role === 'worker' ||
     c.memory.role === 'repairer' || c.memory.role === 'upgrader'
@@ -210,6 +236,7 @@ function analyze(state) {
     nextHarvesterWorkParts,
     recommendedHarvesterCount,
     harvesterWorkDeficit,
+    modeledUncoveredSources,
     consumerFallbackCount,
     consumerWaitingCount,
     consumerCriticalCount,
