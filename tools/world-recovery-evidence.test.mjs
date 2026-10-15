@@ -23,7 +23,15 @@ const original={deploymentId:'exact-deployment-123',
     snapshots:[{c:'STATUS_SNAPSHOT',t:200,x:{
       spawnlessWorkerRescue:{last:{status:'COMPLETED'}}
     }},{c:'STATUS_SNAPSHOT',t:300,x:{
-      gcl:{level:1},
+      gcl:{level:1,progress:123456,progressTotal:1000000},
+      rooms:{W37S79:{
+        rcl:4,controllerProgress:180520,controllerProgressTotal:405000,
+        energyAvailable:780,energyCapacity:1100,energyStored:2500,
+        creeps:{harvester:2,hauler:1,upgrader:1},
+        health:{status:'WATCH',overallScore:79,
+          reasons:['HAULING_DEFICIT','CONTROLLER_STALLED']},
+        economyModel:{haulerCarryDeficit:2,harvesterWorkDeficit:0}
+      }},
       expansionReadiness:{
         ownedRooms:1,availableClaimSlots:0,status:'AT_CAPACITY',
         reasons:['NO_AVAILABLE_CLAIM_SLOT']
@@ -67,6 +75,23 @@ assert.equal(evidence.expansion.source,
   'LIVE_STATUS_SNAPSHOT_NOT_CLAIM_AUTHORITY');
 assert.equal(evidence.expansion.tick,300);
 assert.equal(evidence.expansion.gclLevel,1);
+assert.equal(evidence.expansion.gclProgress,123456);
+assert.equal(evidence.expansion.gclProgressTotal,1000000);
+assert.equal(evidence.expansion.home.room,'W37S79');
+assert.equal(evidence.expansion.home.rcl,4);
+assert.equal(evidence.expansion.home.healthStatus,'WATCH');
+assert.equal(evidence.expansion.home.healthScore,79);
+assert.deepEqual(evidence.expansion.home.healthReasons,
+  ['HAULING_DEFICIT','CONTROLLER_STALLED']);
+assert.equal(evidence.expansion.home.haulingDeficit,2);
+assert.equal(evidence.expansion.home.harvesterCount,2);
+assert.equal(evidence.expansion.home.haulerCount,1);
+assert.equal(evidence.expansion.home.upgraderCount,1);
+assert.equal(evidence.expansion.home.energyAvailable,780);
+assert.equal(evidence.expansion.home.energyCapacity,1100);
+assert.equal(evidence.expansion.home.energyStored,2500);
+assert.equal(evidence.expansion.home.controllerProgressTotal,405000);
+
 assert.equal(evidence.expansion.ownedRooms,1);
 assert.equal(evidence.expansion.availableClaimSlots,0);
 assert.equal(evidence.expansion.readinessStatus,'AT_CAPACITY');
@@ -115,6 +140,27 @@ const sanitized=inspectWorldRecoveryEvidence({
 assert.deepEqual(sanitized.expansion.readinessReasons,['NORMAL_REASON'],
   'untrusted long or dangerous text is never printed as live diagnostics');
 assert.equal(sanitized.expansion.launchReason,null);
+const unsafeHome=structuredClone(original);
+unsafeHome.telemetryJournal.snapshots[1].x.rooms.W37S79.health.reasons=[
+  'HAULING_DEFICIT','<invalid-script>','X'.repeat(400)
+];
+unsafeHome.telemetryJournal.snapshots[1].x.rooms.W37S79.health.status=
+  'NONSENSE';
+unsafeHome.telemetryJournal.snapshots[1].x.rooms.W37S79.health.overallScore=999;
+unsafeHome.telemetryJournal.snapshots[1].x.rooms.W37S79.economyModel.haulerCarryDeficit='many';
+const filteredHome=inspectWorldRecoveryEvidence({
+  data:JSON.stringify(unsafeHome)
+}).expansion.home;
+assert.equal(filteredHome.healthStatus,null);
+assert.equal(filteredHome.healthScore,null);
+assert.deepEqual(filteredHome.healthReasons,['HAULING_DEFICIT']);
+assert.equal(filteredHome.haulingDeficit,null,
+  'missing numeric evidence cannot become an invented zero');
+const unknownRoom=structuredClone(original);
+delete unknownRoom.telemetryJournal.snapshots[1].x.rooms.W37S79;
+assert.equal(inspectWorldRecoveryEvidence({
+  data:JSON.stringify(unknownRoom)
+}).expansion.home,null,'missing own room is UNKNOWN');
 const delayed=structuredClone(original);
 delayed.telemetryJournal.snapshots[1].x={};
 const absent=inspectWorldRecoveryEvidence({data:JSON.stringify(delayed)});
