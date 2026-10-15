@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {ScreepsHttpClient} from './screeps-client.mjs';
+import {inspectWorldRecoveryEvidence} from './world-recovery-evidence.mjs';
 import {buildWorldConfig} from './world-deployment-profile.mjs';
 import {WORLD_NEXT_TARGET_CANDIDATE as target} from './world-next-target-candidate.mjs';
 import {STAGING_BRANCH} from './world-next-staged-readiness.mjs';
@@ -25,6 +26,9 @@ export function assessWorldRuntime({me,branches,status,room,memory}){
   if(!creeps.length)warnings.push('NO_OWNED_CREEPS_OBSERVED');
   const energy=Number(spawn?.energy);
   const capacity=Number(spawn?.energyCapacity);
+  const recoveryEvidence=inspectWorldRecoveryEvidence(memory);
+  if(recoveryEvidence.availability==='UNKNOWN')
+    warnings.push('RECOVERY_MEMORY_UNVERIFIED');
   const result={ok:failures.length===0,failures,warnings,mode:'GET_ONLY',
     target:{shard:target.shard,room:target.room,x:target.x,y:target.y},
     activeBranch:active.length===1?active[0].branch:null,
@@ -38,7 +42,8 @@ export function assessWorldRuntime({me,branches,status,room,memory}){
       return acc;},{}),
     controllerLevel:Number.isInteger(controller?.level)?controller.level:null,
     controllerProgress:Number.isFinite(Number(controller?.progress))?Number(controller.progress):null,
-    memoryAvailable:memory?.ok!==false&&memory!==null,
+    memoryAvailable:recoveryEvidence.availability!=='UNKNOWN',
+    recoveryEvidence,
     placementAttempted:false,activationAttempted:false};
   return result;
 }
@@ -47,7 +52,7 @@ export async function inspectWorldRuntime(api){
   const [me,branches,status,room,memory]=await Promise.all([
     api.authMe(),api.userBranches(),api.userWorldStatus(),
     api.gameRoomObjects(target.room,target.shard),
-    api.userMemory('',target.shard).catch(()=>null)]);
+    api.userMemory('bot',target.shard).catch(()=>null)]);
   return assessWorldRuntime({me,branches,status,room,memory});
 }
 async function main(){
