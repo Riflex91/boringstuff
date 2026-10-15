@@ -105,10 +105,21 @@ export class ScreepsHttpClient {
 
     const max429Retries = Number.isInteger(opts.max429Retries) ? opts.max429Retries : 5;
     const max5xxRetries = Number.isInteger(opts.max5xxRetries) ? opts.max5xxRetries : 2;
+    // Opt-in hard deadline for read-only operational gates. Socket inactivity
+    // timeout alone does not stop a slow, trickling response or retry loop.
+    const maxRequestMs = Number.isSafeInteger(opts.timeoutMs) &&
+      opts.timeoutMs >= 100 ? Math.min(opts.timeoutMs,30000) : 30000;
+    const deadline = Number.isSafeInteger(opts.totalTimeoutMs) &&
+      opts.totalTimeoutMs >= 100
+      ? Date.now() + Math.min(opts.totalTimeoutMs,120000) : null;
     let retry429 = 0;
     let retry5xx = 0;
 
     while (true) {
+      const remaining = deadline === null ? maxRequestMs
+        : Math.min(maxRequestMs,deadline-Date.now());
+      if(remaining <= 0)
+        throw new Error(`HTTP total deadline exceeded calling ${endpoint}`);
       const url = new URL(endpoint.replace(/^\//, ''), this.server.baseUrl);
       if (method === 'GET') addSearchParams(url, params);
       const payload = method === 'GET' ? null : JSON.stringify(params || {});
@@ -127,19 +138,34 @@ export class ScreepsHttpClient {
       let response;
       try {
         response = await new Promise((resolve, reject) => {
+          let finished = false;
+          let hardTimer;
+          const finish = (err, value) => {
+            if (finished) return;
+            finished = true;
+            clearTimeout(hardTimer);
+            if (err) reject(err); else resolve(value);
+          };
           const req = transport.request(url, { method, headers }, res => {
             const chunks = [];
+            res.on('error',err=>finish(err));
+            res.on('aborted',()=>finish(new Error(
+              `HTTP response aborted calling ${endpoint}`)));
             res.on('data', chunk => chunks.push(Buffer.from(chunk)));
-            res.on('end', () => {
-              resolve({
-                statusCode: res.statusCode || 0,
-                headers: res.headers,
-                text: Buffer.concat(chunks).toString('utf8')
-              });
-            });
+            res.on('end', () => finish(null,{
+              statusCode: res.statusCode || 0,
+              headers: res.headers,
+              text: Buffer.concat(chunks).toString('utf8')
+            }));
           });
-          req.setTimeout(30000, () => req.destroy(new Error(`HTTP timeout calling ${endpoint}`)));
-          req.on('error', reject);
+          // Absolute request budget (not a socket idle timer), including
+          // DNS/TLS/slow response bodies. Never let a GET block the live gate
+          // until GitHub kills the job without an explicit verdict.
+          hardTimer = setTimeout(()=>req.destroy(new Error(
+            `HTTP hard deadline (${remaining}ms) calling ${endpoint}`)),remaining);
+          req.setTimeout(remaining, () => req.destroy(new Error(
+            `HTTP socket timeout calling ${endpoint}`)));
+          req.on('error',err=>finish(err));
           if (payload !== null) req.write(payload);
           req.end();
         });
@@ -236,9 +262,10 @@ export class ScreepsHttpClient {
     return this._request('GET', '/api/user/stats', { id, interval });
   }
 
-  userMemory(pathName = '', shard = null) {
+  userMemory(pathName = '', shard = null, opts = {}) {
     const params = pathName ? { path: pathName } : {};
-    return this._request('GET', '/api/user/memory', { ...params, shard: shard ?? this.defaultShard });
+    return this._request('GET', '/api/user/memory',
+      { ...params, shard: shard ?? this.defaultShard }, opts);
   }
 
   gameCheckUniqueObjectName(type, name, shard) {
