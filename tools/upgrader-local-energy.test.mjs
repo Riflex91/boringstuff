@@ -83,4 +83,18 @@ function make({role='upgrader',storageRange=14,controllerBufferEnergy=120,
   assert.equal(energy.acquireForConsumer(creep),false);
   assert.deepEqual(calls,[], 'storage distance >4 never authorizes an upgrader trek');
 }
+{
+  const {creep,calls}=make({controllerBufferEnergy:0,storageRange:3});
+  creep.pos.getRangeTo=()=>-1;
+  assert.equal(energy.acquireForConsumer(creep),false);
+  assert.deepEqual(calls,[],
+    'negative fabricated storage range never permits an optional detour');
+}
+{
+  const {creep,calls}=make({controllerBufferEnergy:0,storageRange:3});
+  creep.pos.getRangeTo=()=>undefined;
+  assert.equal(energy.acquireForConsumer(creep),false);
+  assert.deepEqual(calls,[],
+    'unobserved storage range is UNKNOWN, not near');
+}
 console.log('E12 upgrader controller-local energy selection regressions PASS');
