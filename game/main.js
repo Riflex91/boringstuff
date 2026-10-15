@@ -33,6 +33,7 @@ const defenseRequestsShadow = require('defense.requests.shadow');
 const defenseRegistryPreview = require('defense.registry.preview');
 const regionalDefenseShadow = require('defense.reinforcement.shadow');
 const defenseTransitEvidence = require('defense.transit.evidence');
+const regionalDefenseLive = require('defense.regional.live');
 
 function bootstrapMemory() {
   if (!Memory.bot) Memory.bot = { version: config.VERSION, born: Game.time };
@@ -383,6 +384,19 @@ module.exports.loop = function() {
         }
       });
     }, schedulerContext);
+
+    // D2 real emergency aid uses one pre-existing spare defender, one
+    // directly adjacent owned target and an untouched donor garrison. The
+    // existing D2 transit observer records travel under the same mission tag.
+    if (!criticalCpu && roomStates.length > 1) {
+      try {
+        const aid=regionalDefenseLive.assign(roomStates,Game);
+        if(aid?.status==='ASSIGNED')
+          logger.warn('D2_REGIONAL_DEFENDER_DISPATCH',
+            'Observed urgent adjacent colony defense and spare garrison',aid,
+            {force:true,persist:true,dedupeTicks:0});
+      } catch (_) { /* regional aid must never stop local defense */ }
+    }
 
     // Low-cost, optional I4 parent continuity witness. Each healthy tick is
     // individually observed; a skipped/low-CPU tick breaks the next streak.
