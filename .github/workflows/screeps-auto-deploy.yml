@@ -18,7 +18,9 @@ jobs:
   deploy:
     if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 23
+    # Allow a bounded 30-minute live verifier after setup/deploy overhead.
+    # Keep the job deadline larger than the guard, never vice versa.
+    timeout-minutes: 38
     defaults:
       run:
         working-directory: tools
