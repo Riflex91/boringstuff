@@ -223,10 +223,12 @@ function acquireForConsumer(creep) {
   }
 
   const storage=creep.room.storage;
+  // Read range exactly once; invalid or negative readings cannot authorize
+  // even a short optional detour away from the controller.
+  const storageRange=storage && typeof creep.pos.getRangeTo === 'function'
+    ? creep.pos.getRangeTo(storage) : null;
   const localUpgraderStorage=creep.memory.role !== 'upgrader' ||
-    (storage && typeof creep.pos.getRangeTo === 'function' &&
-     Number.isSafeInteger(creep.pos.getRangeTo(storage)) &&
-     creep.pos.getRangeTo(storage) <= 4);
+    (Number.isSafeInteger(storageRange) && storageRange >= 0 && storageRange <= 4);
   // Do not send an empty upgrader on a long trek back to central storage
   // while live haulers are already serving controller-side consumers.
   // Keep the legacy ordinary-worker path. A genuinely starved upgrader
