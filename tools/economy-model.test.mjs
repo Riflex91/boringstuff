@@ -364,8 +364,8 @@ assert.equal(overRecoveredMining.recommendedHarvesterCount, 2);
     sources:[{id:'cover-a',pos:pos(12,false)},coverageSources[1]]};
   const bootstrapResult=require('../game/economy.model.js').analyze(incomplete);
   assert.equal(bootstrapResult.modeledUncoveredSources,null);
-  assert.equal(bootstrapResult.recommendedHarvesterCount,2,
-    'mobile bootstrap does not increase miner count for unverified container coverage');
+  assert.equal(bootstrapResult.recommendedHarvesterCount,1,
+    'bootstrap retains its original one-miner demand and never adds source-coverage pressure');
 
   const invalid={...good,room:recoveryRoom('E8N1-E14-invalid'),
     creeps:[miner('cover-a'),miner('different-room-source')]};
