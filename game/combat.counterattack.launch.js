@@ -47,7 +47,7 @@ function parentReady(state) {
     state.hostileCreeps.length===0 &&
     Number.isSafeInteger(state.energyStored) && state.energyStored>=15000 &&
     Number.isSafeInteger(state.energyCapacityAvailable) &&
-    state.energyCapacityAvailable>=6*REPEAT_COST &&
+    state.energyCapacityAvailable>=5*REPEAT_COST &&
     state.energyAvailable===state.energyCapacityAvailable &&
     (state.byRole?.defender||0)>=1 &&
     Array.isArray(state.creeps) &&
@@ -135,7 +135,7 @@ function start(states,game,memory) {
   const repeat=Math.min(8,Math.floor(state.energyCapacityAvailable/REPEAT_COST));
   const ownDps=repeat*30;
   const ownHits=repeat*400;
-  if(repeat<6 || damage>ownDps/6 ||
+  if(repeat<5 || damage>ownDps/5 ||
      heals>ownDps/5 || hp>ownDps*8 ||
      damage*50>=ownHits || ownDps-heals<4*damage)
     return hold('REAL_COMBAT_VICTORY_MARGIN_UNPROVEN');
