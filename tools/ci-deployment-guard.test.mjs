@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { gzipSync } from 'node:zlib';
-import { parseBotMemory, inspectDeployment } from './ci-deployment-guard.mjs';
+import { parseBotMemory, inspectDeployment, verifyLiveMemory } from './ci-deployment-guard.mjs';
 
 const id = '20261010-verified';
 const record = (c, t, x = {}, l = 'INFO') => ({ c, t, x, l });
@@ -375,4 +375,51 @@ assert.equal(inspectDeployment(staleSnapshot, id, 100).status, 'PASS');
 const badFresh = structuredClone(staleSnapshot);
 delete badFresh.telemetryJournal.snapshots[1].x.rooms.E8N1;
 assert.equal(inspectDeployment(badFresh, id, 100).reason, 'NO_ROOM_STATUS_AFTER_DEPLOYMENT');
+// GET-only live release harness: a successful tick snapshot really passes;
+// transient 404/429/503 or a stall may never fabricate PASS.
+{
+  let requests=0;
+  const log=[],warning=[];
+  const opts={log:s=>log.push(s),warn:s=>warning.push(s),
+    now:()=>0,sleep:async()=>{}};
+  const read=async(path,shard,requestOpts)=>{
+    requests++;
+    assert.equal(path,'bot');
+    assert.equal(shard,null);
+    assert.equal(requestOpts.max429Retries,0);
+    assert.equal(requestOpts.max5xxRetries,0);
+    assert.ok(requestOpts.totalTimeoutMs<=12000);
+    return {data:JSON.stringify(state)};
+  };
+  const verified=await verifyLiveMemory({userMemory:read},id,opts);
+  assert.equal(verified.status,'PASS');
+  assert.equal(verified.observedTicks,100);
+  assert.equal(requests,1);
+  assert.equal(log.filter(x=>x.startsWith('LIVE_100T_PASS ')).length,1);
+  assert.equal(warning.length,0);
+  requests=0;log.length=0;
+  const missing=structuredClone(state);
+  missing.telemetryJournal.snapshots=[];
+  const delayed=await verifyLiveMemory({userMemory:async()=>{
+    requests++;
+    return {data:JSON.stringify(requests===1?missing:state)};
+  }},id,opts);
+  assert.equal(delayed.status,'PASS');
+  assert.equal(requests,2);
+  assert.equal(log.filter(x=>x.startsWith('LIVE_100T_WAIT ')).length,1);
+  let failed=0;
+  await assert.rejects(verifyLiveMemory({userMemory:async()=>{
+    failed++;
+    throw new Error('Screeps GET offline');
+  }},id,opts),/LIVE_100T_OBSERVATION_UNAVAILABLE/);
+  assert.equal(failed,3,'bounded retries never stall until Github cancellation');
+  const bad=structuredClone(state);
+  bad.telemetryJournal.events.push(record('MAIN_FATAL',1030,{},'FATAL'));
+  await assert.rejects(verifyLiveMemory({userMemory:async()=>({
+    data:JSON.stringify(bad)
+  })},id,opts),/LIVE_100T_FAIL/);
+  await assert.rejects(verifyLiveMemory({userMemory:async()=>({
+    data:JSON.stringify(state)
+  })},'',opts),/exact deployment id required/);
+}
 console.log('CI deployment guard and 100-tick provenance checks passed');
