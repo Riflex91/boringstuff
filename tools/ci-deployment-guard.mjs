@@ -354,9 +354,29 @@ async function verify(api) {
   const id = receipt?.receipt?.deploymentId;
   if (!id) throw new Error('FAIL CLOSED: exact deployment receipt missing');
   const timeLimit = Date.now() + 15 * 60 * 1000;
-  let last = null;
+  let last = null, polls = 0, consecutiveReadErrors = 0;
   while (Date.now() < timeLimit) {
-    const response = await api.userMemory('bot');
+    let response;
+    try {
+      // Absolute per-request GET deadline; any 429/5xx is surfaced rather
+      // than stretching the 15-minute live window past the Actions job cap.
+      response = await api.userMemory('bot',null,{
+        timeoutMs:10000,totalTimeoutMs:12000,
+        max429Retries:0,max5xxRetries:0
+      });
+      consecutiveReadErrors = 0;
+    } catch (_) {
+      consecutiveReadErrors++;
+      console.warn('LIVE_100T_READ_UNAVAILABLE ' + JSON.stringify({
+        server,room,attempt:consecutiveReadErrors,
+        lastVerifiedStatus:last?.status||null
+      }));
+      // Never turn missing/corrupt World API observations into a pass.
+      if(consecutiveReadErrors>=3)throw new Error(
+        'LIVE_100T_OBSERVATION_UNAVAILABLE: 3 bounded GET reads failed');
+      await new Promise(resolve => setTimeout(resolve, 10000));
+      continue;
+    }
     const bot = parseBotMemory(response);
     last = inspectDeployment(bot, id, 100);
     if (last.status === 'PASS') {
@@ -366,6 +386,11 @@ async function verify(api) {
     if (last.status === 'FAIL') {
       throw new Error('LIVE_100T_FAIL ' + JSON.stringify(last));
     }
+    polls++;
+    if(polls===1 || polls%3===0)console.log('LIVE_100T_WAIT ' +
+      JSON.stringify({server,room,reason:last.reason||'UNKNOWN',
+        observedTicks:last.observedTicks??null,
+        deploymentTick:last.tick??null,polls}));
     await new Promise(resolve => setTimeout(resolve, 10000));
   }
   throw new Error('LIVE_100T_INCOMPLETE ' + JSON.stringify(last));
