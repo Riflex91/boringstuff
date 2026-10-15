@@ -94,6 +94,7 @@ assert.equal(r1.observeAndRebuild(states,game,memory).reason,
   'R1 alone cannot construct with zero surviving labor');
 const deployed=r2.dispatch(states,game,memory);
 assert.equal(deployed.status,'ASSIGNED');
+assert.equal(r2.summary(memory).active.status,'ASSIGNED');
 assert.equal(deployed.worker,'rescuer');
 assert.equal(reserve.memory.spawnRescueTarget,undefined,
   'healthy donor keeps a spare normal worker');
@@ -105,6 +106,8 @@ assert.equal(moved.length,1,'real border move issued');
 clock.time=1025;rescuer.room=victimRoom;victim.creeps=[rescuer];
 assert.equal(r2.run(rescuer,game,memory),false,
   'normal worker handler becomes executable in the target');
+assert.equal(r2.summary(memory).active.status,'ARRIVED');
+assert.equal(r2.summary(memory).active.arrivedTick,1025);
 const intent=r1.observeAndRebuild(states,game,memory);
 assert.equal(intent.status,'SITE_INTENT_ACCEPTED');
 assert.equal(sites.length,1);
@@ -123,6 +126,10 @@ assert.equal(proof.newSpawnId,'rebuilt-spawn');
 assert.equal(r2.run(rescuer,game,memory),false);
 assert.equal(rescuer.memory.home,'E1N2');
 assert.equal(rescuer.memory.spawnRescueTarget,undefined);
+assert.equal(r2.summary(memory).active,null);
+assert.equal(r2.summary(memory).last.status,'COMPLETED');
+assert.equal(r2.summary(memory).last.oldSpawnId,'old-verified-spawn');
+assert.equal(r2.summary(memory).last.completedTick,1100);
 assert.equal(r1.observeAndRebuild(states,game,memory).confirmed,undefined,
   'same rebuild must never be counted twice');
 console.log('R1/R2 actual witnessed destroyed Spawn → worker movement → site → new Spawn → local worker PASS');
