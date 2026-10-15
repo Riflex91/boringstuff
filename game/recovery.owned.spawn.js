@@ -44,6 +44,9 @@ function observeAndRebuild(states,game,memory) {
     return hold('RECOVERY_RUNTIME_OR_ROOMS_UNVERIFIED');
   const registry=store(memory);
   if(!registry)return hold('RECOVERY_MEMORY_UNAVAILABLE');
+  // A successful historical construction intent is not rebuild completion.
+  // Verify a physically NEW owned Spawn ID at the originally witnessed tile.
+  let confirmed=null;
   // Persist actual owned Spawn positions continuously, at constant low CPU.
   // When a former room is no longer owned, do NOT use the old witness to
   // issue construction intents there.
@@ -54,11 +57,26 @@ function observeAndRebuild(states,game,memory) {
     if(spawn?.my===true && coords(spawn.pos,name) &&
        typeof spawn.id==='string' && spawn.id.length>0 &&
        spawn.id.length<=64) {
+      const old=registry.rooms[name];
+      if(old && old.lastSpawnId!==spawn.id &&
+         coords(old.pos,name) &&
+         old.pos.x===spawn.pos.x && old.pos.y===spawn.pos.y &&
+         Number.isSafeInteger(old.lastRebuildIntentTick) &&
+         Number.isSafeInteger(old.observedTick) &&
+         old.lastRebuildIntentTick>=old.observedTick &&
+         old.lastRebuildIntentTick<=tick &&
+         tick-old.lastRebuildIntentTick<=MAX_WITNESS_AGE) {
+        confirmed={status:'REBUILD_CONFIRMED',
+          confirmed:true,siteIntentAccepted:false,
+          room:name,oldSpawnId:old.lastSpawnId,
+          newSpawnId:spawn.id,confirmedTick:tick};
+      }
       registry.rooms[name]={observedTick:tick,
         lastSpawnId:spawn.id,
         pos:{roomName:name,x:spawn.pos.x,y:spawn.pos.y}};
     }
   }
+  if(confirmed)return confirmed;
   if(tick%25!==0 ||
      !Number.isFinite(game.cpu.bucket) || game.cpu.bucket<5000 ||
      !Number.isFinite(game.cpu.limit) ||
@@ -128,6 +146,7 @@ function observeAndRebuild(states,game,memory) {
     catch(_){return hold('SPAWN_REBUILD_EXCEPTION');}
     if(rc!==OK)return {status:'SITE_REJECTED',
       reason:'SPAWN_REBUILD_RC_'+String(rc),siteIntentAccepted:false};
+    record.lastRebuildIntentTick=tick;
     return {status:'SITE_INTENT_ACCEPTED',reason:null,
       siteIntentAccepted:true,room:name,x:record.pos.x,
       y:record.pos.y,previousSpawnId:record.lastSpawnId};
