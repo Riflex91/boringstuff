@@ -7,6 +7,78 @@
 const config=require('config');
 const ROOM=/^[WE][0-9]+[NS][0-9]+$/;
 const MISSION_TICKS=900;
+const LEDGER_SCHEMA=1;
+const HISTORY_MAX=6;
+// Every receipt is backed by current Game observations, not by intentions
+// being interpreted as a completed Spawn or an achieved route.
+function ledger(memory) {
+  if(!memory?.bot || typeof memory.bot!=='object')return null;
+  let data=memory.bot.spawnlessWorkerRescueLedger;
+  if(!data || data.schemaVersion!==LEDGER_SCHEMA ||
+     !Array.isArray(data.history) || data.history.length>HISTORY_MAX) {
+    data={schemaVersion:LEDGER_SCHEMA,active:null,history:[]};
+    memory.bot.spawnlessWorkerRescueLedger=data;
+  }
+  return data;
+}
+function advance(memory,game,creep,status,reason=null) {
+  const data=ledger(memory),mission=data?.active;
+  const tick=game?.time;
+  if(!mission || !creep || mission.worker!==creep.name ||
+     !Number.isSafeInteger(tick) || tick<mission.assignedTick ||
+     (creep.memory.spawnRescueHome!==mission.home ||
+      creep.memory.spawnRescueTarget!==mission.target))return false;
+  if(mission.status===status)return false;
+  mission.status=status;
+  mission.lastObservedTick=tick;
+  if(reason)mission.reason=reason;
+  if(status==='ARRIVED')mission.arrivedTick=tick;
+  if(status==='COMPLETED')mission.completedTick=tick;
+  if(['COMPLETED','RETURNED','ABORTED'].includes(status)) {
+    data.history.push({...mission});
+    if(data.history.length>HISTORY_MAX)
+      data.history.splice(0,data.history.length-HISTORY_MAX);
+    data.active=null;
+  }
+  return true;
+}
+function reconcile(memory,game) {
+  const data=ledger(memory),mission=data?.active,tick=game?.time;
+  if(!mission || !Number.isSafeInteger(tick) ||
+     !game?.creeps || tick<=mission.assignedTick)
+    return {status:'NO_STALE_RESCUE'};
+  const c=game.creeps[mission.worker];
+  if(c && c.memory?.spawnRescueHome===mission.home &&
+     c.memory?.spawnRescueTarget===mission.target)
+    return {status:'ACTIVE'};
+  mission.status=c?'ABORTED':'LOST';
+  mission.reason=c?'CREW_MISSION_BINDING_CHANGED':'WORKER_NOT_IN_GAME_CREEPS';
+  mission.lastObservedTick=tick;
+  data.history.push({...mission});
+  if(data.history.length>HISTORY_MAX)
+    data.history.splice(0,data.history.length-HISTORY_MAX);
+  data.active=null;
+  return {status:mission.status,worker:mission.worker,
+    home:mission.home,target:mission.target,reason:mission.reason};
+}
+function summary(memory) {
+  const data=memory?.bot?.spawnlessWorkerRescueLedger;
+  if(data?.schemaVersion!==LEDGER_SCHEMA ||
+     !Array.isArray(data.history))return null;
+  const event=data.history[data.history.length-1];
+  const safe=x=>x?{
+    id:x.id,home:x.home,target:x.target,worker:x.worker,
+    oldSpawnId:x.oldSpawnId,status:x.status,
+    assignedTick:x.assignedTick,
+    arrivedTick:x.arrivedTick??null,
+    completedTick:x.completedTick??null,
+    lastObservedTick:x.lastObservedTick??null,
+    reason:x.reason||null
+  }:null;
+  return {active:safe(data.active),last:safe(event),
+    retainedReceipts:data.history.length};
+}
+
 function hold(reason){return {status:'HOLD',reason,assigned:false};}
 function adjacent(game,from,to) {
   if(!ROOM.test(from||'') || !ROOM.test(to||'') || from===to ||
@@ -50,6 +122,14 @@ function dispatch(states,game,memory) {
      !Number.isFinite(game.cpu.limit) ||
      typeof game.cpu.getUsed!=='function' ||
      game.cpu.limit-game.cpu.getUsed()<12)return hold('RESCUE_CADENCE_OR_CPU');
+  // A dead or reassigned rescuer must not occupy the singleton forever,
+  // nor be silently overwritten by a newly dispatched worker.
+  reconcile(memory,game);
+  const recentLoss=memory?.bot?.spawnlessWorkerRescueLedger?.history
+    ?.some(x=>x?.status==='LOST' &&
+      Number.isSafeInteger(x.lastObservedTick) &&
+      tick>=x.lastObservedTick && tick-x.lastObservedTick<500);
+  if(recentLoss)return hold('RECENT_RESCUER_LOSS_COOLDOWN');
   if(Object.values(game.creeps).some(c=>c?.memory?.spawnRescueTarget))
     return hold('RESCUER_ALREADY_ASSIGNED');
   // No second field economy mission while a claim or hostile operation
@@ -119,6 +199,17 @@ function dispatch(states,game,memory) {
       worker.memory.spawnRescueHome=from;
       worker.memory.spawnRescueTarget=to;
       worker.memory.spawnRescueAssignedTick=tick;
+      const data=ledger(memory);
+      if(data) {
+        const id='r2-'+from+'-'+to+'-'+tick+'-'+worker.name;
+        data.active={
+          id,home:from,target:to,worker:worker.name,
+          oldSpawnId:record.lastSpawnId,
+          oldSite:{roomName:to,x:record.pos.x,y:record.pos.y},
+          assignedTick:tick,lastObservedTick:tick,
+          status:'ASSIGNED',reason:null
+        };
+      }
       return {status:'ASSIGNED',assigned:true,
         from,to,worker:worker.name};
     }
@@ -142,6 +233,7 @@ function run(creep,game,memory) {
      !adjacent(game,from,to) || !creep.room ||
      ![from,to].includes(creep.room.name) ||
      !game.rooms?.[from]?.controller?.my) {
+    advance(memory,game,creep,'ABORTED','MISSION_BINDING_OR_HOME_UNVERIFIED');
     clear(creep);
     return true;
   }
@@ -149,13 +241,21 @@ function run(creep,game,memory) {
   if(!target?.controller?.my ||
      typeof target.find!=='function') {
     // Lack of exact ownership evidence is not permission to settle.
-    if(creep.room.name===from) {clear(creep);return false;}
+    if(creep.room.name===from) {
+      advance(memory,game,creep,'RETURNED','TARGET_OWNERSHIP_UNVERIFIED');
+      clear(creep);return false;
+    }
+    advance(memory,game,creep,'RETREAT','TARGET_OWNERSHIP_UNVERIFIED');
     return travel(creep,game,from);
   }
   const registry=memory?.bot?.ownedSpawnRecovery;
   const record=registry?.rooms?.[to];
   if(registry?.schemaVersion!==1 || !witness(record,to,now)) {
-    if(creep.room.name===from){clear(creep);return false;}
+    if(creep.room.name===from) {
+      advance(memory,game,creep,'RETURNED','OLD_SPAWN_WITNESS_MISSING');
+      clear(creep);return false;
+    }
+    advance(memory,game,creep,'RETREAT','OLD_SPAWN_WITNESS_MISSING');
     return travel(creep,game,from);
   }
   if(typeof FIND_HOSTILE_CREEPS==='undefined' ||
@@ -175,11 +275,28 @@ function run(creep,game,memory) {
   const verifiedSpawn=spawns.find(s=>s?.my===true &&
     s.pos?.roomName===to &&
     s.pos.x===record.pos.x && s.pos.y===record.pos.y);
-  if(verifiedSpawn && creep.room.name===to) {
+  const mission=memory?.bot?.spawnlessWorkerRescueLedger?.active;
+  // Require a NEW physical object. A stale original Spawn resurfacing in
+  // incomplete room state must never be mislabelled as a completed rebuild.
+  // The R1 witness may already have changed to the rebuilt ID earlier in
+  // this tick. The stable mission's original ID is therefore decisive.
+  const newSpawn=verifiedSpawn &&
+    typeof verifiedSpawn.id==='string' && verifiedSpawn.id.length>0 &&
+    mission?.worker===creep.name &&
+    mission.home===from && mission.target===to &&
+    typeof mission.oldSpawnId==='string' &&
+    verifiedSpawn.id!==mission.oldSpawnId;
+  if(newSpawn && creep.room.name===to &&
+     hostiles.length===0 && targetBuildings.length===0 &&
+     homeEnemies.length===0 &&
+     config.AUTO_SPAWNLESS_WORKER_RESCUE===true &&
+     Number.isSafeInteger(creep.ticksToLive) &&
+     creep.ticksToLive>=150) {
+    advance(memory,game,creep,'COMPLETED','NEW_OWN_SPAWN_OBSERVED');
     creep.memory.home=to;
     clear(creep);
     delete creep.memory.working;
-    return false; // genuine new Spawn -> own colony labor permanently
+    return false; // physical new Spawn, not a proposed construction site
   }
   const home=game.rooms[from];
   const expired=config.AUTO_SPAWNLESS_WORKER_RESCUE!==true ||
@@ -192,10 +309,19 @@ function run(creep,game,memory) {
     !!home?.controller?.safeModeCooldown ||
     spawns.length>0; // different-position Spawn must not fake success
   if(expired && creep.room.name===from) {
+    advance(memory,game,creep,'RETURNED',
+      'DANGER_COOLDOWN_TIMEOUT_OR_UNVERIFIED_SPAWN');
     clear(creep);return false;
   }
-  if(expired)return travel(creep,game,from);
-  if(creep.room.name===to)return false; // run ordinary worker energy/build
+  if(expired) {
+    advance(memory,game,creep,'RETREAT',
+      'DANGER_COOLDOWN_TIMEOUT_OR_UNVERIFIED_SPAWN');
+    return travel(creep,game,from);
+  }
+  if(creep.room.name===to) {
+    advance(memory,game,creep,'ARRIVED');
+    return false; // observed onsite: ordinary worker energy/build
+  }
   return travel(creep,game,to);
 }
 function travel(creep,game,destination) {
@@ -208,4 +334,4 @@ function travel(creep,game,destination) {
     maxOps:Math.min(300,config.PATH_MAX_OPS||300)});
   return true;
 }
-module.exports={dispatch,run,_test:{labor,witness,adjacent}};
+module.exports={dispatch,run,summary,reconcile,_test:{labor,witness,adjacent,ledger,advance}};

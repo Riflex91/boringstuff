@@ -318,6 +318,7 @@ function statusSnapshot(roomStates, tickCpu) {
     expansionClaimLaunch,
     expansionPioneerProvision,
     expansionBootstrapRecoveryResult,
+    spawnlessWorkerRescue: spawnlessWorkerRescue.summary(Memory),
     expansionParentStability,
     serverProfile: profile,
     scheduler: schedulerState,

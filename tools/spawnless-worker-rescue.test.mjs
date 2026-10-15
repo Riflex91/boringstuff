@@ -53,7 +53,7 @@ const sandbox={module:{exports:{}},
 };
 vm.runInNewContext(fs.readFileSync(new URL(
   '../game/recovery.spawnless.worker.js',import.meta.url),'utf8'),sandbox);
-const {dispatch,run}=sandbox.module.exports;
+const {dispatch,run,summary,reconcile}=sandbox.module.exports;
 function reset(){
   a.room=home;b.room=home;a.ticksToLive=1400;b.ticksToLive=1200;
   a.memory={role:'worker',home:'E1N1'};
@@ -74,10 +74,13 @@ function reset(){
   };
   delete memory.bot.expansionClaim;
   delete memory.bot.counterattackMission;
+  delete memory.bot.spawnlessWorkerRescueLedger;
 }
 reset();
 const first=dispatch([donor,victim],game,memory);
 assert.equal(first.status,'ASSIGNED');
+assert.equal(summary(memory).active.status,'ASSIGNED');
+assert.equal(summary(memory).active.oldSpawnId,'verified-id');
 assert.equal(first.worker,'A','donate freshest eligible worker');
 assert.equal(a.memory.spawnRescueTarget,'E1N2');
 assert.equal(a.memory.spawnRescueHome,'E1N1');
@@ -94,19 +97,51 @@ a.room=target;moved=[];
 assert.equal(run(a,game,memory),false,
   'in spawnless target worker runs normal harvest/build role');
 assert.equal(a.memory.home,'E1N1');
-realSpawns=[{my:true,
+assert.equal(summary(memory).active.status,'ARRIVED');
+assert.equal(summary(memory).active.arrivedTick,1000);
+realSpawns=[{id:'actually-new-spawn',my:true,
   pos:{roomName:'E1N2',x:25,y:25}}];
 assert.equal(run(a,game,memory),false);
 assert.equal(a.memory.home,'E1N2',
   'actually rebuilt own Spawn permanently rehomes rescue worker');
 assert.equal(a.memory.spawnRescueTarget,undefined);
 assert.equal(a.memory.spawnRescueAssignedTick,undefined);
+assert.equal(summary(memory).active,null);
+assert.equal(summary(memory).last.status,'COMPLETED');
+assert.equal(summary(memory).last.completedTick,1000);
+assert.equal(summary(memory).last.oldSpawnId,'verified-id');
 reset();dispatch([donor,victim],game,memory);a.room=target;
-realSpawns=[{my:true,pos:{roomName:'E1N2',x:24,y:25}}];
+realSpawns=[{id:'different-location',my:true,pos:{roomName:'E1N2',x:24,y:25}}];
 assert.equal(run(a,game,memory),true,
   'wrong-position Spawn recalls worker instead of minting colony handoff');
 assert.equal(a.memory.home,'E1N1');
 assert.equal(moved.length,1);
+reset();dispatch([donor,victim],game,memory);a.room=target;
+realSpawns=[{id:'verified-id',my:true,pos:{roomName:'E1N2',x:25,y:25}}];
+assert.equal(run(a,game,memory),true,
+  'original historical Spawn ID reappearing is not a newly built Spawn');
+assert.equal(a.memory.home,'E1N1');
+assert.equal(summary(memory).last,null);
+assert.equal(summary(memory).active.status,'RETREAT');
+a.room=home;
+assert.equal(run(a,game,memory),false);
+assert.equal(summary(memory).active,null);
+assert.equal(summary(memory).last.status,'RETURNED');
+reset();dispatch([donor,victim],game,memory);a.room=target;
+realSpawns=[{id:'new-spawn-during-raid',my:true,
+  pos:{roomName:'E1N2',x:25,y:25}}];
+targetHostiles=[{id:'enemy'}];
+assert.equal(run(a,game,memory),true,
+  'new own Spawn with hostile nearby must NOT permanently rehome');
+assert.equal(a.memory.home,'E1N1');
+assert.equal(summary(memory).active.status,'RETREAT');
+reset();dispatch([donor,victim],game,memory);a.room=target;
+realSpawns=[{id:'new-spawn-feature-disabled',my:true,
+  pos:{roomName:'E1N2',x:25,y:25}}];
+enabled=false;
+assert.equal(run(a,game,memory),true,
+  'disabling rescue supersedes even a physically rebuilt Spawn');
+assert.equal(summary(memory).active.status,'RETREAT');
 reset();dispatch([donor,victim],game,memory);a.room=target;
 targetHostiles=[{id:'enemy'}];
 assert.equal(run(a,game,memory),true);
@@ -159,6 +194,28 @@ reset();victim.creeps=[{my:true,spawning:false,room:target,
   getActiveBodyparts(which){return ['work','carry'].includes(which)?1:0;}}];
 assert.equal(dispatch([donor,victim],game,memory).status,'HOLD',
   'target already has own labor so no extra donor is needed');
+reset();
+assert.equal(dispatch([donor,victim],game,memory).status,'ASSIGNED');
+delete game.creeps.A;
+game.time=1025;
+assert.equal(dispatch([donor,victim],game,memory).reason,
+  'RECENT_RESCUER_LOSS_COOLDOWN',
+  'a real missing worker must be accounted for before another is sent');
+assert.equal(summary(memory).active,null);
+assert.equal(summary(memory).last.status,'LOST');
+assert.equal(summary(memory).last.reason,'WORKER_NOT_IN_GAME_CREEPS');
+assert.equal(reconcile(memory,game).status,'NO_STALE_RESCUE');
+a.memory={role:'worker',home:'E1N1'};
+game.creeps.A=a;game.time=1525;
+assert.equal(dispatch([donor,victim],game,memory).status,'ASSIGNED',
+  'safe future rescue permitted after measured loss cooldown');
+reset();
+assert.equal(dispatch([donor,victim],game,memory).status,'ASSIGNED');
+a.memory.spawnRescueHome='E9N9';
+game.time=1001;
+assert.equal(reconcile(memory,game).status,'ABORTED',
+  'changed mission bindings are not a real completed rescue');
+assert.equal(summary(memory).last.status,'ABORTED');
 const main=fs.readFileSync(new URL('../game/main.js',import.meta.url),'utf8');
 const creepManager=fs.readFileSync(new URL(
   '../game/creep.manager.js',import.meta.url),'utf8');
