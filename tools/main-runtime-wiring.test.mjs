@@ -101,6 +101,10 @@ assert.match(mainSource,
 assert.ok(mainSource.includes(
   'const expansionReadiness = expansionReadinessShadow.evaluate(capabilities,roomStates,tickCpu);'),
   'readiness must be evaluated once before bounded frontier screening');
+assert.match(mainSource,/safeModeRemainingTicks:\s*controller/,
+  'World live status must expose a bounded actual Controller Safe Mode counter');
+assert.match(mainSource,/safeModeCooldownRemainingTicks:\s*controller/,
+  'World live status must expose actual Controller cooldown, not inferred safety');
 assert.ok(mainSource.includes('    expansionReadiness,'),
   'STATUS_SNAPSHOT must preserve the expansion readiness payload');
 
