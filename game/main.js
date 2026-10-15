@@ -33,6 +33,9 @@ const defenseRequestsShadow = require('defense.requests.shadow');
 const defenseRegistryPreview = require('defense.registry.preview');
 const regionalDefenseShadow = require('defense.reinforcement.shadow');
 const defenseTransitEvidence = require('defense.transit.evidence');
+const combatAggressionEvidence = require('combat.aggression.evidence');
+const combatCounterattackShadow = require('combat.counterattack.shadow');
+const combatCounterattackLaunch = require('combat.counterattack.launch');
 
 function bootstrapMemory() {
   if (!Memory.bot) Memory.bot = { version: config.VERSION, born: Game.time };
@@ -205,6 +208,25 @@ function statusSnapshot(roomStates, tickCpu) {
   }
   const schedulerState = processScheduler.snapshot();
   const worldIntelState = worldIntel.snapshot();
+  const combatCounterattack = combatCounterattackShadow.evaluate(
+    roomStates, Memory.bot?.worldIntel?.rooms || {},
+    Memory.bot?.combatAggressionEvidence, Game);
+  // A SHADOW suggestion is not executable authority; this second module
+  // independently reevaluates current Game owner, towers, enemies and budgets.
+  let combatCounterattackLaunchResult={status:'DISABLED',reason:'AUTO_RAID_OFF'};
+  if(config.AUTO_COUNTERATTACK_RAID===true) {
+    try {
+      combatCounterattackLaunchResult =
+        combatCounterattackLaunch.start(roomStates,Game,Memory);
+      if(combatCounterattackLaunchResult.spawnIntentAccepted)
+        logger.warn('U11_COUNTERATTACK_SPAWN_INTENT',
+          'One verified aggressor raid spawn accepted; no combat proven yet',
+          combatCounterattackLaunchResult,
+          {force:true,persist:true,dedupeTicks:0});
+    }catch(_) {
+      combatCounterattackLaunchResult={status:'HOLD',reason:'RAID_LAUNCH_EXCEPTION'};
+    }
+  }
   const transitEvidence = defenseTransitEvidence.snapshot(Game, Memory);
   // D2 is computed only for bounded snapshot evidence, never used by
   // legacy defense or spawn executors. No observed inter-room transit
@@ -279,6 +301,8 @@ function statusSnapshot(roomStates, tickCpu) {
     scheduler: schedulerState,
     worldIntel: worldIntelState,
     regionalDefense: regionalDefenseShadow.telemetrySummary(regionalDefense),
+    combatCounterattack,
+    combatCounterattackLaunchResult,
     regionalTransit: transitEvidence.summary,
     memoryFootprint: memoryFootprintSnapshot(),
     rooms
@@ -317,6 +341,19 @@ module.exports.loop = function() {
   const tickStart = Game.cpu.getUsed();
   try {
     measureMainDetail('main.bootstrap', bootstrapMemory);
+    // A born or returning U11 raider is supervised against actual ownership
+    // and local home defense on every tick, even if raid launches are disabled.
+    if(['ATTACKING','RETREAT'].includes(
+        Memory.bot?.counterattackMission?.phase)) {
+      try {
+        const result=combatCounterattackLaunch.supervise(Game,Memory);
+        if(result?.changed) logger.info('U11_RAID_MISSION_RESOLVED',
+          'Real raid state updated or survivor recalled', {
+            ...result,missionId:Memory.bot.counterattackMission.id,
+            target:Memory.bot.counterattackMission.target
+          }, {force:true,persist:true,dedupeTicks:0});
+      }catch(_){ /* never interrupt essential colony actions */ }
+    }
     // A previously accepted claimer spawn may vanish or discover an owned
     // target. Resolve the bounded ledger every real game tick even if the
     // launch flag is later disabled. Never mistake OK for verified ownership.
@@ -384,6 +421,13 @@ module.exports.loop = function() {
         }
       });
     }, schedulerContext);
+
+    // U11 actual witnessed armed-player incursion. It records evidence only;
+    // no unobserved NPC or harmless scout can authorize a player raid.
+    if (!criticalCpu && roomStates.length) {
+      try { combatAggressionEvidence.observe(roomStates,Game,Memory); }
+      catch (_) { /* home defense must not depend on optional intel */ }
+    }
 
     // Low-cost, optional I4 parent continuity witness. Each healthy tick is
     // individually observed; a skipped/low-CPU tick breaks the next streak.
