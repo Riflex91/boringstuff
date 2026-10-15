@@ -272,6 +272,20 @@ function statusSnapshot(roomStates, tickCpu) {
       controllerProgress: controller ? controller.progress : null,
       controllerProgressTotal: controller ? controller.progressTotal : null,
       ticksToDowngrade: controller ? controller.ticksToDowngrade : null,
+      // Actual in-game Controller protection counters at snapshot tick.
+      // No expansion intent, policy change, or interpretation from room API
+      // database timestamps. Unsupported/malformed values stay UNKNOWN.
+      safeModeRemainingTicks: controller
+        ? controller.safeMode == null ? 0
+          : Number.isSafeInteger(controller.safeMode) && controller.safeMode >= 0
+            ? controller.safeMode : null
+        : null,
+      safeModeCooldownRemainingTicks: controller
+        ? controller.safeModeCooldown == null ? 0
+          : Number.isSafeInteger(controller.safeModeCooldown) &&
+            controller.safeModeCooldown >= 0
+            ? controller.safeModeCooldown : null
+        : null,
       energyAvailable: state.energyAvailable,
       energyCapacity: state.energyCapacityAvailable,
       energyStored: state.energyStored,
