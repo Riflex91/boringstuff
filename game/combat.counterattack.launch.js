@@ -28,6 +28,16 @@ function parts(creep) {
   }
   return {dps,heal,hits,combat};
 }
+// Local garrison is an observed live, mobile, combat-capable defender;
+// a role count alone can contain a dying, spawning or disarmed creep.
+function liveHomeGuard(creep,room) {
+  return !!creep && creep.my===true && !creep.spawning &&
+    creep.memory?.role==='defender' && creep.memory.home===room &&
+    creep.room?.name===room && Array.isArray(creep.body) &&
+    creep.body.some(p=>p?.hits>0 && p.type==='move') &&
+    creep.body.some(p=>p?.hits>0 &&
+      ['attack','ranged_attack'].includes(p.type));
+}
 function parentReady(state) {
   const c=state?.room?.controller;
   return !!c?.my && !c.safeMode && !c.safeModeCooldown &&
@@ -40,6 +50,8 @@ function parentReady(state) {
     state.energyCapacityAvailable>=6*REPEAT_COST &&
     state.energyAvailable===state.energyCapacityAvailable &&
     (state.byRole?.defender||0)>=1 &&
+    Array.isArray(state.creeps) &&
+    state.creeps.some(creep=>liveHomeGuard(creep,state.room.name)) &&
     (state.byRole?.harvester||0)>=1 &&
     (state.byRole?.worker||0)>=1;
 }
@@ -215,6 +227,8 @@ function supervise(game,memory) {
   catch(_){return retreat('HOME_THREAT_OBSERVATION_FAILED');}
   if(!Array.isArray(hostiles) || hostiles.length)
     return retreat('HOME_UNDER_ATTACK');
+  if(!Object.values(game.creeps).some(c=>liveHomeGuard(c,m.parent)))
+    return retreat('HOME_GARRISON_LOST');
   const target=game.rooms[m.target];
   if(target) {
     if(target.controller?.my!==false ||
@@ -241,4 +255,4 @@ function supervise(game,memory) {
     return retreat('HOME_RAIDER_CASUALTIES');
   return {status:'ATTACKING',changed:false};
 }
-module.exports={start,supervise,_test:{parts,parentReady,neighbor}};
+module.exports={start,supervise,_test:{parts,parentReady,neighbor,liveHomeGuard}};
