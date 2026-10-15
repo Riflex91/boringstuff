@@ -260,6 +260,55 @@ game.time=1100;
 assert.equal(run(a,game,memory),true,
   'only 60 stationary ticks since actual progress must not abort');
 assert.equal(summary(memory).active.status,'ASSIGNED');
+// R8: Creep.memory fields alone are NOT authorization to travel/settle.
+// An exact active, immutable-ID mission must exist in durable bot Memory.
+function orphanTags() {
+  a.memory.spawnRescueHome='E1N1';
+  a.memory.spawnRescueTarget='E1N2';
+  a.memory.spawnRescueAssignedTick=1000;
+}
+reset();orphanTags();
+assert.equal(run(a,game,memory),false,
+  'orphaned worker at home resumes the ordinary economy');
+assert.equal(a.memory.spawnRescueTarget,undefined);
+assert.equal(moved.length,0);
+reset();orphanTags();a.room=target;
+realSpawns=[{id:'not-a-permitted-rebuild',my:true,
+  pos:{roomName:'E1N2',x:25,y:25}}];
+assert.equal(run(a,game,memory),true,
+  'orphaned worker in target must travel toward own original home');
+assert.equal(a.memory.home,'E1N1',
+  'an orphan cannot inherit a colony even if new Spawn is visible');
+assert.equal(moved.length,1,
+  'actual safe return movement attempted for stranded orphan');
+a.room=home;moved=[];
+assert.equal(run(a,game,memory),false,
+  'physically observed return cleans up orphaned mission fields');
+assert.equal(a.memory.spawnRescueTarget,undefined);
+assert.equal(moved.length,0);
+reset();dispatch([donor,victim],game,memory);
+memory.bot.spawnlessWorkerRescueLedger.active.id='tampered-r2-id';
+assert.equal(run(a,game,memory),false);
+assert.equal(a.memory.spawnRescueTarget,undefined);
+assert.equal(moved.length,0,
+  'tampered unique rescue mission ID cannot move the donor');
+reset();dispatch([donor,victim],game,memory);
+memory.bot.spawnlessWorkerRescueLedger.active.oldSite.x=19;
+memory.bot.spawnlessWorkerRescueLedger.active.oldSite.y=99;
+assert.equal(run(a,game,memory),false);
+assert.equal(moved.length,0,'invalid original Spawn site forbids travel');
+reset();dispatch([donor,victim],game,memory);
+memory.bot.spawnlessWorkerRescueLedger.active.worker='another-worker';
+assert.equal(run(a,game,memory),false);
+assert.equal(moved.length,0,'another worker is not mission authorized');
+reset();dispatch([donor,victim],game,memory);
+memory.bot.spawnlessWorkerRescueLedger.active.status='RETURNED';
+assert.equal(run(a,game,memory),false);
+assert.equal(moved.length,0,'completed or returned mission cannot restart');
+reset();dispatch([donor,victim],game,memory);
+a.memory.spawnRescueAssignedTick=975;
+assert.equal(run(a,game,memory),false);
+assert.equal(moved.length,0,'stale assignment tick cannot borrow worker');
 const main=fs.readFileSync(new URL('../game/main.js',import.meta.url),'utf8');
 const creepManager=fs.readFileSync(new URL(
   '../game/creep.manager.js',import.meta.url),'utf8');
