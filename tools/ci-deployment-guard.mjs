@@ -8,6 +8,12 @@ const branch = process.env.SCREEPS_BRANCH || 'chatgpt';
 const room = process.env.SCREEPS_ROOM || 'E8N1';
 const mode = process.argv[2];
 
+// On slower servers, 100 actual game ticks plus the next STATUS_SNAPSHOT
+// (100-tick cadence) may exceed 15 minutes. Longer observation does NOT lower
+// the release gate: the exact post-deployment 100+ tick snapshot, fatal-event
+// and CPU checks remain mandatory. GitHub Actions retains a finite deadline.
+export const LIVE_VERIFICATION_TIMEOUT_MS = 30 * 60 * 1000;
+
 export function parseBotMemory(reply) {
   let value = reply;
   for (let n = 0; n < 6; n++) {
@@ -353,7 +359,7 @@ async function verify(api) {
   });
   const id = receipt?.receipt?.deploymentId;
   if (!id) throw new Error('FAIL CLOSED: exact deployment receipt missing');
-  const timeLimit = Date.now() + 15 * 60 * 1000;
+  const timeLimit = Date.now() + LIVE_VERIFICATION_TIMEOUT_MS;
   let last = null;
   while (Date.now() < timeLimit) {
     const response = await api.userMemory('bot');
