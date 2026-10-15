@@ -203,13 +203,11 @@ function acquireForConsumer(creep) {
     return false;
   }
 
-  if (creep.room.storage && energyAmount(creep.room.storage) > 0) {
-    const rc = creep.withdraw(creep.room.storage, RESOURCE_ENERGY);
-    if (rc === OK) return true;
-    if (rc === ERR_NOT_IN_RANGE) return creep.moveTo(creep.room.storage, { reusePath: 8, maxOps: config.PATH_MAX_OPS }) === OK;
-    return false;
-  }
-
+  // An upgrader works at controller range. If its controller-side buffer
+  // is funded, use it BEFORE storage: the old storage-first branch could send
+  // a productive upgrader across the room while a nearby buffer was ready.
+  // This helper is called only during the hauler-assisted acquisition phase;
+  // no hauler mission or storage reservation is created here.
   if (creep.memory.role === 'upgrader' && creep.room.controller) {
     const controllerContainers = creep.room.controller.pos.findInRange(FIND_STRUCTURES, 1, {
       filter: s => s.structureType === STRUCTURE_CONTAINER && energyAmount(s) > 0
@@ -219,8 +217,27 @@ function acquireForConsumer(creep) {
       const rc = creep.withdraw(target, RESOURCE_ENERGY);
       if (rc === OK) return true;
       if (rc === ERR_NOT_IN_RANGE) return creep.moveTo(target, { reusePath: 8, maxOps: config.PATH_MAX_OPS }) === OK;
-      return false;
+      // A transiently emptied buffer does not prevent the next safe local
+      // option; no accepted movement or withdrawal occurred on this path.
     }
+  }
+
+  const storage=creep.room.storage;
+  // Read range exactly once; invalid or negative readings cannot authorize
+  // even a short optional detour away from the controller.
+  const storageRange=storage && typeof creep.pos.getRangeTo === 'function'
+    ? creep.pos.getRangeTo(storage) : null;
+  const localUpgraderStorage=creep.memory.role !== 'upgrader' ||
+    (Number.isSafeInteger(storageRange) && storageRange >= 0 && storageRange <= 4);
+  // Do not send an empty upgrader on a long trek back to central storage
+  // while live haulers are already serving controller-side consumers.
+  // Keep the legacy ordinary-worker path. A genuinely starved upgrader
+  // still retains the existing bounded self-supply fallback after 12 ticks.
+  if (storage && localUpgraderStorage && energyAmount(storage) > 0) {
+    const rc = creep.withdraw(storage, RESOURCE_ENERGY);
+    if (rc === OK) return true;
+    if (rc === ERR_NOT_IN_RANGE) return creep.moveTo(storage, { reusePath: 8, maxOps: config.PATH_MAX_OPS }) === OK;
+    return false;
   }
   return false;
 }
