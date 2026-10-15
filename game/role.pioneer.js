@@ -11,7 +11,7 @@ function validMission(creep, memory, game) {
   const tick = game?.time;
   if (!creep?.memory || creep.memory.role !== 'pioneer' ||
       !m || m.schemaVersion !== 1 ||
-      m.phase !== 'CLAIMED' ||
+      !['CLAIMED','ESTABLISHED'].includes(m.phase) ||
       typeof m.id !== 'string' || m.id.length > 80 ||
       !/^claim-[WE][0-9]+[NS][0-9]+-[WE][0-9]+[NS][0-9]+-[0-9]+$/.test(m.id) ||
       m.id !== creep.memory.claimMissionId ||
@@ -24,7 +24,14 @@ function validMission(creep, memory, game) {
       m.route.some(name => !ROOM.test(name)) ||
       !Number.isSafeInteger(m.confirmedTick) ||
       !Number.isSafeInteger(tick) || m.confirmedTick > tick ||
-      tick - m.confirmedTick > 2000 ||
+      (m.phase === 'CLAIMED' && tick - m.confirmedTick > 2000) ||
+      (m.phase === 'ESTABLISHED' && (
+        !Number.isSafeInteger(m.createdTick) || m.createdTick < 0 ||
+        m.id !== 'claim-'+m.parent+'-'+m.target+'-'+m.createdTick ||
+        creep.memory.home !== m.parent ||
+        !Number.isSafeInteger(m.establishedTick) ||
+        m.establishedTick < m.confirmedTick ||
+        m.establishedTick > tick || tick-m.establishedTick > 500)) ||
       !m.verifiedSpawnSite ||
       m.verifiedSpawnSite.roomName !== m.target ||
       !Number.isInteger(m.verifiedSpawnSite.x) ||
@@ -80,7 +87,14 @@ function spawnSite(room, mission) {
       typeof room.find !== 'function') return null;
   const built = room.find(FIND_MY_SPAWNS);
   if (!Array.isArray(built)) return null;
-  if (built.length) return {status:'BUILT',target:built[0]};
+  if (built.length) {
+    // Only the original exact owned tile can complete the claim handoff.
+    const verified=built.find(x=>x?.my===true &&
+      x.pos?.roomName===site.roomName &&
+      x.pos.x===site.x && x.pos.y===site.y);
+    return verified?{status:'BUILT',target:verified}:null;
+  }
+  if (mission.phase === 'ESTABLISHED') return null; // no duplicate site intent
   const sites = room.find(FIND_MY_CONSTRUCTION_SITES);
   if (!Array.isArray(sites)) return null;
   const own = sites.filter(x=>x && x.structureType === STRUCTURE_SPAWN);
@@ -174,9 +188,19 @@ function run(creep) {
   const site=spawnSite(creep.room,m);
   if (!site || site.status==='SITE_REJECTED' ||
       site.status==='SITE_INTENT_ACCEPTED') return;
-  // After first colony spawn is confirmed, ordinary worker behavior
-  // will be scheduled in a separate settlement/assignment release.
-  if (site.status!=='SITE') return;
+  // The verified first spawn is real. Re-home the surviving productive
+  // pioneer as an ordinary local worker so the new colony can bootstrap
+  // spawn energy and controller work without waiting for its first newborn.
+  // The regular worker handler picks up this role on the next game tick.
+  if (m.phase==='ESTABLISHED' && site.status==='BUILT') {
+    creep.memory.role='worker';
+    creep.memory.home=m.target;
+    delete creep.memory.claimMissionId;
+    delete creep.memory.targetRoom;
+    delete creep.memory.working;
+    return;
+  }
+  if (site.status!=='SITE' || m.phase!=='CLAIMED') return;
   if ((creep.store?.[RESOURCE_ENERGY]||0) <= 0) {
     workEnergy(creep);
     return;
