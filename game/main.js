@@ -33,6 +33,9 @@ const defenseRequestsShadow = require('defense.requests.shadow');
 const defenseRegistryPreview = require('defense.registry.preview');
 const regionalDefenseShadow = require('defense.reinforcement.shadow');
 const defenseTransitEvidence = require('defense.transit.evidence');
+const combatAggressionEvidence = require('combat.aggression.evidence');
+const combatCounterattackShadow = require('combat.counterattack.shadow');
+const combatCounterattackLaunch = require('combat.counterattack.launch');
 const regionalDefenseLive = require('defense.regional.live');
 
 function bootstrapMemory() {
@@ -206,6 +209,26 @@ function statusSnapshot(roomStates, tickCpu) {
   }
   const schedulerState = processScheduler.snapshot();
   const worldIntelState = worldIntel.snapshot();
+  const combatCounterattack = combatCounterattackShadow.evaluate(
+    roomStates, Memory.bot?.worldIntel?.rooms || {},
+    Memory.bot?.combatAggressionEvidence, Game);
+  // Enemy intelligence and a SHADOW candidate cannot grant attack authority.
+  // The live launcher independently checks current ownership, towers,
+  // body parts, economy, home garrison, route and actual combat margin.
+  let combatCounterattackLaunchResult={status:'DISABLED',reason:'AUTO_RAID_OFF'};
+  if(config.AUTO_COUNTERATTACK_RAID===true) {
+    try {
+      combatCounterattackLaunchResult =
+        combatCounterattackLaunch.start(roomStates,Game,Memory);
+      if(combatCounterattackLaunchResult.spawnIntentAccepted)
+        logger.warn('U11_COUNTERATTACK_SPAWN_INTENT',
+          'Verified hostile-player mission spawn intent accepted, not combat success',
+          combatCounterattackLaunchResult,
+          {force:true,persist:true,dedupeTicks:0});
+    }catch(_) {
+      combatCounterattackLaunchResult={status:'HOLD',reason:'RAID_LAUNCH_EXCEPTION'};
+    }
+  }
   const transitEvidence = defenseTransitEvidence.snapshot(Game, Memory);
   // D2 is computed only for bounded snapshot evidence, never used by
   // legacy defense or spawn executors. No observed inter-room transit
@@ -280,6 +303,8 @@ function statusSnapshot(roomStates, tickCpu) {
     scheduler: schedulerState,
     worldIntel: worldIntelState,
     regionalDefense: regionalDefenseShadow.telemetrySummary(regionalDefense),
+    combatCounterattack,
+    combatCounterattackLaunchResult,
     regionalTransit: transitEvidence.summary,
     memoryFootprint: memoryFootprintSnapshot(),
     rooms
@@ -318,6 +343,19 @@ module.exports.loop = function() {
   const tickStart = Game.cpu.getUsed();
   try {
     measureMainDetail('main.bootstrap', bootstrapMemory);
+    // Preserve real counterattack retreat even if future releases disable
+    // autonomous raid launches. Never interrupt the home economy on error.
+    if(['ATTACKING','RETREAT'].includes(
+        Memory.bot?.counterattackMission?.phase)) {
+      try {
+        const result=combatCounterattackLaunch.supervise(Game,Memory);
+        if(result?.changed) logger.info('U11_RAID_MISSION_RESOLVED',
+          'Real combat mission supervised or survivor recalled', {
+            ...result,missionId:Memory.bot.counterattackMission.id,
+            target:Memory.bot.counterattackMission.target
+          }, {force:true,persist:true,dedupeTicks:0});
+      }catch(_){ /* keep critical creep/defense ticks alive */ }
+    }
     // A previously accepted claimer spawn may vanish or discover an owned
     // target. Resolve the bounded ledger every real game tick even if the
     // launch flag is later disabled. Never mistake OK for verified ownership.
@@ -396,6 +434,13 @@ module.exports.loop = function() {
             'Real regional neighbor defense assignment',aid,
             {force:true,persist:true,dedupeTicks:0});
       } catch (_) { /* local defense always wins over regional aid */ }
+    }
+
+    // U11: actual hostile-player armed incursions, never merely cached
+    // enemy names or NPCs, are the only basis for counterattack selection.
+    if (!criticalCpu && roomStates.length) {
+      try { combatAggressionEvidence.observe(roomStates,Game,Memory); }
+      catch (_) { /* optional intelligence must never halt core defense */ }
     }
 
     // Low-cost, optional I4 parent continuity witness. Each healthy tick is
