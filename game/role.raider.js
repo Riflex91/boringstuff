@@ -78,6 +78,35 @@ function selectEnemy(creep,enemies,player) {
   return candidates[0]||null;
 }
 
+// The original launch advantage cannot be trusted after defenders respawn,
+// receive boosts or destroy our combat parts while the raider is in transit.
+// Re-evaluate the actually observed opponent bodies immediately before every
+// attack, with the same conservative 6:1 damage and heal margin as launch.
+function unsafeEngagement(creep,enemies,owner) {
+  if(!Array.isArray(enemies) || enemies.length>2 ||
+     typeof creep?.getActiveBodyparts!=='function' ||
+     typeof ATTACK==='undefined')return true;
+  const ourDps=30*creep.getActiveBodyparts(ATTACK);
+  if(!Number.isFinite(ourDps) || ourDps<180)return true;
+  let damage=0,heal=0,hits=0;
+  for(const enemy of enemies) {
+    if(enemy?.owner?.username!==owner ||
+       !Array.isArray(enemy.body) || enemy.body.length>50 ||
+       enemy.body.length===0)return true;
+    for(const part of enemy.body) {
+      if(!part || !Number.isInteger(part.hits) ||
+         part.hits<0 || part.hits>100 || part.boost)return true;
+      if(!part.hits)continue;
+      hits+=part.hits;
+      if(part.type==='attack' || part.type==='work')damage+=30;
+      if(part.type==='ranged_attack')damage+=10;
+      if(part.type==='heal')heal+=12;
+    }
+  }
+  return damage>ourDps/6 || heal>ourDps/5 ||
+    hits>ourDps*8 || ourDps-heal<4*damage;
+}
+
 function run(creep) {
   const m=missionFor(creep,Memory,Game);
   if(!m || !creep?.room || !creep.pos) return;
@@ -167,6 +196,10 @@ function run(creep) {
     recall(m,'UNEXPECTED_THIRD_PARTY');
     retreat(creep,m);return;
   }
+  if(unsafeEngagement(creep,here,m.aggressor)) {
+    recall(m,'LIVE_COMBAT_MARGIN_LOST');
+    retreat(creep,m);return;
+  }
   const enemy=selectEnemy(creep,here,m.aggressor);
   if(!enemy) {
     creep.memory.noRaidTargetTicks=(creep.memory.noRaidTargetTicks||0)+1;
@@ -185,4 +218,4 @@ function run(creep) {
     retreat(creep,m);
   }
 }
-module.exports={run,_test:{missionFor,selectEnemy}};
+module.exports={run,_test:{missionFor,selectEnemy,unsafeEngagement}};
