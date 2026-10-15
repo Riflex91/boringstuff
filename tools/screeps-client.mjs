@@ -215,8 +215,8 @@ export class ScreepsHttpClient {
     }
   }
 
-  async authMe() {
-    const me = await this._request('GET', '/api/auth/me');
+  async authMe(opts = {}) {
+    const me = await this._request('GET', '/api/auth/me', {}, opts);
     this._me = me;
     return me;
   }
@@ -242,12 +242,13 @@ export class ScreepsHttpClient {
     return this._request('GET', '/api/game/room-terrain', { room, encoded: 1, shard: shard ?? this.defaultShard });
   }
 
-  gameRoomObjects(room, shard) {
-    return this._request('GET', '/api/game/room-objects', { room, shard: shard ?? this.defaultShard });
+  gameRoomObjects(room, shard, opts = {}) {
+    return this._request('GET', '/api/game/room-objects',
+      { room, shard: shard ?? this.defaultShard }, opts);
   }
 
-  userWorldStatus() {
-    return this._request('GET', '/api/user/world-status');
+  userWorldStatus(opts = {}) {
+    return this._request('GET', '/api/user/world-status', {}, opts);
   }
 
   userFindById(id) {
@@ -280,8 +281,8 @@ export class ScreepsHttpClient {
       { max429Retries:0, max5xxRetries:0, retryAuth:false });
   }
 
-  userBranches() {
-    return this._request('GET', '/api/user/branches');
+  userBranches(opts = {}) {
+    return this._request('GET', '/api/user/branches', {}, opts);
   }
 
   userSetActiveBranch(branch, activeName = 'activeWorld') {
