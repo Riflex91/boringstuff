@@ -21,11 +21,31 @@ const original={deploymentId:'exact-deployment-123',
         x:{room:'W37S79',siteIntentAccepted:false}}
     ],
     snapshots:[{c:'STATUS_SNAPSHOT',t:200,x:{
+      gcl:{level:1,progress:122456,progressTotal:1000000},
+      rooms:{W37S79:{rcl:4,controllerProgress:179520}},
       spawnlessWorkerRescue:{last:{status:'COMPLETED'}}
     }},{c:'STATUS_SNAPSHOT',t:300,x:{
-      gcl:{level:1},
+      gcl:{level:1,progress:123456,progressTotal:1000000},
+      rooms:{W37S79:{
+        rcl:4,controllerProgress:180520,controllerProgressTotal:405000,
+        energyAvailable:780,energyCapacity:1100,energyStored:2500,
+        constructionSites:1,
+        economy:{last100:{controllerProgress:1000}},
+        creeps:{harvester:2,hauler:1,upgrader:1},
+        health:{status:'WATCH',overallScore:79,
+          scores:{economy:87,logistics:55,controller:25},
+          reasons:['HAULING_DEFICIT','CONTROLLER_STALLED']},
+        economyModel:{haulerCarryDeficit:2,harvesterWorkDeficit:0,
+          theoreticalIncomePerTick:20,dedicatedHarvestCapacityPerTick:15.5,
+          productiveDemandPerTick:12,haulerCarryParts:10,
+          recommendedHaulerCarryParts:12,sourceContainersReady:1,
+          sourceCount:2,consumerWaitingCount:2,consumerFallbackCount:1,
+          consumerCriticalCount:2}
+      }},
+      expansionParentStability:{rooms:[{room:'W37S79',status:'HOLD',
+        reason:'PARENT_SUPPORT_UNVERIFIED',consecutiveSupportTicks:0}]},
       expansionReadiness:{
-        ownedRooms:1,availableClaimSlots:0,status:'AT_CAPACITY',
+        ownedRooms:1,availableClaimSlots:0,suitableParent:false,status:'AT_CAPACITY',
         reasons:['NO_AVAILABLE_CLAIM_SLOT']
       },
       expansionCandidates:{status:'HOLD',
@@ -67,6 +87,45 @@ assert.equal(evidence.expansion.source,
   'LIVE_STATUS_SNAPSHOT_NOT_CLAIM_AUTHORITY');
 assert.equal(evidence.expansion.tick,300);
 assert.equal(evidence.expansion.gclLevel,1);
+assert.equal(evidence.expansion.gclProgress,123456);
+assert.equal(evidence.expansion.gclProgressTotal,1000000);
+assert.equal(evidence.expansion.observedGclProgressPerTick,10);
+assert.equal(evidence.expansion.suitableParent,false);
+assert.equal(evidence.expansion.home.room,'W37S79');
+assert.equal(evidence.expansion.home.rcl,4);
+assert.equal(evidence.expansion.home.observedControllerProgressPerTick,10);
+assert.equal(evidence.expansion.home.economyWindowControllerProgress,1000);
+assert.equal(evidence.expansion.home.healthStatus,'WATCH');
+assert.equal(evidence.expansion.home.healthScore,79);
+assert.deepEqual(evidence.expansion.home.healthReasons,
+  ['HAULING_DEFICIT','CONTROLLER_STALLED']);
+assert.equal(evidence.expansion.home.haulingDeficit,2);
+assert.equal(evidence.expansion.home.healthEconomyScore,87);
+assert.equal(evidence.expansion.home.healthLogisticsScore,55);
+assert.equal(evidence.expansion.home.healthControllerScore,25);
+assert.equal(evidence.expansion.home.parentContinuityStatus,'HOLD');
+assert.equal(evidence.expansion.home.parentContinuityReason,
+  'PARENT_SUPPORT_UNVERIFIED');
+assert.equal(evidence.expansion.home.parentContinuityTicks,0);
+assert.equal(evidence.expansion.home.constructionSites,1);
+assert.equal(evidence.expansion.home.theoreticalIncomePerTick,20);
+assert.equal(evidence.expansion.home.harvestedCapacityPerTick,15.5);
+assert.equal(evidence.expansion.home.productiveDemandPerTick,12);
+assert.equal(evidence.expansion.home.haulerCarryParts,10);
+assert.equal(evidence.expansion.home.requiredHaulerCarryParts,12);
+assert.equal(evidence.expansion.home.sourceContainersReady,1);
+assert.equal(evidence.expansion.home.sourceCount,2);
+assert.equal(evidence.expansion.home.consumerWaitingCount,2);
+assert.equal(evidence.expansion.home.consumerFallbackCount,1);
+assert.equal(evidence.expansion.home.consumerCriticalCount,2);
+assert.equal(evidence.expansion.home.harvesterCount,2);
+assert.equal(evidence.expansion.home.haulerCount,1);
+assert.equal(evidence.expansion.home.upgraderCount,1);
+assert.equal(evidence.expansion.home.energyAvailable,780);
+assert.equal(evidence.expansion.home.energyCapacity,1100);
+assert.equal(evidence.expansion.home.energyStored,2500);
+assert.equal(evidence.expansion.home.controllerProgressTotal,405000);
+
 assert.equal(evidence.expansion.ownedRooms,1);
 assert.equal(evidence.expansion.availableClaimSlots,0);
 assert.equal(evidence.expansion.readinessStatus,'AT_CAPACITY');
@@ -115,6 +174,51 @@ const sanitized=inspectWorldRecoveryEvidence({
 assert.deepEqual(sanitized.expansion.readinessReasons,['NORMAL_REASON'],
   'untrusted long or dangerous text is never printed as live diagnostics');
 assert.equal(sanitized.expansion.launchReason,null);
+const unsafeHome=structuredClone(original);
+unsafeHome.telemetryJournal.snapshots[1].x.rooms.W37S79.health.reasons=[
+  'HAULING_DEFICIT','<invalid-script>','X'.repeat(400)
+];
+unsafeHome.telemetryJournal.snapshots[1].x.rooms.W37S79.health.status=
+  'NONSENSE';
+unsafeHome.telemetryJournal.snapshots[1].x.rooms.W37S79.health.overallScore=999;
+unsafeHome.telemetryJournal.snapshots[1].x.rooms.W37S79.economyModel.haulerCarryDeficit='many';
+const filteredHome=inspectWorldRecoveryEvidence({
+  data:JSON.stringify(unsafeHome)
+}).expansion.home;
+assert.equal(filteredHome.healthStatus,null);
+assert.equal(filteredHome.healthScore,null);
+assert.deepEqual(filteredHome.healthReasons,['HAULING_DEFICIT']);
+assert.equal(filteredHome.haulingDeficit,null,
+  'missing numeric evidence cannot become an invented zero');
+const resetGcl=structuredClone(original);
+resetGcl.telemetryJournal.snapshots[0].x.gcl.level=0;
+assert.equal(inspectWorldRecoveryEvidence({
+  data:JSON.stringify(resetGcl)
+}).expansion.observedGclProgressPerTick,null,
+  'progress across a GCL level transition is not a valid speed');
+const resetController=structuredClone(original);
+resetController.telemetryJournal.snapshots[0].x.rooms.W37S79.rcl=3;
+assert.equal(inspectWorldRecoveryEvidence({
+  data:JSON.stringify(resetController)
+}).expansion.home.observedControllerProgressPerTick,null,
+  'controller progress across RCL level transition is UNKNOWN');
+const invalidRate=structuredClone(original);
+invalidRate.telemetryJournal.snapshots[0].x.gcl.progress=123457;
+assert.equal(inspectWorldRecoveryEvidence({
+  data:JSON.stringify(invalidRate)
+}).expansion.observedGclProgressPerTick,null,
+  'counter rollback cannot imply positive progress');
+const missingMeasurements=structuredClone(original);
+delete missingMeasurements.telemetryJournal.snapshots[1].x.rooms.W37S79.economyModel;
+assert.equal(inspectWorldRecoveryEvidence({
+  data:JSON.stringify(missingMeasurements)
+}).expansion.home.harvestedCapacityPerTick,null,
+  'missing mining model is UNKNOWN, not zero');
+const unknownRoom=structuredClone(original);
+delete unknownRoom.telemetryJournal.snapshots[1].x.rooms.W37S79;
+assert.equal(inspectWorldRecoveryEvidence({
+  data:JSON.stringify(unknownRoom)
+}).expansion.home,null,'missing own room is UNKNOWN');
 const delayed=structuredClone(original);
 delayed.telemetryJournal.snapshots[1].x={};
 const absent=inspectWorldRecoveryEvidence({data:JSON.stringify(delayed)});
