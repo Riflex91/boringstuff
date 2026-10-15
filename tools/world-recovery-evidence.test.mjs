@@ -41,7 +41,15 @@ const original={deploymentId:'exact-deployment-123',
           productiveDemandPerTick:12,haulerCarryParts:10,
           recommendedHaulerCarryParts:12,sourceContainersReady:1,
           sourceCount:2,consumerWaitingCount:2,consumerFallbackCount:1,
-          consumerCriticalCount:2}
+          consumerCriticalCount:2,
+          sourceRoutes:[
+            {sourceId:'unexposed-source-A',spawnDistance:8,
+             assignedHarvesterWorkParts:5,dedicatedIncomePerTick:10,
+             containerReady:true},
+            {sourceId:'unexposed-source-B',spawnDistance:9,
+             assignedHarvesterWorkParts:2.5,dedicatedIncomePerTick:5,
+             containerReady:true}
+          ]}
       }},
       expansionParentStability:{rooms:[{room:'W37S79',status:'HOLD',
         reason:'PARENT_SUPPORT_UNVERIFIED',consecutiveSupportTicks:0}]},
@@ -119,6 +127,15 @@ assert.equal(evidence.expansion.home.haulerCarryParts,10);
 assert.equal(evidence.expansion.home.requiredHaulerCarryParts,12);
 assert.equal(evidence.expansion.home.sourceContainersReady,1);
 assert.equal(evidence.expansion.home.sourceCount,2);
+const perSource=evidence.expansion.home.modeledSourceCoverage;
+assert.equal(perSource.evidenceType,'MODEL_ONLY_NOT_SETTLED_HARVEST');
+assert.equal(perSource.sourceCount,2);
+assert.equal(perSource.sourcesBelowFiveWork,1);
+assert.equal(perSource.unassignedSources,0);
+assert.equal(perSource.modeledCombinedIncomePerTick,15);
+assert.deepEqual(perSource.routes.map(x=>x.modeledHarvesterWorkParts),[5,2.5]);
+assert.ok(!JSON.stringify(perSource).includes('unexposed-source-'),
+  'Source IDs never escape the bounded World diagnostic');
 assert.equal(evidence.expansion.home.consumerWaitingCount,2);
 assert.equal(evidence.expansion.home.consumerFallbackCount,1);
 assert.equal(evidence.expansion.home.consumerCriticalCount,2);
@@ -220,6 +237,43 @@ assert.equal(inspectWorldRecoveryEvidence({
 assert.equal(inspectWorldRecoveryEvidence({
   data:JSON.stringify(spoofedProtection)
 }).expansion.home.parentDefenseGate,'UNVERIFIED');
+const oneEmptySource=structuredClone(original);
+oneEmptySource.telemetryJournal.snapshots[1].x.rooms.W37S79
+  .economyModel.sourceRoutes[1].assignedHarvesterWorkParts=0;
+oneEmptySource.telemetryJournal.snapshots[1].x.rooms.W37S79
+  .economyModel.sourceRoutes[1].dedicatedIncomePerTick=0;
+assert.equal(inspectWorldRecoveryEvidence({
+  data:JSON.stringify(oneEmptySource)
+}).expansion.home.modeledSourceCoverage.unassignedSources,1,
+  'an actually modeled zero-work source must be visible as a source-level gap');
+const missingSourceRoutes=structuredClone(original);
+delete missingSourceRoutes.telemetryJournal.snapshots[1].x.rooms.W37S79
+  .economyModel.sourceRoutes;
+assert.equal(inspectWorldRecoveryEvidence({
+  data:JSON.stringify(missingSourceRoutes)
+}).expansion.home.modeledSourceCoverage,null,
+  'missing or depth-truncated source routes are UNKNOWN, never zero');
+const untrustedSource=structuredClone(original);
+untrustedSource.telemetryJournal.snapshots[1].x.rooms.W37S79
+  .economyModel.sourceRoutes[0].assignedHarvesterWorkParts='5';
+assert.equal(inspectWorldRecoveryEvidence({
+  data:JSON.stringify(untrustedSource)
+}).expansion.home.modeledSourceCoverage,null,
+  'malformed per-source capacity must invalidate the entire model breakdown');
+const duplicateSource=structuredClone(original);
+duplicateSource.telemetryJournal.snapshots[1].x.rooms.W37S79
+  .economyModel.sourceRoutes[1].sourceId='unexposed-source-A';
+assert.equal(inspectWorldRecoveryEvidence({
+  data:JSON.stringify(duplicateSource)
+}).expansion.home.modeledSourceCoverage,null,
+  'repeated source IDs must not be double-counted');
+const inconsistentSourceCount=structuredClone(original);
+inconsistentSourceCount.telemetryJournal.snapshots[1].x.rooms.W37S79
+  .economyModel.sourceCount=3;
+assert.equal(inspectWorldRecoveryEvidence({
+  data:JSON.stringify(inconsistentSourceCount)
+}).expansion.home.modeledSourceCoverage,null,
+  'partial source evidence must not appear complete');
 const resetGcl=structuredClone(original);
 resetGcl.telemetryJournal.snapshots[0].x.gcl.level=0;
 assert.equal(inspectWorldRecoveryEvidence({
