@@ -150,6 +150,13 @@ opponents=[{...enemy(),body:[{type:'attack',hits:100},
 assert.equal(start([home],game,memory).reason,
   'REAL_COMBAT_VICTORY_MARGIN_UNPROVEN',
   'unproven survival margin must block the expedition');
+reset();home.energyCapacityAvailable=1050;home.energyAvailable=1050;
+const earlyRaid=start([home],game,memory);
+assert.equal(earlyRaid.status,'SPAWN_INTENT_ACCEPTED',
+  'RCL4 1050-energy colony can dispatch a bounded 5x-advantage counterstrike');
+assert.equal(spawnRequests[0].parts.length,20,
+  '950-energy [TOUGH ATTACK MOVE MOVE] x5 fits in real spawn capacity');
+home.energyCapacityAvailable=1300;
 const main=fs.readFileSync(new URL('../game/main.js',import.meta.url),'utf8');
 assert.ok(main.includes('combatCounterattackLaunch.start(roomStates,Game,Memory)'));
 assert.ok(main.includes('combatCounterattackLaunch.supervise(Game,Memory)'));
