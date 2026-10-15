@@ -18,7 +18,7 @@ const worker=(name,ttl)=>({
   name,my:true,spawning:false,room:home,ticksToLive:ttl,
   memory:{role:'worker',home:'E1N1'},
   getActiveBodyparts(type){return ['work','carry','move'].includes(type)?1:0;},
-  pos:{findClosestByRange(which){assert.equal(which,3);return {id:'own-border'};}},
+  pos:{x:25,y:25,findClosestByRange(which){assert.equal(which,3);return {id:'own-border'};}},
   moveTo(pos,opts){moved.push({name,pos,opts});return 0;}
 });
 const a=worker('A',1400),b=worker('B',1200);
@@ -56,6 +56,7 @@ vm.runInNewContext(fs.readFileSync(new URL(
 const {dispatch,run,summary,reconcile}=sandbox.module.exports;
 function reset(){
   a.room=home;b.room=home;a.ticksToLive=1400;b.ticksToLive=1200;
+  a.pos.x=25;a.pos.y=25;b.pos.x=25;b.pos.y=25;
   a.memory={role:'worker',home:'E1N1'};
   b.memory={role:'worker',home:'E1N1'};
   game.creeps={A:a,B:b};game.time=1000;bucket=10000;
@@ -216,6 +217,49 @@ game.time=1001;
 assert.equal(reconcile(memory,game).status,'ABORTED',
   'changed mission bindings are not a real completed rescue');
 assert.equal(summary(memory).last.status,'ABORTED');
+// A safety RETREAT is irreversible until the physically observed home
+// return. The disappearance of danger, even a new Spawn, is insufficient.
+reset();dispatch([donor,victim],game,memory);a.room=target;
+targetHostiles=[{id:'enemy'}];
+assert.equal(run(a,game,memory),true);
+assert.equal(summary(memory).active.status,'RETREAT');
+const recallReason=summary(memory).active.reason;
+targetHostiles=[];
+realSpawns=[{id:'new-after-retreat',my:true,
+  pos:{roomName:'E1N2',x:25,y:25}}];
+game.time=1001;moved=[];
+assert.equal(run(a,game,memory),true,
+  'observed new Spawn may not cancel a previously ordered retreat');
+assert.equal(a.memory.home,'E1N1');
+assert.equal(summary(memory).active.status,'RETREAT');
+assert.equal(moved.length,1,'real homeward movement issued');
+game.time=1002;a.room=home;
+assert.equal(run(a,game,memory),false);
+assert.equal(a.memory.spawnRescueTarget,undefined);
+assert.equal(summary(memory).last.status,'RETURNED');
+assert.equal(summary(memory).last.reason,recallReason,
+  'completed return retains its originally observed danger reason');
+// Actual tile observation detects a worker trapped in the safe origin.
+reset();dispatch([donor,victim],game,memory);
+assert.equal(run(a,game,memory),true);
+game.time=1074;
+assert.equal(run(a,game,memory),true,
+  'under 75 ticks stationary is not enough evidence of failed travel');
+game.time=1075;
+assert.equal(run(a,game,memory),false,
+  '75 ticks without actual movement releases home worker');
+assert.equal(a.memory.spawnRescueTarget,undefined);
+assert.equal(summary(memory).last.status,'RETURNED');
+assert.equal(summary(memory).last.reason,'OUTBOUND_STALLED_75_TICKS');
+reset();dispatch([donor,victim],game,memory);
+assert.equal(run(a,game,memory),true);
+a.pos.x=26;game.time=1040;
+assert.equal(run(a,game,memory),true,
+  'observed tile progress restarts measured stalling window');
+game.time=1100;
+assert.equal(run(a,game,memory),true,
+  'only 60 stationary ticks since actual progress must not abort');
+assert.equal(summary(memory).active.status,'ASSIGNED');
 const main=fs.readFileSync(new URL('../game/main.js',import.meta.url),'utf8');
 const creepManager=fs.readFileSync(new URL(
   '../game/creep.manager.js',import.meta.url),'utf8');
