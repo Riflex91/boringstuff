@@ -44,10 +44,16 @@ export function assessWorldRuntime({me,branches,status,room,memory}){
 }
 export async function inspectWorldRuntime(api){
   if(api?.defaultShard!==target.shard)throw new Error('EXACT_SHARD_REQUIRED');
+  // The 10-minute diagnostic job must never be cancelled mid-read by
+  // a slow World endpoint: each GET has an absolute 15-second deadline.
+  // No POST/upload/activation retries or state-changing actions.
+  const bounded={timeoutMs:10000,totalTimeoutMs:15000,
+    max429Retries:0,max5xxRetries:0};
   const [me,branches,status,room,memory]=await Promise.all([
-    api.authMe(),api.userBranches(),api.userWorldStatus(),
-    api.gameRoomObjects(target.room,target.shard),
-    api.userMemory('',target.shard).catch(()=>null)]);
+    api.authMe(bounded),api.userBranches(bounded),
+    api.userWorldStatus(bounded),
+    api.gameRoomObjects(target.room,target.shard,bounded),
+    api.userMemory('',target.shard,bounded).catch(()=>null)]);
   return assessWorldRuntime({me,branches,status,room,memory});
 }
 async function main(){
