@@ -128,6 +128,21 @@ assert.equal(run(a,game,memory),false);
 assert.equal(summary(memory).active,null);
 assert.equal(summary(memory).last.status,'RETURNED');
 reset();dispatch([donor,victim],game,memory);a.room=target;
+realSpawns=[{id:'new-spawn-during-raid',my:true,
+  pos:{roomName:'E1N2',x:25,y:25}}];
+targetHostiles=[{id:'enemy'}];
+assert.equal(run(a,game,memory),true,
+  'new own Spawn with hostile nearby must NOT permanently rehome');
+assert.equal(a.memory.home,'E1N1');
+assert.equal(summary(memory).active.status,'RETREAT');
+reset();dispatch([donor,victim],game,memory);a.room=target;
+realSpawns=[{id:'new-spawn-feature-disabled',my:true,
+  pos:{roomName:'E1N2',x:25,y:25}}];
+enabled=false;
+assert.equal(run(a,game,memory),true,
+  'disabling rescue supersedes even a physically rebuilt Spawn');
+assert.equal(summary(memory).active.status,'RETREAT');
+reset();dispatch([donor,victim],game,memory);a.room=target;
 targetHostiles=[{id:'enemy'}];
 assert.equal(run(a,game,memory),true);
 assert.equal(moved.length,1,'target enemies issue an actual return move');
