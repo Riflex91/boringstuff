@@ -85,6 +85,8 @@ module.exports = {
   // ongoing accepted missions are still supervised every tick.
   AUTO_EXPANSION_CLAIM: true,
   AUTO_EXPANSION_BOOTSTRAP: true,
+  // U11: bounded independently verified single-raider enemy counterstrike.
+  AUTO_COUNTERATTACK_RAID: true,
   ENABLE_REMOTE_MINING: false,
 
   // Construction planning is staged. Critical energy infrastructure is placed
