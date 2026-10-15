@@ -33,10 +33,12 @@ function adjacent(game,from,to) {
 }
 function assign(states,game) {
   const now=game?.time;
-  if(!Number.isSafeInteger(now) || now%25!==0 ||
+  if(config.AUTO_REGIONAL_DEFENSE_SUPPORT!==true ||
+     !Number.isSafeInteger(now) || now%25!==0 ||
      !Array.isArray(states) || states.length<2 || states.length>8 ||
      !game.creeps || !game.rooms || !game.cpu ||
-     game.cpu.bucket<7000 ||
+     !Number.isFinite(game.cpu.bucket) || game.cpu.bucket<7000 ||
+     !Number.isFinite(game.cpu.limit) ||
      typeof game.cpu.getUsed!=='function' ||
      game.cpu.limit-game.cpu.getUsed()<8)
     return {status:'HOLD',reason:'NO_SAFE_REGIONAL_SPAWN_CAPACITY'};
@@ -115,7 +117,8 @@ function run(creep,game) {
   }catch(_){return true;}
   if(!Array.isArray(homeHostiles) || !Array.isArray(targetHostiles))
     return true;
-  const expired=now-creep.memory.defenseSupportAssignedTick>MAX_ASSIGNMENT_TICKS ||
+  const expired=config.AUTO_REGIONAL_DEFENSE_SUPPORT!==true ||
+    now-creep.memory.defenseSupportAssignedTick>MAX_ASSIGNMENT_TICKS ||
     !Number.isSafeInteger(creep.ticksToLive) ||
     creep.ticksToLive<100 ||
     homeHostiles.some(armed) || home.controller.safeMode ||
