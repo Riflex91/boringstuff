@@ -76,6 +76,18 @@ homeState.hostileCreeps=[hostile()];
 assert.equal(assign([homeState,targetState],game).status,'HOLD');
 homeState.hostileCreeps=[];
 enabled=false;
+// Operational rollback must actually recall a deployed fighter, not merely
+// prevent future dispatches.
+spare.memory.defenseSupportHome='E1N1';
+spare.memory.defenseSupportTarget='E1N2';
+spare.memory.defenseSupportAssignedTick=1000;
+spare.room=target;targetEnemies=[hostile()];issued=[];
+assert.equal(run(spare,game),true,
+  'turning the flag off must recall field troops still fighting');
+assert.equal(issued.length,1,'feature rollback must issue actual return movement');
+spare.room=home;
+assert.equal(run(spare,game),false,'home arrival clears mission on rollback');
+assert.equal(spare.memory.defenseSupportTarget,undefined);
 assert.equal(assign([homeState,targetState],game).status,'HOLD',
   'disabled regional dispatch must issue no mission');
 enabled=true;
