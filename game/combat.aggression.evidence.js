@@ -12,7 +12,7 @@ function armedParts(creep) {
   if(!creep || !Array.isArray(creep.body))return 0;
   return creep.body.reduce((n,p)=>n+
     (p && p.hits>0 &&
-     ['attack','ranged_attack','work','heal'].includes(p.type)?1:0),0);
+     ['attack','ranged_attack','work'].includes(p.type)?1:0),0);
 }
 function validRecord(x,tick) {
   return !!x && typeof x.room==='string' &&
