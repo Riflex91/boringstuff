@@ -22,6 +22,7 @@ const expansionClaimLaunchExecutor = require('expansion.claim.launch.executor');
 const expansionPioneerProvisioner = require('expansion.pioneer.provisioner');
 const expansionBootstrapRecovery = require('expansion.bootstrap.recovery');
 const ownedSpawnRecovery = require('recovery.owned.spawn');
+const spawnlessWorkerRescue = require('recovery.spawnless.worker');
 const expansionParentStabilityShadow = require('expansion.parent.stability.shadow');
 const serverProfile = require('server.profile');
 const processScheduler = require('process.scheduler');
@@ -476,6 +477,18 @@ module.exports.loop = function() {
           'New owned Spawn ID observed on witnessed former Spawn tile',
           rebuild,{force:true,persist:true,dedupeTicks:0});
     }catch(_){ /* must not interfere with core colony defenses */ }
+
+    // R2 supports a still-owned neighboring colony whose Spawn and all
+    // productive workers died. R1 must witness the original Spawn first.
+    if (!criticalCpu && roomStates.length>1) {
+      try {
+        const rescue=spawnlessWorkerRescue.dispatch(roomStates,Game,Memory);
+        if(rescue?.assigned)
+          logger.warn('R2_SPAWNLESS_WORKER_DISPATCH',
+            'One actual spare worker assigned to a verified owned colony',
+            rescue,{force:true,persist:true,dedupeTicks:0});
+      }catch(_) { /* recovery cannot interrupt colony defense */ }
+    }
 
     // Low-cost, optional I4 parent continuity witness. Each healthy tick is
     // individually observed; a skipped/low-CPU tick breaks the next streak.
