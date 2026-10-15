@@ -77,6 +77,8 @@ module.exports = {
   AUTO_SAFE_MODE: true,
   // D2: one safe preexisting defender across directly adjacent own rooms.
   AUTO_REGIONAL_DEFENSE_SUPPORT: true,
+  // R2: one original-witnessed neighbor receives a bounded spare worker.
+  AUTO_SPAWNLESS_WORKER_RESCUE: true,
   // U8 I4: automatic candidate -> guarded claim -> bounded bootstrap.
   // Can issue gameplay intents ONLY after original real-time GCL, verified
   // controller/route/TTL, 100-tick parent stability, CPU and reserve checks.
