@@ -259,7 +259,12 @@ function run(creep,game,memory) {
     mission.home===from && mission.target===to &&
     typeof mission.oldSpawnId==='string' &&
     verifiedSpawn.id!==mission.oldSpawnId;
-  if(newSpawn && creep.room.name===to) {
+  if(newSpawn && creep.room.name===to &&
+     hostiles.length===0 && targetBuildings.length===0 &&
+     homeEnemies.length===0 &&
+     config.AUTO_SPAWNLESS_WORKER_RESCUE===true &&
+     Number.isSafeInteger(creep.ticksToLive) &&
+     creep.ticksToLive>=150) {
     advance(memory,game,creep,'COMPLETED','NEW_OWN_SPAWN_OBSERVED');
     creep.memory.home=to;
     clear(creep);
