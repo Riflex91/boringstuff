@@ -140,6 +140,14 @@ memory.bot.combatAggressionEvidence.records=[];
 game.time=1300;
 role.run(creep);
 assert.equal(moves.length,1,'stale intel must not block an ongoing retreat');
+reset();memory.bot.counterattackMission.phase='RETREAT';
+memory.bot.combatAggressionEvidence.records=[];
+game.time=2550;creep.ticksToLive=10;
+role.run(creep);
+assert.equal(moves.length,1,
+  'surviving creep beyond normal attack authority may still move home');
+assert.equal(attacks.length,0,
+  'late retreat never recovers expired attack permission');
 reset();game.time=1902;role.run(creep);
 assert.equal(attacks.length,0,'old raid never attacks after expiry');
 console.log('U11 mission-only raider target identity and retreat tests PASS');
