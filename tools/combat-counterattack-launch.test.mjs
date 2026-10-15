@@ -22,11 +22,14 @@ const spawn={spawning:false,spawnCreep(parts,name,opts){
   spawnRequests.push({parts,name,opts});
   return spawnRc;
 }};
+const guard={my:true,spawning:false,name:'Guard',room:myRoom,
+  memory:{role:'defender',home:'E1N1'},
+  body:[{type:'move',hits:100},{type:'attack',hits:100}]};
 const home={room:myRoom,spawn,health:{status:'HEALTHY'},
   emergency:false,energyAvailable:1300,energyCapacityAvailable:1300,
-  energyStored:20000,hostileCreeps:[],byRole:{
+  energyStored:20000,hostileCreeps:[],creeps:[guard],byRole:{
     defender:1,harvester:2,worker:2}};
-const game={time:1000,rooms:{E1N1:myRoom,E1N2:enemyRoom},creeps:{},
+const game={time:1000,rooms:{E1N1:myRoom,E1N2:enemyRoom},creeps:{Guard:guard},
   map:{getRoomLinearDistance(){return 1;},
     describeExits(name) {return name==='E1N1'?
       {3:'E1N2'}:{7:'E1N1'};}},
@@ -51,7 +54,7 @@ const sandbox={module:{exports:{}},TOUGH:'tough',ATTACK:'attack',MOVE:'move',
 vm.runInNewContext(code,sandbox);
 const {start,supervise}=sandbox.module.exports;
 function reset() {
-  game.time=1000;game.creeps={};
+  game.time=1000;game.creeps={Guard:guard};home.creeps=[guard];
   home.energyStored=20000;home.energyAvailable=1300;
   home.hostileCreeps=[];homeHostiles=[];
   myRoom.controller.safeMode=0;
@@ -64,6 +67,10 @@ function reset() {
   memory.bot.combatAggressionEvidence.records[0].tick=980;
   spawnRequests=[];spawnRc=0;enabled=true;
 }
+reset();home.creeps=[];
+assert.equal(start([home],game,memory).reason,
+  'LIVE_OWNER_PARENT_OR_ROOM_UNVERIFIED',
+  'an obsolete defender role count without actual armed home guard cannot launch');
 reset();enabled=false;
 assert.equal(start([home],game,memory).reason,'AUTO_RAID_DISABLED');
 assert.equal(spawnRequests.length,0);
@@ -109,6 +116,15 @@ assert.equal(start([home],game,memory).status,'HOLD');
 game.time=1001;
 assert.equal(supervise(game,memory).status,'ATTACKING',
   'spawn may take 72 ticks before a creep becomes available');
+// The mission supervisor must not wait until the next status snapshot to
+// recall an expedition whose actual mobile home garrison just disappeared.
+game.creeps={};
+assert.equal(supervise(game,memory).status,'RETREAT');
+assert.equal(memory.bot.counterattackMission.reason,'HOME_GARRISON_LOST');
+// The main combat fixtures below still test owner-change recall independently.
+reset();
+const secondMission=start([home],game,memory);
+assert.equal(secondMission.status,'SPAWN_INTENT_ACCEPTED');
 const tracked=memory.bot.counterattackMission;
 game.time=1002;enemyRoom.controller.owner.username='Other';
 assert.equal(supervise(game,memory).status,'RETREAT',
