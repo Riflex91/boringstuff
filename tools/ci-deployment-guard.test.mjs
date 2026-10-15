@@ -385,7 +385,7 @@ console.log('CI deployment guard and 100-tick provenance checks passed');
 assert.equal(LIVE_VERIFICATION_TIMEOUT_MS, 30 * 60 * 1000);
 const newbielandActions = readFileSync(
   new URL('../.github/workflows/screeps-auto-deploy.yml', import.meta.url), 'utf8');
-const workflowTimeout = newbielandActions.match(/^    timeout-minutes: (\\d+)$/m);
+const workflowTimeout = newbielandActions.match(/^    timeout-minutes: (\d+)$/m);
 assert.ok(workflowTimeout, 'Newbieland live job must have a finite timeout');
 assert.ok(Number(workflowTimeout[1]) * 60 * 1000 >=
   LIVE_VERIFICATION_TIMEOUT_MS + 5 * 60 * 1000,
