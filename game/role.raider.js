@@ -81,13 +81,13 @@ function selectEnemy(creep,enemies,player) {
 // The original launch advantage cannot be trusted after defenders respawn,
 // receive boosts or destroy our combat parts while the raider is in transit.
 // Re-evaluate the actually observed opponent bodies immediately before every
-// attack, with the same conservative 6:1 damage and heal margin as launch.
+// attack, with the same conservative 5:1 damage and heal margin as launch.
 function unsafeEngagement(creep,enemies,owner) {
   if(!Array.isArray(enemies) || enemies.length>2 ||
      typeof creep?.getActiveBodyparts!=='function' ||
      typeof ATTACK==='undefined')return true;
   const ourDps=30*creep.getActiveBodyparts(ATTACK);
-  if(!Number.isFinite(ourDps) || ourDps<180)return true;
+  if(!Number.isFinite(ourDps) || ourDps<150)return true;
   let damage=0,heal=0,hits=0;
   for(const enemy of enemies) {
     if(enemy?.owner?.username!==owner ||
@@ -103,7 +103,7 @@ function unsafeEngagement(creep,enemies,owner) {
       if(part.type==='heal')heal+=12;
     }
   }
-  return damage>ourDps/6 || heal>ourDps/5 ||
+  return damage>ourDps/5 || heal>ourDps/5 ||
     hits>ourDps*8 || ourDps-heal<4*damage;
 }
 
