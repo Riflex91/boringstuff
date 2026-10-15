@@ -156,11 +156,22 @@ function productivePrespawnHorizon(role, state) {
         state.economyModel.sourceContainersReady !== state.sources.length ||
         (state.economyModel.recommendedHaulerCount || 0) < 2) return 0;
   } else {
-    // RCL1 source income relies on two mobile harvesters. Replace one only
-    // within a spawn-time-sized TTL window; RCL2+ mining remains unchanged.
-    if (role === 'harvester' && state.rcl !== 1) return 0;
-    if (role !== 'harvester' && role !== 'worker' &&
-        role !== 'builder' && role !== 'upgrader') return 0;
+    if (role === 'harvester') {
+      // RCL1 retains its conservative mobile-mining overlap. At RCL2+,
+      // never let a fully established source-container miner expire before
+      // a replacement can finish spawning. Do not enable speculative
+      // overlap during bootstrap, emergency or active defense.
+      if (state.rcl !== 1 && (
+          state.rcl < 2 || state.emergency ||
+          !Array.isArray(state.sources) || state.sources.length === 0 ||
+          !state.economyModel ||
+          state.economyModel.sourceContainersReady !== state.sources.length ||
+          !Number.isSafeInteger(state.economyModel.recommendedHarvesterCount) ||
+          state.economyModel.recommendedHarvesterCount < state.sources.length ||
+          !Array.isArray(state.hostileCreeps) ||
+          state.hostileCreeps.length > 0)) return 0;
+    } else if (role !== 'worker' && role !== 'builder' &&
+               role !== 'upgrader') return 0;
   }
   const budget = Math.max(0, Number(state.energyCapacityAvailable) || Number(state.energyAvailable) || 0);
   const replacementBody = bodyFor(role, budget, state);
@@ -297,6 +308,19 @@ function spawnOne(state) {
     }
   }
 
+  // RCL2+: fill missing workers, haulers, controller capacity and urgent
+  // repairs first. Once the actual workforce is healthy, overlap a source
+  // miner ONLY inside its replacement-body spawn-time window.
+  if (!role && state.rcl >= 2 &&
+      countRole(state.room, 'harvester') >= want.harvester &&
+      countRoleAvailable(state, 'harvester') < want.harvester &&
+      countRoleAvailable(state, 'worker') >= want.worker &&
+      countRoleAvailable(state, 'upgrader') >= Math.min(1, want.upgrader) &&
+      countRoleAvailable(state, 'hauler') >= Math.min(1, want.hauler) &&
+      !workPriority.hasEmergencyRepair(state.structures)) {
+    role = 'harvester';
+  }
+
   if (!role) {
     for (const r of priority) {
       const count = (r === 'worker' || r === 'builder' ||
@@ -335,6 +359,12 @@ function spawnOne(state) {
   let creepBody = bodyFor(role, available, state);
   let cost = creepBody.reduce((sum, p) => sum + BODYPART_COST[p], 0);
   if (earlyHaulerReplacement && cost > state.energyAvailable) return false;
+  const earlyHarvesterReplacement = role === 'harvester' &&
+    countRole(state.room, role) >= want[role] &&
+    countRoleAvailable(state, role) < want[role];
+  // Early miner overlap is optional. Do not launch a reduced-body miner
+  // that consumes scarce energy and has too little WORK to replace its peer.
+  if (earlyHarvesterReplacement && cost > state.energyAvailable) return false;
   if (cost > state.energyAvailable) {
     const lowEnergyFloor = Math.min(300, state.energyCapacityAvailable);
     if (!state.emergency && state.energyAvailable < lowEnergyFloor && !prespawnShortfall) return false;
