@@ -145,4 +145,83 @@ creep.memory.claimMissionId='claim-E1N1-E2N2-1000';
 role.run(creep);
 assert.equal(moved.length,0,'forged mismatching mission ID must never move');
 
+// Handoff MUST be proven by a real own Spawn on the originally verified
+// tile. The objective is usable workers, not a mission ledger alone.
+function established() {
+  clear();
+  memory.bot.expansionClaim.phase='ESTABLISHED';
+  memory.bot.expansionClaim.establishedTick=1040;
+  game.time=1050;
+  creep.memory.home='E1N1';
+  creep.memory.targetRoom='E1N2';
+}
+established();structures=[{
+  id:'first-built-spawn',my:true,
+  pos:{x:25,y:25,roomName:'E1N2'}
+}];
+role.run(creep);
+assert.equal(creep.memory.role,'worker',
+  'after exact built spawn, surviving pioneer becomes local worker');
+assert.equal(creep.memory.home,'E1N2');
+assert.equal(creep.memory.claimMissionId,undefined);
+assert.equal(creep.memory.targetRoom,undefined);
+assert.equal(moved.length,0);
+assert.equal(attemptedSite,0);
+assert.equal(built,0);
+established();structures=[{
+  id:'other-spawn',my:true,pos:{x:20,y:20,roomName:'E1N2'}
+}];
+role.run(creep);
+assert.equal(creep.memory.role,'pioneer',
+  'some other owned Spawn cannot authorize first-spawn handoff');
+established();structures=[{
+  id:'foreign-spawn',my:false,pos:{x:25,y:25,roomName:'E1N2'}
+}];
+role.run(creep);
+assert.equal(creep.memory.role,'pioneer',
+  'an enemy building cannot authorize role migration');
+established();role.run(creep);
+assert.equal(attemptedSite,0,
+  'a committed established mission never creates a second spawn');
+assert.equal(creep.memory.role,'pioneer',
+  'lost real spawn visibility must not mint a worker transfer');
+established();structures=[{
+  id:'first-built-spawn',my:true,
+  pos:{x:25,y:25,roomName:'E1N2'}
+}];
+creep.memory.home='E9N9';role.run(creep);
+assert.equal(creep.memory.role,'pioneer',
+  'mismatched home may not authorize ownership role mutation');
+established();structures=[{
+  id:'first-built-spawn',my:true,
+  pos:{x:25,y:25,roomName:'E1N2'}
+}];delete memory.bot.expansionClaim.establishedTick;
+role.run(creep);
+assert.equal(creep.memory.role,'pioneer',
+  'an unverified establishedTick cannot trigger handoff');
+established();structures=[{
+  id:'first-built-spawn',my:true,
+  pos:{x:25,y:25,roomName:'E1N2'}
+}];game.time=1541;
+role.run(creep);
+assert.equal(creep.memory.role,'pioneer',
+  'ancient settlement ledger may not indefinitely reassign creeps');
+established();structures=[{
+  id:'first-built-spawn',my:true,
+  pos:{x:25,y:25,roomName:'E1N2'}
+}];creep.room=home;
+role.run(creep);
+assert.equal(moved.length,1,
+  'late-arriving pioneer must still move through its verified corridor');
+assert.equal(creep.memory.role,'pioneer',
+  'do not change role while outside actual target room');
+established();structures=[{
+  id:'first-built-spawn',my:true,
+  pos:{x:25,y:25,roomName:'E1N2'}
+}];memory.bot.expansionClaim.id='claim-E1N1-E9N9-1000';
+creep.memory.claimMissionId='claim-E1N1-E9N9-1000';
+role.run(creep);
+assert.equal(creep.memory.role,'pioneer',
+  'forged settlement mission binding cannot transfer a creep');
+
 console.log('I4 mission-bound pioneer first-spawn bootstrap tests PASS');
