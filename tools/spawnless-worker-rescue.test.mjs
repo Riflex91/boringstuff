@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 let enabled=true,bucket=10000,homeHostiles=[],targetHostiles=[],
-  hostileBuildings=[],realSpawns=[],moved=[],reverseBroken=false;
+  hostileBuildings=[],realSpawns=[],spawnSites=[],moved=[],reverseBroken=false;
 const home={name:'E1N1',controller:{my:true,safeMode:0,
   safeModeCooldown:0},
   find(which){return which===1?homeHostiles:[];}};
@@ -11,6 +11,7 @@ const target={name:'E1N2',controller:{my:true,safeMode:0},
     if(which===1)return targetHostiles;
     if(which===2)return hostileBuildings;
     if(which===3)return realSpawns;
+    if(which===4)return spawnSites;
     return [];
   }};
 const worker=(name,ttl)=>({
@@ -42,7 +43,8 @@ const game={time:1000,creeps:{A:a,B:b},
   }};
 const sandbox={module:{exports:{}},
   FIND_MY_SPAWNS:3,FIND_HOSTILE_CREEPS:1,
-  FIND_HOSTILE_STRUCTURES:2,
+  FIND_HOSTILE_STRUCTURES:2,FIND_MY_CONSTRUCTION_SITES:4,
+  STRUCTURE_SPAWN:'spawn',
   WORK:'work',CARRY:'carry',MOVE:'move',
   require(name){if(name==='config')return {
     get AUTO_SPAWNLESS_WORKER_RESCUE(){return enabled;},
@@ -65,7 +67,7 @@ function reset(){
     defender:1,harvester:2,hauler:2,worker:2};
   victim.creeps=[];victim.spawn=null;victim.hostileCreeps=[];
   homeHostiles=[];targetHostiles=[];hostileBuildings=[];
-  realSpawns=[];moved=[];enabled=true;reverseBroken=false;
+  realSpawns=[];spawnSites=[];moved=[];enabled=true;reverseBroken=false;
   memory.bot.ownedSpawnRecovery.rooms.E1N2={
     observedTick:900,lastSpawnId:'verified-id',
     pos:{roomName:'E1N2',x:25,y:25}
@@ -135,6 +137,14 @@ reset();targetHostiles=[{id:'attacker'}];
 assert.equal(dispatch([donor,victim],game,memory).status,'HOLD');
 reset();memory.bot.ownedSpawnRecovery.rooms.E1N2.observedTick=-1;
 assert.equal(dispatch([donor,victim],game,memory).status,'HOLD');
+reset();spawnSites=[{structureType:'spawn',
+  pos:{roomName:'E1N2',x:20,y:20}}];
+assert.equal(dispatch([donor,victim],game,memory).status,'HOLD',
+  'unrelated Spawn site cannot justify emergency donor reassignment');
+reset();spawnSites=[{structureType:'spawn',
+  pos:{roomName:'E1N2',x:25,y:25}}];
+assert.equal(dispatch([donor,victim],game,memory).status,'ASSIGNED',
+  'a correct existing verified Spawn site may be rescued');
 reset();reverseBroken=true;
 assert.equal(dispatch([donor,victim],game,memory).status,'HOLD');
 reset();memory.bot.expansionClaim={phase:'CLAIMED'};
