@@ -167,6 +167,22 @@ function run(creep) {
   }
   const m=validMission(creep, Memory, Game);
   if (!m || !creep?.room || !creep.pos) return;
+  // The verified target Spawn means a truly independent colony. Convert
+  // its surviving labor even if the original parent loses ownership.
+  if (m.phase==='ESTABLISHED' &&
+      creep.room.name===m.target &&
+      creep.room.controller?.my===true &&
+      !hostile(creep.room)) {
+    const verified=spawnSite(creep.room,m);
+    if(verified?.status==='BUILT') {
+      creep.memory.role='worker';
+      creep.memory.home=m.target;
+      delete creep.memory.claimMissionId;
+      delete creep.memory.targetRoom;
+      delete creep.memory.working;
+      return;
+    }
+  }
   const parent=Game.rooms?.[m.parent];
   if (!parent?.controller?.my ||
       (Number(parent.controller.safeMode)||0)>0 ||
@@ -188,18 +204,6 @@ function run(creep) {
   const site=spawnSite(creep.room,m);
   if (!site || site.status==='SITE_REJECTED' ||
       site.status==='SITE_INTENT_ACCEPTED') return;
-  // The verified first spawn is real. Re-home the surviving productive
-  // pioneer as an ordinary local worker so the new colony can bootstrap
-  // spawn energy and controller work without waiting for its first newborn.
-  // The regular worker handler picks up this role on the next game tick.
-  if (m.phase==='ESTABLISHED' && site.status==='BUILT') {
-    creep.memory.role='worker';
-    creep.memory.home=m.target;
-    delete creep.memory.claimMissionId;
-    delete creep.memory.targetRoom;
-    delete creep.memory.working;
-    return;
-  }
   if (site.status!=='SITE' || m.phase!=='CLAIMED') return;
   if ((creep.store?.[RESOURCE_ENERGY]||0) <= 0) {
     workEnergy(creep);
