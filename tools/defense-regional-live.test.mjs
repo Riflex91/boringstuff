@@ -37,6 +37,7 @@ const sandbox={module:{exports:{}},FIND_HOSTILE_CREEPS:1,
 vm.runInNewContext(fs.readFileSync(new URL(
   '../game/defense.regional.live.js',import.meta.url),'utf8'),sandbox);
 const {assign,run}=sandbox.module.exports;
+targetEnemies=[hostile()];
 let output=assign([homeState,targetState],game);
 assert.equal(output.status,'ASSIGNED');
 assert.equal(output.from,'E1N1');
