@@ -22,6 +22,7 @@ const expansionClaimLaunchExecutor = require('expansion.claim.launch.executor');
 const expansionPioneerProvisioner = require('expansion.pioneer.provisioner');
 const expansionBootstrapRecovery = require('expansion.bootstrap.recovery');
 const ownedSpawnRecovery = require('recovery.owned.spawn');
+const spawnlessWorkerRescue = require('recovery.spawnless.worker');
 const expansionParentStabilityShadow = require('expansion.parent.stability.shadow');
 const serverProfile = require('server.profile');
 const processScheduler = require('process.scheduler');
@@ -473,6 +474,19 @@ module.exports.loop = function() {
           'Real old owned Spawn position now has a reconstruction intent',
           rebuild,{force:true,persist:true,dedupeTicks:0});
     } catch (_) { /* recovery must not halt colony defense */ }
+
+    // R2 worker support only targets previously witnessed own Spawn rooms.
+    // The R1 witness/rebuild supervisor runs immediately before dispatch.
+    if (!criticalCpu && roomStates.length>1) {
+      try {
+        const rescue=spawnlessWorkerRescue.dispatch(
+          roomStates,Game,Memory);
+        if(rescue?.assigned)
+          logger.warn('R2_SPAWNLESS_WORKER_DISPATCH',
+            'Existing spare worker moving to previously Spawn-owned room',
+            rescue,{force:true,persist:true,dedupeTicks:0});
+      }catch(_) { /* never abort core colony work */ }
+    }
 
     // Low-cost, optional I4 parent continuity witness. Each healthy tick is
     // individually observed; a skipped/low-CPU tick breaks the next streak.
