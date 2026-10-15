@@ -23,7 +23,7 @@ function missionFor(creep,memory,game) {
      ['Invader','Source Keeper'].includes(m.aggressor) ||
      !Number.isSafeInteger(m.createdTick) || m.createdTick<0 ||
      !Number.isSafeInteger(tick) || tick<m.createdTick ||
-     tick-m.createdTick>1500 ||
+     tick-m.createdTick>(m.phase==='RETREAT'?1700:1500) ||
      !Array.isArray(m.route) || m.route.length<2 ||
      m.route.length>4 || m.route[0]!==m.parent ||
      m.route.at(-1)!==m.target ||
