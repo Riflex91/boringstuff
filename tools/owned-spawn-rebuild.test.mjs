@@ -58,6 +58,44 @@ assert.equal(success.status,'SITE_INTENT_ACCEPTED');
 assert.equal(success.siteIntentAccepted,true);
 assert.equal(success.room,'E1N1');
 assert.deepEqual(siteCalls,[{x:25,y:25,type:'spawn'}]);
+assert.equal(memory.bot.ownedSpawnRecovery.rooms.E1N1.lastRebuildIntentTick,1025);
+const rebuilt={id:'owned-id-2',my:true,
+  pos:{x:25,y:25,roomName:'E1N1'}};
+state.spawn=rebuilt;game.time=1050;
+const physicallyConfirmed=execute();
+assert.equal(physicallyConfirmed.status,'REBUILD_CONFIRMED',
+  'actual new own Spawn ID at exact original tile proves recovery');
+assert.equal(physicallyConfirmed.confirmed,true);
+assert.equal(physicallyConfirmed.oldSpawnId,'owned-id-1');
+assert.equal(physicallyConfirmed.newSpawnId,'owned-id-2');
+assert.equal(memory.bot.ownedSpawnRecovery.rooms.E1N1.lastSpawnId,'owned-id-2');
+game.time=1051;
+assert.notEqual(execute().status,'REBUILD_CONFIRMED',
+  'do not duplicate a real completed rebuild event');
+state.spawn=null;
+memory.bot.ownedSpawnRecovery.rooms.E1N1={
+  observedTick:1000,lastSpawnId:'owned-id-1',
+  pos:{roomName:'E1N1',x:25,y:25}
+};
+state.spawn=rebuilt;game.time=1050;
+assert.notEqual(execute().status,'REBUILD_CONFIRMED',
+  'a new Spawn without accepted R1 construction intent is not an automated rebuild');
+state.spawn=null;
+memory.bot.ownedSpawnRecovery.rooms.E1N1={
+  observedTick:1000,lastSpawnId:'owned-id-1',
+  lastRebuildIntentTick:1025,
+  pos:{roomName:'E1N1',x:25,y:25}
+};
+state.spawn={id:'wrong-spot-new',my:true,
+  pos:{x:26,y:25,roomName:'E1N1'}};
+assert.notEqual(execute().status,'REBUILD_CONFIRMED',
+  'a different tile is not proof the witnessed Spawn was rebuilt');
+state.spawn=null;
+memory.bot.ownedSpawnRecovery.rooms.E1N1={
+  observedTick:1000,lastSpawnId:'owned-id-1',
+  pos:{roomName:'E1N1',x:25,y:25}
+};
+
 reset();game.time=1026;
 assert.equal(execute().reason,'RECOVERY_CADENCE_OR_CPU_DEFERRED');
 assert.equal(siteCalls.length,0);
