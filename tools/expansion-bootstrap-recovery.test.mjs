@@ -43,7 +43,8 @@ const run=()=>resume([parent],game,memory,{});
 function reset() {
   memory.bot.expansionClaim=mission();game.time=3900;
   game.rooms.E1N1=home;game.rooms.E1N2=target;
-  home.controller.safeMode=0;home.controller.my=true;
+  home.controller.safeMode=0;home.controller.safeModeCooldown=0;
+  home.controller.my=true;
   target.controller.my=true;parent.health.status='HEALTHY';
   parent.energyStored=12000;parent.energyAvailable=1050;
   game.creeps={};enabled=true;continuity=true;bucket=10000;
