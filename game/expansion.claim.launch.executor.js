@@ -11,6 +11,11 @@ function start(readiness,operation,budget,continuity,states,game,memory) {
     spawnIntentAccepted:false,missionId:null});
   if(config.AUTO_EXPANSION_CLAIM!==true)
     return reject('AUTO_EXPANSION_CLAIM_DISABLED');
+  // Never spend an irreversible GCL slot on a claimed but unbootstrapped
+  // colony. The paired pioneer/supply executor must be enabled *before* a
+  // claimer order is possible, not merely toggled on after ownership.
+  if(config.AUTO_EXPANSION_BOOTSTRAP!==true)
+    return reject('BOOTSTRAP_SUPPORT_NOT_AUTHORIZED');
 
   // Only a CURRENT runtime audit may permit a spawn; no cached Memory flag
   // or apparently positive shadow value can authorize the operation.
