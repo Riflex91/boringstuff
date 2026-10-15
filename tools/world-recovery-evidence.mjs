@@ -43,6 +43,51 @@ function observedRate(current,previous,currentTick,previousTick,currentLevel,pre
      currentLevel===null||currentLevel!==previousLevel)return null;
   return nonNegativeRate((a-b)/(currentTick-previousTick));
 }
+// Read-only source-level economics from an already persisted STATUS_SNAPSHOT.
+// Every figure is modeled WORK capacity, not a confirmed harvest/withdrawal.
+// Never print source IDs, infer nonexistent sources, or trust truncated
+// logger.slim snapshots as complete evidence.
+function modelSourceCoverage(model) {
+  const count=model?.sourceCount, routes=model?.sourceRoutes;
+  if(!Number.isSafeInteger(count)||count<1||count>5||
+     !Array.isArray(routes)||routes.length!==count)return null;
+  const seen=new Set(),clean=[];
+  for(const route of routes) {
+    if(!route||typeof route!=='object'||Array.isArray(route)||
+       typeof route.sourceId!=='string'||route.sourceId.length<1||
+       route.sourceId.length>80||seen.has(route.sourceId)||
+       !Number.isSafeInteger(route.spawnDistance)||
+       route.spawnDistance<0||route.spawnDistance>100||
+       typeof route.containerReady!=='boolean'||
+       route.assignedHarvesterWorkParts===null||
+       typeof route.assignedHarvesterWorkParts!=='number'||
+       !Number.isFinite(route.assignedHarvesterWorkParts)||
+       route.assignedHarvesterWorkParts<0||
+       route.assignedHarvesterWorkParts>50||
+       route.dedicatedIncomePerTick===null||
+       typeof route.dedicatedIncomePerTick!=='number'||
+       !Number.isFinite(route.dedicatedIncomePerTick)||
+       route.dedicatedIncomePerTick<0||
+       route.dedicatedIncomePerTick>100)return null;
+    seen.add(route.sourceId);
+    clean.push({
+      index:clean.length,
+      modeledHarvesterWorkParts:Math.round(route.assignedHarvesterWorkParts*100)/100,
+      modeledIncomePerTick:Math.round(route.dedicatedIncomePerTick*1000)/1000,
+      containerReady:route.containerReady,
+      spawnDistance:route.spawnDistance
+    });
+  }
+  return {
+    evidenceType:'MODEL_ONLY_NOT_SETTLED_HARVEST',
+    sourceCount:count,
+    unassignedSources:clean.filter(r=>r.modeledHarvesterWorkParts===0).length,
+    sourcesBelowFiveWork:clean.filter(r=>r.modeledHarvesterWorkParts<5).length,
+    modeledCombinedIncomePerTick:Math.round(
+      clean.reduce((sum,r)=>sum+r.modeledIncomePerTick,0)*1000)/1000,
+    routes:clean
+  };
+}
 function homeEvidence(x,previous,currentTick,previousTick) {
   // Exact operational World home. The diagnostic never guesses an unsafe
   // parent from stale scout/SHADOW candidate room records.
@@ -95,6 +140,7 @@ function homeEvidence(x,previous,currentTick,previousTick) {
     economyWindowControllerProgress:progress(room.economy?.last100?.controllerProgress),
     theoreticalIncomePerTick:nonNegativeRate(model?.theoreticalIncomePerTick),
     harvestedCapacityPerTick:nonNegativeRate(model?.dedicatedHarvestCapacityPerTick),
+    modeledSourceCoverage:modelSourceCoverage(model),
     productiveDemandPerTick:nonNegativeRate(model?.productiveDemandPerTick),
     haulerCarryParts:nint(model?.haulerCarryParts),
     requiredHaulerCarryParts:nint(model?.recommendedHaulerCarryParts),
