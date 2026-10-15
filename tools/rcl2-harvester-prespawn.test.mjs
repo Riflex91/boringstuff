@@ -82,11 +82,25 @@ function make({ttl=32,harvesters=2,workers=2,upgraders=1,haulers=2,
     'one expiring surplus miner does not create a fourth body');
 }
 for(const options of [
-  {ready:1},{emergency:true},{spawning:true}
+  {ready:1},{emergency:true},{spawning:true},{enemy:true}
 ]) {
   const x=make(options);
   assert.equal(manager.spawnOne(x.state),false,
     'no speculative prespawn outside healthy steady mining');
+}
+{
+  const x=make();
+  x.state.economyModel=null;
+  assert.equal(manager._test.productivePrespawnHorizon('harvester',x.state),0);
+  assert.equal(manager.spawnOne(x.state),false,
+    'unknown capacity model must never authorize an optional mining overlap');
+}
+{
+  const x=make();
+  x.state.economyModel.sourceContainersReady='2';
+  assert.equal(manager._test.productivePrespawnHorizon('harvester',x.state),0);
+  assert.equal(manager.spawnOne(x.state),false,
+    'a coerced string is not proof of ready source containers');
 }
 {
   const x=make({energy:700});
