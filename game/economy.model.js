@@ -165,7 +165,8 @@ function analyze(state) {
         harvesters.length + Math.ceil(harvesterWorkDeficit / Math.max(1, nextHarvesterWorkParts))
       )
       : idealHarvesterCount,
-    Math.min(5, harvesters.length + guardedCoverageRecovery)
+    guardedCoverageRecovery > 0
+      ? Math.min(5, harvesters.length + guardedCoverageRecovery) : 0
   );
   const consumers = state.creeps.filter(c =>
     c.memory.role === 'builder' || c.memory.role === 'worker' ||
