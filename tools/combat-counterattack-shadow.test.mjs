@@ -19,6 +19,7 @@ const raid={...mine,hostileCreeps:[
   armed('Aggressor',['attack','move']),
   armed('Invader',['ranged_attack','move']),
   armed('HarmlessScout',['move']),
+  armed('HealOnly',['heal','move']),
   armed('Aggressor',['heal','move'])
 ]};
 const hit=evidence.observe([raid],game,memory);
