@@ -21,6 +21,7 @@ const expansionClaimLaunchPreflight = require('expansion.claim.launch.preflight'
 const expansionClaimLaunchExecutor = require('expansion.claim.launch.executor');
 const expansionPioneerProvisioner = require('expansion.pioneer.provisioner');
 const expansionBootstrapRecovery = require('expansion.bootstrap.recovery');
+const ownedSpawnRecovery = require('recovery.owned.spawn');
 const expansionParentStabilityShadow = require('expansion.parent.stability.shadow');
 const serverProfile = require('server.profile');
 const processScheduler = require('process.scheduler');
@@ -460,6 +461,18 @@ module.exports.loop = function() {
       try { combatAggressionEvidence.observe(roomStates,Game,Memory); }
       catch (_) { /* optional intelligence must never halt core defense */ }
     }
+
+    // R1: capture actual own Spawn positions and, if destroyed, issue one
+    // conservative first construction site on the old witnessed tile.
+    // This is NOT permission to invent a site for an unspawned new colony.
+    try {
+      const rebuild=ownedSpawnRecovery.observeAndRebuild(
+        roomStates,Game,Memory);
+      if(rebuild?.siteIntentAccepted)
+        logger.warn('R1_OWNED_SPAWN_REBUILD_SITE_INTENT',
+          'Real old owned Spawn position now has a reconstruction intent',
+          rebuild,{force:true,persist:true,dedupeTicks:0});
+    } catch (_) { /* recovery must not halt colony defense */ }
 
     // Low-cost, optional I4 parent continuity witness. Each healthy tick is
     // individually observed; a skipped/low-CPU tick breaks the next streak.
