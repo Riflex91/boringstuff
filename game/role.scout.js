@@ -4,6 +4,42 @@ const config = require('config');
 const worldIntel = require('world.intel');
 const profiler = require('profiler');
 
+// The I4 expansion operation accepts source/route intel for at most 150 ticks.
+// Legacy scout Memory.intel may stay "fresh" for 1500 ticks: choosing the
+// next scout target from that legacy TTL can starve the I4 frontier of valid
+// controller, source, site and threat observations for much longer.
+const EXPANSION_ROUTE_INTEL_MAX_AGE = 150;
+
+function expansionRouteIntelFresh(roomName) {
+  const record = worldIntel.get(roomName);
+  const observation = record && record.observation;
+  const age = Game.time - observation?.lastSeenTick;
+  return record?.schemaVersion === 1 &&
+    record.roomName === roomName &&
+    Number.isSafeInteger(observation?.lastSeenTick) &&
+    Number.isSafeInteger(Game.time) &&
+    Number.isSafeInteger(age) && age >= 0 &&
+    age <= EXPANSION_ROUTE_INTEL_MAX_AGE &&
+    Number.isFinite(observation?.confidence) &&
+    observation.confidence >= 0.95 &&
+    (observation.source === 'scout' ||
+     observation.source === 'visible-room');
+}
+
+function usableAdjacentRooms(roomName) {
+  return adjacentRooms(roomName).filter(name => {
+    if (typeof name !== 'string' ||
+        !/^[WE][0-9]+[NS][0-9]+$/.test(name)) return false;
+    const status = Game.map.getRoomStatus;
+    if (typeof status !== 'function') return true;
+    try {
+      const observed = status.call(Game.map, name)?.status;
+      return !observed || observed === 'normal';
+    } catch (_) { return true; }
+  });
+}
+
+
 function adjacentRooms(roomName) {
   const exits = Game.map.describeExits(roomName) || {};
   return Object.keys(exits).map(k => exits[k]);
@@ -65,9 +101,13 @@ function run(creep) {
 
   profiler.detailSection('scout.target', function() {
     if (!creep.memory.targetRoom || creep.room.name === creep.memory.targetRoom) {
-      const adjacent = adjacentRooms(room.name);
-      const candidates = adjacent.filter(r => !Memory.intel[r] || Game.time - Memory.intel[r].tick > 1500);
-      creep.memory.targetRoom = candidates[0] || adjacent[Game.time % Math.max(1, adjacent.length)];
+      const adjacent = usableAdjacentRooms(room.name);
+      // Prefer unverified/expired full I0 observations rather than 1500-tick
+      // legacy summaries. Keep the old time-rotated patrol when all immediate
+      // neighbors are already observed with recent high-confidence intel.
+      const candidates = adjacent.filter(r => !expansionRouteIntelFresh(r));
+      creep.memory.targetRoom = candidates[0] ||
+        (adjacent.length ? adjacent[Game.time % adjacent.length] : null);
     }
   });
 
@@ -82,4 +122,6 @@ function run(creep) {
   });
 }
 
-module.exports = { run, _test: { adjacentRooms, worldIntelNeedsRefresh, scoutHome, activeScoutName, isActiveScout } };
+module.exports = { run, _test: { adjacentRooms, usableAdjacentRooms,
+  expansionRouteIntelFresh, EXPANSION_ROUTE_INTEL_MAX_AGE,
+  worldIntelNeedsRefresh, scoutHome, activeScoutName, isActiveScout } };
