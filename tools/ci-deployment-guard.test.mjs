@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
-import { parseBotMemory, inspectDeployment, LIVE_VERIFICATION_TIMEOUT_MS } from './ci-deployment-guard.mjs';
+import { parseBotMemory, inspectDeployment, summarizeExpansionEvidence, LIVE_VERIFICATION_TIMEOUT_MS } from './ci-deployment-guard.mjs';
 
 const id = '20261010-verified';
 const record = (c, t, x = {}, l = 'INFO') => ({ c, t, x, l });
@@ -404,3 +404,85 @@ assert.equal(inspectDeployment(cadenceDelayed, id, 100).status, 'PASS');
 cadenceDelayed.telemetryJournal.events.push(record('MAIN_FATAL', 1270, {}, 'FATAL'));
 assert.equal(inspectDeployment(cadenceDelayed, id, 100).reason,
   'RUNTIME_FATAL_OR_CRITICAL_CPU');
+
+
+// O14 is read-only diagnostic evidence added to an ALREADY-PASSING exact
+// deployment witness, never a new release predicate or authority to claim.
+{
+  const sample = structuredClone(state);
+  const status = sample.telemetryJournal.snapshots[0];
+  status.x.expansionReadiness = {
+    status:'PLANNING_CANDIDATE', availableClaimSlots:1
+  };
+  status.x.expansionCandidates = {
+    status:'NEEDS_MORE_INTEL', reason:'NO_VERIFIED_LOCAL_CANDIDATES',
+    candidateCount:0, visitedRooms:7, unknownOrStaleRooms:5
+  };
+  status.x.expansionOperation = {
+    phase:'HOLD', reason:'NO_VERIFIED_CANDIDATE'
+  };
+  status.x.expansionClaimLaunch = {
+    status:'HOLD', reason:'SHADOW_OR_BUDGET_GATES_NOT_READY'
+  };
+  status.x.expansionParentStability = {
+    lastTick:1100, rooms:[{
+      room:'E8N1',status:'HOLD',reason:'PARENT_INFRASTRUCTURE_REFILL_PRESSURE',
+      lastTick:1100,consecutiveSupportTicks:0,requiredTicks:100
+    }]
+  };
+  status.x.rooms.E8N1.economyModel = {
+    sourceCount:2,
+    sourceRoutes:[
+      { sourceId:'internal-source-A', containerReady:true,
+        assignedHarvesterWorkParts:5,dedicatedIncomePerTick:10 },
+      { sourceId:'internal-source-B', containerReady:true,
+        assignedHarvesterWorkParts:0,dedicatedIncomePerTick:0 }
+    ]
+  };
+  const pass = inspectDeployment(sample,id,100);
+  assert.equal(pass.status,'PASS');
+  assert.deepEqual(pass.expansionEvidence,{
+    snapshotTick:1100,readinessStatus:'PLANNING_CANDIDATE',
+    availableClaimSlots:1,candidateStatus:'NEEDS_MORE_INTEL',
+    candidateReason:'NO_VERIFIED_LOCAL_CANDIDATES',verifiedCandidates:0,
+    visitedRooms:7,unknownOrStaleRooms:5,operationPhase:'HOLD',
+    operationReason:'NO_VERIFIED_CANDIDATE',
+    parentContinuity:{status:'HOLD',reason:'PARENT_INFRASTRUCTURE_REFILL_PRESSURE',
+      consecutiveSupportTicks:0,requiredTicks:100},
+    claimLaunchStatus:'HOLD',
+    claimLaunchReason:'SHADOW_OR_BUDGET_GATES_NOT_READY',
+    sourceModel:{verifiedModeledSources:2,readySources:2,
+      zeroAssignedWorkSources:1,modeledAssignedWorkParts:5,
+      modeledIncomePerTick:10}
+  });
+  assert.equal(JSON.stringify(pass.expansionEvidence).includes('internal-source-'),false,
+    'Do not leak source IDs into GitHub release diagnostics');
+
+  // The parent witness must be current for the exact status snapshot. A
+  // stale historical 100-tick streak must not be represented as current.
+  const stale = structuredClone(sample);
+  stale.telemetryJournal.snapshots[0].x.expansionParentStability.lastTick=1099;
+  assert.equal(inspectDeployment(stale,id,100).expansionEvidence.parentContinuity,null);
+
+  // Malformed/truncated model routes must not pretend zero uncovered sites.
+  const malformed = structuredClone(sample);
+  malformed.telemetryJournal.snapshots[0].x.rooms.E8N1.economyModel
+    .sourceRoutes[1].assignedHarvesterWorkParts='[depth-limit]';
+  const incomplete = inspectDeployment(malformed,id,100);
+  assert.equal(incomplete.status,'PASS');
+  assert.equal(incomplete.expansionEvidence.sourceModel,null);
+
+  const duplicate = structuredClone(sample);
+  duplicate.telemetryJournal.snapshots[0].x.rooms.E8N1.economyModel
+    .sourceRoutes[1].sourceId='internal-source-A';
+  assert.equal(inspectDeployment(duplicate,id,100).expansionEvidence.sourceModel,null);
+
+  const absent = structuredClone(state);
+  const unknown = inspectDeployment(absent,id,100);
+  assert.equal(unknown.status,'PASS');
+  assert.equal(unknown.expansionEvidence.verifiedCandidates,null);
+  assert.equal(unknown.expansionEvidence.availableClaimSlots,null);
+  assert.equal(unknown.expansionEvidence.sourceModel,null);
+  assert.equal(unknown.expansionEvidence.parentContinuity,null);
+  assert.equal(summarizeExpansionEvidence({c:'OTHER',t:1100,x:status.x},'E8N1'),null);
+}

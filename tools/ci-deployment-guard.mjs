@@ -41,6 +41,98 @@ export function parseBotMemory(reply) {
     typeof value.deploymentId === 'string' ? value : null;
 }
 
+// Strictly read-only, compact evidence from the SAME qualifying live
+// STATUS_SNAPSHOT. Missing, truncated or invalid fields stay null rather than
+// being converted into zero/OK. Does not alter any deployment pass predicate.
+export function summarizeExpansionEvidence(snapshot, homeRoom) {
+  if (!snapshot || snapshot.c !== 'STATUS_SNAPSHOT' ||
+      !Number.isSafeInteger(snapshot.t) || snapshot.t < 0 ||
+      !snapshot.x || typeof snapshot.x !== 'object' ||
+      typeof homeRoom !== 'string' ||
+      !Object.prototype.hasOwnProperty.call(snapshot.x.rooms || {}, homeRoom))
+    return null;
+  const x = snapshot.x;
+  const home = x.rooms[homeRoom];
+  if (!home || typeof home !== 'object' || Array.isArray(home)) return null;
+  const token = value => typeof value === 'string' &&
+    /^[A-Z][A-Z0-9_]{0,79}$/.test(value) ? value : null;
+  const count = value => Number.isSafeInteger(value) && value >= 0 &&
+    value <= 10000 ? value : null;
+
+  const readiness = x.expansionReadiness;
+  const candidates = x.expansionCandidates;
+  const operation = x.expansionOperation;
+  const launch = x.expansionClaimLaunch;
+  const continuity = x.expansionParentStability;
+  const row = continuity?.lastTick === snapshot.t &&
+    Array.isArray(continuity.rooms) && continuity.rooms.length <= 20
+    ? continuity.rooms.filter(item => item?.room === homeRoom) : [];
+  const parent = row.length === 1 && row[0] &&
+    count(row[0].consecutiveSupportTicks) !== null &&
+    row[0].requiredTicks === 100 && row[0].lastTick === snapshot.t
+    ? { status: token(row[0].status), reason: token(row[0].reason),
+        consecutiveSupportTicks: row[0].consecutiveSupportTicks,
+        requiredTicks: 100 } : null;
+
+  // O13 source-route model: all sources must be represented exactly once.
+  // Drop the entire collection if even one member is malformed, missing,
+  // duplicate, or truncated; no partial source count is presented as complete.
+  const model = home.economyModel;
+  const routes = model?.sourceRoutes;
+  let sources = null;
+  if (Array.isArray(routes) && routes.length >= 1 && routes.length <= 5 &&
+      Number.isSafeInteger(model?.sourceCount) &&
+      model.sourceCount === routes.length) {
+    const ids = new Set();
+    let good = true;
+    for (const item of routes) {
+      if (!item || typeof item.sourceId !== 'string' ||
+          item.sourceId.length < 1 || item.sourceId.length > 80 ||
+          ids.has(item.sourceId) ||
+          typeof item.containerReady !== 'boolean' ||
+          !Number.isFinite(item.assignedHarvesterWorkParts) ||
+          item.assignedHarvesterWorkParts < 0 ||
+          item.assignedHarvesterWorkParts > 50 ||
+          !Number.isFinite(item.dedicatedIncomePerTick) ||
+          item.dedicatedIncomePerTick < 0 ||
+          item.dedicatedIncomePerTick > 100) {
+        good = false;
+        break;
+      }
+      ids.add(item.sourceId);
+    }
+    if (good) {
+      sources = {
+        verifiedModeledSources: routes.length,
+        readySources: routes.filter(s => s.containerReady).length,
+        zeroAssignedWorkSources: routes.filter(s =>
+          s.assignedHarvesterWorkParts === 0).length,
+        modeledAssignedWorkParts: Math.round(routes.reduce((n, s) =>
+          n + s.assignedHarvesterWorkParts, 0) * 100) / 100,
+        modeledIncomePerTick: Math.round(routes.reduce((n, s) =>
+          n + s.dedicatedIncomePerTick, 0) * 100) / 100
+      };
+    }
+  }
+
+  return {
+    snapshotTick: snapshot.t,
+    readinessStatus: token(readiness?.status),
+    availableClaimSlots: count(readiness?.availableClaimSlots),
+    candidateStatus: token(candidates?.status),
+    candidateReason: token(candidates?.reason),
+    verifiedCandidates: count(candidates?.candidateCount),
+    visitedRooms: count(candidates?.visitedRooms),
+    unknownOrStaleRooms: count(candidates?.unknownOrStaleRooms),
+    operationPhase: token(operation?.phase),
+    operationReason: token(operation?.reason),
+    parentContinuity: parent,
+    claimLaunchStatus: token(launch?.status),
+    claimLaunchReason: token(launch?.reason),
+    sourceModel: sources
+  };
+}
+
 export function inspectDeployment(bot, deploymentId, minTicks = 25) {
   if (!bot || typeof bot !== 'object') return { status: 'WAIT', reason: 'NO_MEMORY' };
   if (bot.deploymentId !== deploymentId) {
@@ -323,6 +415,7 @@ export function inspectDeployment(bot, deploymentId, minTicks = 25) {
     snapshotTick: last.t, rcl: roomStatus.rcl, cpu, bucket,
     checkedCpuSnapshots: sampled.length, minimumSnapshotBucket, maximumSnapshotCpu,
     roomEvidence,
+    expansionEvidence: summarizeExpansionEvidence(last, room),
     roles: roomStatus.creeps,
     constructionSites: roomStatus.constructionSites,
     energyAvailable: roomStatus.energyAvailable,
