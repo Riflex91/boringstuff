@@ -167,3 +167,67 @@ assert.equal(Memory.bot.cpu.details['scout.world-intel'].lastTick, 126);
 }
 
 console.log('scout role tests passed');
+
+
+{
+  // Reproduce Newbieland's I4 starvation: legacy scout Memory.intel was just
+  // refreshed, but the full I0 source/claim evidence is older than the
+  // 150-tick route preflight. The scout must revisit that stale I0 room
+  // before a neighbor whose full I0 evidence is still genuinely fresh.
+  const oldMemory=Memory.bot.worldIntel.rooms;
+  Memory.bot.worldIntel.rooms={
+    E1N1:oldMemory.E1N1,
+    E1N2:{schemaVersion:1,roomName:'E1N2',
+      observation:{lastSeenTick:10,confidence:1,source:'scout'}},
+    E2N1:{schemaVersion:1,roomName:'E2N1',
+      observation:{lastSeenTick:199,confidence:1,source:'visible-room'}}
+  };
+  Game.time=200;
+  Memory.intel.E1N2={tick:199};
+  Memory.intel.E2N1={tick:150};
+  assert.equal(scout._test.expansionRouteIntelFresh('E1N2'),false);
+  assert.equal(scout._test.expansionRouteIntelFresh('E2N1'),true);
+  creep.memory.targetRoom=null;
+  scout.run(creep);
+  assert.equal(creep.memory.targetRoom,'E1N2',
+    'fresh legacy summaries must not suppress expired full I0 evidence');
+
+  // Exactly 150 ticks old remains eligible; the next tick is stale.
+  Memory.bot.worldIntel.rooms.E1N2.observation.lastSeenTick=50;
+  assert.equal(scout._test.expansionRouteIntelFresh('E1N2'),true);
+  Memory.bot.worldIntel.rooms.E1N2.observation.lastSeenTick=49;
+  assert.equal(scout._test.expansionRouteIntelFresh('E1N2'),false);
+
+  // Low-confidence migrated data and future-dated timestamps cannot
+  // satisfy the I4 route-intel window.
+  Memory.bot.worldIntel.rooms.E1N2.observation.lastSeenTick=200;
+  Memory.bot.worldIntel.rooms.E1N2.observation.confidence=0.5;
+  Memory.bot.worldIntel.rooms.E1N2.observation.source='legacy-memory-intel';
+  assert.equal(scout._test.expansionRouteIntelFresh('E1N2'),false);
+  Memory.bot.worldIntel.rooms.E1N2.observation.confidence=1;
+  Memory.bot.worldIntel.rooms.E1N2.observation.source='scout';
+  Memory.bot.worldIntel.rooms.E1N2.observation.lastSeenTick=201;
+  assert.equal(scout._test.expansionRouteIntelFresh('E1N2'),false);
+
+  // A later repaired high-quality observation stops unnecessary priority
+  // and retains the bounded fallback patrol.
+  Memory.bot.worldIntel.rooms.E1N2.observation.lastSeenTick=200;
+  creep.memory.targetRoom=null;
+  scout.run(creep);
+  assert.ok(['E1N2','E2N1'].includes(creep.memory.targetRoom));
+  assert.equal(scout._test.EXPANSION_ROUTE_INTEL_MAX_AGE,150);
+  Memory.bot.worldIntel.rooms=oldMemory;
+}
+
+{
+  // Do not actively scout a closed/novice room when a normal neighbor exists.
+  const originalStatus=Game.map.getRoomStatus;
+  Game.map.getRoomStatus=name=>({status:name==='E1N2'?'closed':'normal'});
+  assert.deepEqual(scout._test.usableAdjacentRooms('E1N1'),['E2N1']);
+  const movedBefore=moveCalls;
+  creep.memory.targetRoom=null;
+  scout.run(creep);
+  assert.equal(creep.memory.targetRoom,'E2N1');
+  assert.equal(moveCalls,movedBefore+1);
+  Game.map.getRoomStatus=originalStatus;
+}
