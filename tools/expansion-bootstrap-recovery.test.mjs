@@ -63,6 +63,16 @@ assert.equal(run().reason,'PARENT_ECONOMY_OR_CREW_RESERVE_LOW');
 reset();game.creeps.old={memory:{
   role:'pioneer',claimMissionId:mission().id}};
 assert.equal(run().reason,'SURVIVING_CREW_MUST_RETURN_FIRST');
+reset();home.controller.safeModeCooldown=500;
+assert.equal(run().reason,'PARENT_DEFENSE_OR_CONTINUITY_UNVERIFIED',
+  'home defensive emergency cancels rescue spending');
+reset();game.creeps.claimer={memory:{
+  role:'claimer',claimMissionId:mission().id}};
+assert.equal(run().reason,'SURVIVING_CREW_MUST_RETURN_FIRST',
+  'an existing bound claimer is never duplicated');
+reset();parent.energyAvailable=500;
+assert.equal(run().reason,'PARENT_ECONOMY_OR_CREW_RESERVE_LOW',
+  'do not bootstrap while home spawn energy is below capacity');
 reset();returnWrong=true;
 assert.equal(run().reason,'RECOVERY_ROUTE_ADJACENCY_FAILED');
 reset();routeHostiles=[{id:'enemy'}];
