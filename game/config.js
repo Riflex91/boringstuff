@@ -75,11 +75,14 @@ module.exports = {
   // Conservative safety defaults. Turn on only after reviewing logs.
   // D1 survival: use the bounded core-loss guard, never lone scouts.
   AUTO_SAFE_MODE: true,
-  // U8 I4 execution remains OFF until its own real-bot release gates pass:
-  // full route+TTL/parent military+economy preflight, claim settlement,
-  // pioneer-first-spawn and operational rollback proof.
-  AUTO_EXPANSION_CLAIM: false,
-  AUTO_EXPANSION_BOOTSTRAP: false,
+  // U8 I4: automatic candidate -> guarded claim -> bounded bootstrap.
+  // Can issue gameplay intents ONLY after original real-time GCL, verified
+  // controller/route/TTL, 100-tick parent stability, CPU and reserve checks.
+  // Both flags are coupled by the claim executor: never claim without the
+  // follow-on pioneer bootstrap enabled. Disable BOTH to roll back launches;
+  // ongoing accepted missions are still supervised every tick.
+  AUTO_EXPANSION_CLAIM: true,
+  AUTO_EXPANSION_BOOTSTRAP: true,
   ENABLE_REMOTE_MINING: false,
 
   // Construction planning is staged. Critical energy infrastructure is placed

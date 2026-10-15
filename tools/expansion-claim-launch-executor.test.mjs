@@ -4,13 +4,16 @@ import vm from 'node:vm';
 
 const source=fs.readFileSync(new URL(
   '../game/expansion.claim.launch.executor.js',import.meta.url),'utf8');
-let enabled=false,approved=true,issued=[],spawnRc=0,throwSpawn=false;
+let enabled=false,boot=false,approved=true,issued=[],spawnRc=0,throwSpawn=false;
 const ctx={
   module:{exports:{}}, MOVE:'move',CLAIM:'claim',OK:0,
   BODYPART_COST:{move:50,claim:600},
   FIND_HOSTILE_CREEPS:1,
   require(name){
-    if(name==='config')return {get AUTO_EXPANSION_CLAIM(){return enabled;}};
+    if(name==='config')return {
+      get AUTO_EXPANSION_CLAIM(){return enabled;},
+      get AUTO_EXPANSION_BOOTSTRAP(){return boot;}
+    };
     if(name==='expansion.claim.launch.preflight')return {
       audit:()=>approved?{
         status:'REVIEW_CANDIDATE',actionAuthority:'NONE',
@@ -46,7 +49,13 @@ let out=execute(p);
 assert.equal(out.reason,'AUTO_EXPANSION_CLAIM_DISABLED');
 assert.equal(issued.length,0);
 assert.equal(JSON.stringify(p.memory),original,'flag-off must not write missions');
-enabled=true;approved=false;
+enabled=true;boot=false;
+out=execute(p);
+assert.equal(out.reason,'BOOTSTRAP_SUPPORT_NOT_AUTHORIZED');
+assert.equal(issued.length,0);
+assert.equal(JSON.stringify(p.memory),original,
+  'an enabled claimer must not start without authorized bootstrap support');
+boot=true;approved=false;
 out=execute(p);
 assert.equal(out.reason,'PRECHECK_UNVERIFIED');
 assert.equal(issued.length,0);

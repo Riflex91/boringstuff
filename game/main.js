@@ -179,9 +179,10 @@ function statusSnapshot(roomStates, tickCpu) {
       readyForAutonomousLaunch:false,spawnActionEnabled:false,
       claimActionEnabled:false};
   }
-  // Release-gated I4: audit, then at most one guarded expedition action per
-  // existing 100-tick status cadence. Both flags default FALSE; a SHADOW
-  // advisory is never converted into an unconditional spawn.
+  // I4 paired live authorization: one guarded claim + bounded pioneer
+  // provision per existing status cadence. This release enables both
+  // explicitly, but a SHADOW advisory never grants unconditional authority:
+  // the executor re-audits current Game evidence, reserves and mission state.
   let expansionClaimLaunch = {status:'DISABLED',reason:'AUTO_EXPANSION_CLAIM_OFF'};
   let expansionPioneerProvision = {status:'DISABLED',reason:'AUTO_EXPANSION_BOOTSTRAP_OFF'};
   if (config.AUTO_EXPANSION_CLAIM === true) {

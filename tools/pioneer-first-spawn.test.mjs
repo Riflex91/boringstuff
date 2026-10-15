@@ -123,4 +123,26 @@ game.rooms.E1N1=home;
 clear();memory.bot.expansionClaim.confirmedTick=game.time-2001;
 role.run(creep);assert.equal(attemptedSite,0,
   'expired mission cannot cause permanent uncontrolled build attempts');
+// Supervisor changes the mission phase before creep handlers run; survivors
+// must retreat instead of silently freezing in a lost or timed-out colony.
+clear();memory.bot.expansionClaim.phase='LOST';creep.memory.home='E1N1';
+role.run(creep);
+assert.equal(moved.length,1,'lost colony must issue real safe return movement');
+assert.equal(moved[0].opts.maxRooms,1);
+assert.equal(attemptedSite,0);
+clear();memory.bot.expansionClaim.phase='BOOTSTRAP_BLOCKED';
+creep.memory.home='E1N1';game.time=3200;
+role.run(creep);
+assert.equal(moved.length,1,
+  'expired bootstrap still permits bound survivor return');
+assert.equal(built,0);
+clear();memory.bot.expansionClaim.phase='LOST';creep.memory.home='WRONG';
+role.run(creep);
+assert.equal(moved.length,0,'wrong origin may not authorize evacuation');
+clear();memory.bot.expansionClaim.phase='LOST';creep.memory.home='E1N1';
+memory.bot.expansionClaim.id='claim-E1N1-E2N2-1000';
+creep.memory.claimMissionId='claim-E1N1-E2N2-1000';
+role.run(creep);
+assert.equal(moved.length,0,'forged mismatching mission ID must never move');
+
 console.log('I4 mission-bound pioneer first-spawn bootstrap tests PASS');

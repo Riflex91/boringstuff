@@ -124,7 +124,33 @@ function workEnergy(creep) {
   return rc===OK || rc===ERR_NOT_IN_RANGE;
 }
 
+// Return survivors of failed, lost or expired bootstrap operations to their
+// parent even after the supervisor changed the phase before creep processing.
+function recoveryMission(creep,memory,game) {
+  const m=memory?.bot?.expansionClaim;
+  if(!m || !['LOST','BOOTSTRAP_BLOCKED'].includes(m.phase) ||
+     m.schemaVersion!==1 || creep?.memory?.role!=='pioneer' ||
+     !Number.isSafeInteger(game?.time) ||
+     !Number.isSafeInteger(m.createdTick) ||
+     m.createdTick<0 || m.createdTick>game.time ||
+     !ROOM.test(m.parent||'') || !ROOM.test(m.target||'') ||
+     m.parent===m.target ||
+     m.id!==('claim-'+m.parent+'-'+m.target+'-'+m.createdTick) ||
+     m.id!==creep.memory.claimMissionId ||
+     creep.memory.home!==m.parent ||
+     !Array.isArray(m.route) || m.route.length<2 || m.route.length>4 ||
+     m.route[0]!==m.parent || m.route.at(-1)!==m.target ||
+     new Set(m.route).size!==m.route.length ||
+     m.route.some(name=>!ROOM.test(name)))return null;
+  return m;
+}
+
 function run(creep) {
+  const recovery=recoveryMission(creep,Memory,Game);
+  if(recovery && creep?.room && creep.pos) {
+    retreat(creep,recovery);
+    return;
+  }
   const m=validMission(creep, Memory, Game);
   if (!m || !creep?.room || !creep.pos) return;
   const parent=Game.rooms?.[m.parent];
@@ -159,4 +185,4 @@ function run(creep) {
   if (rc===ERR_NOT_IN_RANGE) move(creep,site.target,5);
 }
 
-module.exports={run,_test:{validMission,hostile,spawnSite,workEnergy}};
+module.exports={run,_test:{validMission,recoveryMission,hostile,spawnSite,workEnergy}};

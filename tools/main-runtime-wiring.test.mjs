@@ -162,12 +162,17 @@ for(const forbidden of ['.claimController(','.spawnCreep(',
   assert.equal(claimLaunchAuditSource.includes(forbidden),false,
     'launcher AUDIT may not issue a gameplay intent: '+forbidden);
 
-// I4 staged execution wiring is present but fail-closed in actual config.
+// I4 is live-authorized only as a paired, guarded claim/bootstrap pipeline.
 const safeConfig=fs.readFileSync(path.resolve(here,'../game/config.js'),'utf8');
-assert.match(safeConfig,/AUTO_EXPANSION_CLAIM:\s*false\s*,/,
-  'automatic claim must stay OFF until dedicated live release');
-assert.match(safeConfig,/AUTO_EXPANSION_BOOTSTRAP:\s*false\s*,/,
-  'pioneer production must stay OFF until post-claim bootstrap proof');
+const claimExecutorSource=fs.readFileSync(path.resolve(here,
+  '../game/expansion.claim.launch.executor.js'),'utf8');
+assert.match(safeConfig,/AUTO_EXPANSION_CLAIM:\s*true\s*,/,
+  'autonomous claim intent must be enabled as an explicit release choice');
+assert.match(safeConfig,/AUTO_EXPANSION_BOOTSTRAP:\s*true\s*,/,
+  'the first-spawn pioneer executor must be enabled with the claim');
+assert.match(claimExecutorSource,
+  /if\(config\.AUTO_EXPANSION_BOOTSTRAP!==true\)[\s\S]*?BOOTSTRAP_SUPPORT_NOT_AUTHORIZED/,
+  'a disabled bootstrap executor must prevent irreversible claim orders');
 assert.match(mainSource,
   /const\s+expansionClaimLaunchExecutor\s*=\s*require\(['"]expansion\.claim\.launch\.executor['"]\)/,
   'main imports only the existing exact-identity protected launcher');
