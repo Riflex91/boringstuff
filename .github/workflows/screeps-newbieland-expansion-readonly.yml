@@ -1,0 +1,47 @@
+name: Screeps Newbieland expansion diagnostics (GET only)
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/screeps-newbieland-expansion-readonly.yml
+      - tools/newbieland-expansion-readonly.mjs
+      - tools/newbieland-expansion-readonly.test.mjs
+permissions:
+  contents: read
+concurrency:
+  group: screeps-newbieland-expansion-get-only
+  cancel-in-progress: false
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    defaults:
+      run:
+        working-directory: tools
+    env:
+      SCREEPS_TOKEN_NEWBIELAND: ${{ secrets.SCREEPS_TOKEN_NEWBIELAND }}
+      SCREEPS_USERNAME_NEWBIELAND: Riflex91
+      SCREEPS_PASSWORD_NEWBIELAND: ${{ secrets.SCREEPS_PASSWORD_NEWBIELAND }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Test read-only parser and fail-closed active-branch handling
+        run: node newbieland-expansion-readonly.test.mjs
+      - name: Set temporary API configuration path
+        working-directory: .
+        shell: bash
+        run: echo "SCREEPS_CONFIG=$RUNNER_TEMP/screeps-newbieland-readonly.json" >> "$GITHUB_ENV"
+      - name: Prepare short-lived authenticated HTTPS GET access
+        run: node ci-deployment-credentials.mjs
+      - name: Observe current retained Newbieland expansion status (no writes)
+        run: node newbieland-expansion-readonly.mjs
+      - name: Remove temporary credentials
+        if: always()
+        working-directory: .
+        shell: bash
+        run: rm -f "$SCREEPS_CONFIG"
