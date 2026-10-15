@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
 import { parseBotMemory, inspectDeployment, LIVE_VERIFICATION_TIMEOUT_MS } from './ci-deployment-guard.mjs';
 
@@ -382,6 +383,13 @@ console.log('CI deployment guard and 100-tick provenance checks passed');
 // beyond the first 15-minute verification window. Extending only the time
 // budget must not reinterpret elapsed ticks as a valid room/CPU state.
 assert.equal(LIVE_VERIFICATION_TIMEOUT_MS, 30 * 60 * 1000);
+const newbielandActions = readFileSync(
+  new URL('../.github/workflows/screeps-auto-deploy.yml', import.meta.url), 'utf8');
+const workflowTimeout = newbielandActions.match(/^    timeout-minutes: (\\d+)$/m);
+assert.ok(workflowTimeout, 'Newbieland live job must have a finite timeout');
+assert.ok(Number(workflowTimeout[1]) * 60 * 1000 >=
+  LIVE_VERIFICATION_TIMEOUT_MS + 5 * 60 * 1000,
+  'the GitHub Actions job deadline must exceed the live verifier plus setup overhead');
 const cadenceDelayed = structuredClone(state);
 cadenceDelayed.telemetryJournal.snapshots[0].t = 1099;
 cadenceDelayed.telemetryJournal.events.push(record('BOT_HEARTBEAT', 1280));
