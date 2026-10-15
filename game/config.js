@@ -75,6 +75,8 @@ module.exports = {
   // Conservative safety defaults. Turn on only after reviewing logs.
   // D1 survival: use the bounded core-loss guard, never lone scouts.
   AUTO_SAFE_MODE: true,
+  // D2: only one spare defender across directly adjacent owned rooms.
+  AUTO_REGIONAL_DEFENSE_SUPPORT: true,
   // U8 I4 execution remains OFF until its own real-bot release gates pass:
   // full route+TTL/parent military+economy preflight, claim settlement,
   // pioneer-first-spawn and operational rollback proof.
