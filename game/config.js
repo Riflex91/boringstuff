@@ -83,6 +83,8 @@ module.exports = {
   // ongoing accepted missions are still supervised every tick.
   AUTO_EXPANSION_CLAIM: true,
   AUTO_EXPANSION_BOOTSTRAP: true,
+  // U11: one observed-aggressor, no-tower, high-margin counterattack only.
+  AUTO_COUNTERATTACK_RAID: true,
   ENABLE_REMOTE_MINING: false,
 
   // Construction planning is staged. Critical energy infrastructure is placed
