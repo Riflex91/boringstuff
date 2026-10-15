@@ -224,4 +224,15 @@ role.run(creep);
 assert.equal(creep.memory.role,'pioneer',
   'forged settlement mission binding cannot transfer a creep');
 
+established();structures=[{
+  id:'first-built-spawn',my:true,
+  pos:{x:25,y:25,roomName:'E1N2'}
+}];delete game.rooms.E1N1;
+role.run(creep);
+assert.equal(creep.memory.role,'worker',
+  'established target stays independently productive if home is lost');
+assert.equal(creep.memory.home,'E1N2');
+assert.equal(moved.length,0);
+game.rooms.E1N1=home;
+
 console.log('I4 mission-bound pioneer first-spawn bootstrap tests PASS');
