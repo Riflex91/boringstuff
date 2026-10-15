@@ -64,6 +64,16 @@ function homeEvidence(x,previous,currentTick,previousTick) {
     room:'W37S79',rcl:nint(room.rcl),
     controllerProgress:progress(room.controllerProgress),
     controllerProgressTotal:progress(room.controllerProgressTotal),
+    safeModeRemainingTicks:nint(room.safeModeRemainingTicks),
+    safeModeCooldownRemainingTicks:nint(room.safeModeCooldownRemainingTicks),
+    // Preserve the distinction between a current Safe Mode and its cooldown.
+    // A missing historical field must NOT be treated as proof of no protection.
+    parentDefenseGate:
+      nint(room.safeModeRemainingTicks)>0?'SAFE_MODE_ACTIVE':
+      nint(room.safeModeCooldownRemainingTicks)>0?'SAFE_MODE_COOLDOWN_ACTIVE':
+      nint(room.safeModeRemainingTicks)===0 &&
+      nint(room.safeModeCooldownRemainingTicks)===0?'NO_ACTIVE_PROTECTION':
+      'UNVERIFIED',
     observedControllerProgressPerTick:observedRate(
       room.controllerProgress,priorRoom?.controllerProgress,currentTick,
       previousTick,nint(room.rcl),nint(priorRoom?.rcl)),
