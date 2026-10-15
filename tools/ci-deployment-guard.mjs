@@ -346,54 +346,62 @@ async function preflight(api) {
   console.log('PASS: authenticated target branch, activeWorld and backup read verified');
 }
 
-async function verify(api) {
-  const receipt = readDeploymentReceipt({
-    logDir: process.env.SCREEPS_LOG_DIR || DEFAULT_VERIFICATION_LOG_DIR,
-    server, branch
-  });
-  const id = receipt?.receipt?.deploymentId;
-  if (!id) throw new Error('FAIL CLOSED: exact deployment receipt missing');
-  const timeLimit = Date.now() + 15 * 60 * 1000;
-  let last = null, polls = 0, consecutiveReadErrors = 0;
-  while (Date.now() < timeLimit) {
+// Injectable GET-only evidence loop for deterministic regression tests. The
+// normal production entry still requires an exact on-disk deployment receipt
+// and never accepts caller-supplied or cached PASS as proof of live ticks.
+export async function verifyLiveMemory(api,id,options={}) {
+  if(typeof id!=='string' || id.length<1 || id.length>128)
+    throw new Error('FAIL CLOSED: exact deployment id required');
+  const now=typeof options.now==='function'?options.now:Date.now;
+  const sleep=typeof options.sleep==='function'?options.sleep:
+    ms=>new Promise(resolve=>setTimeout(resolve,ms));
+  const log=typeof options.log==='function'?options.log:console.log;
+  const warn=typeof options.warn==='function'?options.warn:console.warn;
+  const timeLimit=now()+15*60*1000;
+  let last=null, polls=0, consecutiveReadErrors=0;
+  while(now()<timeLimit) {
     let response;
     try {
-      // Absolute per-request GET deadline; any 429/5xx is surfaced rather
-      // than stretching the 15-minute live window past the Actions job cap.
-      response = await api.userMemory('bot',null,{
+      response=await api.userMemory('bot',null,{
         timeoutMs:10000,totalTimeoutMs:12000,
         max429Retries:0,max5xxRetries:0
       });
-      consecutiveReadErrors = 0;
-    } catch (_) {
+      consecutiveReadErrors=0;
+    }catch(_) {
       consecutiveReadErrors++;
-      console.warn('LIVE_100T_READ_UNAVAILABLE ' + JSON.stringify({
+      warn('LIVE_100T_READ_UNAVAILABLE '+JSON.stringify({
         server,room,attempt:consecutiveReadErrors,
         lastVerifiedStatus:last?.status||null
       }));
-      // Never turn missing/corrupt World API observations into a pass.
       if(consecutiveReadErrors>=3)throw new Error(
         'LIVE_100T_OBSERVATION_UNAVAILABLE: 3 bounded GET reads failed');
-      await new Promise(resolve => setTimeout(resolve, 10000));
-      continue;
+      await sleep(10000);continue;
     }
-    const bot = parseBotMemory(response);
-    last = inspectDeployment(bot, id, 100);
-    if (last.status === 'PASS') {
-      console.log('LIVE_100T_PASS ' + JSON.stringify(last));
-      return;
+    last=inspectDeployment(parseBotMemory(response),id,100);
+    if(last.status==='PASS'){
+      log('LIVE_100T_PASS '+JSON.stringify(last));
+      return last;
     }
-    if (last.status === 'FAIL') {
-      throw new Error('LIVE_100T_FAIL ' + JSON.stringify(last));
-    }
+    if(last.status==='FAIL')
+      throw new Error('LIVE_100T_FAIL '+JSON.stringify(last));
     polls++;
-    if(polls===1 || polls%3===0)console.log('LIVE_100T_WAIT ' +
+    if(polls===1||polls%3===0)log('LIVE_100T_WAIT '+
       JSON.stringify({server,room,reason:last.reason||'UNKNOWN',
         observedTicks:last.observedTicks??null,
         deploymentTick:last.tick??null,polls}));
-    await new Promise(resolve => setTimeout(resolve, 10000));
+    await sleep(10000);
   }
-  throw new Error('LIVE_100T_INCOMPLETE ' + JSON.stringify(last));
+  throw new Error('LIVE_100T_INCOMPLETE '+JSON.stringify(last));
+}
+
+async function verify(api) {
+  const receipt=readDeploymentReceipt({
+    logDir:process.env.SCREEPS_LOG_DIR||DEFAULT_VERIFICATION_LOG_DIR,
+    server,branch
+  });
+  const id=receipt?.receipt?.deploymentId;
+  if(!id)throw new Error('FAIL CLOSED: exact deployment receipt missing');
+  return verifyLiveMemory(api,id);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
