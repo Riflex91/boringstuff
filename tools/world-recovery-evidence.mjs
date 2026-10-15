@@ -26,11 +26,47 @@ function receiptStatus(v) {
     assignedTick:v.assignedTick,lastObservedTick:v.lastObservedTick,
     completedTick:goodTick(v.completedTick)?v.completedTick:null};
 }
+// Expansion fields are observations in one actual STATUS_SNAPSHOT, not
+// permission to claim. Filter untrusted text and keep only bounded reasons.
+// "NO_CLAIM_INTENT" and "GCL_AT_CAPACITY" are distinct operational states.
+const code=v=>typeof v==='string'&&/^[A-Z][A-Z0-9_]{0,70}$/.test(v)?v:null;
+const nint=v=>Number.isSafeInteger(v)&&v>=0&&v<=1000000?v:null;
+function expansionAt(snapshot) {
+  const x=snapshot?.x;
+  if(!x || typeof x!=='object')return null;
+  const readiness=x.expansionReadiness;
+  const candidates=x.expansionCandidates;
+  const launch=x.expansionClaimLaunch;
+  const operation=x.expansionOperation;
+  const recovery=x.expansionBootstrapRecoveryResult;
+  // Snapshot missing expansion content is UNKNOWN, not "no available slot".
+  if(!readiness || typeof readiness!=='object')
+    return null;
+  const reasons=Array.isArray(readiness.reasons)?
+    readiness.reasons.slice(0,8).map(code).filter(Boolean):null;
+  return {
+    source:'LIVE_STATUS_SNAPSHOT_NOT_CLAIM_AUTHORITY',
+    tick:snapshot.t,
+    gclLevel:nint(x.gcl?.level),
+    ownedRooms:nint(readiness.ownedRooms),
+    availableClaimSlots:nint(readiness.availableClaimSlots),
+    readinessStatus:code(readiness.status),
+    readinessReasons:reasons,
+    candidatesStatus:code(candidates?.status),
+    candidatesReason:code(candidates?.reason),
+    candidateCount:nint(candidates?.candidateCount),
+    operationPhase:code(operation?.phase),
+    launchStatus:code(launch?.status),
+    launchReason:code(launch?.reason),
+    bootstrapRecoveryStatus:code(recovery?.status),
+    bootstrapRecoveryReason:code(recovery?.reason)
+  };
+}
 export function inspectWorldRecoveryEvidence(reply) {
   const bot=parseBotMemory(reply);
   if(!bot)return {availability:'UNKNOWN',reason:'BOT_MEMORY_NOT_VERIFIABLE',
     observedEventCount:null,events:null,rescue:null,
-    witnessedSpawnRoomCount:null,latestSnapshotTick:null};
+    witnessedSpawnRoomCount:null,latestSnapshotTick:null,expansion:null};
   const journal=bot.telemetryJournal;
   const rawEvents=Array.isArray(journal?.events)?journal.events:null;
   const events=rawEvents===null?null:[];
@@ -71,8 +107,10 @@ export function inspectWorldRecoveryEvidence(reply) {
       record.pos?.roomName===room).length:null;
   const snapshots=Array.isArray(journal?.snapshots)?
     journal.snapshots.filter(s=>s?.c==='STATUS_SNAPSHOT'&&goodTick(s.t)):null;
-  const latestSnapshotTick=snapshots?.length?
-    Math.max(...snapshots.map(s=>s.t)):null;
+  const latestSnapshot=snapshots?.length?
+    snapshots.reduce((best,row)=>!best||row.t>best.t?row:best,null):null;
+  const latestSnapshotTick=latestSnapshot?.t??null;
+  const expansion=expansionAt(latestSnapshot);
   return {availability:'OBSERVED_IN_BOT_MEMORY',
     observationScope:'RETAINED_EVENTS_AND_BOUNDED_MISSION_HISTORY_ONLY',
     observedEventCount:events?.length??null,events,
@@ -80,5 +118,5 @@ export function inspectWorldRecoveryEvidence(reply) {
       active,last,retainedReceiptCount:history?.length??null
     }:null,
     witnessedSpawnRoomCount:witnessed,
-    latestSnapshotTick};
+    latestSnapshotTick,expansion};
 }
