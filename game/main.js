@@ -21,6 +21,7 @@ const expansionClaimLaunchPreflight = require('expansion.claim.launch.preflight'
 const expansionClaimLaunchExecutor = require('expansion.claim.launch.executor');
 const expansionPioneerProvisioner = require('expansion.pioneer.provisioner');
 const ownedSpawnRecovery = require('recovery.owned.spawn');
+const spawnlessWorkerRescue = require('recovery.spawnless.worker');
 const expansionParentStabilityShadow = require('expansion.parent.stability.shadow');
 const serverProfile = require('server.profile');
 const processScheduler = require('process.scheduler');
@@ -455,6 +456,21 @@ module.exports.loop = function() {
           'Actual former Spawn tile is being rebuilt in still-owned room',
           rebuild,{force:true,persist:true,dedupeTicks:0});
     } catch (_) { /* never interrupt authoritative room/creep work */ }
+
+    // R2 real workforce rescue: only adjacent, still-owned previously
+    // witnessed Spawn colony may borrow one spare productive home worker.
+    // R1 observes the arrival and erects the original Spawn construction
+    // site on its next 25-tick safe placement cadence.
+    if (!criticalCpu && roomStates.length>1) {
+      try {
+        const rescue=spawnlessWorkerRescue.dispatch(
+          roomStates,Game,Memory);
+        if(rescue.assigned)
+          logger.warn('R2_SPAWNLESS_WORKER_DISPATCH',
+            'Verified formerly owned Spawn room borrows a spare worker',
+            rescue,{force:true,persist:true,dedupeTicks:0});
+      }catch(_) { /* rescue never interrupts essential colony work */ }
+    }
 
     // Low-cost, optional I4 parent continuity witness. Each healthy tick is
     // individually observed; a skipped/low-CPU tick breaks the next streak.
