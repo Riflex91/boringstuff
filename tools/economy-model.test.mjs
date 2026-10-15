@@ -291,3 +291,86 @@ assert.equal(overRecoveredMining.recommendedHarvesterWorkParts, 10);
 assert.equal(overRecoveredMining.harvesterWorkDeficit, 0);
 assert.equal(overRecoveredMining.nextHarvesterWorkParts, 5);
 assert.equal(overRecoveredMining.recommendedHarvesterCount, 2);
+
+
+// E14: aggregate WORK is not source-level coverage. All miners on one of two
+// container sources must provision one temporary additional miner despite a
+// zero total WORK-part deficit. This recovery is unavailable on unknown or
+// hostile evidence and must stop as soon as the source receives a miner.
+{
+  const coverageSources=[
+    {id:'cover-a',pos:pos(12,true)},
+    {id:'cover-b',pos:pos(8,true)}
+  ];
+  function recoveryRoom(name){
+    return {
+      name,
+      findPath(from){
+        return Array.from({length:from===coverageSources[0].pos?12:8},()=>({}));
+      }
+    };
+  }
+  function miner(sourceId){
+    return countedCreep('harvester',{[WORK]:5,[CARRY]:1},sourceId);
+  }
+  const harvesters=[miner('cover-a'),miner('cover-a')];
+  const good={
+    room:recoveryRoom('E8N1-E14'),
+    spawn:{id:'spawn-E14',pos:{x:19,y:22}},
+    sources:coverageSources,creeps:harvesters,
+    sites:[],energyCapacityAvailable:800,
+    emergency:false,hostileCreeps:[]
+  };
+  Memory.rooms={};
+  const gap=require('../game/economy.model.js').analyze(good);
+  assert.equal(gap.theoreticalIncomePerTick,20);
+  assert.equal(gap.harvesterWorkParts,10);
+  assert.equal(gap.harvesterWorkDeficit,0);
+  assert.equal(gap.dedicatedHarvestCapacityPerTick,10);
+  assert.equal(gap.modeledUncoveredSources,1);
+  assert.equal(gap.recommendedHarvesterCount,3,
+    'an otherwise invisible uncovered source needs one temporary new miner');
+
+  const recovered={...good,room:recoveryRoom('E8N1-E14-recovered'),
+    spawn:{...good.spawn,id:'spawn-E14-recovered'},
+    creeps:[...harvesters,miner('cover-b')]};
+  const full=require('../game/economy.model.js').analyze(recovered);
+  assert.equal(full.modeledUncoveredSources,0);
+  assert.equal(full.dedicatedHarvestCapacityPerTick,20);
+  assert.equal(full.recommendedHarvesterCount,2,
+    'do not create a permanent extra harvester once both sources are covered');
+
+  const pending={...good,room:recoveryRoom('E8N1-E14-pending'),
+    creeps:[...harvesters,miner()]};
+  const pendingResult=require('../game/economy.model.js').analyze(pending);
+  assert.equal(pendingResult.modeledUncoveredSources,null);
+  assert.equal(pendingResult.recommendedHarvesterCount,2,
+    'unassigned existing miner must be allowed to select the uncovered source');
+
+  const hostile={...good,room:recoveryRoom('E8N1-E14-hostile'),
+    hostileCreeps:[{id:'attack'}]};
+  const hostileResult=require('../game/economy.model.js').analyze(hostile);
+  assert.equal(hostileResult.modeledUncoveredSources,null);
+  assert.equal(hostileResult.recommendedHarvesterCount,2,
+    'active defense pressure must suppress optional source coverage scaling');
+
+  const unsafe={...good,room:recoveryRoom('E8N1-E14-emergency'),
+    emergency:true};
+  const emergencyResult=require('../game/economy.model.js').analyze(unsafe);
+  assert.equal(emergencyResult.modeledUncoveredSources,null);
+  assert.equal(emergencyResult.recommendedHarvesterCount,2);
+
+  const incomplete={...good,room:recoveryRoom('E8N1-E14-bootstrap'),
+    sources:[{id:'cover-a',pos:pos(12,false)},coverageSources[1]]};
+  const bootstrapResult=require('../game/economy.model.js').analyze(incomplete);
+  assert.equal(bootstrapResult.modeledUncoveredSources,null);
+  assert.equal(bootstrapResult.recommendedHarvesterCount,1,
+    'bootstrap retains its original one-miner demand and never adds source-coverage pressure');
+
+  const invalid={...good,room:recoveryRoom('E8N1-E14-invalid'),
+    creeps:[miner('cover-a'),miner('different-room-source')]};
+  const invalidResult=require('../game/economy.model.js').analyze(invalid);
+  assert.equal(invalidResult.modeledUncoveredSources,null);
+  assert.equal(invalidResult.recommendedHarvesterCount,2,
+    'unknown source identity must fail closed rather than adding miners');
+}
