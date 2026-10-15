@@ -20,6 +20,7 @@ const expansionBootstrapBudgetShadow = require('expansion.bootstrap.budget.shado
 const expansionClaimLaunchPreflight = require('expansion.claim.launch.preflight');
 const expansionClaimLaunchExecutor = require('expansion.claim.launch.executor');
 const expansionPioneerProvisioner = require('expansion.pioneer.provisioner');
+const ownedSpawnRecovery = require('recovery.owned.spawn');
 const expansionParentStabilityShadow = require('expansion.parent.stability.shadow');
 const serverProfile = require('server.profile');
 const processScheduler = require('process.scheduler');
@@ -442,6 +443,18 @@ module.exports.loop = function() {
       try { combatAggressionEvidence.observe(roomStates,Game,Memory); }
       catch (_) { /* optional intelligence must never halt core defense */ }
     }
+
+    // R1 survival priority: real previously witnessed own Spawn location
+    // permits a single bounded rebuild construction intent if that owned
+    // room still has WORK+CARRY labor. Never guess a missing base anchor.
+    try {
+      const rebuild=ownedSpawnRecovery.observeAndRebuild(
+        roomStates,Game,Memory);
+      if(rebuild?.siteIntentAccepted)
+        logger.warn('R1_OWNED_SPAWN_REBUILD_SITE_INTENT',
+          'Actual former Spawn tile is being rebuilt in still-owned room',
+          rebuild,{force:true,persist:true,dedupeTicks:0});
+    } catch (_) { /* never interrupt authoritative room/creep work */ }
 
     // Low-cost, optional I4 parent continuity witness. Each healthy tick is
     // individually observed; a skipped/low-CPU tick breaks the next streak.
