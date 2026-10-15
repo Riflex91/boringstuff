@@ -205,6 +205,7 @@ assert.equal(summary(memory).active,null);
 assert.equal(summary(memory).last.status,'LOST');
 assert.equal(summary(memory).last.reason,'WORKER_NOT_IN_GAME_CREEPS');
 assert.equal(reconcile(memory,game).status,'NO_STALE_RESCUE');
+a.memory={role:'worker',home:'E1N1'};
 game.creeps.A=a;game.time=1525;
 assert.equal(dispatch([donor,victim],game,memory).status,'ASSIGNED',
   'safe future rescue permitted after measured loss cooldown');
