@@ -9,6 +9,8 @@ on:
       - .github/workflows/screeps-world-next-runtime-diagnostics.yml
       - tools/world-next-runtime-diagnostics.mjs
       - tools/world-next-runtime-diagnostics.test.mjs
+      - tools/world-recovery-evidence.mjs
+      - tools/world-recovery-evidence.test.mjs
 permissions:
   contents: read
 concurrency:
@@ -29,7 +31,9 @@ jobs:
         with:
           node-version: '24.21.0'
       - name: Validate diagnostics offline
-        run: node world-next-runtime-diagnostics.test.mjs
+        run: |
+          node world-next-runtime-diagnostics.test.mjs
+          node world-recovery-evidence.test.mjs
       - name: Observe active World branch, spawn, creeps, energy and controller without writes
         env:
           SCREEPS_TOKEN_WORLD: ${{ secrets.SCREEPS_TOKEN_WORLD }}
