@@ -23,8 +23,10 @@ export function summarizeParentBlockerEvidence(snapshot, homeRoom = HOME) {
       ? values.slice() : null;
   const count = value => Number.isSafeInteger(value) &&
     value >= 0 && value <= 10000000 ? value : null;
-  const decimal = value => Number.isFinite(value) &&
-    value >= 0 && value <= 10000 ? value : null;
+  // Hauler carry *deficit* is signed: negative values mean surplus. Do not
+  // misclassify a supported parent as UNKNOWN solely because it has surplus.
+  const signedDeficit = value => Number.isFinite(value) &&
+    value >= -10000 && value <= 10000 ? value : null;
   const health = room.health;
   const readiness = x.expansionReadiness;
   return {
@@ -42,7 +44,7 @@ export function summarizeParentBlockerEvidence(snapshot, homeRoom = HOME) {
     roomStoredEnergy: count(room.energyStored),
     safeModeTicks: count(room.safeModeRemainingTicks),
     safeModeCooldownTicks: count(room.safeModeCooldownRemainingTicks),
-    modeledHaulerCarryDeficit: decimal(room.economyModel?.haulerCarryDeficit),
+    modeledHaulerCarryDeficit: signedDeficit(room.economyModel?.haulerCarryDeficit),
     modeledWaitingConsumers: count(room.economyModel?.consumerWaitingCount),
     modeledFallbackConsumers: count(room.economyModel?.consumerFallbackCount)
   };
