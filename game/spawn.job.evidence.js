@@ -57,7 +57,8 @@ function snapshot(state, game, memory) {
   const mem = row && typeof row === 'object' && !Array.isArray(row)
     ? row : creep && creep.memory && typeof creep.memory === 'object'
       ? creep.memory : null;
-  const role = mem && Object.prototype.hasOwnProperty.call(ROLES, mem.role)
+  const role = mem && typeof mem.role === 'string' &&
+    Object.prototype.hasOwnProperty.call(ROLES, mem.role)
     ? mem.role : null;
   const born = mem && tick(mem.born) && mem.born <= currentTick
     ? mem.born : null;
@@ -92,4 +93,66 @@ function snapshot(state, game, memory) {
   });
 }
 
-module.exports = { snapshot, MAX_SPAWN_TICKS };
+// Called ONLY from the existing 100-tick STATUS_SNAPSHOT. Store a single
+// private, bounded first/last observation per owned room in bot Memory so
+// the identical opaque Spawn + Spawning.name can be verified at *two actual*
+// Game.time samples. No raw identity is ever logged; no spawn/game intent is
+// issued. This does not imply the spawn stayed busy between sample ticks.
+function sample(state, game, memory) {
+  const observation = snapshot(state, game, memory);
+  const result = Object.assign({}, observation, {
+    sameJobAcrossSnapshotsVerified: false,
+    sameJobObservedGameTickSpan: null,
+    sameJobExceeds150ObservedTicks: null,
+    continuousBusyBetweenSnapshotsVerified: false,
+    observationMemoryWrites: 0
+  });
+  const bot = memory && memory.bot;
+  const room = state && state.room && state.room.name;
+  const validRoom = typeof room === 'string' &&
+    /^(E|W)\\d+(N|S)\\d+$/.test(room);
+  if (!bot || typeof bot !== 'object' || Array.isArray(bot) ||
+      !validRoom || !tick(game && game.time)) return result;
+  // One bounded entry per room; don't overwrite untrusted or oversized state.
+  let watches = bot.spawnJobWitness;
+  if (!watches) {
+    watches = Object.create(null);
+    bot.spawnJobWitness = watches;
+  }
+  if (!watches || typeof watches !== 'object' || Array.isArray(watches) ||
+      Object.keys(watches).length > 8) return result;
+  const spawn = state.spawn;
+  const spawnId = spawn && typeof spawn.id === 'string' &&
+    spawn.id.length >= 1 && spawn.id.length <= 100 ? spawn.id : null;
+  const job = spawn && spawn.spawning;
+  const jobName = job && typeof job.name === 'string' &&
+    job.name.length >= 1 && job.name.length <= 100 ? job.name : null;
+  if (!spawnId || !jobName || observation.spawning !== true) {
+    if (Object.prototype.hasOwnProperty.call(watches, room)) {
+      delete watches[room];
+      result.observationMemoryWrites = 1;
+    }
+    return result;
+  }
+  const deploymentId = typeof bot.deploymentId === 'string' &&
+    bot.deploymentId.length <= 140 ? bot.deploymentId : null;
+  const prev = watches[room];
+  const validPrev = prev && typeof prev === 'object' &&
+    prev.spawnId === spawnId && prev.jobName === jobName &&
+    prev.deploymentId === deploymentId &&
+    tick(prev.firstTick) && tick(prev.lastTick) &&
+    prev.firstTick <= prev.lastTick && prev.lastTick < game.time;
+  const firstTick = validPrev ? prev.firstTick : game.time;
+  watches[room] = { spawnId, jobName, deploymentId,
+    firstTick, lastTick: game.time };
+  result.observationMemoryWrites = 1;
+  if (validPrev) {
+    const span = game.time - firstTick;
+    result.sameJobAcrossSnapshotsVerified = true;
+    result.sameJobObservedGameTickSpan = span;
+    result.sameJobExceeds150ObservedTicks = span > MAX_SPAWN_TICKS;
+  }
+  return result;
+}
+
+module.exports = { snapshot, sample, MAX_SPAWN_TICKS };
