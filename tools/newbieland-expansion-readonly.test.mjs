@@ -145,6 +145,15 @@ assert.deepEqual(blockerResult.parentBlockerEvidence.parentHealthReasons,
   ['HAULING_DEFICIT','CONSUMER_FALLBACK_ACTIVE']);
 assert.equal(blockerResult.parentBlockerEvidence.parentHealthScore,62);
 assert.equal(blockerResult.parentBlockerEvidence.modeledHaulerCarryDeficit,2);
+
+const surplusParent=structuredClone(blockedParentData);
+surplusParent.telemetryJournal.snapshots[1].x.rooms.E8N1.economyModel
+  .haulerCarryDeficit=-4;
+assert.equal(inspectNewbielandExpansion({
+  data:JSON.stringify(surplusParent)},branch)
+  .parentBlockerEvidence.modeledHaulerCarryDeficit,-4,
+  'negative modeled deficit is actual surplus, not missing evidence');
+
 assert.equal(blockerResult.parentBlockerEvidence.currentGameTickVerified,false);
 assert.equal(blockerResult.parentBlockerEvidence.infrastructureEnergyAvailable,450);
 const hostileFrontier=structuredClone(blockedParentData);
