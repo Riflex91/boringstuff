@@ -8,14 +8,15 @@ const game=path.join(path.dirname(fileURLToPath(import.meta.url)),'..','game');
 const modules=Object.fromEntries(fs.readdirSync(game).filter(x=>x.endsWith('.js'))
   .map(x=>[x.slice(0,-3),fs.readFileSync(path.join(game,x),'utf8')]));
 function fakeWorld({occupied=false,otherEnemy=false,failedPost=false,
- badName=false}={}) {
+ badName=false,postPlacementWorldStatus='normal'}={}) {
   const calls=[];
   let placed=false;
   const api={
     defaultShard:'shard0',
     async authMe() {calls.push('GET_AUTH');return {_id:'me',ok:1};},
     async userWorldStatus() {
-      calls.push('GET_WORLD');return {status:placed?'normal':'empty'};
+      calls.push('GET_WORLD');return {
+        status:placed?postPlacementWorldStatus:'empty'};
     },
     async userBranches() {
       calls.push('GET_BRANCHES');return {list:[
@@ -108,4 +109,18 @@ for (const cfg of [{occupied:true},{otherEnemy:true},{badName:true}]) {
    /WORLD_PLACEMENT_RESULT_UNCERTAIN/);
  assert.equal(f.calls.filter(c=>c==='POST_PLACE_SPAWN').length,1);
 }
+// The same room-object API can retain a pinned spawn even when the
+// authoritative World account is LOST. A placement POST that appears to
+// succeed but whose fresh account readback is not normal MUST NOT certify
+// readiness, and MUST NOT trigger a second placement or activation.
+for(const status of ['lost','empty','paused',null]){
+ const f=fakeWorld({postPlacementWorldStatus:status});
+ await assert.rejects(()=>placePinnedWorldSpawn(f.api,'me'),
+   /WORLD_SPAWN_READBACK_UNVERIFIED/);
+ assert.equal(f.calls.filter(c=>c==='POST_PLACE_SPAWN').length,1,
+   'never retry an irreversible placement on unverified world status');
+ assert.equal(f.placed(),true);
+ assert.ok(f.calls.includes('GET_WORLD'));
+}
+
 console.log('World pinned first spawn isolated full offline flow: PASS');
