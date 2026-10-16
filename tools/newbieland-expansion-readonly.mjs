@@ -9,6 +9,45 @@ const HOME = 'E8N1';
 const BRANCH = 'chatgpt';
 const goodTick = n => Number.isSafeInteger(n) && n >= 0 && n <= 2_000_000_000;
 
+// Read-only snapshot fields already emitted by game/main.js; all missing or
+// logger-truncated values remain null. This does not assess safety independently.
+export function summarizeParentBlockerEvidence(snapshot, homeRoom = HOME) {
+  const x = snapshot?.x;
+  const room = x?.rooms?.[homeRoom];
+  if (!room || typeof room !== 'object' || Array.isArray(room))
+    return null;
+  const token = value => typeof value === 'string' &&
+    /^[A-Z][A-Z0-9_]{0,79}$/.test(value) ? value : null;
+  const tokens = values => Array.isArray(values) &&
+    values.length <= 16 && values.every(v => token(v) !== null)
+      ? values.slice() : null;
+  const count = value => Number.isSafeInteger(value) &&
+    value >= 0 && value <= 10000000 ? value : null;
+  const decimal = value => Number.isFinite(value) &&
+    value >= 0 && value <= 10000 ? value : null;
+  const health = room.health;
+  const readiness = x.expansionReadiness;
+  return {
+    snapshotTick: snapshot?.t ?? null,
+    status: 'RETAINED_SNAPSHOT_ONLY',
+    currentGameTickVerified: false,
+    readinessReasons: tokens(readiness?.reasons),
+    parentHealthStatus: token(health?.status),
+    parentHealthScore: count(health?.overallScore) !== null &&
+      health.overallScore <= 100 ? health.overallScore : null,
+    parentHealthReasons: tokens(health?.reasons),
+    hostilesAtSnapshot: count(room.hostiles),
+    infrastructureEnergyAvailable: count(room.energyAvailable),
+    infrastructureEnergyCapacity: count(room.energyCapacity),
+    roomStoredEnergy: count(room.energyStored),
+    safeModeTicks: count(room.safeModeRemainingTicks),
+    safeModeCooldownTicks: count(room.safeModeCooldownRemainingTicks),
+    modeledHaulerCarryDeficit: decimal(room.economyModel?.haulerCarryDeficit),
+    modeledWaitingConsumers: count(room.economyModel?.consumerWaitingCount),
+    modeledFallbackConsumers: count(room.economyModel?.consumerFallbackCount)
+  };
+}
+
 export function inspectNewbielandExpansion(reply, branches) {
   const active = Array.isArray(branches?.list)
     ? branches.list.filter(item => item?.activeWorld === true) : null;
@@ -47,6 +86,7 @@ export function inspectNewbielandExpansion(reply, branches) {
     // prove fresh real-time observation.
     currentGameTickVerified:false,
     expansionEvidence:evidence,
+    parentBlockerEvidence:summarizeParentBlockerEvidence(latest,HOME),
     retainedIntelFrontier:summarizeRetainedIntelFrontier(bot,journalLatestTick,HOME)
   };
 }
