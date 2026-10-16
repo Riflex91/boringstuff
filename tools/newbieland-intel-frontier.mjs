@@ -37,12 +37,17 @@ function evaluateRecord(records, name, hops, journalTick) {
     routeFreshAtJournalTick: age <= MAX_ROUTE_AGE };
 }
 
-function eligibleToExplore(record, home) {
-  if (!record || !record.controller ||
-      record.threat?.hostileCreeps !== 0) return false;
+function traversalBlockReason(record, home) {
+  if (!record?.controller) return 'CONTROLLER_UNVERIFIED';
+  if (!Number.isSafeInteger(record.threat?.hostileCreeps) ||
+      record.threat.hostileCreeps < 0) return 'THREAT_UNVERIFIED';
+  if (record.threat.hostileCreeps > 0)
+    return 'HOSTILES_AT_RETAINED_OBSERVATION';
   const c = record.controller;
-  return home ? c.my === true :
-    c.owner == null && c.reservationOwner == null;
+  if (home ? c.my !== true :
+      c.owner != null || c.reservationOwner != null)
+    return 'TRANSIT_OWNERSHIP_NOT_VERIFIED';
+  return null;
 }
 
 export function summarizeRetainedIntelFrontier(bot, journalTick,
@@ -62,6 +67,7 @@ export function summarizeRetainedIntelFrontier(bot, journalTick,
   const queue = [{ room: homeRoom, hops: 0 }];
   const visited = new Set([homeRoom]);
   const rows = [];
+  const traversalBlockers = [];
   let truncated = false;
   for (let i = 0; i < queue.length; i++) {
     if (i >= MAX_FRONTIER_ROOMS) { truncated = true; break; }
@@ -71,12 +77,20 @@ export function summarizeRetainedIntelFrontier(bot, journalTick,
     rows.push(row);
     const record = own(records, node.room) ? records[node.room] : null;
     if (row.status !== 'RECENT_TRUSTED_RECORD' ||
-        node.hops >= MAX_HOPS ||
-        !eligibleToExplore(record, node.hops === 0)) continue;
+        node.hops >= MAX_HOPS) continue;
+    const blocked = traversalBlockReason(record, node.hops === 0);
+    if (blocked) {
+      traversalBlockers.push({room:node.room,reason:blocked});
+      continue;
+    }
     const exits = record.topology?.exits;
     if (!Array.isArray(exits) || exits.length > 4 ||
         exits.some(e => !validName(e?.roomName))) {
       return { status: 'UNVERIFIED', reason: 'FRONTIER_TOPOLOGY_INVALID' };
+    }
+    if (!exits.length) {
+      traversalBlockers.push({room:node.room,reason:'NO_RECORDED_EXITS'});
+      continue;
     }
     for (const name of exits.map(e => e.roomName).sort()) {
       if (!visited.has(name)) {
@@ -98,6 +112,10 @@ export function summarizeRetainedIntelFrontier(bot, journalTick,
       r.status === 'RECENT_TRUSTED_RECORD' &&
       !r.routeFreshAtJournalTick).map(r => r.room),
     frontierTruncated: truncated,
+    traversalBlockers,
+    // An empty named frontier is not proof that all adjacent rooms are known
+    // when ownership/threat/topology prevented traversal of a trusted record.
+    frontierCoverageVerified: !truncated && traversalBlockers.length === 0,
     rooms: rows
   };
 }
