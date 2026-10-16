@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { gzipSync } from 'node:zlib';
-import { inspectNewbielandExpansion, summarizeRoomDefenseObjects, summarizeRetainedTowerEngagements, compareRoomDefenseGetPairs, compareTowerEnergyGetPairs, compareRetainedJournalProgress, summarizeRetainedDefenderSpawns, summarizeActiveSpawnJob, summarizeRecentSpawnReceipts } from './newbieland-expansion-readonly.mjs';
+import { inspectNewbielandExpansion, summarizeRoomDefenseObjects, summarizeRetainedTowerEngagements, compareRoomDefenseGetPairs, compareTowerEnergyGetPairs, compareRetainedJournalProgress, summarizeRetainedDefenderSpawns, summarizeActiveSpawnJob, summarizeRecentSpawnReceipts, summarizeSpawnRoleFromCreepMemory, compareActiveSpawnJobs } from './newbieland-expansion-readonly.mjs';
 
 const branch={list:[{branch:'chatgpt',activeWorld:true}]};
 const snapshot={c:'STATUS_SNAPSHOT',t:2100,x:{
@@ -457,5 +457,49 @@ assert.equal(roleReceipts.acceptedSpawnsByRole.harvester,1);
 assert.equal(roleReceipts.fullWindowCoverageVerified,false);
 assert.ok(!JSON.stringify(roleReceipts).includes('secret'));
 assert.equal(summarizeRecentSpawnReceipts(null,4015).status,'UNVERIFIED');
+
+
+// The active spawn job may be absent from the bounded retained event journal.
+// Explicit Memory.creeps GET is the only permitted role witness; never print
+// raw creep name, private owner ID or memory map.
+const ownSpawnJob={objects:[{type:'spawn',user:'own',_id:'private-spawn',
+  spawning:{name:'private-def',remainingTime:14}}]};
+const ownCreepMemory={data:JSON.stringify({
+  'private-def':{role:'defender',home:'E8N1',born:3900},
+  'private-other':{role:'worker',home:'E8N1'}
+})};
+const matchedMemory=summarizeSpawnRoleFromCreepMemory(
+  ownSpawnJob,ownCreepMemory,{_id:'own'});
+assert.equal(matchedMemory.status,'SPAWNING_ROLE_CONFIRMED_BY_CREEP_MEMORY');
+assert.equal(matchedMemory.role,'defender');
+assert.equal(matchedMemory.observationSharedServerTickVerified,false);
+assert.ok(!JSON.stringify(matchedMemory).includes('private'));
+const compressedCreepMemory={data:'gz:'+gzipSync(Buffer.from(
+  JSON.stringify({'private-def':{role:'defender'}}))).toString('base64')};
+assert.equal(summarizeSpawnRoleFromCreepMemory(
+  ownSpawnJob,compressedCreepMemory,{_id:'own'}).role,'defender');
+assert.equal(summarizeSpawnRoleFromCreepMemory(
+  ownSpawnJob,{data:'not-json'},{_id:'own'}).status,'UNVERIFIED');
+assert.equal(summarizeSpawnRoleFromCreepMemory(
+  ownSpawnJob,{data:'{}'},{_id:'own'}).status,'UNVERIFIED');
+assert.equal(summarizeSpawnRoleFromCreepMemory(
+  ownSpawnJob,{data:JSON.stringify({'private-def':{role:'dangerousHTML'}})},
+  {_id:'own'}).status,'UNVERIFIED');
+const sameSpawnJob={objects:[{type:'spawn',user:'own',_id:'private-spawn',
+  spawning:{name:'private-def',remainingTime:11}}]};
+const identicalJob=compareActiveSpawnJobs(ownSpawnJob,sameSpawnJob,
+  {_id:'own'});
+assert.equal(identicalJob.status,'SAME_OWN_SPAWN_OBSERVED_TWICE');
+assert.equal(identicalJob.sameJobName,true);
+assert.equal(identicalJob.remainingTimeChange,-3);
+assert.equal(identicalJob.serverGameTickDeltaVerified,false);
+assert.ok(!JSON.stringify(identicalJob).includes('private'));
+const differentJob={objects:[{type:'spawn',user:'own',_id:'private-spawn',
+  spawning:{name:'private-newjob',remainingTime:50}}]};
+assert.equal(compareActiveSpawnJobs(ownSpawnJob,differentJob,
+  {_id:'own'}).sameJobName,false);
+assert.equal(compareActiveSpawnJobs(ownSpawnJob,
+  {objects:[{type:'spawn',user:'own',_id:'not-ours',
+    spawning:{name:'private-def'}}]},{_id:'own'}).status,'UNVERIFIED');
 
 console.log('Newbieland GET-only expansion evidence tests passed');
