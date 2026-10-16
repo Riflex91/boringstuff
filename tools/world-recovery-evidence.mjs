@@ -196,11 +196,72 @@ function expansionAt(snapshot,previousSnapshot) {
     bootstrapRecoveryReason:code(recovery?.reason)
   };
 }
+// O18: retention-bounded historical W37S79 collapse witnesses. These are
+// in-game journal snapshots, NOT simultaneous observations with current API
+// room objects or the authoritative current server tick. No IDs or raw memory.
+const COLLAPSE_TIMELINE_LIMIT = 12;
+function collapseTimeline(snapshots) {
+  if (!Array.isArray(snapshots) || snapshots.length > 200)
+    return {status:'UNVERIFIED',reason:'SNAPSHOT_JOURNAL_UNAVAILABLE'};
+  const ordered=snapshots.filter(s=>s?.c==='STATUS_SNAPSHOT')
+    .map(s=>({t:s.t,x:s.x})).sort((a,b)=>a.t-b.t);
+  if (ordered.some(s=>!goodTick(s.t)) ||
+      ordered.some((s,i)=>i>0&&s.t===ordered[i-1].t))
+    return {status:'UNVERIFIED',reason:'SNAPSHOT_TICKS_INVALID'};
+  if (!ordered.length)
+    return {status:'UNVERIFIED',reason:'NO_RETAINED_STATUS_SNAPSHOTS'};
+  const recent=ordered.slice(-COLLAPSE_TIMELINE_LIMIT);
+  const rows=recent.map(s=>{
+    const room=s.x?.rooms?.W37S79;
+    const health=room?.health;
+    const hReasons=Array.isArray(health?.reasons) &&
+      health.reasons.length<=12 &&
+      health.reasons.every(value=>code(value)!==null)
+      ?health.reasons:null;
+    const roles=room?.creeps;
+    const names=roles&&typeof roles==='object'&&!Array.isArray(roles)?
+      Object.keys(roles):null;
+    const creepTotal=names&&names.length<=30 &&
+      names.every(name=>/^[a-z][a-z0-9_]{0,39}$/.test(name) &&
+        Number.isSafeInteger(roles[name]) &&
+        roles[name]>=0&&roles[name]<=150)
+      ?names.reduce((total,name)=>total+roles[name],0):null;
+    return {
+      tick:s.t,
+      homePresent:room&&typeof room==='object'&&!Array.isArray(room),
+      rcl:nint(room?.rcl),
+      healthStatus:healthStatuses.has(code(health?.status))?
+        health.status:null,
+      healthScore:Number.isSafeInteger(health?.overallScore)&&
+        health.overallScore>=0&&health.overallScore<=100?
+        health.overallScore:null,
+      healthReasons:hReasons,
+      spawnMissingHealthFlag:hReasons?hReasons.includes('SPAWN_MISSING'):null,
+      observedHomeCreeps:creepTotal,
+      infrastructureEnergyAvailable:nint(room?.energyAvailable),
+      infrastructureEnergyCapacity:nint(room?.energyCapacity),
+      modeledHarvestCapacityPerTick:
+        nonNegativeRate(room?.economyModel?.dedicatedHarvestCapacityPerTick)
+    };
+  });
+  return {
+    status:'RETAINED_SNAPSHOTS_ONLY',
+    currentGameTickVerified:false,
+    fullCollapseHistoryVerified:false,
+    firstRetainedTick:rows[0].tick,
+    latestRetainedTick:rows.at(-1).tick,
+    reportedSnapshotCount:rows.length,
+    olderSnapshotsNotDisplayed:ordered.length>COLLAPSE_TIMELINE_LIMIT,
+    snapshots:rows
+  };
+}
+
 export function inspectWorldRecoveryEvidence(reply) {
   const bot=parseBotMemory(reply);
   if(!bot)return {availability:'UNKNOWN',reason:'BOT_MEMORY_NOT_VERIFIABLE',
     observedEventCount:null,events:null,rescue:null,
-    witnessedSpawnRoomCount:null,latestSnapshotTick:null,expansion:null};
+    witnessedSpawnRoomCount:null,latestSnapshotTick:null,expansion:null,
+    collapseTimeline:{status:'UNVERIFIED',reason:'BOT_MEMORY_NOT_VERIFIABLE'}};
   const journal=bot.telemetryJournal;
   const rawEvents=Array.isArray(journal?.events)?journal.events:null;
   const events=rawEvents===null?null:[];
@@ -255,5 +316,6 @@ export function inspectWorldRecoveryEvidence(reply) {
       active,last,retainedReceiptCount:history?.length??null
     }:null,
     witnessedSpawnRoomCount:witnessed,
-    latestSnapshotTick,expansion};
+    latestSnapshotTick,expansion,
+    collapseTimeline:collapseTimeline(journal?.snapshots)};
 }
