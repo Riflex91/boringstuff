@@ -28,6 +28,10 @@ jobs:
           node-version: '24.21.0'
       - name: Run fail-closed offline tests
         run: node world-footholds-getonly.test.mjs
+      - name: Check exact W37S79 placement gates (name availability check may POST; no placement)
+        env:
+          SCREEPS_TOKEN_WORLD: ${{ secrets.SCREEPS_TOKEN_WORLD }}
+        run: node world-next-staged-readiness.mjs
       - name: List owned World rooms and corroborate possible footholds via GET only
         env:
           SCREEPS_TOKEN_WORLD: ${{ secrets.SCREEPS_TOKEN_WORLD }}
