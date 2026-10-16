@@ -106,8 +106,17 @@ export function summarizeUserRoomListing(input) {
   } else if(source&&typeof source==='object'&&!Array.isArray(source)){
     const keys=Object.keys(source);
     if(!keys.length)return unknown; // Empty object shape isn't authoritative.
-    if(keys.length>15||keys.some(k=>!SHARD.test(k)))return unknown;
-    for(const shard of keys)if(!add(source[shard],shard))return unknown;
+    if(keys.length>15)return unknown;
+    const shards=keys.filter(k=>SHARD.test(k));
+    if(!shards.length)return unknown;
+    for(const shard of shards)if(!add(source[shard],shard))return unknown;
+    // Some servers include extra sections (e.g. sim). Do not silently
+    // discard them and claim complete multi-shard account coverage.
+    if(shards.length!==keys.length)return {
+      status:'PARTIAL_USER_ROOMS_LIST',
+      reason:'OTHER_ROOM_GROUPS_NOT_VERIFIED',
+      returnedRooms:rows,listingComplete:false
+    };
   } else return unknown;
   if(rows.length>MAX_ROOMS)return { ...unknown,reason:'USER_ROOMS_LIMIT_EXCEEDED' };
   const uniq=new Set(rows.map(x=>x.shard+':'+x.room));
@@ -174,6 +183,7 @@ export async function inspectWorldFootholds(api) {
     // Only schema metadata; no raw data or even room IDs.
     userRoomsResponseShape:summarizeRoomListingResponseShape(listing),
     userRoomCount:rooms.listingComplete?rooms.returnedRooms.length:null,
+    recognizedShardRoomCount:rooms.returnedRooms.length,
     allListedRoomsChecked:allRoomsChecked,
     roomsWithOwnController:allRoomsChecked?roomsWithController:null,
     roomsWithOwnSpawn:allRoomsChecked?roomsWithSpawn:null,
