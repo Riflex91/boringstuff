@@ -44,6 +44,13 @@ export function summarizeRoomListingResponseShape(input) {
     } else if(value&&typeof value==='object') {
       row.shardKeys=Object.keys(value)
         .filter(key=>SHARD.test(key)).slice(0,15);
+      row.simGroup=Object.hasOwn(value,'sim')?
+        {kind:kind(value.sim),
+          count:Array.isArray(value.sim)?value.sim.length:null,
+          explicitEmpty:Array.isArray(value.sim)&&value.sim.length===0
+        }:null;
+      row.otherGroupKeyCount=Object.keys(value)
+        .filter(key=>!SHARD.test(key)&&key!=='sim').length;
       row.shardShapes=row.shardKeys.map(shard=>{
         const content=value[shard];
         const info={shard,kind:kind(content)};
@@ -111,6 +118,13 @@ export function summarizeUserRoomListing(input) {
     if(keys.length>15)return unknown;
     const shards=keys.filter(k=>SHARD.test(k));
     if(!shards.length)return unknown;
+    // Official /api/user/rooms may add an explicit `sim: []` group.
+    // A *verified empty* simulator list does not imply missing World rooms.
+    // A populated or malformed sim group remains partial/UNKNOWN; arbitrary
+    // extra keys are never silently ignored.
+    const extras=keys.filter(k=>!SHARD.test(k));
+    const emptySimOnly=extras.length===1 && extras[0]==='sim' &&
+      Array.isArray(source.sim) && source.sim.length===0;
     for(const shard of shards)if(!add(source[shard],shard))return unknown;
     // Enforce GLOBAL request bound and unique locators BEFORE either a
     // partial or complete listing is permitted to drive follow-up GETs.
@@ -124,7 +138,7 @@ export function summarizeUserRoomListing(input) {
     };
     // Some servers include extra sections (e.g. sim). Do not silently
     // discard them and claim complete multi-shard account coverage.
-    if(shards.length!==keys.length)return {
+    if(extras.length>0 && !emptySimOnly)return {
       status:'PARTIAL_USER_ROOMS_LIST',
       reason:'OTHER_ROOM_GROUPS_NOT_VERIFIED',
       returnedRooms:rows,listingComplete:false
