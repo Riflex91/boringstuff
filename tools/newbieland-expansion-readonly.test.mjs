@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { gzipSync } from 'node:zlib';
-import { inspectNewbielandExpansion, summarizeRoomDefenseObjects, summarizeRetainedTowerEngagements, compareRoomDefenseGetPairs, compareTowerEnergyGetPairs, compareRetainedJournalProgress, summarizeRetainedDefenderSpawns } from './newbieland-expansion-readonly.mjs';
+import { inspectNewbielandExpansion, summarizeRoomDefenseObjects, summarizeRetainedTowerEngagements, compareRoomDefenseGetPairs, compareTowerEnergyGetPairs, compareRetainedJournalProgress, summarizeRetainedDefenderSpawns, summarizeActiveSpawnJob, summarizeRecentSpawnReceipts } from './newbieland-expansion-readonly.mjs';
 
 const branch={list:[{branch:'chatgpt',activeWorld:true}]};
 const snapshot={c:'STATUS_SNAPSHOT',t:2100,x:{
@@ -409,5 +409,53 @@ assert.equal(summarizeRetainedDefenderSpawns(
   {telemetryJournal:{events:[]}},2125).defenderSpawnAcceptedLogCount,0);
 assert.equal(summarizeRetainedDefenderSpawns(
   {telemetryJournal:{events:[]}},null).status,'UNVERIFIED');
+
+
+const spawnEvents={telemetryJournal:{events:[
+  {c:'SPAWN_OK',t:4000,x:{room:'E8N1',creep:'secret-worker',
+    role:'worker'}},
+  {c:'SPAWN_OK',t:4010,x:{room:'E8N1',creep:'secret-defender',
+    role:'defender'}},
+  {c:'SPAWN_OK',t:4005,x:{room:'E8N1',creep:'secret-harvester',
+    role:'harvester'}},
+  {c:'SPAWN_OK',t:3990,x:{room:'W1N1',creep:'secret-other',
+    role:'worker'}}
+]}};
+const spawningWorker={objects:[{
+  type:'spawn',user:'own',_id:'spawn-hidden',
+  spawning:{name:'secret-worker',remainingTime:12}
+}]};
+const workerJob=summarizeActiveSpawnJob(spawningWorker,spawnEvents,
+  {_id:'own'},4015);
+assert.equal(workerJob.status,'SPAWN_JOB_ROLE_MATCHED_TO_RETAINED_RECEIPT');
+assert.equal(workerJob.role,'worker');
+assert.equal(workerJob.remainingTime,12);
+assert.equal(workerJob.receiptTick,4000);
+assert.ok(!JSON.stringify(workerJob).includes('secret'));
+assert.equal(summarizeActiveSpawnJob({objects:[{
+  type:'spawn',user:'own',spawning:null
+}]},spawnEvents,{_id:'own'},4015).status,'OBSERVED_NO_SPAWN_JOB');
+assert.equal(summarizeActiveSpawnJob({objects:[{
+  type:'spawn',user:'own'
+}]},spawnEvents,{_id:'own'},4015).status,'UNVERIFIED',
+  'omitted API property must not be mistaken for a truly idle spawn');
+assert.equal(summarizeActiveSpawnJob({objects:[{
+  type:'spawn',user:'own',spawning:{name:'secret-unlogged'}
+}]},spawnEvents,{_id:'own'},4015).status,'SPAWN_JOB_SEEN_RECEIPT_UNKNOWN');
+assert.equal(summarizeActiveSpawnJob({objects:[{
+  type:'spawn',user:'other',spawning:{name:'secret-worker'}
+}]},spawnEvents,{_id:'own'},4015).status,'UNVERIFIED');
+assert.equal(summarizeActiveSpawnJob({objects:[{
+  type:'spawn',user:'own',spawning:{name:'secret-worker'}
+}]},spawnEvents,{_id:'own'},4800).status,'SPAWN_JOB_SEEN_RECEIPT_UNKNOWN',
+  'stale spawn receipts cannot identify current live spawn job');
+const roleReceipts=summarizeRecentSpawnReceipts(spawnEvents,4015);
+assert.equal(roleReceipts.status,'RETAINED_EVENTS_ONLY');
+assert.equal(roleReceipts.acceptedSpawnsByRole.worker,1);
+assert.equal(roleReceipts.acceptedSpawnsByRole.defender,1);
+assert.equal(roleReceipts.acceptedSpawnsByRole.harvester,1);
+assert.equal(roleReceipts.fullWindowCoverageVerified,false);
+assert.ok(!JSON.stringify(roleReceipts).includes('secret'));
+assert.equal(summarizeRecentSpawnReceipts(null,4015).status,'UNVERIFIED');
 
 console.log('Newbieland GET-only expansion evidence tests passed');
