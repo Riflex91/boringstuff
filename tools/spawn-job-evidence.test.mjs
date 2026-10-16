@@ -5,7 +5,7 @@ import vm from 'node:vm';
 const code=fs.readFileSync(new URL('../game/spawn.job.evidence.js',import.meta.url),'utf8');
 const context={module:{exports:{}}};
 vm.runInNewContext(code,context);
-const {snapshot,MAX_SPAWN_TICKS}=context.module.exports;
+const {snapshot,sample,MAX_SPAWN_TICKS}=context.module.exports;
 assert.equal(MAX_SPAWN_TICKS,150);
 const me={creeps:{'private-repairer':{role:'repairer',born:480}}};
 const activeSpawn={spawning:{
@@ -87,4 +87,58 @@ assert.equal(badName.jobNameVerified,false);
 assert.equal(badName.status,'ACTIVE_JOB_PARTIAL');
 assert.equal(badName.memoryRole,null);
 assert.equal(badName.actionsTaken,0);
+
+// The same opaque job must be re-observed by the actual game at different
+// Game.time values. Private witness values stay inside Memory.bot only.
+const sequenceMemory={bot:{deploymentId:'TEST_DEPLOYMENT'},creeps:{
+  'private-repairer':{role:'repairer',born:480}
+}};
+const liveState={room:{name:'E8N1'},spawn:{
+  id:'private-spawn-id',spawning:{
+    name:'private-repairer',needTime:60,remainingTime:40,
+    cancel(){throw Error('No cancellation authorized');}
+  }
+}};
+const first=sample(liveState,{time:500,creeps:{}},sequenceMemory);
+assert.equal(first.sameJobAcrossSnapshotsVerified,false);
+assert.equal(first.sameJobObservedGameTickSpan,null);
+assert.equal(first.observationMemoryWrites,1);
+const second=sample(liveState,{time:600,creeps:{}},sequenceMemory);
+assert.equal(second.sameJobAcrossSnapshotsVerified,true);
+assert.equal(second.sameJobObservedGameTickSpan,100);
+assert.equal(second.sameJobExceeds150ObservedTicks,false);
+const third=sample(liveState,{time:701,creeps:{}},sequenceMemory);
+assert.equal(third.sameJobAcrossSnapshotsVerified,true);
+assert.equal(third.sameJobObservedGameTickSpan,201);
+assert.equal(third.sameJobExceeds150ObservedTicks,true);
+assert.equal(third.continuousBusyBetweenSnapshotsVerified,false);
+assert.equal(third.canAuthorizeCancel,false);
+assert.equal(third.actionsTaken,0);
+assert.ok(!JSON.stringify(third).includes('private'),
+  'opaque names and spawn IDs must not appear in diagnostic journal');
+// Deployment changes discard old witness identity, even if it is the same
+// private engine object. Observations are not transferrable between releases.
+sequenceMemory.bot.deploymentId='NEW_DEPLOYMENT';
+const deployed=sample(liveState,{time:801,creeps:{}},sequenceMemory);
+assert.equal(deployed.sameJobAcrossSnapshotsVerified,false);
+assert.equal(deployed.sameJobObservedGameTickSpan,null);
+const newJobState={room:{name:'E8N1'},spawn:{
+  id:'private-spawn-id',spawning:{
+    name:'other-private-job',needTime:60,remainingTime:10
+  }
+}};
+const different=sample(newJobState,{time:901,creeps:{}},sequenceMemory);
+assert.equal(different.sameJobAcrossSnapshotsVerified,false);
+const finished=sample({room:{name:'E8N1'},spawn:{
+  id:'private-spawn-id',spawning:null
+}},{time:1001,creeps:{}},sequenceMemory);
+assert.equal(finished.status,'IDLE');
+assert.equal(finished.sameJobAcrossSnapshotsVerified,false);
+assert.equal(Object.hasOwn(sequenceMemory.bot.spawnJobWitness,'E8N1'),false);
+const invalidWatcher={bot:{deploymentId:'TEST',spawnJobWitness:Array(10)},
+  creeps:sequenceMemory.creeps};
+const safelyRejected=sample(liveState,{time:500,creeps:{}},invalidWatcher);
+assert.equal(safelyRejected.observationMemoryWrites,0);
+assert.equal(safelyRejected.sameJobAcrossSnapshotsVerified,false);
+
 console.log('O20 in-game spawn-job evidence (read-only) regression PASS');
