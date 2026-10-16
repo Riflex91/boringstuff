@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { summarizeUserRoomListing, summarizeCandidateRoom,
-  summarizeRoomListingResponseShape, inspectWorldFootholds } from './world-footholds-getonly.mjs';
+  summarizeRoomListingResponseShape, inspectWorldFootholds,
+  compareWorldRoomGetPairs } from './world-footholds-getonly.mjs';
 
 const p={ok:1,rooms:{shard0:['W37S79'],shard1:['E8N1']}};
 assert.deepEqual(summarizeUserRoomListing(p).returnedRooms,[
@@ -66,7 +67,7 @@ function mock({rooms=p,first='lost',last='lost',failedRoom=false,
  return {api,calls};
 }
 const ok=mock();
-const valid=await inspectWorldFootholds(ok.api);
+const valid=await inspectWorldFootholds(ok.api,{observeDelayMs:0});
 assert.equal(valid.status,'READONLY_LISTING_AND_ROOM_OBJECTS_VERIFIED');
 assert.equal(valid.worldStatusBefore,'lost');
 assert.equal(valid.worldStatusAfter,'lost');
@@ -79,25 +80,26 @@ assert.equal(valid.apiMutationsAttempted,0);
 assert.equal(valid.respawnAuthorized,false);
 assert.deepEqual(ok.calls,[
  'GET auth','GET status','GET user rooms',
+ 'GET room shard0:W37S79','GET room shard1:E8N1',
  'GET room shard0:W37S79','GET room shard1:E8N1','GET status'
 ]);
 assert.ok(!JSON.stringify(valid).includes('private-'));
 const changed=await inspectWorldFootholds(
- mock({last:'normal'}).api);
+ mock({last:'normal'}).api,{observeDelayMs:0});
 assert.equal(changed.status,'UNVERIFIED');
 assert.equal(changed.accountStatusStable,false);
 const missingList=await inspectWorldFootholds(
- mock({failedList:true}).api);
+ mock({failedList:true}).api,{observeDelayMs:0});
 assert.equal(missingList.status,'UNVERIFIED');
 assert.equal(missingList.userRoomCount,null);
 assert.equal(missingList.userRoomsReason,'USER_ROOMS_GET_FAILED');
 const missingObjects=await inspectWorldFootholds(
- mock({failedRoom:true}).api);
+ mock({failedRoom:true}).api,{observeDelayMs:0});
 assert.equal(missingObjects.status,'UNVERIFIED');
 assert.equal(missingObjects.allListedRoomsChecked,false);
 assert.equal(missingObjects.roomsWithOwnSpawn,null);
 const explicitEmpty=await inspectWorldFootholds(
- mock({rooms:{ok:1,rooms:[]}}).api);
+ mock({rooms:{ok:1,rooms:[]}}).api,{observeDelayMs:0});
 assert.equal(explicitEmpty.userRoomCount,0);
 assert.equal(explicitEmpty.noRecoverableFootholdVerified,false);
 assert.equal(explicitEmpty.operationalFootholdVerified,false);
@@ -123,12 +125,38 @@ assert.equal(partialListing.listingComplete,false);
 assert.deepEqual(partialListing.returnedRooms,[{room:'W37S79',shard:'shard0'}]);
 const observedPartial=await inspectWorldFootholds(mock({
   rooms:{ok:1,shards:{shard0:['W37S79'],sim:['untrusted']}}
-}).api);
+}).api,{observeDelayMs:0});
 assert.equal(observedPartial.status,'UNVERIFIED');
 assert.equal(observedPartial.recognizedShardRoomCount,1);
 assert.equal(observedPartial.userRoomCount,null);
 assert.equal(observedPartial.sampledRooms.length,1);
 assert.equal(observedPartial.sampledRooms[0].verifiedOwnSpawn,true);
 assert.equal(observedPartial.noRecoverableFootholdVerified,false);
+
+
+const sameRoom={objects:[
+ {type:'controller',id:'private-controller',user:'private-account',level:4},
+ {type:'spawn',id:'private-spawn',user:'private-account',energy:1000}
+]};
+const paired=compareWorldRoomGetPairs(sameRoom,
+ structuredClone(sameRoom),'private-account',location);
+assert.equal(paired.status,'TWO_ROOM_OBJECT_GETS_OBSERVED');
+assert.equal(paired.ownSpawnObservedBoth,true);
+assert.equal(paired.ownControllerObservedBoth,true);
+assert.equal(paired.sameSpawnIdVerified,true);
+assert.equal(paired.sameControllerIdVerified,true);
+assert.equal(paired.liveOperationalSpawnVerified,false);
+assert.equal(paired.gameTickAlignedWithRoomObjects,false);
+assert.ok(!JSON.stringify(paired).includes('private-'));
+const changedRoom={objects:[
+ {type:'controller',id:'private-controller',user:'private-account',level:4},
+ {type:'spawn',id:'second-spawn',user:'private-account',energy:1000}
+]};
+const changed=compareWorldRoomGetPairs(sameRoom,changedRoom,
+ 'private-account',location);
+assert.equal(changed.sameSpawnIdVerified,false);
+assert.equal(changed.sameControllerIdVerified,true);
+assert.equal(compareWorldRoomGetPairs(sameRoom,null,
+ 'private-account',location).status,'UNVERIFIED');
 
 console.log('World O22 GET-only cross-shard foothold safety regression PASS');
