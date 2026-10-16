@@ -278,6 +278,7 @@ export function summarizeWorldRetainedMemory(reply) {
   const recent=latestEvent===null?[]:events.filter(row=>
     validTick(row?.t) && latestEvent-row.t<=25);
   const allowedEventCodes=new Set([
+    'BOT_HEARTBEAT','DEPLOYMENT_MARKER','VERSION_CHANGE',
     'TOWER_ENGAGE','TOWER_ATTACK_RC','SPAWN_OK','SPAWN_RC',
     'SPAWN_BUSY','STATUS_SNAPSHOT','ROOM_HEALTH','HAULER_TRANSFER',
     'R1_OWNED_SPAWN_REBUILD_SITE_INTENT',
@@ -295,6 +296,29 @@ export function summarizeWorldRetainedMemory(reply) {
     recentEventWindowTicks:25,
     recentRetainedEventCount:recent.length,
     recentRetainedEventTypes:types,
+    latestRetainedHeartbeat:(()=>{
+      const heartbeats=events.filter(row=>row?.c==='BOT_HEARTBEAT'&&
+        validTick(row?.t)&&row.x&&typeof row.x==='object'&&
+        !Array.isArray(row.x));
+      if(!heartbeats.length)return null;
+      const row=heartbeats.reduce((best,row)=>!best||row.t>best.t?row:best,null);
+      // Both roomCount/creepCount are sampled in the bot's own Game loop,
+      // unlike /room-objects or /world-status GETs (different clocks).
+      const count=value=>Number.isSafeInteger(value)&&
+        value>=0&&value<=1000?value:null;
+      const cpu=typeof row.x.cpu==='number'&&
+        Number.isFinite(row.x.cpu)&&row.x.cpu>=0&&row.x.cpu<=1000
+        ?Math.round(row.x.cpu*1000)/1000:null;
+      return {tick:row.t,roomCount:count(row.x.rooms),
+        creepCount:count(row.x.creeps),cpuUsed:cpu,
+        bucket:count(row.x.bucket)??(
+          Number.isSafeInteger(row.x.bucket)&&row.x.bucket<=10000&&
+          row.x.bucket>1000?row.x.bucket:null),
+        source:'RETAINED_BOT_HEARTBEAT',
+        // Event could be historical; freshness checked against server clock
+        // below, and it cannot show working spawns without room state.
+        sameServerResponseTickVerified:false};
+    })(),
     latestStatusSnapshotTick:latestSnapshot,
     latestJournalEventTick:latestEvent,
     latestRetainedTick:latestSnapshot===null?latestEvent:
@@ -327,6 +351,16 @@ export function compareWorldRetainedMemoryPairs(first,second,clockBefore,clockAf
       b.recentRetainedEventCount:null,
     latestRetainedEventTypes:b.status==='RETAINED_MEMORY_JOURNAL_OBSERVED'?
       b.recentRetainedEventTypes:null,
+    latestBotHeartbeat:b.status==='RETAINED_MEMORY_JOURNAL_OBSERVED'?
+      b.latestRetainedHeartbeat:null,
+    latestHeartbeatAgeFromServerClock:b.latestRetainedHeartbeat &&
+      validTick(clockAfter)&&clockAfter>=b.latestRetainedHeartbeat.tick
+      ?clockAfter-b.latestRetainedHeartbeat.tick:null,
+    // A recent heartbeat evidences the bot main-loop's telemetry path;
+    // it does NOT establish a usable StructureSpawn or normal account.
+    executableBotHeartbeatRecentlyObserved:b.latestRetainedHeartbeat&&
+      validTick(clockAfter)&&clockAfter>=b.latestRetainedHeartbeat.tick
+      ?clockAfter-b.latestRetainedHeartbeat.tick<=25:null,
     approximateRetainedLagAtFirstGet:lagStart,
     approximateRetainedLagAtSecondGet:lagEnd,
     serverClockComparisonVerified:validTick(clockBefore)&&
