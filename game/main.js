@@ -2,6 +2,7 @@
 
 const config = require('config');
 const logger = require('logger');
+const spawnJobEvidence = require('spawn.job.evidence');
 const profiler = require('profiler');
 const roomManager = require('room.manager');
 const creepManager = require('creep.manager');
@@ -294,6 +295,16 @@ function statusSnapshot(roomStates, tickCpu) {
       hostiles: state.hostileCreeps.length,
       spawnBusy: !!(state.spawn && state.spawn.spawning),
       spawnRemainingTime: state.spawn && state.spawn.spawning ? state.spawn.spawning.remainingTime : 0,
+      // O20 same-Game-tick evidence from the actual StructureSpawn.Spawning
+      // object. Never cancel/force spawning. A stale external room-objects
+      // API can disagree; this live witness remains read-only and untrusted
+      // for overriding recovery, combat or expansion eligibility.
+      spawnJobEvidence: (function() {
+        try { return spawnJobEvidence.sample(state, Game, Memory); }
+        catch (_) { return {status:'UNVERIFIED',
+          reason:'SPAWN_JOB_OBSERVER_EXCEPTION',
+          authority:'IN_GAME_DIAGNOSTIC_ONLY',actionsTaken:0}; }
+      })(),
       economy: state.economyMetrics || null,
       economyModel: state.economyModel || null,
       consumerSupply: consumerSupplySnapshot(state),
