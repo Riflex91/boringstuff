@@ -264,6 +264,66 @@ export function compareRetainedJournalProgress(first,second,branches) {
   };
 }
 
+// A currently spawning creep is not counted in room-local completed roles.
+// Correlate the private spawning.name with bounded SPAWN_OK receipts entirely
+// in memory. A missing receipt is UNKNOWN, not proof of wrong spawn priority.
+export function summarizeActiveSpawnJob(roomReply,bot,me,journalTick) {
+  const self=me?._id??me?.id;
+  const objects=roomReply?.objects;
+  if(typeof self!=='string'||!self||!Array.isArray(objects)||
+     objects.length>2500)return {status:'UNVERIFIED',reason:'SPAWN_OBJECTS_UNAVAILABLE'};
+  const spawns=objects.filter(o=>(o?.type??o?.structureType)==='spawn' &&
+    o?.user===self);
+  if(spawns.length!==1)return {
+    status:'UNVERIFIED',reason:'EXACT_ONE_OWN_SPAWN_NOT_VERIFIED'
+  };
+  const job=spawns[0].spawning;
+  if(job===null || job===undefined)
+    return {status:'OBSERVED_NO_SPAWN_JOB',
+      currentGameTickVerified:false,role:null};
+  if(!job||typeof job!=='object'||Array.isArray(job)||
+     typeof job.name!=='string'||!job.name||
+     job.name.length>128)return {status:'UNVERIFIED',
+       reason:'SPAWN_JOB_NAME_NOT_VERIFIED'};
+  const remaining=Number.isSafeInteger(job.remainingTime)&&
+    job.remainingTime>=0&&job.remainingTime<=150?
+    job.remainingTime:null;
+  const events=bot?.telemetryJournal?.events;
+  if(!Array.isArray(events)||events.length>1500||
+     !goodTick(journalTick))return {status:'SPAWN_JOB_SEEN_RECEIPT_UNKNOWN',
+    remainingTime:remaining,role:null,currentGameTickVerified:false};
+  const matches=events.filter(e=>e?.c==='SPAWN_OK' &&
+    e?.x?.room===HOME && e?.x?.creep===job.name &&
+    goodTick(e?.t) && e.t<=journalTick &&
+    journalTick-e.t<=300 &&
+    typeof e?.x?.role==='string' &&
+    /^[a-z][a-z0-9_]{0,39}$/.test(e.x.role));
+  if(matches.length!==1)return {status:'SPAWN_JOB_SEEN_RECEIPT_UNKNOWN',
+    remainingTime:remaining,role:null,currentGameTickVerified:false};
+  return {status:'SPAWN_JOB_ROLE_MATCHED_TO_RETAINED_RECEIPT',
+    remainingTime:remaining,role:matches[0].x.role,
+    receiptTick:matches[0].t,currentGameTickVerified:false};
+}
+
+// Count only retained *accepted* spawn events; no accepted receipt does not
+// prove no attempted spawns, and no event log indicates the job role.
+export function summarizeRecentSpawnReceipts(bot,journalTick) {
+  const events=bot?.telemetryJournal?.events;
+  if(!goodTick(journalTick)||!Array.isArray(events)||
+     events.length>1500)return {status:'UNVERIFIED'};
+  const roles=['defender','harvester','hauler','worker','upgrader',
+    'builder','repairer','scout'];
+  const matched=events.filter(e=>e?.c==='SPAWN_OK' &&
+    e?.x?.room===HOME&&goodTick(e?.t)&&e.t<=journalTick&&
+    journalTick-e.t<=500 &&
+    roles.includes(e?.x?.role));
+  return {status:'RETAINED_EVENTS_ONLY',fullWindowCoverageVerified:false,
+    periodJournalTicks:500,
+    acceptedSpawnsByRole:Object.fromEntries(roles.map(role=>[
+      role,matched.filter(e=>e.x.role===role).length
+    ]))};
+}
+
 // Explicitly separated evidence of accepted defender SPAWN_OK log paths.
 // Quiet or pruned logs cannot prove that no defender was ever spawned, and
 // `SPAWN_RC` excludes expected busy/insufficient-energy return codes.
@@ -376,6 +436,11 @@ async function main() {
   ]);
   const result=inspectNewbielandExpansion(reply,branches);
   result.roomDefenseObjects=summarizeRoomDefenseObjects(roomObjects,me);
+  const bot=parseBotMemory(reply);
+  result.activeSpawnJob=summarizeActiveSpawnJob(
+    roomObjects,bot,me,result.journalLatestTick);
+  result.recentSpawnReceipts=summarizeRecentSpawnReceipts(
+    bot,result.journalLatestTick);
   // One further GET after 15 seconds, never a gameplay intent. A stable
   // foreign ID with identical HP provides persistence evidence, but does not
   // prove that server ticks advanced or that any attacks were accepted.
