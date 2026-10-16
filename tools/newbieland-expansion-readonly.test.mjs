@@ -73,4 +73,53 @@ const unknownSource=inspectNewbielandExpansion({data:JSON.stringify(malformed)},
 assert.equal(unknownSource.status,'OBSERVED_RETAINED');
 assert.equal(unknownSource.expansionEvidence.sourceModel,null);
 
+
+// Exact retained journal tick is an *age anchor*, never current server time.
+// Enumerate only home-reachable, bounded 3-hop frontier rooms, not arbitrary
+// Memory records. Missing/old records must remain named and unverifiable.
+const frontierData=structuredClone(data);
+frontierData.worldIntel={schemaVersion:1,rooms:{
+  E8N1:{schemaVersion:1,roomName:'E8N1',
+    observation:{lastSeenTick:2100,confidence:1,source:'visible-room'},
+    classification:{roomStatus:'normal'},
+    controller:{my:true},
+    threat:{hostileCreeps:0},
+    topology:{exits:[{roomName:'E7N1'},{roomName:'E8N2'},
+      {roomName:'E9N1'}]},
+    resources:{sources:[{id:'private-source-id'}]}},
+  E8N2:{schemaVersion:1,roomName:'E8N2',
+    observation:{lastSeenTick:1000,confidence:1,source:'scout'},
+    classification:{roomStatus:'normal'}},
+  E9N1:{schemaVersion:1,roomName:'E9N1',
+    observation:{lastSeenTick:2110,confidence:1,source:'scout'},
+    classification:{roomStatus:'normal'},
+    controller:{my:false,owner:null,reservationOwner:null},
+    threat:{hostileCreeps:0},
+    topology:{exits:[{roomName:'E8N1'},{roomName:'E9N2'}]}}
+}};
+const frontierResult=inspectNewbielandExpansion(
+  {data:JSON.stringify(frontierData)},branch);
+const frontier=frontierResult.retainedIntelFrontier;
+assert.equal(frontier.status,'OBSERVED_RETAINED');
+assert.equal(frontier.journalTick,2125);
+assert.equal(frontier.currentGameTickVerified,false);
+assert.equal(frontier.routeVerified,false);
+assert.deepEqual(frontier.missingOrUnverifiedRooms,
+  ['E7N1','E8N2','E9N2']);
+assert.equal(frontier.rooms.find(r=>r.room==='E7N1').status,
+  'MISSING_RECORD');
+assert.equal(frontier.rooms.find(r=>r.room==='E8N2').status,
+  'STALE_OVER_500_TICKS');
+assert.equal(frontier.rooms.find(r=>r.room==='E9N1')
+  .routeFreshAtJournalTick,true);
+assert.equal(JSON.stringify(frontier).includes('private-source-id'),false);
+const badTopo=structuredClone(frontierData);
+badTopo.worldIntel.rooms.E8N1.topology.exits=[{roomName:'invalid-name'}];
+assert.equal(inspectNewbielandExpansion(
+  {data:JSON.stringify(badTopo)},branch).retainedIntelFrontier.reason,
+  'FRONTIER_TOPOLOGY_INVALID');
+const unknownIntel=inspectNewbielandExpansion(reply,branch);
+assert.equal(unknownIntel.retainedIntelFrontier.reason,
+  'WORLD_INTEL_UNAVAILABLE');
+
 console.log('Newbieland GET-only expansion evidence tests passed');

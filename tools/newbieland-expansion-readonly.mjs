@@ -1,6 +1,7 @@
 // Newbieland expansion diagnosis — authenticated GET-only game observation.
 // No code upload, spawn, controller, memory, or branch mutation.
 import { pathToFileURL } from 'node:url';
+import { summarizeRetainedIntelFrontier } from './newbieland-intel-frontier.mjs';
 import { ScreepsHttpClient } from './screeps-client.mjs';
 import { parseBotMemory, summarizeExpansionEvidence } from './ci-deployment-guard.mjs';
 
@@ -45,7 +46,8 @@ export function inspectNewbielandExpansion(reply, branches) {
     // This is not a server-current tick. Absence of journal events does not
     // prove fresh real-time observation.
     currentGameTickVerified:false,
-    expansionEvidence:evidence
+    expansionEvidence:evidence,
+    retainedIntelFrontier:summarizeRetainedIntelFrontier(bot,journalLatestTick,HOME)
   };
 }
 
