@@ -335,4 +335,40 @@ const unknownWorldGroup=summarizeUserRoomListing({ok:1,shards:{
 assert.equal(unknownWorldGroup.status,'PARTIAL_USER_ROOMS_LIST');
 assert.equal(unknownWorldGroup.listingComplete,false);
 
+
+const unknownExtraShape=summarizeRoomListingResponseShape({
+ ok:1,shards:{shard0:['W37S79'],shard1:[],anonymousPrivateId:['W1N1']}
+});
+assert.equal(unknownExtraShape.shards.otherGroupKeyCount,1);
+assert.deepEqual(unknownExtraShape.shards.otherGroupShapes,[{
+ kind:'array',length:1,sampleItemKind:'string',sampleMatchesRoom:true
+}]);
+assert.ok(!JSON.stringify(unknownExtraShape).includes('anonymousPrivateId'));
+assert.ok(!JSON.stringify(unknownExtraShape).includes('W1N1'));
+const eventKinds=summarizeWorldRetainedMemory({data:JSON.stringify({
+ deploymentId:'PRIVATE_ACCOUNT',
+ telemetryJournal:{snapshots:[],events:[
+  {c:'TOWER_ENGAGE',t:100,x:{creep:'PRIVATE_CREEP'}},
+  {c:'SPAWN_OK',t:101,x:{name:'PRIVATE_NAME'}},
+  {c:'PRIVATE_MESSAGE',t:102,x:{secret:'PRIVATE_DATA'}},
+  {c:'TOWER_ENGAGE',t:102,x:{creep:'PRIVATE_CREEP'}}
+ ]}
+})});
+assert.equal(eventKinds.recentRetainedEventCount,4);
+assert.equal(eventKinds.recentRetainedEventTypes.TOWER_ENGAGE,2);
+assert.equal(eventKinds.recentRetainedEventTypes.SPAWN_OK,1);
+assert.equal(eventKinds.recentRetainedEventTypes.OTHER_OR_UNVERIFIED,1);
+assert.ok(!JSON.stringify(eventKinds).includes('PRIVATE_'));
+const boundedKinds=summarizeWorldRetainedMemory({data:JSON.stringify({
+ deploymentId:'DEP',
+ telemetryJournal:{snapshots:[],events:[
+  {c:'SPAWN_OK',t:100,x:{}},
+  {c:'SPAWN_OK',t:102,x:{}},
+  {c:'TOWER_ENGAGE',t:150,x:{}}
+ ]}
+})});
+assert.equal(boundedKinds.recentRetainedEventCount,1);
+assert.equal(boundedKinds.recentRetainedEventTypes.TOWER_ENGAGE,1);
+assert.equal(boundedKinds.recentRetainedEventTypes.SPAWN_OK,undefined);
+
 console.log('World O22 GET-only cross-shard foothold safety regression PASS');
