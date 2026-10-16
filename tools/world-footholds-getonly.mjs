@@ -300,14 +300,17 @@ export function summarizeWorldRetainedMemory(reply) {
     // by the same game loop at the same Game.time, unlike API room GETs.
     // Health SPAWN_MISSING is diagnostic evidence, not a permission to reset.
     inGameSameTickHomeSnapshot:(()=>{
-      const heartbeats=events.filter(row=>row?.c==='BOT_HEARTBEAT'&&
-        validTick(row.t));
-      if(!heartbeats.length)return null;
-      const beat=heartbeats.reduce((a,b)=>a.t>b.t?a:b);
-      const rows=snapshots.filter(row=>row?.c==='STATUS_SNAPSHOT'&&
-        row?.t===beat.t && row.x &&
-        typeof row.x==='object' && !Array.isArray(row.x));
+      const heartbeatTicks=new Set(events.filter(row=>
+        row?.c==='BOT_HEARTBEAT'&&validTick(row.t)).map(row=>row.t));
+      if(!heartbeatTicks.size)return null;
+      const aligned=snapshots.filter(row=>row?.c==='STATUS_SNAPSHOT'&&
+        validTick(row.t)&&heartbeatTicks.has(row.t)&&row.x&&
+        typeof row.x==='object'&&!Array.isArray(row.x));
+      if(!aligned.length)return null;
+      const bestTick=Math.max(...aligned.map(row=>row.t));
+      const rows=aligned.filter(row=>row.t===bestTick);
       if(rows.length!==1)return null;
+      const beat={t:bestTick};
       const home=rows[0].x.rooms?.W37S79;
       if(!home||typeof home!=='object'||Array.isArray(home))return null;
       const reasons=home.health?.reasons;
