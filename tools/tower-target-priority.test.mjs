@@ -3,10 +3,11 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 
 const source = fs.readFileSync(new URL('../game/tower.manager.js', import.meta.url), 'utf8');
+const warnings = [];
 const context = {
   module: { exports: {} },
   require(name) {
-    if (name === 'logger') return { warn() {} };
+    if (name === 'logger') return { warn(...args) { warnings.push(args); } };
     throw new Error('Unexpected dependency: ' + name);
   },
   STRUCTURE_SPAWN: 'spawn',
@@ -37,4 +38,46 @@ assert.ok(hostilePriority(healer, state) > hostilePriority(deadHealer, state));
 const towers = [{ attack(target) { this.target = target.id; } }];
 context.module.exports.run({ ...state, towers, room: { name: 'W1N1' } });
 assert.equal(towers[0].target, 'healer');
+
+assert.equal(warnings.length,1);
+assert.equal(warnings[0][0],'TOWER_ENGAGE');
+assert.equal(warnings[0][2].attackIntentCount,1);
+assert.equal(warnings[0][2].unknownReturnCodes,1,
+  'undefined/mock result is UNKNOWN, not a successful hit');
+assert.equal(warnings[0][2].hitOrKillVerified,false);
+
+let accepted=0, empty=0, malformed=0;
+const results=[
+  {store:{energy:500},attack(target) {
+    accepted++;assert.equal(target.id,'healer');return 0;
+  }},
+  {store:{energy:0},attack(target) {
+    empty++;assert.equal(target.id,'healer');return -6;
+  }},
+  {store:{energy:50},attack(target) {
+    malformed++;assert.equal(target.id,'healer');return undefined;
+  }}
+];
+context.module.exports.run({...state,towers:results,room:{name:'E8N1'}});
+assert.equal(accepted,1);
+assert.equal(empty,1);
+assert.equal(malformed,1);
+const outcome=warnings.at(-1)[2];
+assert.equal(outcome.attackIntentCount,3);
+assert.equal(outcome.acceptedIntentCount,1);
+assert.equal(outcome.unknownReturnCodes,1);
+assert.equal(outcome.towersWithVerifiedEnergy,3);
+assert.equal(outcome.towersReadyAtIntent,2);
+assert.equal(outcome.hitOrKillVerified,false);
+assert.deepEqual(JSON.parse(JSON.stringify(outcome.attackReturnCodeCounts)),
+  {'0':1,'-6':1},
+  'capture each actual integer return code without implying damage');
+
+const missingAmmo=[{attack:()=>0,store:{}}];
+context.module.exports.run({...state,towers:missingAmmo,room:{name:'E8N1'}});
+assert.equal(warnings.at(-1)[2].towersReadyAtIntent,null,
+  'unknown tower energy must not become zero or healthy');
+assert.equal(warnings.at(-1)[2].acceptedIntentCount,1,
+  'do not infer actual damage even from OK');
+
 console.log('Tower hostile priority regression PASS');
