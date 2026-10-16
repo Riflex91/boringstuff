@@ -299,4 +299,40 @@ const duplicatePartial=summarizeUserRoomListing({ok:1,shards:{
 assert.equal(duplicatePartial.status,'UNVERIFIED');
 assert.equal(duplicatePartial.reason,'USER_ROOMS_DUPLICATES');
 
+
+// The screeps.com /api/user/rooms result has a separate "sim" grouping.
+// Only an explicitly EMPTY sim group can be safely ignored for complete
+// World-shard coverage; a populated/unknown sim must not be silently dropped.
+const worldWithEmptySim={ok:1,shards:{
+ shard0:['W37S79'],shard1:[],shard2:[],shard3:[],sim:[]
+}};
+const completeWorld=summarizeUserRoomListing(worldWithEmptySim);
+assert.equal(completeWorld.status,'EXPLICIT_USER_ROOMS_LIST');
+assert.equal(completeWorld.listingComplete,true);
+assert.equal(completeWorld.returnedRooms.length,1);
+const shapeSim=summarizeRoomListingResponseShape(worldWithEmptySim);
+assert.equal(shapeSim.shards.simGroup.explicitEmpty,true);
+assert.equal(shapeSim.shards.simGroup.count,0);
+assert.equal(shapeSim.shards.otherGroupKeyCount,0);
+const verifiedComplete=await inspectWorldFootholds(
+ mock({rooms:worldWithEmptySim}).api,{observeDelayMs:0});
+assert.equal(verifiedComplete.status,'READONLY_LISTING_AND_ROOM_OBJECTS_VERIFIED');
+assert.equal(verifiedComplete.userRoomCount,1);
+assert.equal(verifiedComplete.allListedRoomsChecked,true);
+assert.equal(verifiedComplete.worldStatusBefore,'lost');
+assert.equal(verifiedComplete.operationalFootholdVerified,false);
+assert.equal(verifiedComplete.noRecoverableFootholdVerified,false);
+for(const nonemptySim of [['E1N1'],['secret'],{}]){
+ const listing=summarizeUserRoomListing({ok:1,shards:{
+  shard0:['W37S79'],sim:nonemptySim
+ }});
+ assert.equal(listing.status,'PARTIAL_USER_ROOMS_LIST');
+ assert.equal(listing.listingComplete,false);
+}
+const unknownWorldGroup=summarizeUserRoomListing({ok:1,shards:{
+ shard0:['W37S79'],sim:[],newUnknown:['E1N1']
+}});
+assert.equal(unknownWorldGroup.status,'PARTIAL_USER_ROOMS_LIST');
+assert.equal(unknownWorldGroup.listingComplete,false);
+
 console.log('World O22 GET-only cross-shard foothold safety regression PASS');
