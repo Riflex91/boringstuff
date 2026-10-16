@@ -300,7 +300,7 @@ function statusSnapshot(roomStates, tickCpu) {
       // API can disagree; this live witness remains read-only and untrusted
       // for overriding recovery, combat or expansion eligibility.
       spawnJobEvidence: (function() {
-        try { return spawnJobEvidence.snapshot(state, Game, Memory); }
+        try { return spawnJobEvidence.sample(state, Game, Memory); }
         catch (_) { return {status:'UNVERIFIED',
           reason:'SPAWN_JOB_OBSERVER_EXCEPTION',
           authority:'IN_GAME_DIAGNOSTIC_ONLY',actionsTaken:0}; }
