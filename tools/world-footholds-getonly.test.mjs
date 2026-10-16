@@ -114,4 +114,21 @@ assert.deepEqual(schema.rooms.firstShardKnownFields,['rooms']);
 assert.ok(!JSON.stringify(schema).includes('private'),
   'schema probe must not expose user data or raw list values');
 
+
+const partialListing=summarizeUserRoomListing({ok:1,shards:{
+ shard0:['W37S79'],shard1:[],shard2:[],shard3:[],sim:['sim']
+}});
+assert.equal(partialListing.status,'PARTIAL_USER_ROOMS_LIST');
+assert.equal(partialListing.listingComplete,false);
+assert.deepEqual(partialListing.returnedRooms,[{room:'W37S79',shard:'shard0'}]);
+const observedPartial=await inspectWorldFootholds(mock({
+  rooms:{ok:1,shards:{shard0:['W37S79'],sim:['untrusted']}}
+}).api);
+assert.equal(observedPartial.status,'UNVERIFIED');
+assert.equal(observedPartial.recognizedShardRoomCount,1);
+assert.equal(observedPartial.userRoomCount,null);
+assert.equal(observedPartial.sampledRooms.length,1);
+assert.equal(observedPartial.sampledRooms[0].verifiedOwnSpawn,true);
+assert.equal(observedPartial.noRecoverableFootholdVerified,false);
+
 console.log('World O22 GET-only cross-shard foothold safety regression PASS');
