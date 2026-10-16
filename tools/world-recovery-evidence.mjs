@@ -201,7 +201,7 @@ function expansionAt(snapshot,previousSnapshot) {
 // room objects or the authoritative current server tick. No IDs or raw memory.
 const COLLAPSE_TIMELINE_LIMIT = 12;
 function collapseTimeline(snapshots) {
-  if (!Array.isArray(snapshots) || snapshots.length > 200)
+  if (!Array.isArray(snapshots) || snapshots.length > 512)
     return {status:'UNVERIFIED',reason:'SNAPSHOT_JOURNAL_UNAVAILABLE'};
   const ordered=snapshots.filter(s=>s?.c==='STATUS_SNAPSHOT')
     .map(s=>({t:s.t,x:s.x})).sort((a,b)=>a.t-b.t);
@@ -228,7 +228,7 @@ function collapseTimeline(snapshots) {
       ?names.reduce((total,name)=>total+roles[name],0):null;
     return {
       tick:s.t,
-      homePresent:room&&typeof room==='object'&&!Array.isArray(room),
+      homePresent:!!room&&typeof room==='object'&&!Array.isArray(room),
       rcl:nint(room?.rcl),
       healthStatus:healthStatuses.has(code(health?.status))?
         health.status:null,
