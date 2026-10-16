@@ -257,4 +257,33 @@ assert.deepEqual(towerThreat.otherOwnerActiveParts,{
   attack:1,ranged_attack:0,heal:1,work:0,tough:1
 });
 
+
+// A single non-owner threat may survive due to boosted TOUGH or be wounded.
+// Observe only present body/HP fields; omit names, IDs and boost mineral names.
+const boostedThreat=summarizeRoomDefenseObjects({objects:[
+  {type:'tower',user:'ours',x:1,y:1,energy:1000},
+  {type:'creep',user:'other',x:20,y:20,hits:1630,hitsMax:2100,
+    name:'private-dangerous-creep',id:'private-creep-id',body:[
+      {type:'tough',hits:100,boost:'XGHO2'},
+      {type:'tough',hits:0,boost:'GHO2'},
+      {type:'attack',hits:100,boost:'XUH2O'},
+      {type:'move',hits:100}
+    ]}
+]}, {_id:'ours'});
+assert.equal(boostedThreat.soleForeignCreepHits,1630);
+assert.equal(boostedThreat.soleForeignCreepHitsMax,2100);
+assert.equal(boostedThreat.soleForeignCreepActiveBoostedToughParts,1);
+assert.equal(boostedThreat.soleForeignCreepActiveBoostedNonToughParts,1);
+assert.ok(!JSON.stringify(boostedThreat).includes('private-'));
+assert.ok(!JSON.stringify(boostedThreat).includes('XGHO2'),
+  'do not expose unique opponent details or mineral boost names');
+const unknownHits=summarizeRoomDefenseObjects({objects:[
+  {type:'creep',user:'other',hits:'100',hitsMax:300,
+    body:[{type:'tough',hits:100,boost:77}]}
+]}, {_id:'ours'});
+assert.equal(unknownHits.soleForeignCreepHits,null);
+assert.equal(unknownHits.soleForeignCreepActiveBoostedToughParts,null);
+assert.equal(summarizeRoomDefenseObjects({objects:[]},{_id:'ours'})
+  .soleForeignCreepHits,null);
+
 console.log('Newbieland GET-only expansion evidence tests passed');
