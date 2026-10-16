@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { gzipSync } from 'node:zlib';
-import { inspectNewbielandExpansion, summarizeRoomDefenseObjects, summarizeRetainedTowerEngagements, compareRoomDefenseGetPairs, compareTowerEnergyGetPairs, compareRetainedJournalProgress } from './newbieland-expansion-readonly.mjs';
+import { inspectNewbielandExpansion, summarizeRoomDefenseObjects, summarizeRetainedTowerEngagements, compareRoomDefenseGetPairs, compareTowerEnergyGetPairs, compareRetainedJournalProgress, summarizeRetainedDefenderSpawns } from './newbieland-expansion-readonly.mjs';
 
 const branch={list:[{branch:'chatgpt',activeWorld:true}]};
 const snapshot={c:'STATUS_SNAPSHOT',t:2100,x:{
@@ -388,5 +388,26 @@ assert.equal(inspectNewbielandExpansion(
   {data:JSON.stringify(truncatedGarrison)},branch)
   .parentBlockerEvidence.roomLocalDefenders,null,
   'truncated role object must never assert zero defenders');
+
+
+const defenderLogs={telemetryJournal:{events:[
+  {c:'SPAWN_OK',t:2050,x:{room:'E8N1',role:'defender',creep:'SECRET'}},
+  {c:'SPAWN_OK',t:2118,x:{room:'E8N1',role:'defender'}},
+  {c:'SPAWN_OK',t:2119,x:{room:'E8N1',role:'harvester'}},
+  {c:'SPAWN_RC',t:2120,x:{room:'E8N1',role:'defender',rc:-14}},
+  {c:'SPAWN_OK',t:2121,x:{room:'W1N1',role:'defender'}}
+]}};
+const acceptedDefender=summarizeRetainedDefenderSpawns(defenderLogs,2125);
+assert.equal(acceptedDefender.status,'RETAINED_EVENTS_ONLY');
+assert.equal(acceptedDefender.defenderSpawnAcceptedLogCount,2);
+assert.equal(acceptedDefender.lastDefenderSpawnAcceptedTick,2118);
+assert.equal(acceptedDefender.unexpectedDefenderSpawnReturnLogCount,1);
+assert.equal(acceptedDefender.expectedBusyOrInsufficientEnergyFailuresObservable,
+  false);
+assert.ok(!JSON.stringify(acceptedDefender).includes('SECRET'));
+assert.equal(summarizeRetainedDefenderSpawns(
+  {telemetryJournal:{events:[]}},2125).defenderSpawnAcceptedLogCount,0);
+assert.equal(summarizeRetainedDefenderSpawns(
+  {telemetryJournal:{events:[]}},null).status,'UNVERIFIED');
 
 console.log('Newbieland GET-only expansion evidence tests passed');
