@@ -50,6 +50,59 @@ export function summarizeParentBlockerEvidence(snapshot, homeRoom = HOME) {
   };
 }
 
+
+// Independent GET /api/game/room-objects evidence. Room objects and retained
+// game STATUS_SNAPSHOTs do not share a proven tick. Foreign ownership is not
+// equivalent to Game.FIND_HOSTILE_CREEPS (allies may appear here).
+export function summarizeRoomDefenseObjects(reply, me) {
+  const objects=reply?.objects;
+  const self=me?._id ?? me?.id;
+  if (typeof self!=='string' || !self || !Array.isArray(objects) ||
+      objects.length>2500)
+    return {status:'UNVERIFIED',reason:'ROOM_OBJECTS_OR_AUTH_UNAVAILABLE'};
+  const type=o=>o?.type ?? o?.structureType;
+  const owned=o=>String(o?.user ?? '')===self;
+  const creeps=objects.filter(o=>type(o)==='creep');
+  const towers=objects.filter(o=>type(o)==='tower' && owned(o));
+  const otherCreeps=creeps.filter(o=>o?.user!=null && !owned(o));
+  const unknownOwnership=creeps.filter(o=>o?.user==null).length;
+  const energy=t=>{
+    const amount=t?.store?.energy ?? t?.energy;
+    return Number.isSafeInteger(amount) && amount>=0 && amount<=10000
+      ? amount:null;
+  };
+  const towerEnergy=towers.map(energy);
+  const allEnergyKnown=towerEnergy.every(x=>x!==null);
+  const countActiveCombat=c=>{
+    if (!Array.isArray(c?.body) || c.body.length>50 ||
+        c.body.some(part=>!part || typeof part.type!=='string' ||
+          !Number.isSafeInteger(part.hits) || part.hits<0 ||
+          part.hits>100)) return null;
+    return c.body.filter(part=>part.hits>0 &&
+      ['attack','ranged_attack','work','heal'].includes(part.type)).length;
+  };
+  const foreignCombat=otherCreeps.map(countActiveCombat);
+  return {
+    status:'ROOM_OBJECTS_GET_OBSERVED',room:HOME,
+    currentGameTickVerified:false,gameHostilityVerified:false,
+    crossSnapshotSameTickVerified:false,
+    ownSpawnObjects:objects.filter(o=>type(o)==='spawn'&&owned(o)).length,
+    ownTowerObjects:towers.length,
+    ownTowersWithEnergyKnown:towerEnergy.filter(v=>v!==null).length,
+    towersReadyToAttack:allEnergyKnown?
+      towerEnergy.filter(v=>v>=10).length:null,
+    towerEnergySum:allEnergyKnown?
+      towerEnergy.reduce((a,v)=>a+v,0):null,
+    roomLocalOwnedCreeps:creeps.filter(owned).length,
+    otherOwnerCreeps:otherCreeps.length,
+    unknownOwnerCreeps:unknownOwnership,
+    otherOwnerCombatOrSupportCreeps:foreignCombat.every(v=>v!==null)?
+      foreignCombat.filter(v=>v>0).length:null,
+    otherOwnerUnarmedCreeps:foreignCombat.every(v=>v!==null)?
+      foreignCombat.filter(v=>v===0).length:null
+  };
+}
+
 export function inspectNewbielandExpansion(reply, branches) {
   const active = Array.isArray(branches?.list)
     ? branches.list.filter(item => item?.activeWorld === true) : null;
@@ -103,8 +156,13 @@ async function main() {
     process.exitCode=2;
     return;
   }
-  const reply=await api.userMemory('bot');
+  const [reply,me,roomObjects]=await Promise.all([
+    api.userMemory('bot'),
+    api.authMe().catch(()=>null),
+    api.gameRoomObjects(HOME).catch(()=>null)
+  ]);
   const result=inspectNewbielandExpansion(reply,branches);
+  result.roomDefenseObjects=summarizeRoomDefenseObjects(roomObjects,me);
   console.log('NEWBIELAND_EXPANSION_GET_ONLY '+JSON.stringify(result));
   if (result.status!=='OBSERVED_RETAINED') process.exitCode=2;
 }
