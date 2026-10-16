@@ -30,6 +30,17 @@ export function summarizeParentBlockerEvidence(snapshot, homeRoom = HOME) {
     value >= -10000 && value <= 10000 ? value : null;
   const health = room.health;
   const readiness = x.expansionReadiness;
+  const roles=room.creeps;
+  // Logger truncation is not a verified empty garrison. Room-local role
+  // counts come from a retained STATUS_SNAPSHOT, not global Game.creeps.
+  const roleCountsVerified=roles&&typeof roles==='object' &&
+    !Array.isArray(roles)&&!roles.__truncated &&
+    Object.keys(roles).length<=20 &&
+    Object.keys(roles).every(key=>/^[a-z][a-z0-9_]{0,39}$/.test(key) &&
+      Number.isSafeInteger(roles[key]) &&
+      roles[key]>=0 && roles[key]<=120) &&
+    Object.values(roles).reduce((n,v)=>n+v,0)<=120;
+  const roleCount=name=>roleCountsVerified?(roles[name]??0):null;
   return {
     snapshotTick: snapshot?.t ?? null,
     status: 'RETAINED_SNAPSHOT_ONLY',
@@ -47,7 +58,14 @@ export function summarizeParentBlockerEvidence(snapshot, homeRoom = HOME) {
     safeModeCooldownTicks: count(room.safeModeCooldownRemainingTicks),
     modeledHaulerCarryDeficit: signedDeficit(room.economyModel?.haulerCarryDeficit),
     modeledWaitingConsumers: count(room.economyModel?.consumerWaitingCount),
-    modeledFallbackConsumers: count(room.economyModel?.consumerFallbackCount)
+    modeledFallbackConsumers: count(room.economyModel?.consumerFallbackCount),
+    roomLocalRolesVerified:Boolean(roleCountsVerified),
+    roomLocalDefenders:roleCount('defender'),
+    roomLocalHarvesters:roleCount('harvester'),
+    roomLocalHaulers:roleCount('hauler'),
+    roomLocalScouts:roleCount('scout'),
+    roomLocalWorkers:roleCount('worker'),
+    roomLocalUpgraders:roleCount('upgrader')
   };
 }
 
