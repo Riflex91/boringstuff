@@ -48,6 +48,14 @@ export function summarizeRoomListingResponseShape(input) {
         if(Array.isArray(content)) {
           info.length=content.length;
           info.sampleItemKind=content.length?kind(content[0]):null;
+          if(typeof content[0]==='string'){
+            // Shape only; preserve neither room names nor opaque tokens.
+            info.sampleStringLength=content[0].length;
+            info.sampleMatchesRoom=ROOM.test(content[0]);
+            info.sampleTrimChanges=content[0].trim()!==content[0];
+            info.sampleLooksHexId=/^[0-9a-f]{24}$/i.test(content[0]);
+            info.sampleHasShardPrefix=/^shard\\d+\\//.test(content[0]);
+          }
           if(content[0]&&typeof content[0]==='object'&&
              !Array.isArray(content[0]))
             info.sampleKnownFields=['room','name','shard',
