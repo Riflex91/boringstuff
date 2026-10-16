@@ -318,5 +318,16 @@ assert.equal(compareRoomDefenseGetPairs(firstCombatGet,
   'FOREIGN_CREEP_HEALTH_UNVERIFIED');
 assert.equal(compareRoomDefenseGetPairs(firstCombatGet,sameCombatGet,
   null).status,'UNVERIFIED');
+const underscoreId={objects:[{
+  type:'creep',_id:'private-hidden-creep',user:'other-id',
+  hits:5000,hitsMax:5000
+}]};
+assert.equal(compareRoomDefenseGetPairs(underscoreId,
+  structuredClone(underscoreId),{_id:'our-id'}).status,
+  'SAME_FOREIGN_CREEP_OBSERVED_TWICE',
+  'Screeps room-objects payload may expose _id instead of id');
+assert.ok(!JSON.stringify(compareRoomDefenseGetPairs(underscoreId,
+  underscoreId,{_id:'our-id'})).includes('private-'));
+
 
 console.log('Newbieland GET-only expansion evidence tests passed');
