@@ -42,8 +42,42 @@ function run(state) {
   if (!state.towers.length) return;
   const hostile = selectHostile(state);
   if (hostile) {
-    state.towers.forEach(t => t.attack(hostile));
-    logger.warn('TOWER_ENGAGE', 'Tower engaging hostile', { room: state.room.name, hostile: hostile.owner && hostile.owner.username, hostileId: hostile.id, count: state.hostileCreeps.length }, { dedupeTicks: 3 });
+    // O19 evidence only: preserve the exact tower target and one attack intent
+    // per tower. Historically TOWER_ENGAGE was logged even when every attack
+    // returned an error (e.g. no energy). An accepted intent is NOT confirmed
+    // damage: never use this telemetry as combat or expansion authority.
+    const codeCounts = {};
+    let unknownReturnCodes = 0;
+    let towersWithVerifiedEnergy = 0;
+    let towersReadyAtIntent = 0;
+    for (const tower of state.towers) {
+      const energy = tower?.store?.[RESOURCE_ENERGY];
+      if (Number.isSafeInteger(energy) && energy >= 0) {
+        towersWithVerifiedEnergy++;
+        if (energy >= 10) towersReadyAtIntent++;
+      }
+      const rc = tower.attack(hostile);
+      if (Number.isSafeInteger(rc) && rc >= -100 && rc <= 100) {
+        const key = String(rc);
+        codeCounts[key] = (codeCounts[key] || 0) + 1;
+      } else {
+        unknownReturnCodes++;
+      }
+    }
+    logger.warn('TOWER_ENGAGE', 'Tower engaging hostile', {
+      room: state.room.name,
+      hostile: hostile.owner && hostile.owner.username,
+      hostileId: hostile.id,
+      count: state.hostileCreeps.length,
+      attackIntentCount: state.towers.length,
+      acceptedIntentCount: codeCounts['0'] || 0,
+      attackReturnCodeCounts: codeCounts,
+      unknownReturnCodes,
+      towersWithVerifiedEnergy,
+      towersReadyAtIntent: towersWithVerifiedEnergy === state.towers.length
+        ? towersReadyAtIntent : null,
+      hitOrKillVerified: false
+    }, { dedupeTicks: 3 });
     return;
   }
 
