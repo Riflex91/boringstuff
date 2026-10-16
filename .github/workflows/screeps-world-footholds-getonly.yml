@@ -28,10 +28,6 @@ jobs:
           node-version: '24.21.0'
       - name: Run fail-closed offline tests
         run: node world-footholds-getonly.test.mjs
-      - name: Verify post-respawn W37S79 spawn tile and 24-room threat ring (GET only)
-        env:
-          SCREEPS_TOKEN_WORLD: ${{ secrets.SCREEPS_TOKEN_WORLD }}
-        run: node world-next-target-threat-ring.mjs
       - name: List owned World rooms and corroborate possible footholds via GET only
         env:
           SCREEPS_TOKEN_WORLD: ${{ secrets.SCREEPS_TOKEN_WORLD }}
