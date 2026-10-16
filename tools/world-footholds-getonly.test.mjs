@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { summarizeUserRoomListing, summarizeCandidateRoom,
   summarizeRoomListingResponseShape, inspectWorldFootholds,
-  compareWorldRoomGetPairs } from './world-footholds-getonly.mjs';
+  compareWorldRoomGetPairs, summarizeWorldRetainedMemory,
+  compareWorldRetainedMemoryPairs } from './world-footholds-getonly.mjs';
 
 const p={ok:1,rooms:{shard0:['W37S79'],shard1:['E8N1']}};
 assert.deepEqual(summarizeUserRoomListing(p).returnedRooms,[
@@ -158,5 +159,80 @@ assert.equal(changedRoomPair.sameSpawnIdVerified,false);
 assert.equal(changedRoomPair.sameControllerIdVerified,true);
 assert.equal(compareWorldRoomGetPairs(sameRoom,null,
  'private-account',location).status,'UNVERIFIED');
+
+
+// The memory endpoint may contain gz: JSON, but only public bounded tick
+// summaries are emitted. No raw Memory or deployment IDs may be logged.
+const worldMemory=t=>({data:JSON.stringify({
+  deploymentId:'PRIVATE_WORLD_DEPLOYMENT',
+  telemetryJournal:{
+    snapshots:[{c:'STATUS_SNAPSHOT',t:t-10,x:{
+      rooms:{W37S79:{health:{status:'CRITICAL'}}}
+    }}],
+    events:[{c:'TOWER_ENGAGE',t,x:{creep:'PRIVATE_CREEP_ID'}}]
+  }
+})});
+const oldMemory=worldMemory(78345200);
+const newMemory=worldMemory(78345205);
+const progress=compareWorldRetainedMemoryPairs(
+ oldMemory,newMemory,78345202,78345208);
+assert.equal(progress.status,'TWO_RETAINED_MEMORY_GETS_OBSERVED');
+assert.equal(progress.retainedJournalTickDelta,5);
+assert.equal(progress.retainedJournalAdvanced,true);
+assert.equal(progress.approximateRetainedLagAtFirstGet,2);
+assert.equal(progress.approximateRetainedLagAtSecondGet,3);
+assert.equal(progress.getResponsesSameServerTickVerified,false);
+assert.equal(progress.gameCodeExecutingNowVerified,false);
+assert.equal(progress.ownSpawnOperationalVerified,false);
+assert.equal(progress.firstSnapshotTick,78345190);
+assert.equal(summarizeWorldRetainedMemory(oldMemory).storedDeploymentIdKnown,
+ true);
+assert.ok(!JSON.stringify(progress).includes('PRIVATE_'));
+const identical=compareWorldRetainedMemoryPairs(
+ oldMemory,oldMemory,78345202,78345208);
+assert.equal(identical.retainedJournalTickDelta,0);
+assert.equal(identical.retainedJournalAdvanced,false);
+assert.equal(identical.gameCodeExecutingNowVerified,false,
+ 'absence of new retained events is NOT proof the bot stopped');
+const backward=compareWorldRetainedMemoryPairs(
+ newMemory,oldMemory,78345205,78345208);
+assert.equal(backward.retainedJournalTickDelta,null,
+ 'retained journal rollback must not be treated as time progress');
+assert.equal(backward.retainedJournalAdvanced,null);
+const malformed=compareWorldRetainedMemoryPairs(
+ {data:JSON.stringify({deploymentId:'PRIVATE',telemetryJournal:{
+  events:[{c:'BAD',t:-1}],snapshots:[]
+ }})},newMemory,100,110);
+assert.equal(malformed.status,'UNVERIFIED');
+assert.equal(malformed.retainedJournalAdvanced,null);
+const unavailable=compareWorldRetainedMemoryPairs(null,null,100,110);
+assert.equal(unavailable.status,'UNVERIFIED');
+assert.equal(unavailable.approximateRetainedLagAtFirstGet,null);
+
+// Read-only integration checks both separate Memory.bot GETs and independent
+// shard game time. World lost remains a hard operational veto.
+const memoryCalls=[];
+const memoryProbe={
+ async authMe(){return {_id:'private-account'};},
+ async userWorldStatus(){return {status:'lost'};},
+ async userRooms(){return {ok:1,rooms:[]};},
+ async gameRoomObjects(){throw Error('no rooms must be requested');},
+ async userMemory(path,shard) {
+  memoryCalls.push([path,shard]);
+  return memoryCalls.length===1?oldMemory:newMemory;
+ },
+ async _request(method,endpoint) {
+  assert.equal(method,'GET');
+  assert.equal(endpoint,'/api/game/time');
+  this.clock=(this.clock||0)+1;
+  return {time:this.clock===1?78345202:78345208};
+ }
+};
+const observedMemory=await inspectWorldFootholds(memoryProbe,{observeDelayMs:0});
+assert.equal(observedMemory.worldStatusBefore,'lost');
+assert.equal(observedMemory.retainedBotMemoryProgress.retainedJournalAdvanced,true);
+assert.deepEqual(memoryCalls,[['bot','shard0'],['bot','shard0']]);
+assert.equal(observedMemory.apiMutationsAttempted,0);
+assert.equal(observedMemory.respawnAuthorized,false);
 
 console.log('World O22 GET-only cross-shard foothold safety regression PASS');
