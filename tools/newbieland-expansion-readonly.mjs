@@ -89,6 +89,21 @@ export function summarizeRoomDefenseObjects(reply, me) {
       otherCreeps.reduce((total,c)=>total+
         c.body.filter(part=>part.hits>0&&part.type===type).length,0)]))
     :null;
+  const soleForeign=otherCreeps.length===1?otherCreeps[0]:null;
+  // Room-object GET can report a creep's current durability and boosts, but
+  // still cannot prove that the same creep persisted across independent GETs.
+  const hits=v=>Number.isSafeInteger(v)&&v>=0&&v<=5000?v:null;
+  const foreignHits=soleForeign?hits(soleForeign.hits):null;
+  const foreignHitsMax=soleForeign?hits(soleForeign.hitsMax):null;
+  const foreignHealthVerified=foreignHits!==null &&
+    foreignHitsMax!==null && foreignHitsMax>0 &&
+    foreignHits<=foreignHitsMax;
+  const bodyBoostsVerified=!!soleForeign&&trustedBody&&
+    soleForeign.body.every(part=>part.boost==null ||
+      (typeof part.boost==='string' &&
+       /^[A-Za-z0-9]{1,10}$/.test(part.boost)));
+  const activeBoosted=bodyBoostsVerified?
+    soleForeign.body.filter(part=>part.hits>0&&part.boost!=null):null;
   const pos=o=>Number.isSafeInteger(o?.x)&&o.x>=0&&o.x<50 &&
     Number.isSafeInteger(o?.y)&&o.y>=0&&o.y<50;
   const positionsVerifiable=towers.length>0&&otherCreeps.length>0&&
@@ -114,6 +129,12 @@ export function summarizeRoomDefenseObjects(reply, me) {
     otherOwnerUnarmedCreeps:trustedBody?
       foreignCombat.filter(v=>v===0).length:null,
     otherOwnerActiveParts:activeForeignParts,
+    soleForeignCreepHits:foreignHealthVerified?foreignHits:null,
+    soleForeignCreepHitsMax:foreignHealthVerified?foreignHitsMax:null,
+    soleForeignCreepActiveBoostedToughParts:activeBoosted?
+      activeBoosted.filter(part=>part.type==='tough').length:null,
+    soleForeignCreepActiveBoostedNonToughParts:activeBoosted?
+      activeBoosted.filter(part=>part.type!=='tough').length:null,
     closestTowerToForeignCreepRange:positionsVerifiable?
       Math.min(...ranges):null,
     furthestTowerToForeignCreepRange:positionsVerifiable?
