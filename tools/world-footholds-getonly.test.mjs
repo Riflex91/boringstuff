@@ -401,4 +401,47 @@ for(const dangerousExtra of [['W1N1'],{rooms:[]},'unverified',null]){
  assert.equal(unsafeListing.listingComplete,false);
 }
 
+
+// BOT_HEARTBEAT is emitted by production game/main.js inside Game.time loop
+// with logger.info(...,{force:true,journal:true,dedupeTicks:0}). Decode only
+// numeric room/creep/cpu/bucket figures, not raw event context.
+const recentHeartbeat={
+ data:JSON.stringify({
+  deploymentId:'private-deployment-id',
+  telemetryJournal:{
+   snapshots:[{c:'STATUS_SNAPSHOT',t:500,x:{rooms:{}}}],
+   events:[
+    {c:'BOT_HEARTBEAT',t:525,x:{rooms:0,creeps:0,cpu:2.315,
+      bucket:10000,name:'PRIVATE_OBJECT_ID'}},
+    {c:'BOT_HEARTBEAT',t:530,x:{rooms:0,creeps:0,cpu:1.124,
+      bucket:9990,name:'PRIVATE_OBJECT_ID'}},
+    {c:'OTHER_PRIVATE_CODE',t:530,x:{creep:'PRIVATE_CREEP'}}
+   ]
+  }
+ })
+};
+const hb=summarizeWorldRetainedMemory(recentHeartbeat);
+assert.equal(hb.recentRetainedEventTypes.BOT_HEARTBEAT,2);
+assert.equal(hb.recentRetainedEventTypes.OTHER_OR_UNVERIFIED,1);
+assert.equal(hb.latestRetainedHeartbeat.tick,530);
+assert.equal(hb.latestRetainedHeartbeat.roomCount,0);
+assert.equal(hb.latestRetainedHeartbeat.creepCount,0);
+assert.equal(hb.latestRetainedHeartbeat.cpuUsed,1.124);
+assert.equal(hb.latestRetainedHeartbeat.bucket,9990);
+assert.equal(hb.latestRetainedHeartbeat.sameServerResponseTickVerified,false);
+assert.ok(!JSON.stringify(hb).includes('PRIVATE_'));
+const fresh=compareWorldRetainedMemoryPairs(recentHeartbeat,
+ recentHeartbeat,529,534);
+assert.equal(fresh.executableBotHeartbeatRecentlyObserved,true);
+assert.equal(fresh.latestHeartbeatAgeFromServerClock,4);
+assert.equal(fresh.ownSpawnOperationalVerified,false);
+assert.equal(fresh.gameCodeExecutingNowVerified,false);
+const aged=compareWorldRetainedMemoryPairs(recentHeartbeat,
+ recentHeartbeat,555,560);
+assert.equal(aged.executableBotHeartbeatRecentlyObserved,false);
+assert.equal(aged.latestHeartbeatAgeFromServerClock,30);
+const missing=compareWorldRetainedMemoryPairs(worldMemory(100),
+ worldMemory(105),100,110);
+assert.equal(missing.executableBotHeartbeatRecentlyObserved,null);
+
 console.log('World O22 GET-only cross-shard foothold safety regression PASS');
