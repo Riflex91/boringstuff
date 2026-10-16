@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { gzipSync } from 'node:zlib';
-import { inspectNewbielandExpansion, summarizeRoomDefenseObjects, summarizeRetainedTowerEngagements, compareRoomDefenseGetPairs } from './newbieland-expansion-readonly.mjs';
+import { inspectNewbielandExpansion, summarizeRoomDefenseObjects, summarizeRetainedTowerEngagements, compareRoomDefenseGetPairs, compareTowerEnergyGetPairs, compareRetainedJournalProgress } from './newbieland-expansion-readonly.mjs';
 
 const branch={list:[{branch:'chatgpt',activeWorld:true}]};
 const snapshot={c:'STATUS_SNAPSHOT',t:2100,x:{
@@ -329,5 +329,44 @@ assert.equal(compareRoomDefenseGetPairs(underscoreId,
 assert.ok(!JSON.stringify(compareRoomDefenseGetPairs(underscoreId,
   underscoreId,{_id:'our-id'})).includes('private-'));
 
+
+
+const towerFirst={objects:[
+  {type:'tower',user:'our-id',_id:'secret-tower-1',energy:1000},
+  {type:'tower',user:'our-id',id:'secret-tower-2',store:{energy:700}},
+  {type:'tower',user:'another-user',id:'enemy-tower',energy:20}
+]};
+const towerSecond={objects:[
+  {type:'tower',user:'our-id',_id:'secret-tower-1',energy:980},
+  {type:'tower',user:'our-id',id:'secret-tower-2',store:{energy:750}}
+]};
+const energyDelta=compareTowerEnergyGetPairs(
+  towerFirst,towerSecond,{_id:'our-id'});
+assert.equal(energyDelta.status,'SAME_TOWERS_OBSERVED_TWICE');
+assert.equal(energyDelta.towerCount,2);
+assert.equal(energyDelta.firstEnergySum,1700);
+assert.equal(energyDelta.secondEnergySum,1730);
+assert.equal(energyDelta.netTowerEnergyChange,30);
+assert.equal(energyDelta.consumptionVerified,false);
+assert.equal(energyDelta.refillsExcluded,false);
+assert.ok(!JSON.stringify(energyDelta).includes('secret-tower-'));
+assert.equal(compareTowerEnergyGetPairs(towerFirst,
+  {objects:[{type:'tower',user:'our-id',id:'different',energy:900}]},
+  {_id:'our-id'}).status,'UNVERIFIED');
+assert.equal(compareTowerEnergyGetPairs(towerFirst,towerSecond,
+  null).status,'UNVERIFIED');
+assert.equal(compareTowerEnergyGetPairs(
+  {objects:[{type:'tower',user:'our-id',id:'unique',energy:'1000'}]},
+  towerSecond,{_id:'our-id'}).status,'UNVERIFIED');
+const progressData=structuredClone(data);
+progressData.telemetryJournal.events.push(
+  {c:'TOWER_ENGAGE',t:2133,x:{room:'E8N1'}});
+const progress=compareRetainedJournalProgress(reply,
+  {data:JSON.stringify(progressData)},branch);
+assert.equal(progress.status,'RETAINED_JOURNAL_PROGRESS_OBSERVED');
+assert.equal(progress.journalTickDelta,8);
+assert.equal(progress.gameTickProgressIndependentlyVerified,false);
+assert.equal(compareRetainedJournalProgress(
+  {data:JSON.stringify(progressData)},reply,branch).status,'UNVERIFIED');
 
 console.log('Newbieland GET-only expansion evidence tests passed');
