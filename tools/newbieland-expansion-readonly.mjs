@@ -1,6 +1,7 @@
 // Newbieland expansion diagnosis — authenticated GET-only game observation.
 // No code upload, spawn, controller, memory, or branch mutation.
 import { pathToFileURL } from 'node:url';
+import { setTimeout as pause } from 'node:timers/promises';
 import { summarizeRetainedIntelFrontier } from './newbieland-intel-frontier.mjs';
 import { ScreepsHttpClient } from './screeps-client.mjs';
 import { parseBotMemory, summarizeExpansionEvidence } from './ci-deployment-guard.mjs';
@@ -142,6 +143,45 @@ export function summarizeRoomDefenseObjects(reply, me) {
   };
 }
 
+// Compare two separate GET responses in ONE isolated diagnostic job. Opaque
+// object IDs are used solely in memory to check identity; never emit names,
+// IDs, hashes, coordinates or owner names. Wall time != server game ticks.
+export function compareRoomDefenseGetPairs(first,second,me) {
+  const id=me?._id ?? me?.id;
+  const roomCreeps=value=>{
+    if(!Array.isArray(value?.objects) || value.objects.length>2500)
+      return null;
+    return value.objects.filter(o=>o?.type==='creep' &&
+      typeof o.user==='string' && o.user!==id);
+  };
+  const a=roomCreeps(first),b=roomCreeps(second);
+  const unknown={status:'UNVERIFIED',reason:'SINGLE_FOREIGN_CREEP_ID_UNVERIFIED',
+    gameTickProgressVerified:false,attackIntentOrDamageVerified:false};
+  if (typeof id!=='string'||!id||!a||!b||
+      a.length!==1||b.length!==1||
+      typeof a[0].id!=='string'||!a[0].id||
+      typeof b[0].id!=='string'||!b[0].id||
+      a[0].user!==b[0].user) return unknown;
+  if (a[0].id!==b[0].id) return {
+    ...unknown,reason:'FOREIGN_CREEP_ID_CHANGED'
+  };
+  const validHp=o=>Number.isSafeInteger(o?.hits) &&
+    Number.isSafeInteger(o?.hitsMax) &&
+    o.hits>=0 && o.hitsMax>0 && o.hits<=o.hitsMax &&
+    o.hitsMax<=5000;
+  if(!validHp(a[0])||!validHp(b[0]))
+    return {...unknown,reason:'FOREIGN_CREEP_HEALTH_UNVERIFIED'};
+  return {
+    status:'SAME_FOREIGN_CREEP_OBSERVED_TWICE',
+    gameTickProgressVerified:false,
+    attackIntentOrDamageVerified:false,
+    firstHits:a[0].hits,secondHits:b[0].hits,
+    firstHitsMax:a[0].hitsMax,secondHitsMax:b[0].hitsMax,
+    hpChange:b[0].hits-a[0].hits,
+    healthLossObserved:b[0].hits<a[0].hits
+  };
+}
+
 // Diagnostic TOWER_ENGAGE logging is an issued tower action path, NOT proof
 // of actual hits. Lack of retained WARN events cannot prove no attacks.
 export function summarizeRetainedTowerEngagements(bot, journalTick) {
@@ -226,6 +266,13 @@ async function main() {
   ]);
   const result=inspectNewbielandExpansion(reply,branches);
   result.roomDefenseObjects=summarizeRoomDefenseObjects(roomObjects,me);
+  // One further GET after 15 seconds, never a gameplay intent. A stable
+  // foreign ID with identical HP provides persistence evidence, but does not
+  // prove that server ticks advanced or that any attacks were accepted.
+  await pause(15000);
+  const later=await api.gameRoomObjects(HOME).catch(()=>null);
+  result.roomDefenseComparison=compareRoomDefenseGetPairs(
+    roomObjects,later,me);
   console.log('NEWBIELAND_EXPANSION_GET_ONLY '+JSON.stringify(result));
   if (result.status!=='OBSERVED_RETAINED') process.exitCode=2;
 }
