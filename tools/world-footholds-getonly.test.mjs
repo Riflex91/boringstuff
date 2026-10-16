@@ -444,4 +444,47 @@ const missing=compareWorldRetainedMemoryPairs(worldMemory(100),
  worldMemory(105),100,110);
 assert.equal(missing.executableBotHeartbeatRecentlyObserved,null);
 
+
+const alignedBotMemory={data:JSON.stringify({
+ deploymentId:'PRIVATE_DEPLOYMENT_ID',
+ telemetryJournal:{
+  snapshots:[{c:'STATUS_SNAPSHOT',t:600,x:{
+    totalCreeps:0,rooms:{W37S79:{
+      energyAvailable:0,energyCapacity:0,constructionSites:1,
+      health:{status:'CRITICAL',
+        reasons:['SPAWN_MISSING','MINING_DEFICIT']}
+    }}
+  }}],
+  events:[{c:'BOT_HEARTBEAT',t:600,x:{
+    rooms:1,creeps:0,cpu:4.363,bucket:10000,
+    secret:'PRIVATE_CREEP_NAME'
+  }}]
+ }
+})};
+const aligned=compareWorldRetainedMemoryPairs(
+ alignedBotMemory,alignedBotMemory,601,606);
+assert.equal(aligned.latestAlignedInGameHomeSnapshot.tick,600);
+assert.equal(aligned.latestAlignedInGameHomeSnapshot.spawnMissingReported,true);
+assert.equal(aligned.latestAlignedInGameHomeSnapshot.healthStatus,'CRITICAL');
+assert.equal(aligned.latestAlignedInGameHomeSnapshot.energyAvailable,0);
+assert.equal(aligned.latestAlignedInGameHomeSnapshot.energyCapacity,0);
+assert.equal(aligned.latestAlignedInGameHomeSnapshot.gameTotalCreeps,0);
+assert.equal(aligned.latestAlignedInGameHomeSnapshot.constructionSiteCount,1);
+assert.equal(aligned.latestAlignedInGameHomeSnapshot.sameGameTickAsRetainedHeartbeat,true);
+assert.equal(aligned.latestAlignedInGameHomeSnapshot.gameSpawnObjectDirectlyVerified,false);
+assert.equal(aligned.executableBotHeartbeatRecentlyObserved,true);
+assert.ok(!JSON.stringify(aligned).includes('PRIVATE_'));
+const nonaligned=structuredClone(JSON.parse(alignedBotMemory.data));
+nonaligned.telemetryJournal.snapshots[0].t=500;
+const noAligned=compareWorldRetainedMemoryPairs(
+ {data:JSON.stringify(nonaligned)},{data:JSON.stringify(nonaligned)},601,606);
+assert.equal(noAligned.latestAlignedInGameHomeSnapshot,null);
+const malformedHome=structuredClone(JSON.parse(alignedBotMemory.data));
+malformedHome.telemetryJournal.snapshots[0].x.rooms.W37S79.health.reasons=
+ ['SPAWN_MISSING','INVALID PRIVATE DETAIL'];
+const safelyUnknown=compareWorldRetainedMemoryPairs(
+ {data:JSON.stringify(malformedHome)},
+ {data:JSON.stringify(malformedHome)},601,606);
+assert.equal(safelyUnknown.latestAlignedInGameHomeSnapshot.spawnMissingReported,null);
+
 console.log('World O22 GET-only cross-shard foothold safety regression PASS');
