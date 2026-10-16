@@ -19,6 +19,7 @@ for(const patch of [{room:{objects:[]}},{branches:{list:[{branch:'chatgpt',activ
 // API still reports a matching historical spawn object. Never treat the
 // matching object alone as proof of a healthy, deployable colony.
 const lostMemory={data:JSON.stringify({
+  deploymentId:'test-lost-deployment',
   telemetryJournal:{events:[],snapshots:[{
     c:'STATUS_SNAPSHOT',t:1000,x:{
       expansionReadiness:{status:'AT_CAPACITY',reasons:['NO_AVAILABLE_CLAIM_SLOT']},
