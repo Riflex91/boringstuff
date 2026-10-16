@@ -157,12 +157,13 @@ export function compareRoomDefenseGetPairs(first,second,me) {
   const a=roomCreeps(first),b=roomCreeps(second);
   const unknown={status:'UNVERIFIED',reason:'SINGLE_FOREIGN_CREEP_ID_UNVERIFIED',
     gameTickProgressVerified:false,attackIntentOrDamageVerified:false};
+  const objectId=o=>typeof o?.id==='string'&&o.id ? o.id :
+    typeof o?._id==='string'&&o._id ? o._id : null;
   if (typeof id!=='string'||!id||!a||!b||
       a.length!==1||b.length!==1||
-      typeof a[0].id!=='string'||!a[0].id||
-      typeof b[0].id!=='string'||!b[0].id||
+      !objectId(a[0])||!objectId(b[0])||
       a[0].user!==b[0].user) return unknown;
-  if (a[0].id!==b[0].id) return {
+  if (objectId(a[0])!==objectId(b[0])) return {
     ...unknown,reason:'FOREIGN_CREEP_ID_CHANGED'
   };
   const validHp=o=>Number.isSafeInteger(o?.hits) &&
