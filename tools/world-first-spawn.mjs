@@ -141,10 +141,11 @@ export async function activateVerifiedWorldSpawn(api,id,placement) {
       phase:'ACTIVATION_PRECONDITIONS',
       failures:['OWNED_EXACT_SPAWN_NOT_YET_VERIFIED']});
   const proof=await readBackSpawn(api,id);
-  if(!proof.spawnVerified||!proof.activeDefault||!proof.inactiveChatgpt)
-    throw Object.assign(new Error('WORLD_SPAWN_OR_BRANCH_CHANGED'),{
+  if(!proof.spawnVerified||!proof.activeDefault||!proof.inactiveChatgpt||
+     proof.observedWorldStatus!=='normal')
+    throw Object.assign(new Error('WORLD_SPAWN_BRANCH_OR_ACCOUNT_CHANGED'),{
       phase:'ACTIVATION_FRESH_READBACK',
-      failures:['OWNED_SPAWN_AND_INACTIVE_BRANCH_REQUIRED']});
+      failures:['OWNED_SPAWN_INACTIVE_BRANCH_AND_NORMAL_WORLD_REQUIRED']});
   const game=path.join(path.dirname(fileURLToPath(import.meta.url)),'..','game');
   const expected=Object.fromEntries(fs.readdirSync(game).filter(name=>name.endsWith('.js'))
     .sort().map(name=>[name.slice(0,-3),
@@ -159,10 +160,11 @@ export async function activateVerifiedWorldSpawn(api,id,placement) {
       phase:'ACTIVATION_CODE_READBACK',
       failures:['CHATGPT_CODE_MUST_MATCH_EXACT_TESTED_MAIN']});
   const final=await readBackSpawn(api,id);
-  if(!final.spawnVerified||!final.activeDefault||!final.inactiveChatgpt)
+  if(!final.spawnVerified||!final.activeDefault||!final.inactiveChatgpt||
+     final.observedWorldStatus!=='normal')
     throw Object.assign(new Error('WORLD_ACTIVATION_STATE_CHANGED'),{
       phase:'ACTIVATION_LAST_GET_GATE',
-      failures:['OWNED_SPAWN_OR_WORLD_BRANCH_CHANGED']});
+      failures:['OWNED_SPAWN_BRANCH_OR_WORLD_ACCOUNT_CHANGED']});
   let response;
   try {
     response=await api.userSetActiveBranch('chatgpt','activeWorld');
@@ -176,8 +178,9 @@ export async function activateVerifiedWorldSpawn(api,id,placement) {
       phase:'ACTIVATION_POST_REJECTED',
       failures:['GET_ONLY_RECOVERY_DO_NOT_RETRY']});
   try {
-    const [objects,branchesAfter]=await Promise.all([
-      api.gameRoomObjects(TARGET.room,TARGET.shard),api.userBranches()
+    const [objects,branchesAfter,worldAfter]=await Promise.all([
+      api.gameRoomObjects(TARGET.room,TARGET.shard),
+      api.userBranches(),api.userWorldStatus()
     ]);
     const spawn=Array.isArray(objects?.objects)&&objects.objects.some(o=>
       (o?.type==='spawn'||o?.structureType==='spawn') &&
@@ -185,7 +188,8 @@ export async function activateVerifiedWorldSpawn(api,id,placement) {
       o.name===TARGET.spawnName && String(o.user||'')===String(id));
     const active=Array.isArray(branchesAfter?.list)?
       branchesAfter.list.filter(b=>b?.activeWorld===true):[];
-    if(!spawn||active.length!==1||active[0]?.branch!=='chatgpt')
+    if(!spawn||active.length!==1||active[0]?.branch!=='chatgpt'||
+       worldAfter?.status!=='normal')
       throw new Error('POST_ACTIVATION_READBACK_MISMATCH');
   } catch {
     throw Object.assign(new Error('WORLD_ACTIVATION_NOT_VERIFIED'),{
@@ -244,7 +248,8 @@ export async function placePinnedWorldSpawn(api,id) {
     } catch {latest=null;}
     if(n<5) await new Promise(resolve=>setTimeout(resolve,1200));
   }
-  if(!latest?.spawnVerified||!latest?.activeDefault||!latest?.inactiveChatgpt)
+  if(!latest?.spawnVerified||!latest?.activeDefault||
+     !latest?.inactiveChatgpt||latest?.observedWorldStatus!=='normal')
     throw Object.assign(new Error('WORLD_SPAWN_READBACK_UNVERIFIED'),{
       phase:'POST_PLACEMENT_GET_ONLY_VERIFICATION',
       failures:['NEVER_AUTOMATICALLY_RETRY_PLACEMENT']});
