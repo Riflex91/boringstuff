@@ -43,11 +43,12 @@ function exactModules(observed,expected){
     HASH(observed[name])===HASH(expected[name]));
 }
 async function evidence(api) {
-  const [me,status,branches,rooms]=await Promise.all([
-    api.authMe(),api.userWorldStatus(),api.userBranches(),
-    api.userRooms()
+  const me=await api.authMe();
+  if(me?.username!==EXPECTED_USER||!(me?._id||me?.id))
+    throw Error('WORLD_ACCOUNT_USERNAME_MISMATCH');
+  const [status,branches,rooms]=await Promise.all([
+    api.userWorldStatus(),api.userBranches(),api.userRooms(me._id||me.id)
   ]);
-  if(me?.username!==EXPECTED_USER)throw Error('WORLD_ACCOUNT_USERNAME_MISMATCH');
   return {status,branches,rooms};
 }
 async function readCode(api,branch){
@@ -59,8 +60,10 @@ async function readCode(api,branch){
 async function onceWriteCode(api,branch,modules){
   // Zero automatic replay for every transport failure, 401, 429 or 5xx.
   // A failed/ambiguous write requires a separate GET-only reconciliation.
-  const response=await api._request('POST','/api/user/code',
-    {branch,modules},{max429Retries:0,max5xxRetries:0,retryAuth:false});
+  let response;
+  try{response=await api._request('POST','/api/user/code',
+    {branch,modules},{max429Retries:0,max5xxRetries:0,retryAuth:false});}
+  catch{throw Error('CODE_UPLOAD_OUTCOME_UNCERTAIN_NO_RETRY');}
   if(response?.ok===false||response?.error)
     throw Error('INACTIVE_CODE_WRITE_NOT_VERIFIED_NO_RETRY');
 }
@@ -90,7 +93,9 @@ export async function normalizeEmptyWorldBootstrap(api,modules,onPhase=()=>{}) {
   // One activation while account is still EMPTY and owns NO rooms.
   // This ensures that the *later* Spawn1 creation starts on known Main code.
   onPhase('ACTIVATE_EXACT_MAIN_CHATGPT_WHILE_WORLD_EMPTY_ONCE');
-  const response=await api.userSetActiveBranch(MAIN_BRANCH,'activeWorld');
+  let response;
+  try{response=await api.userSetActiveBranch(MAIN_BRANCH,'activeWorld');}
+  catch{throw Error('ACTIVATION_OUTCOME_UNCERTAIN_NO_RETRY');}
   if(response?.ok===false||response?.error)
     throw Error('WORLD_ACTIVATION_RESPONSE_UNVERIFIED_NO_RETRY');
   const after=await evidence(api);
