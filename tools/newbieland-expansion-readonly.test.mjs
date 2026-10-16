@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { gzipSync } from 'node:zlib';
-import { inspectNewbielandExpansion, summarizeRoomDefenseObjects, summarizeRetainedTowerEngagements, compareRoomDefenseGetPairs, compareTowerEnergyGetPairs, compareRetainedJournalProgress, summarizeRetainedDefenderSpawns, summarizeActiveSpawnJob, summarizeRecentSpawnReceipts, summarizeSpawnRoleFromCreepMemory, compareActiveSpawnJobs } from './newbieland-expansion-readonly.mjs';
+import { inspectNewbielandExpansion, summarizeRoomDefenseObjects, summarizeRetainedTowerEngagements, compareRoomDefenseGetPairs, compareTowerEnergyGetPairs, compareRetainedJournalProgress, summarizeRetainedDefenderSpawns, summarizeActiveSpawnJob, summarizeRecentSpawnReceipts, summarizeSpawnRoleFromCreepMemory, compareActiveSpawnJobs, summarizeRetainedSpawnBusyHistory } from './newbieland-expansion-readonly.mjs';
 
 const branch={list:[{branch:'chatgpt',activeWorld:true}]};
 const snapshot={c:'STATUS_SNAPSHOT',t:2100,x:{
@@ -524,5 +524,36 @@ assert.equal(summarizeSpawnRoleFromCreepMemory(
   ownSpawnJob,{data:JSON.stringify({
     'private-def':{role:'worker',born:'old'}
   })},{_id:'own'},4015).jobAgeFromRetainedJournalTicks,null);
+
+
+const busySnapshots={telemetryJournal:{snapshots:[
+  {c:'STATUS_SNAPSHOT',t:100,x:{rooms:{E8N1:{
+    spawnBusy:true,spawnRemainingTime:null
+  }}}},
+  {c:'STATUS_SNAPSHOT',t:200,x:{rooms:{E8N1:{
+    spawnBusy:true,spawnRemainingTime:undefined
+  }}}},
+  {c:'STATUS_SNAPSHOT',t:300,x:{rooms:{E8N1:{
+    spawnBusy:true
+  }}}}
+]}};
+const persistent=summarizeRetainedSpawnBusyHistory(busySnapshots);
+assert.equal(persistent.status,'RETAINED_SNAPSHOT_SAMPLES_ONLY');
+assert.equal(persistent.snapshotCount,3);
+assert.equal(persistent.observedGameTickSpan,200);
+assert.equal(persistent.allSamplesSpawnBusy,true);
+assert.equal(persistent.sameSpawnJobVerified,false);
+assert.equal(persistent.continuousBusyBetweenSamplesVerified,false);
+assert.equal(persistent.allRemainingTimeKnown,false);
+const unknownBusy=structuredClone(busySnapshots);
+delete unknownBusy.telemetryJournal.snapshots[1].x.rooms.E8N1.spawnBusy;
+assert.equal(summarizeRetainedSpawnBusyHistory(
+  unknownBusy).allSamplesSpawnBusy,null);
+const recoveredBusy=structuredClone(busySnapshots);
+recoveredBusy.telemetryJournal.snapshots[1].x.rooms.E8N1.spawnBusy=false;
+assert.equal(summarizeRetainedSpawnBusyHistory(
+  recoveredBusy).allSamplesSpawnBusy,false);
+assert.equal(summarizeRetainedSpawnBusyHistory(
+  {telemetryJournal:{snapshots:[]}}).status,'UNVERIFIED');
 
 console.log('Newbieland GET-only expansion evidence tests passed');
