@@ -1,0 +1,34 @@
+name: Screeps World account footholds (GET only)
+on:
+  workflow_dispatch:
+  push:
+    branches: [diagnostics/o22-world-foothold-getonly-20261016]
+    paths:
+      - tools/world-footholds-getonly.mjs
+      - tools/world-footholds-getonly.test.mjs
+      - .github/workflows/screeps-world-footholds-getonly.yml
+permissions:
+  contents: read
+concurrency:
+  group: screeps-world-footholds-getonly
+  cancel-in-progress: false
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: tools
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Run fail-closed offline tests
+        run: node world-footholds-getonly.test.mjs
+      - name: List owned World rooms and corroborate possible footholds via GET only
+        env:
+          SCREEPS_TOKEN_WORLD: ${{ secrets.SCREEPS_TOKEN_WORLD }}
+        run: node world-footholds-getonly.mjs
