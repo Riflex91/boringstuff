@@ -103,8 +103,16 @@ export class ScreepsHttpClient {
   async _request(method, endpoint, params = {}, opts = {}) {
     if (!opts.skipAuth && !this.token) await this.auth();
 
-    const max429Retries = Number.isInteger(opts.max429Retries) ? opts.max429Retries : 5;
-    const max5xxRetries = Number.isInteger(opts.max5xxRetries) ? opts.max5xxRetries : 2;
+    // Non-GET requests may have been committed despite a lost response,
+    // proxy 429 or server 5xx. Never replay a mutation automatically, even
+    // when a caller supplies permissive retry options. Only GET is replayable.
+    const replayable = method === 'GET';
+    const max429Retries = replayable
+      ? (Number.isInteger(opts.max429Retries) && opts.max429Retries >= 0
+          ? opts.max429Retries : 5) : 0;
+    const max5xxRetries = replayable
+      ? (Number.isInteger(opts.max5xxRetries) && opts.max5xxRetries >= 0
+          ? opts.max5xxRetries : 2) : 0;
     let retry429 = 0;
     let retry5xx = 0;
 
@@ -156,7 +164,11 @@ export class ScreepsHttpClient {
       if (headerToken) this.token = Array.isArray(headerToken) ? headerToken[0] : headerToken;
       const data = decodeResponseBody(response.text);
 
-      if (response.statusCode === 401 && !opts.skipAuth && opts.retryAuth !== false && this.server.email && this.server.password) {
+      // A 401 re-authentication must not silently replay a write either.
+      // Explicit recovery belongs to the caller after fresh GET-only proof.
+      if (response.statusCode === 401 && replayable &&
+          !opts.skipAuth && opts.retryAuth !== false &&
+          this.server.email && this.server.password) {
         this.token = null;
         await this.auth();
         return this._request(method, endpoint, params, { ...opts, retryAuth: false });
