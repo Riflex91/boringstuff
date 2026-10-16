@@ -278,9 +278,10 @@ export function summarizeActiveSpawnJob(roomReply,bot,me,journalTick) {
     status:'UNVERIFIED',reason:'EXACT_ONE_OWN_SPAWN_NOT_VERIFIED'
   };
   const job=spawns[0].spawning;
-  if(job===null || job===undefined)
-    return {status:'OBSERVED_NO_SPAWN_JOB',
-      currentGameTickVerified:false,role:null};
+  if(job===undefined)return {status:'UNVERIFIED',
+    reason:'SPAWN_JOB_FIELD_NOT_RETURNED_BY_API'};
+  if(job===null)return {status:'OBSERVED_NO_SPAWN_JOB',
+    currentGameTickVerified:false,role:null};
   if(!job||typeof job!=='object'||Array.isArray(job)||
      typeof job.name!=='string'||!job.name||
      job.name.length>128)return {status:'UNVERIFIED',
