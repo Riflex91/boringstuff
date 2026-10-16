@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { setTimeout as pause } from 'node:timers/promises';
 import { ScreepsHttpClient } from './screeps-client.mjs';
 import { buildWorldConfig } from './world-deployment-profile.mjs';
 
@@ -144,7 +145,42 @@ export function summarizeCandidateRoom(reply,accountId,location) {
     verifiedOwnSpawn:ownSpawn,ownCreepsObserved:ownCreeps};
 }
 
-export async function inspectWorldFootholds(api) {
+// The /api/game/time endpoint is an independent read. Its advance does
+// NOT make separate room-object replies same-tick or prove a functional spawn.
+function numericGameTick(reply) {
+  const n=reply?.time;
+  return Number.isSafeInteger(n)&&n>=0&&n<=2000000000?n:null;
+}
+export function compareWorldRoomGetPairs(first,second,accountId,location) {
+  const a=summarizeCandidateRoom(first,accountId,location);
+  const b=summarizeCandidateRoom(second,accountId,location);
+  if(a.status!=='ROOM_OBJECTS_OBSERVED'||
+     b.status!=='ROOM_OBJECTS_OBSERVED')
+    return {status:'UNVERIFIED',sameSpawnIdVerified:false,
+      sameControllerIdVerified:false};
+  const id=o=>typeof o?.id==='string'&&o.id?o.id:
+    typeof o?._id==='string'&&o._id?o._id:null;
+  const own=(reply,type)=>reply.objects.filter(o=>
+    (o?.type===type||o?.structureType===type)&&
+    o.user===accountId);
+  const getUniqueId=(reply,type)=>{
+    const items=own(reply,type);
+    return items.length===1?id(items[0]):null;
+  };
+  const spawnA=getUniqueId(first,'spawn');
+  const spawnB=getUniqueId(second,'spawn');
+  const ctrlA=getUniqueId(first,'controller');
+  const ctrlB=getUniqueId(second,'controller');
+  return {status:'TWO_ROOM_OBJECT_GETS_OBSERVED',
+    ownSpawnObservedBoth:a.verifiedOwnSpawn&&b.verifiedOwnSpawn,
+    ownControllerObservedBoth:a.verifiedOwnController&&b.verifiedOwnController,
+    sameSpawnIdVerified:Boolean(spawnA&&spawnB&&spawnA===spawnB),
+    sameControllerIdVerified:Boolean(ctrlA&&ctrlB&&ctrlA===ctrlB),
+    gameTickAlignedWithRoomObjects:false,
+    liveOperationalSpawnVerified:false};
+}
+
+export async function inspectWorldFootholds(api,options={}) {
   if(!api||typeof api.authMe!=='function'||
      typeof api.userWorldStatus!=='function'||
      typeof api.userRooms!=='function'||
@@ -157,13 +193,30 @@ export async function inspectWorldFootholds(api) {
   try{listing=await api.userRooms(id);}
   catch{fetchFailed=true;listing=null;}
   const rooms=summarizeUserRoomListing(listing);
-  const observed=[];
+  let time1=null,time2=null;
+  try{time1=numericGameTick(await api._request('GET',
+    '/api/game/time',{shard:'shard0'}));}catch{/* current tick unknown */}
+  const observed=[],initialObjects=[];
   for(const candidate of rooms.returnedRooms){
     let reply=null;
     try{reply=await api.gameRoomObjects(candidate.room,candidate.shard);}
     catch{/* Failed GET => unverified room, never no owned structure. */}
     observed.push(summarizeCandidateRoom(reply,id,candidate));
+    initialObjects.push(reply);
   }
+  const delay=options?.observeDelayMs===0?0:15000;
+  if(delay)await pause(delay);
+  const comparison=[];
+  for(let i=0;i<rooms.returnedRooms.length;i++){
+    const candidate=rooms.returnedRooms[i];
+    let later=null;
+    try{later=await api.gameRoomObjects(candidate.room,candidate.shard);}
+    catch{/* no equivalence proof */}
+    comparison.push({...candidate,
+      ...compareWorldRoomGetPairs(initialObjects[i],later,id,candidate)});
+  }
+  try{time2=numericGameTick(await api._request('GET',
+    '/api/game/time',{shard:'shard0'}));}catch{/* tick unknown */}
   const after=await api.userWorldStatus();
   const statusBefore=typeof before?.status==='string'?before.status:null;
   const statusAfter=typeof after?.status==='string'?after.status:null;
@@ -194,6 +247,12 @@ export async function inspectWorldFootholds(api) {
     noRecoverableFootholdVerified:false,
     currentGameTickVerified:false,
     sampledRooms:observed,
+    pairedRoomObjectObservations:comparison,
+    serverGameTickBefore:time1,
+    serverGameTickAfter:time2,
+    serverGameTickAdvanced:time1!==null&&time2!==null?
+      time2>time1:null,
+    gameTimeAndRoomSnapshotsSameTickVerified:false,
     mode:'GET_ONLY',apiMutationsAttempted:0,
     respawnAuthorized:false,placementAuthorized:false,
     activationAuthorized:false,deployAuthorized:false
