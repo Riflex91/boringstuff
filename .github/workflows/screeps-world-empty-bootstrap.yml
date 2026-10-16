@@ -1,0 +1,47 @@
+name: Screeps World empty bootstrap exact Main (one-shot operator approved)
+on:
+  push:
+    branches: [bootstrap/world-w37s79-userapproved-20261016]
+    paths:
+      - .github/workflows/screeps-world-empty-bootstrap.yml
+permissions:
+  contents: read
+concurrency:
+  group: screeps-world-chatgpt
+  cancel-in-progress: false
+jobs:
+  prepare-exact-main-code:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: tools
+    env:
+      SCREEPS_TOKEN_WORLD: ${{ secrets.SCREEPS_TOKEN_WORLD }}
+      WORLD_BOOTSTRAP_CONFIRM: USER_APPROVED_W37S79_37_26
+      EXPECTED_MAIN_SHA: bc43f2faf1f345e63d9bfe78b6bbaa59e5eaab0c
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - name: Pin current main exactly and prevent any game code deviation
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${{ github.ref }}" = "refs/heads/bootstrap/world-w37s79-userapproved-20261016"
+          test "$WORLD_BOOTSTRAP_CONFIRM" = "USER_APPROVED_W37S79_37_26"
+          git fetch origin main --quiet
+          test "$(git rev-parse origin/main)" = "$EXPECTED_MAIN_SHA"
+          git diff --exit-code "$EXPECTED_MAIN_SHA" HEAD -- game/
+          echo "BOOTSTRAP_EXACT_GAME_MAIN_VALIDATED"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Complete canonical tests and four P3 comparisons
+        run: |
+          npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+          npm test
+          npm run bench:p3
+      - name: Normalize World empty-account branches for first spawn, never place
+        run: node world-empty-bootstrap.mjs
