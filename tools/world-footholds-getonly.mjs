@@ -172,11 +172,39 @@ export function compareWorldRoomGetPairs(first,second,accountId,location) {
   const spawnB=getUniqueId(second,'spawn');
   const ctrlA=getUniqueId(first,'controller');
   const ctrlB=getUniqueId(second,'controller');
+  // Numeric controller decay / spawn energy and hits can provide additional
+  // freshness clues. Every field is optional; no unchanged value is proof
+  // that the game engine stopped, and room-GETs aren't same-tick Game reads.
+  const unique=(reply,type)=>{
+    const list=own(reply,type);
+    return list.length===1?list[0]:null;
+  };
+  const ctrl1=unique(first,'controller'),ctrl2=unique(second,'controller');
+  const spawn1=unique(first,'spawn'),spawn2=unique(second,'spawn');
+  const num=(v,max)=>Number.isSafeInteger(v)&&v>=0&&v<=max?v:null;
+  const change=(a,b)=>a!==null&&b!==null?b-a:null;
+  const ticks1=num(ctrl1?.ticksToDowngrade,20_000_000);
+  const ticks2=num(ctrl2?.ticksToDowngrade,20_000_000);
+  const energy1=num(spawn1?.store?.energy??spawn1?.energy,1000);
+  const energy2=num(spawn2?.store?.energy??spawn2?.energy,1000);
+  const hits1=num(spawn1?.hits,5_000_000);
+  const hits2=num(spawn2?.hits,5_000_000);
+  const sameSpawn=Boolean(spawnA&&spawnB&&spawnA===spawnB);
+  const sameController=Boolean(ctrlA&&ctrlB&&ctrlA===ctrlB);
   return {status:'TWO_ROOM_OBJECT_GETS_OBSERVED',
     ownSpawnObservedBoth:a.verifiedOwnSpawn&&b.verifiedOwnSpawn,
     ownControllerObservedBoth:a.verifiedOwnController&&b.verifiedOwnController,
-    sameSpawnIdVerified:Boolean(spawnA&&spawnB&&spawnA===spawnB),
-    sameControllerIdVerified:Boolean(ctrlA&&ctrlB&&ctrlA===ctrlB),
+    sameSpawnIdVerified:sameSpawn,
+    sameControllerIdVerified:sameController,
+    controllerDowngradeTicksFirst:sameController?ticks1:null,
+    controllerDowngradeTicksSecond:sameController?ticks2:null,
+    controllerDowngradeTicksDelta:sameController?change(ticks1,ticks2):null,
+    spawnEnergyFirst:sameSpawn?energy1:null,
+    spawnEnergySecond:sameSpawn?energy2:null,
+    spawnEnergyDelta:sameSpawn?change(energy1,energy2):null,
+    spawnHitsFirst:sameSpawn?hits1:null,
+    spawnHitsSecond:sameSpawn?hits2:null,
+    spawnHitsDelta:sameSpawn?change(hits1,hits2):null,
     gameTickAlignedWithRoomObjects:false,
     liveOperationalSpawnVerified:false};
 }
