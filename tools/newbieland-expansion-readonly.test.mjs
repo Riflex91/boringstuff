@@ -122,4 +122,54 @@ const unknownIntel=inspectNewbielandExpansion(reply,branch);
 assert.equal(unknownIntel.retainedIntelFrontier.reason,
   'WORLD_INTEL_UNAVAILABLE');
 
+
+const blockedParentData=structuredClone(frontierData);
+blockedParentData.telemetryJournal.snapshots[1].x.expansionReadiness={
+  status:'HOLD',availableClaimSlots:1,
+  reasons:['NO_HEALTHY_SUPPORTING_PARENT']
+};
+Object.assign(blockedParentData.telemetryJournal.snapshots[1].x.rooms.E8N1,{
+  health:{status:'DEGRADED',overallScore:62,
+    reasons:['HAULING_DEFICIT','CONSUMER_FALLBACK_ACTIVE']},
+  hostiles:0,energyAvailable:450,energyCapacity:1050,
+  energyStored:7000,safeModeRemainingTicks:0,
+  safeModeCooldownRemainingTicks:0
+});
+blockedParentData.telemetryJournal.snapshots[1].x.rooms.E8N1
+  .economyModel.haulerCarryDeficit=2;
+const blockerResult=inspectNewbielandExpansion(
+  {data:JSON.stringify(blockedParentData)},branch);
+assert.deepEqual(blockerResult.parentBlockerEvidence.readinessReasons,
+  ['NO_HEALTHY_SUPPORTING_PARENT']);
+assert.deepEqual(blockerResult.parentBlockerEvidence.parentHealthReasons,
+  ['HAULING_DEFICIT','CONSUMER_FALLBACK_ACTIVE']);
+assert.equal(blockerResult.parentBlockerEvidence.parentHealthScore,62);
+assert.equal(blockerResult.parentBlockerEvidence.modeledHaulerCarryDeficit,2);
+assert.equal(blockerResult.parentBlockerEvidence.currentGameTickVerified,false);
+assert.equal(blockerResult.parentBlockerEvidence.infrastructureEnergyAvailable,450);
+const hostileFrontier=structuredClone(blockedParentData);
+hostileFrontier.worldIntel.rooms.E8N1.threat.hostileCreeps=1;
+const hostileResult=inspectNewbielandExpansion(
+  {data:JSON.stringify(hostileFrontier)},branch).retainedIntelFrontier;
+assert.deepEqual(hostileResult.traversalBlockers,[
+  {room:'E8N1',reason:'HOSTILES_AT_RETAINED_OBSERVATION'}
+]);
+assert.equal(hostileResult.frontierCoverageVerified,false);
+assert.equal(hostileResult.visitedFrontierRooms,1);
+const noExits=structuredClone(blockedParentData);
+noExits.worldIntel.rooms.E8N1.topology.exits=[];
+const noExitsResult=inspectNewbielandExpansion(
+  {data:JSON.stringify(noExits)},branch).retainedIntelFrontier;
+assert.deepEqual(noExitsResult.traversalBlockers,[
+  {room:'E8N1',reason:'NO_RECORDED_EXITS'}
+]);
+assert.equal(noExitsResult.frontierCoverageVerified,false);
+assert.equal(frontierResult.retainedIntelFrontier.frontierCoverageVerified,true);
+const corruptReasons=structuredClone(blockedParentData);
+corruptReasons.telemetryJournal.snapshots[1].x.rooms.E8N1.health
+  .reasons=['[depth-limit]'];
+const corruptResult=inspectNewbielandExpansion(
+  {data:JSON.stringify(corruptReasons)},branch);
+assert.equal(corruptResult.parentBlockerEvidence.parentHealthReasons,null);
+
 console.log('Newbieland GET-only expansion evidence tests passed');
