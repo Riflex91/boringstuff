@@ -146,6 +146,10 @@ assert.equal(paired.ownSpawnObservedBoth,true);
 assert.equal(paired.ownControllerObservedBoth,true);
 assert.equal(paired.sameSpawnIdVerified,true);
 assert.equal(paired.sameControllerIdVerified,true);
+assert.equal(paired.controllerDowngradeTicksDelta,null,
+  'missing decay field remains unknown, not zero');
+assert.equal(paired.spawnEnergyDelta,0,
+  'same validated energy is a net observation, not a functionality claim');
 assert.equal(paired.liveOperationalSpawnVerified,false);
 assert.equal(paired.gameTickAlignedWithRoomObjects,false);
 assert.ok(!JSON.stringify(paired).includes('private-'));
@@ -234,5 +238,46 @@ assert.equal(observedMemory.retainedBotMemoryProgress.retainedJournalAdvanced,tr
 assert.deepEqual(memoryCalls,[['bot','shard0'],['bot','shard0']]);
 assert.equal(observedMemory.apiMutationsAttempted,0);
 assert.equal(observedMemory.respawnAuthorized,false);
+
+
+// Two fully identified API object pairs allow bounded field deltas only;
+// neither decay nor energy delta authorizes operation or destructive reset.
+const changingRoom1={objects:[
+ {type:'controller',id:'private-controller',user:'private-account',
+  level:4,ticksToDowngrade:12345},
+ {type:'spawn',id:'private-spawn',user:'private-account',
+  energy:250,hits:5000}
+]};
+const changingRoom2={objects:[
+ {type:'controller',id:'private-controller',user:'private-account',
+  level:4,ticksToDowngrade:12340},
+ {type:'spawn',id:'private-spawn',user:'private-account',
+  energy:245,hits:4985}
+]};
+const delta=compareWorldRoomGetPairs(changingRoom1,changingRoom2,
+ 'private-account',location);
+assert.equal(delta.sameSpawnIdVerified,true);
+assert.equal(delta.sameControllerIdVerified,true);
+assert.equal(delta.controllerDowngradeTicksDelta,-5);
+assert.equal(delta.spawnEnergyDelta,-5);
+assert.equal(delta.spawnHitsDelta,-15);
+assert.equal(delta.liveOperationalSpawnVerified,false);
+assert.ok(!JSON.stringify(delta).includes('private-'));
+const unavailableEnergy=compareWorldRoomGetPairs(changingRoom1,
+ {objects:[
+  {type:'controller',id:'private-controller',user:'private-account',
+   level:4,ticksToDowngrade:12340},
+  {type:'spawn',id:'private-spawn',user:'private-account',energy:'245'}
+ ]},'private-account',location);
+assert.equal(unavailableEnergy.spawnEnergyDelta,null,
+  'string energy is UNKNOWN, never numeric conversion to valid ammo');
+const idChanged=compareWorldRoomGetPairs(changingRoom1,
+ {objects:[
+  {type:'controller',id:'new-ctrl',user:'private-account',level:4,
+   ticksToDowngrade:12340},
+  {type:'spawn',id:'new-spawn',user:'private-account',energy:240}
+ ]},'private-account',location);
+assert.equal(idChanged.controllerDowngradeTicksDelta,null);
+assert.equal(idChanged.spawnEnergyDelta,null);
 
 console.log('World O22 GET-only cross-shard foothold safety regression PASS');
