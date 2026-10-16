@@ -49,8 +49,23 @@ export function summarizeRoomListingResponseShape(input) {
           count:Array.isArray(value.sim)?value.sim.length:null,
           explicitEmpty:Array.isArray(value.sim)&&value.sim.length===0
         }:null;
-      row.otherGroupKeyCount=Object.keys(value)
-        .filter(key=>!SHARD.test(key)&&key!=='sim').length;
+      const otherKeys=Object.keys(value)
+        .filter(key=>!SHARD.test(key)&&key!=='sim');
+      row.otherGroupKeyCount=otherKeys.length;
+      row.otherGroupShapes=otherKeys.slice(0,4).map(key=>{
+        const item=value[key];
+        const info={kind:kind(item)};
+        if(Array.isArray(item)){
+          info.length=item.length;
+          info.sampleItemKind=item.length?kind(item[0]):null;
+          info.sampleMatchesRoom=typeof item[0]==='string'?
+            ROOM.test(item[0]):null;
+        }else if(item&&typeof item==='object'){
+          info.propertyCount=Object.keys(item).length;
+        }
+        // Never print the unknown key or its raw values: it may be a user ID.
+        return info;
+      });
       row.shardShapes=row.shardKeys.map(shard=>{
         const content=value[shard];
         const info={shard,kind:kind(content)};
@@ -258,8 +273,28 @@ export function summarizeWorldRetainedMemory(reply) {
   const eventTicks=events.map(row=>row?.t);
   if(eventTicks.some(t=>!validTick(t)))return unknown;
   const latestEvent=eventTicks.length?Math.max(...eventTicks):null;
+  // Export only allowlisted event code counts for a bounded near-latest
+  // window; all event payloads, names and IDs remain private.
+  const recent=latestEvent===null?[]:events.filter(row=>
+    validTick(row?.t) && latestEvent-row.t<=25);
+  const allowedEventCodes=new Set([
+    'TOWER_ENGAGE','TOWER_ATTACK_RC','SPAWN_OK','SPAWN_RC',
+    'SPAWN_BUSY','STATUS_SNAPSHOT','ROOM_HEALTH','HAULER_TRANSFER',
+    'R1_OWNED_SPAWN_REBUILD_SITE_INTENT',
+    'R1_OWNED_SPAWN_REBUILD_CONFIRMED',
+    'R2_SPAWNLESS_WORKER_DISPATCH'
+  ]);
+  const types=Object.create(null);
+  for(const row of recent){
+    const code=typeof row.c==='string'&&allowedEventCodes.has(row.c)
+      ?row.c:'OTHER_OR_UNVERIFIED';
+    types[code]=(types[code]||0)+1;
+  }
   return {
     status:'RETAINED_MEMORY_JOURNAL_OBSERVED',
+    recentEventWindowTicks:25,
+    recentRetainedEventCount:recent.length,
+    recentRetainedEventTypes:types,
     latestStatusSnapshotTick:latestSnapshot,
     latestJournalEventTick:latestEvent,
     latestRetainedTick:latestSnapshot===null?latestEvent:
@@ -288,6 +323,10 @@ export function compareWorldRetainedMemoryPairs(first,second,clockBefore,clockAf
     secondRetainedJournalTick:end,
     retainedJournalTickDelta:delta,
     retainedJournalAdvanced:delta===null?null:delta>0,
+    latestRetainedEventCount:b.status==='RETAINED_MEMORY_JOURNAL_OBSERVED'?
+      b.recentRetainedEventCount:null,
+    latestRetainedEventTypes:b.status==='RETAINED_MEMORY_JOURNAL_OBSERVED'?
+      b.recentRetainedEventTypes:null,
     approximateRetainedLagAtFirstGet:lagStart,
     approximateRetainedLagAtSecondGet:lagEnd,
     serverClockComparisonVerified:validTick(clockBefore)&&
