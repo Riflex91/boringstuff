@@ -65,7 +65,10 @@ export function summarizeParentBlockerEvidence(snapshot, homeRoom = HOME) {
     roomLocalHaulers:roleCount('hauler'),
     roomLocalScouts:roleCount('scout'),
     roomLocalWorkers:roleCount('worker'),
-    roomLocalUpgraders:roleCount('upgrader')
+    roomLocalUpgraders:roleCount('upgrader'),
+    spawnBusyAtSnapshot:typeof room.spawnBusy==='boolean'?
+      room.spawnBusy:null,
+    spawnRemainingTimeAtSnapshot:count(room.spawnRemainingTime)
   };
 }
 
@@ -261,6 +264,33 @@ export function compareRetainedJournalProgress(first,second,branches) {
   };
 }
 
+// Explicitly separated evidence of accepted defender SPAWN_OK log paths.
+// Quiet or pruned logs cannot prove that no defender was ever spawned, and
+// `SPAWN_RC` excludes expected busy/insufficient-energy return codes.
+export function summarizeRetainedDefenderSpawns(bot, journalTick) {
+  const events=bot?.telemetryJournal?.events;
+  if(!goodTick(journalTick)||!Array.isArray(events)||
+     events.length>1500)return {
+    status:'UNVERIFIED',reason:'DEFENDER_EVENTS_UNAVAILABLE'
+  };
+  const relevant=events.filter(e=>e?.x?.room===HOME &&
+    e?.x?.role==='defender' && ['SPAWN_OK','SPAWN_RC'].includes(e.c));
+  if(relevant.some(e=>!goodTick(e.t)||e.t>journalTick))
+    return {status:'UNVERIFIED',reason:'DEFENDER_EVENT_TICK_INVALID'};
+  const rows=relevant.filter(e=>journalTick-e.t<=500);
+  const ok=rows.filter(e=>e.c==='SPAWN_OK');
+  const errors=rows.filter(e=>e.c==='SPAWN_RC');
+  return {
+    status:'RETAINED_EVENTS_ONLY',periodJournalTicks:500,
+    fullWindowCoverageVerified:false,
+    defenderSpawnAcceptedLogCount:ok.length,
+    lastDefenderSpawnAcceptedTick:ok.length?
+      Math.max(...ok.map(e=>e.t)):null,
+    unexpectedDefenderSpawnReturnLogCount:errors.length,
+    expectedBusyOrInsufficientEnergyFailuresObservable:false
+  };
+}
+
 // Diagnostic TOWER_ENGAGE logging is an issued tower action path, NOT proof
 // of actual hits. Lack of retained WARN events cannot prove no attacks.
 export function summarizeRetainedTowerEngagements(bot, journalTick) {
@@ -324,6 +354,7 @@ export function inspectNewbielandExpansion(reply, branches) {
     expansionEvidence:evidence,
     parentBlockerEvidence:summarizeParentBlockerEvidence(latest,HOME),
     retainedTowerEngagements:summarizeRetainedTowerEngagements(bot,journalLatestTick),
+    retainedDefenderSpawns:summarizeRetainedDefenderSpawns(bot,journalLatestTick),
     retainedIntelFrontier:summarizeRetainedIntelFrontier(bot,journalLatestTick,HOME)
   };
 }
