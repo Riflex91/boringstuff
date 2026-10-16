@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
+import path from 'node:path';
+import Module from 'node:module';
+import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
 
 const code=fs.readFileSync(new URL('../game/spawn.job.evidence.js',import.meta.url),'utf8');
 const context={module:{exports:{}}};
@@ -140,5 +144,62 @@ const invalidWatcher={bot:{deploymentId:'TEST',spawnJobWitness:Array(10)},
 const safelyRejected=sample(liveState,{time:500,creeps:{}},invalidWatcher);
 assert.equal(safelyRejected.observationMemoryWrites,0);
 assert.equal(safelyRejected.sameJobAcrossSnapshotsVerified,false);
+
+// Integration: require the actual logger and telemetry-journal modules
+// to prove the nested, sanitized O20 witness survives production serializer
+// depth and field-count limits, not merely the pure observer unit tests.
+const mainText=fs.readFileSync(new URL('../game/main.js',import.meta.url),'utf8');
+assert.ok(mainText.includes('spawnJobEvidence.sample(state, Game, Memory)'),
+  'real runtime must call the longitudinal witness, not one-tick observer');
+const homeStart=mainText.indexOf('rooms[state.room.name] = {');
+const homeEnd=mainText.indexOf('};',homeStart);
+assert.ok(homeStart>=0&&homeEnd>homeStart);
+const roomFields=mainText.slice(homeStart,homeEnd);
+assert.ok(roomFields.includes('spawnJobEvidence:'));
+assert.ok(roomFields.indexOf('spawnJobEvidence:')<
+  roomFields.indexOf('economyModel:'),
+  'journal 30-field truncation must not remove spawn witness');
+
+const toolsDir=path.dirname(fileURLToPath(import.meta.url));
+process.env.NODE_PATH=path.resolve(toolsDir,'../game');
+Module._initPaths();
+const requireGame=createRequire(import.meta.url);
+globalThis.Memory={bot:{sessionId:'O20-serializer-test'}};
+globalThis.Game={time:701};
+const logger=requireGame('../game/logger.js');
+const observed={...third};
+const syntheticSnapshot={
+  cpu:3.5,bucket:10000,gcl:{level:2},
+  totalCreeps:4,
+  rooms:{E8N1:{
+    rcl:6,controllerProgress:1,controllerProgressTotal:5,
+    ticksToDowngrade:2000,safeModeRemainingTicks:0,
+    safeModeCooldownRemainingTicks:0,
+    energyAvailable:700,energyCapacity:1050,
+    energyStored:3320,creeps:{repairer:2},
+    constructionSites:1,hostiles:1,spawnBusy:true,
+    spawnRemainingTime:null,spawnJobEvidence:observed,
+    economy:{},economyModel:{}
+  }}
+};
+let logLine=null;
+const originalLog=console.log;
+console.log=line=>{logLine=String(line);};
+try {
+ logger.info('STATUS_SNAPSHOT','snapshot',syntheticSnapshot,{
+   force:true,persist:false,dedupeTicks:0});
+}finally{console.log=originalLog;}
+assert.ok(logLine?.startsWith('[BOTLOG]'));
+const journalPayload=JSON.parse(logLine.slice('[BOTLOG]'.length));
+const serialized=journalPayload.ctx.rooms.E8N1.spawnJobEvidence;
+assert.equal(serialized.status,'ACTIVE_JOB_TIMING_OBSERVED');
+assert.equal(serialized.sameJobObservedGameTickSpan,201);
+assert.equal(serialized.sameJobExceeds150ObservedTicks,true);
+assert.equal(serialized.canAuthorizeCancel,false);
+assert.ok(!logLine.includes('private-repairer'));
+assert.ok(!logLine.includes('private-spawn-id'));
+const record=Memory.bot.telemetryJournal.snapshots.at(-1);
+assert.equal(record.c,'STATUS_SNAPSHOT');
+assert.equal(record.x.rooms.E8N1.spawnJobEvidence.sameJobObservedGameTickSpan,201);
 
 console.log('O20 in-game spawn-job evidence (read-only) regression PASS');
