@@ -2,7 +2,7 @@ name: Screeps Newbieland expansion diagnostics (GET only)
 on:
   workflow_dispatch:
   push:
-    branches: [main, observability/o17-expansion-blocker-provenance-20261016]
+    branches: [main]
     paths:
       - .github/workflows/screeps-newbieland-expansion-readonly.yml
       - tools/newbieland-expansion-readonly.mjs
