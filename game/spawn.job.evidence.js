@@ -110,7 +110,7 @@ function sample(state, game, memory) {
   const bot = memory && memory.bot;
   const room = state && state.room && state.room.name;
   const validRoom = typeof room === 'string' &&
-    /^(E|W)\\d+(N|S)\\d+$/.test(room);
+    /^(E|W)\d+(N|S)\d+$/.test(room);
   if (!bot || typeof bot !== 'object' || Array.isArray(bot) ||
       !validRoom || !tick(game && game.time)) return result;
   // One bounded entry per room; don't overwrite untrusted or oversized state.
@@ -120,7 +120,9 @@ function sample(state, game, memory) {
     bot.spawnJobWitness = watches;
   }
   if (!watches || typeof watches !== 'object' || Array.isArray(watches) ||
-      Object.keys(watches).length > 8) return result;
+      Object.keys(watches).length > 8 ||
+      (Object.keys(watches).length >= 8 &&
+       !Object.prototype.hasOwnProperty.call(watches, room))) return result;
   const spawn = state.spawn;
   const spawnId = spawn && typeof spawn.id === 'string' &&
     spawn.id.length >= 1 && spawn.id.length <= 100 ? spawn.id : null;
