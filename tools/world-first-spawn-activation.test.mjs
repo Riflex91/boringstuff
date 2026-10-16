@@ -19,7 +19,8 @@ const placement={status:'PASS',spawnVerified:true,
  target:{shard:'shard0',room:'W37N11',x:12,y:13},
  activeBranch:'default',worldCodeActivated:false};
 function fake({missingSpawn=false,codeChanged=false,alreadyActive=false,
- reject=false,throwActivation=false}={}) {
+ reject=false,throwActivation=false,worldStatus='normal',
+ worldStatusAfterActivation=null}={}) {
  let active=alreadyActive?'chatgpt':'default',count=0;
  const calls=[];
  const api={defaultShard:'shard0',
@@ -30,7 +31,9 @@ function fake({missingSpawn=false,codeChanged=false,alreadyActive=false,
        x:12,y:13,user:'my-user-id'}]};
    },
    async userWorldStatus() {
-     calls.push('GET_STATUS');return {status:'normal'};
+     calls.push('GET_STATUS');return {status:active==='chatgpt' &&
+       worldStatusAfterActivation!==null
+       ?worldStatusAfterActivation:worldStatus};
    },
    async userBranches() {
      calls.push('GET_BRANCHES');return {list:[
@@ -62,7 +65,7 @@ function fake({missingSpawn=false,codeChanged=false,alreadyActive=false,
  assert.equal(actual.activeBranch,'chatgpt');
  assert.equal(actual.activationApiCalls,1);
  assert.equal(f.count(),1);
- assert.equal(f.calls.at(-1),'GET_BRANCHES');
+ assert.equal(f.calls.at(-1),'GET_STATUS');
 }
 {
  const f=fake();
@@ -76,6 +79,26 @@ for(const scenario of [{missingSpawn:true},{codeChanged:true},
  await assert.rejects(()=>activateVerifiedWorldSpawn(f.api,'my-user-id',placement));
  assert.equal(f.count(),0,'Never activate when spawn/code/branch is unverified');
 }
+// Existing pinned spawn is not evidence of a live account. Both the first
+// GET and final before-POST GET must demand World NORMAL.
+for(const status of ['lost','empty','paused','unexpected',null]) {
+ const f=fake({worldStatus:status});
+ await assert.rejects(
+  ()=>activateVerifiedWorldSpawn(f.api,'my-user-id',placement),
+  /WORLD_SPAWN_BRANCH_OR_ACCOUNT_CHANGED/);
+ assert.equal(f.count(),0,
+   'A historical spawn must never authorize World activation from LOST');
+ assert.ok(f.calls.includes('GET_STATUS'));
+}
+{
+ const f=fake({worldStatusAfterActivation:'lost'});
+ await assert.rejects(
+  ()=>activateVerifiedWorldSpawn(f.api,'my-user-id',placement),
+  /WORLD_ACTIVATION_NOT_VERIFIED/);
+ assert.equal(f.count(),1,'Never retry uncertain status after a POST');
+ assert.equal(f.calls.at(-1),'GET_STATUS');
+}
+
 for(const scenario of [{reject:true},{throwActivation:true}]) {
  const f=fake(scenario);
  await assert.rejects(()=>activateVerifiedWorldSpawn(f.api,'my-user-id',placement));
