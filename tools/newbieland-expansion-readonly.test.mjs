@@ -502,4 +502,27 @@ assert.equal(compareActiveSpawnJobs(ownSpawnJob,
   {objects:[{type:'spawn',user:'own',_id:'not-ours',
     spawning:{name:'private-def'}}]},{_id:'own'}).status,'UNVERIFIED');
 
+
+const oldSpawnMemory={data:JSON.stringify({
+  'private-def':{role:'repairer',born:3500}
+})};
+const stuckJob=summarizeSpawnRoleFromCreepMemory(
+  ownSpawnJob,oldSpawnMemory,{_id:'own'},4015);
+assert.equal(stuckJob.status,'SPAWNING_ROLE_CONFIRMED_BY_CREEP_MEMORY');
+assert.equal(stuckJob.role,'repairer');
+assert.equal(stuckJob.jobAgeFromRetainedJournalTicks,515);
+assert.equal(stuckJob.exceeds150TickMaximumIfSameJob,true);
+assert.equal(stuckJob.sameJobAndTickProvenanceVerified,false);
+assert.ok(!JSON.stringify(stuckJob).includes('private'));
+const freshJob=summarizeSpawnRoleFromCreepMemory(
+  ownSpawnJob,{data:JSON.stringify({
+    'private-def':{role:'defender',born:4000}
+  })},{_id:'own'},4015);
+assert.equal(freshJob.jobAgeFromRetainedJournalTicks,15);
+assert.equal(freshJob.exceeds150TickMaximumIfSameJob,false);
+assert.equal(summarizeSpawnRoleFromCreepMemory(
+  ownSpawnJob,{data:JSON.stringify({
+    'private-def':{role:'worker',born:'old'}
+  })},{_id:'own'},4015).jobAgeFromRetainedJournalTicks,null);
+
 console.log('Newbieland GET-only expansion evidence tests passed');
