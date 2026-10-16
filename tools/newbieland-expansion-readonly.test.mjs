@@ -369,4 +369,24 @@ assert.equal(progress.gameTickProgressIndependentlyVerified,false);
 assert.equal(compareRetainedJournalProgress(
   {data:JSON.stringify(progressData)},reply,branch).status,'UNVERIFIED');
 
+
+const countedGarrison=structuredClone(blockedParentData);
+countedGarrison.telemetryJournal.snapshots[1].x.rooms.E8N1.creeps={
+  harvester:2,hauler:3,worker:2,upgrader:1,repairer:1
+};
+const foundGarrison=inspectNewbielandExpansion(
+  {data:JSON.stringify(countedGarrison)},branch).parentBlockerEvidence;
+assert.equal(foundGarrison.roomLocalRolesVerified,true);
+assert.equal(foundGarrison.roomLocalDefenders,0);
+assert.equal(foundGarrison.roomLocalHaulers,3);
+assert.equal(foundGarrison.roomLocalHarvesters,2);
+assert.equal(foundGarrison.roomLocalScouts,0);
+const truncatedGarrison=structuredClone(countedGarrison);
+truncatedGarrison.telemetryJournal.snapshots[1].x.rooms.E8N1.creeps
+  .__truncated=true;
+assert.equal(inspectNewbielandExpansion(
+  {data:JSON.stringify(truncatedGarrison)},branch)
+  .parentBlockerEvidence.roomLocalDefenders,null,
+  'truncated role object must never assert zero defenders');
+
 console.log('Newbieland GET-only expansion evidence tests passed');
