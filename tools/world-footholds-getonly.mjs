@@ -112,6 +112,16 @@ export function summarizeUserRoomListing(input) {
     const shards=keys.filter(k=>SHARD.test(k));
     if(!shards.length)return unknown;
     for(const shard of shards)if(!add(source[shard],shard))return unknown;
+    // Enforce GLOBAL request bound and unique locators BEFORE either a
+    // partial or complete listing is permitted to drive follow-up GETs.
+    // A per-shard limit alone could otherwise trigger hundreds of reads.
+    if(rows.length>MAX_ROOMS)return {
+      ...unknown,reason:'USER_ROOMS_LIMIT_EXCEEDED'
+    };
+    const shardUnique=new Set(rows.map(x=>x.shard+':'+x.room));
+    if(shardUnique.size!==rows.length)return {
+      ...unknown,reason:'USER_ROOMS_DUPLICATES'
+    };
     // Some servers include extra sections (e.g. sim). Do not silently
     // discard them and claim complete multi-shard account coverage.
     if(shards.length!==keys.length)return {
