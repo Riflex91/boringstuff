@@ -92,6 +92,57 @@ assert.equal(evidence.rescue.last.completedTick,200);
 assert.equal(evidence.rescue.active,null);
 assert.equal(evidence.witnessedSpawnRoomCount,2);
 assert.equal(evidence.latestSnapshotTick,300);
+
+const trajectory=evidence.collapseTimeline;
+assert.equal(trajectory.status,'RETAINED_SNAPSHOTS_ONLY');
+assert.equal(trajectory.currentGameTickVerified,false);
+assert.equal(trajectory.fullCollapseHistoryVerified,false);
+assert.equal(trajectory.firstRetainedTick,200);
+assert.equal(trajectory.latestRetainedTick,300);
+assert.equal(trajectory.reportedSnapshotCount,2);
+assert.deepEqual(trajectory.snapshots.map(item=>item.tick),[200,300]);
+assert.equal(trajectory.snapshots[0].homePresent,true);
+assert.equal(trajectory.snapshots[0].observedHomeCreeps,null);
+assert.equal(trajectory.snapshots[1].observedHomeCreeps,4);
+assert.equal(trajectory.snapshots[1].healthStatus,'WATCH');
+assert.equal(trajectory.snapshots[1].spawnMissingHealthFlag,false);
+assert.equal(trajectory.snapshots[1].modeledHarvestCapacityPerTick,15.5);
+assert.ok(!JSON.stringify(trajectory).includes('unexposed-source-'),
+  'historical snapshots must not expose source or creep IDs');
+const lostHistory=structuredClone(original);
+lostHistory.telemetryJournal.snapshots.push({
+  c:'STATUS_SNAPSHOT',t:400,x:{rooms:{W37S79:{
+    rcl:4,energyAvailable:0,energyCapacity:0,creeps:{},
+    health:{status:'CRITICAL',overallScore:45,
+      reasons:['SPAWN_MISSING','MINING_DEFICIT']},
+    economyModel:{dedicatedHarvestCapacityPerTick:0}
+  }}}
+});
+const lostTrail=inspectWorldRecoveryEvidence({data:JSON.stringify(lostHistory)})
+  .collapseTimeline;
+assert.deepEqual(lostTrail.snapshots.map(row=>row.tick),[200,300,400]);
+assert.equal(lostTrail.snapshots[2].spawnMissingHealthFlag,true);
+assert.equal(lostTrail.snapshots[2].observedHomeCreeps,0);
+assert.equal(lostTrail.snapshots[2].modeledHarvestCapacityPerTick,0);
+assert.equal(lostTrail.fullCollapseHistoryVerified,false,
+  'two observations cannot prove what caused the collapse');
+const duplicateHistory=structuredClone(lostHistory);
+duplicateHistory.telemetryJournal.snapshots.push(
+  structuredClone(duplicateHistory.telemetryJournal.snapshots.at(-1)));
+assert.equal(inspectWorldRecoveryEvidence({data:JSON.stringify(duplicateHistory)})
+  .collapseTimeline.status,'UNVERIFIED');
+const damagedHistory=structuredClone(lostHistory);
+damagedHistory.telemetryJournal.snapshots[1].x.rooms.W37S79.creeps
+  .hauler='3';
+damagedHistory.telemetryJournal.snapshots[1].x.rooms.W37S79.health
+  .reasons=['SPAWN_MISSING','<bad>'];
+const damagedTimeline=inspectWorldRecoveryEvidence({
+  data:JSON.stringify(damagedHistory)}).collapseTimeline;
+assert.equal(damagedTimeline.snapshots[1].observedHomeCreeps,null);
+assert.equal(damagedTimeline.snapshots[1].spawnMissingHealthFlag,null);
+assert.equal(inspectWorldRecoveryEvidence(null).collapseTimeline.status,
+  'UNVERIFIED');
+
 assert.equal(evidence.expansion.source,
   'LIVE_STATUS_SNAPSHOT_NOT_CLAIM_AUTHORITY');
 assert.equal(evidence.expansion.tick,300);

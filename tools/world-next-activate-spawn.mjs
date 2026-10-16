@@ -20,8 +20,10 @@ export function assessActivationState({approval,branches,objects,me,code,status,
   const staged=list.filter(b=>b?.branch===STAGING_BRANCH);
   if(active.length!==1||active[0]?.branch!=='chatgpt')failures.push('ACTIVE_BRANCH_CHANGED');
   if(staged.length!==1||staged[0]?.activeWorld===true)failures.push('STAGING_NOT_INACTIVE');
-  // Post-placement World must no longer be empty. Fail closed on unknown status.
-  if(status?.status==='empty'||typeof status?.status!=='string')failures.push('WORLD_STATUS_NOT_POST_SPAWN');
+  // A historical pinned spawn object can outlive account ownership in the
+  // room-objects API. Only an authoritative NORMAL account state may permit
+  // activation; EMPTY, LOST and every unrecognized string must fail closed.
+  if(status?.status!=='normal')failures.push('WORLD_STATUS_NOT_NORMAL');
   const exact=assessStagedCode(branches,{status:'empty'},code,expected);
   if(!exact.exactInactiveCode)failures.push('STAGED_CODE_NOT_EXACT');
   return {ok:failures.length===0,failures,ownedSpawnVerified:Boolean(owned),
@@ -49,14 +51,16 @@ export async function activateW37S79(api,approval,onPhase=()=>{}){
   catch{throw new Error('ACTIVATION_RESULT_UNCERTAIN_NO_RETRY');}
   if(raw?.ok===false||raw?.error)throw new Error('ACTIVATION_REJECTED_NO_RETRY');
   onPhase('GET_ONLY_ACTIVATION_READBACK');
-  const [branches,objects,me]=await Promise.all([
-    api.userBranches(),api.gameRoomObjects(target.room,target.shard),api.authMe()]);
+  const [branches,objects,me,worldStatus]=await Promise.all([
+    api.userBranches(),api.gameRoomObjects(target.room,target.shard),
+    api.authMe(),api.userWorldStatus()]);
   const active=Array.isArray(branches?.list)?branches.list.filter(b=>b?.activeWorld===true):[];
   const id=me?._id||me?.id;
   const owned=Array.isArray(objects?.objects)&&objects.objects.some(o=>
     (o?.type==='spawn'||o?.structureType==='spawn')&&o.x===target.x&&o.y===target.y&&
     o.name===target.spawnName&&String(o.user||'')===String(id));
-  if(!owned||active.length!==1||active[0]?.branch!==STAGING_BRANCH)
+  if(!owned||active.length!==1||active[0]?.branch!==STAGING_BRANCH||
+     worldStatus?.status!=='normal')
     throw new Error('ACTIVATION_READBACK_UNVERIFIED_NO_RETRY');
   return {status:'PASS',branch:STAGING_BRANCH,spawnVerified:true,
     activationApiCalls:1,placementAttempted:false};
