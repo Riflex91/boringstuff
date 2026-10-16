@@ -183,6 +183,66 @@ export function compareRoomDefenseGetPairs(first,second,me) {
   };
 }
 
+// Two GETs do not share an authoritative game tick. Preserve only signed
+// aggregate tower-energy delta for the SAME opaque tower IDs. Refill during the
+// interval may offset consumption; delta must not be called shots fired.
+export function compareTowerEnergyGetPairs(first,second,me) {
+  const self=me?._id ?? me?.id;
+  const unknown={status:'UNVERIFIED',reason:'TOWER_PAIR_NOT_VERIFIABLE',
+    consumptionVerified:false,refillsExcluded:false};
+  if(typeof self!=='string'||!self)return unknown;
+  const ident=o=>typeof o?.id==='string'&&o.id?o.id:
+    typeof o?._id==='string'&&o._id?o._id:null;
+  const group=r=>{
+    if(!Array.isArray(r?.objects)||r.objects.length>2500)return null;
+    const ts=r.objects.filter(o=>(o?.type??o?.structureType)==='tower' &&
+      o.user===self);
+    if(!ts.length||ts.length>6)return null;
+    const map=new Map();
+    for(const tower of ts) {
+      const id=ident(tower);
+      const energy=tower?.store?.energy??tower?.energy;
+      if(!id||map.has(id)||!Number.isSafeInteger(energy) ||
+        energy<0||energy>1000)return null;
+      map.set(id,energy);
+    }
+    return map;
+  };
+  const a=group(first),b=group(second);
+  if(!a||!b||a.size!==b.size||[...a.keys()].some(k=>!b.has(k)))
+    return unknown;
+  const initial=[...a.values()].reduce((n,v)=>n+v,0);
+  const final=[...b.values()].reduce((n,v)=>n+v,0);
+  return {
+    status:'SAME_TOWERS_OBSERVED_TWICE',
+    towerCount:a.size,
+    firstEnergySum:initial,secondEnergySum:final,
+    netTowerEnergyChange:final-initial,
+    consumptionVerified:false,refillsExcluded:false
+  };
+}
+
+// Journal events are game-code tick witnesses, not independently verified
+// server-current game time or evidence of successful tower commands.
+export function compareRetainedJournalProgress(first,second,branches) {
+  const a=inspectNewbielandExpansion(first,branches);
+  const b=inspectNewbielandExpansion(second,branches);
+  const unknown={status:'UNVERIFIED',reason:'RETAINED_JOURNAL_TICKS_UNVERIFIED',
+    gameTickProgressIndependentlyVerified:false};
+  if(a.status!=='OBSERVED_RETAINED'||b.status!=='OBSERVED_RETAINED'||
+     !goodTick(a.journalLatestTick)||!goodTick(b.journalLatestTick)||
+     b.journalLatestTick<a.journalLatestTick)
+    return unknown;
+  return {status:'RETAINED_JOURNAL_PROGRESS_OBSERVED',
+    firstRetainedJournalTick:a.journalLatestTick,
+    secondRetainedJournalTick:b.journalLatestTick,
+    journalTickDelta:b.journalLatestTick-a.journalLatestTick,
+    gameTickProgressIndependentlyVerified:false,
+    firstTowerWarnCount:a.retainedTowerEngagements?.eventCount??null,
+    secondTowerWarnCount:b.retainedTowerEngagements?.eventCount??null
+  };
+}
+
 // Diagnostic TOWER_ENGAGE logging is an issued tower action path, NOT proof
 // of actual hits. Lack of retained WARN events cannot prove no attacks.
 export function summarizeRetainedTowerEngagements(bot, journalTick) {
@@ -271,9 +331,16 @@ async function main() {
   // foreign ID with identical HP provides persistence evidence, but does not
   // prove that server ticks advanced or that any attacks were accepted.
   await pause(15000);
-  const later=await api.gameRoomObjects(HOME).catch(()=>null);
+  const [later,laterMemory]=await Promise.all([
+    api.gameRoomObjects(HOME).catch(()=>null),
+    api.userMemory('bot').catch(()=>null)
+  ]);
   result.roomDefenseComparison=compareRoomDefenseGetPairs(
     roomObjects,later,me);
+  result.towerEnergyComparison=compareTowerEnergyGetPairs(
+    roomObjects,later,me);
+  result.retainedJournalProgress=compareRetainedJournalProgress(
+    reply,laterMemory,branches);
   console.log('NEWBIELAND_EXPANSION_GET_ONLY '+JSON.stringify(result));
   if (result.status!=='OBSERVED_RETAINED') process.exitCode=2;
 }
