@@ -1,0 +1,87 @@
+name: Screeps World W37S79 one-shot user-approved first Spawn1
+on:
+  push:
+    branches: [bootstrap/world-w37s79-userapproved-20261016]
+    paths:
+      - .github/workflows/screeps-world-w37s79-approved-placement.yml
+permissions:
+  contents: read
+concurrency:
+  group: screeps-world-chatgpt
+  cancel-in-progress: false
+jobs:
+  place-one-initial-spawn:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: tools
+    env:
+      SCREEPS_TOKEN_WORLD: ${{ secrets.SCREEPS_TOKEN_WORLD }}
+      WORLD_W37S79_PLACEMENT_APPROVAL: PLACE_W37S79_37_26_ONLY
+      EXPECTED_MAIN_SHA: bc43f2faf1f345e63d9bfe78b6bbaa59e5eaab0c
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - name: Enforce exact unchanged production main gameplay and placement guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${{ github.ref }}" = "refs/heads/bootstrap/world-w37s79-userapproved-20261016"
+          test "$WORLD_W37S79_PLACEMENT_APPROVAL" = "PLACE_W37S79_37_26_ONLY"
+          git fetch origin main --quiet
+          test "$(git rev-parse origin/main)" = "$EXPECTED_MAIN_SHA"
+          git diff --exit-code "$EXPECTED_MAIN_SHA" HEAD -- game/ tools/world-next-place-spawn.mjs tools/world-next-staged-readiness.mjs tools/world-next-target-threat-ring.mjs tools/spawn-safety.mjs tools/screeps-client.mjs
+          echo "WORLD_PLACEMENT_EXACT_MAIN_GAME_AND_SAFETY_GUARD_VALIDATED"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Full canonical regression tests and four P3 checks
+        run: |
+          npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+          npm test
+          npm run bench:p3
+      - name: Two independently fresh 24-room preflights then one authorized Spawn1 placement
+        run: node world-next-place-spawn.mjs
+      - name: Verify World account and exact owned Spawn1 via GET only, never retry placement
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import path from 'node:path';
+          import {setTimeout as sleep} from 'node:timers/promises';
+          import {ScreepsHttpClient} from './screeps-client.mjs';
+          import {buildWorldConfig} from './world-deployment-profile.mjs';
+          const file=path.join(process.env.RUNNER_TEMP,'world-firstspawn-postcheck-'+process.pid+'.json');
+          fs.writeFileSync(file,JSON.stringify(buildWorldConfig(process.env)),{mode:0o600,flag:'wx'});
+          try {
+            const api=await ScreepsHttpClient.fromConfig('world',{file,shard:'shard0'});
+            const me=await api.authMe();
+            if(me.username!=='riflex91'||!(me._id||me.id))
+              throw Error('WORLD_OWNER_UNVERIFIED');
+            const id=me._id||me.id;
+            let last=null;
+            for(let i=0;i<6;i++){
+              const [status,branches,room]=await Promise.all([
+                api.userWorldStatus(),api.userBranches(),
+                api.gameRoomObjects('W37S79','shard0')
+              ]);
+              const spawns=Array.isArray(room?.objects)?
+                room.objects.filter(x=>(x?.type==='spawn'||x?.structureType==='spawn')&&
+                  x?.user===id && x?.name==='Spawn1'&&x?.x===37&&x?.y===26):[];
+              const active=Array.isArray(branches?.list)?
+                branches.list.filter(x=>x.activeWorld===true):[];
+              last={accountStatus:status?.status??null,
+                exactOwnedSpawnCount:spawns.length,
+                chatgptSoleActive:active.length===1&&active[0].branch==='chatgpt'};
+              if(last.accountStatus==='normal'&&last.exactOwnedSpawnCount===1&&
+                 last.chatgptSoleActive)break;
+              if(i<5)await sleep(1500);
+            }
+            console.log('WORLD_FIRST_SPAWN_POSTCHECK_GET_ONLY '+JSON.stringify(last));
+            if(last?.accountStatus!=='normal'||last?.exactOwnedSpawnCount!==1||
+               last?.chatgptSoleActive!==true)
+              throw Error('WORLD_FIRST_SPAWN_POSTCHECK_UNVERIFIED_NO_RETRY');
+          }finally{fs.rmSync(file,{force:true});}
+          NODE
