@@ -1,6 +1,7 @@
 // Newbieland expansion diagnosis — authenticated GET-only game observation.
 // No code upload, spawn, controller, memory, or branch mutation.
 import { pathToFileURL } from 'node:url';
+import { gunzipSync } from 'node:zlib';
 import { setTimeout as pause } from 'node:timers/promises';
 import { summarizeRetainedIntelFrontier } from './newbieland-intel-frontier.mjs';
 import { ScreepsHttpClient } from './screeps-client.mjs';
@@ -306,6 +307,91 @@ export function summarizeActiveSpawnJob(roomReply,bot,me,journalTick) {
     receiptTick:matches[0].t,currentGameTickVerified:false};
 }
 
+// Role from Memory.creeps is fetched through authenticated GET only;
+// no raw memory, names, object IDs, position or body fields are ever emitted.
+// Missing names, payload formats and untrusted role names remain UNKNOWN.
+const ROLES=new Set(['defender','harvester','hauler','worker',
+  'upgrader','builder','repairer','scout']);
+function decodeCreepMemoryReply(reply) {
+  let value=reply;
+  for(let step=0;step<5;step++){
+    if(typeof value==='string'){
+      try{
+        value=value.startsWith('gz:')
+          ?JSON.parse(gunzipSync(Buffer.from(value.slice(3),'base64'),
+            {maxOutputLength:4_000_000}).toString('utf8'))
+          :JSON.parse(value);
+      }catch{return null}
+      continue;
+    }
+    if(!value||typeof value!=='object'||Array.isArray(value))return null;
+    if(Object.hasOwn(value,'data')){
+      value=value.data;
+      continue;
+    }
+    return value;
+  }
+  return null;
+}
+export function summarizeSpawnRoleFromCreepMemory(roomReply,creepReply,me){
+  const self=me?._id??me?.id;
+  if(typeof self!=='string'||!self||!Array.isArray(roomReply?.objects)||
+     roomReply.objects.length>2500)return {status:'UNVERIFIED',
+       reason:'SPAWN_OBJECTS_OR_ACCOUNT_UNKNOWN'};
+  const objects=roomReply.objects.filter(o=>
+    (o?.type??o?.structureType)==='spawn'&&o.user===self);
+  if(objects.length!==1)return {status:'UNVERIFIED',
+    reason:'EXACTLY_ONE_OWN_SPAWN_NOT_VERIFIED'};
+  const spawning=objects[0].spawning;
+  if(!spawning||typeof spawning!=='object'||Array.isArray(spawning)||
+     typeof spawning.name!=='string'||!spawning.name||
+     spawning.name.length>128)return {status:'UNVERIFIED',
+       reason:'ACTIVE_SPAWN_JOB_NAME_NOT_VERIFIED'};
+  const memory=decodeCreepMemoryReply(creepReply);
+  if(!memory||Object.keys(memory).length>5000 ||
+     !Object.hasOwn(memory,spawning.name))return {status:'UNVERIFIED',
+       reason:'SPAWNING_CREEP_MEMORY_UNVERIFIED'};
+  const role=memory[spawning.name]?.role;
+  if(!ROLES.has(role))return {status:'UNVERIFIED',
+    reason:'SPAWNING_CREEP_ROLE_UNVERIFIED'};
+  return {status:'SPAWNING_ROLE_CONFIRMED_BY_CREEP_MEMORY',
+    role,activeSpawnJobVerified:true,
+    observationSharedServerTickVerified:false};
+}
+
+// Same opaque job name and own spawn identity across two GETs; does not
+// assert server ticks advanced, and excludes all unverified fields.
+export function compareActiveSpawnJobs(first,second,me){
+  const self=me?._id??me?.id;
+  const read=reply=>{
+    if(typeof self!=='string'||!self||!Array.isArray(reply?.objects)||
+      reply.objects.length>2500)return null;
+    const spawns=reply.objects.filter(o=>
+      (o?.type??o?.structureType)==='spawn'&&o.user===self);
+    if(spawns.length!==1)return null;
+    const own=spawns[0];
+    const id=typeof own.id==='string'&&own.id?own.id:
+      typeof own._id==='string'&&own._id?own._id:null;
+    const job=own.spawning;
+    if(!id||!job||typeof job!=='object'||Array.isArray(job)||
+      typeof job.name!=='string'||!job.name)return null;
+    const remaining=Number.isSafeInteger(job.remainingTime) &&
+      job.remainingTime>=0&&job.remainingTime<=150?
+      job.remainingTime:null;
+    return {id,name:job.name,remaining};
+  };
+  const a=read(first),b=read(second);
+  if(!a||!b||a.id!==b.id)return {status:'UNVERIFIED',
+    reason:'ACTIVE_SPAWN_PAIR_NOT_VERIFIED'};
+  return {status:'SAME_OWN_SPAWN_OBSERVED_TWICE',
+    sameJobName:a.name===b.name,
+    firstRemainingTime:a.remaining,
+    secondRemainingTime:b.remaining,
+    remainingTimeChange:a.remaining!==null&&b.remaining!==null?
+      b.remaining-a.remaining:null,
+    serverGameTickDeltaVerified:false};
+}
+
 // Count only retained *accepted* spawn events; no accepted receipt does not
 // prove no attempted spawns, and no event log indicates the job role.
 export function summarizeRecentSpawnReceipts(bot,journalTick) {
@@ -430,16 +516,19 @@ async function main() {
     process.exitCode=2;
     return;
   }
-  const [reply,me,roomObjects]=await Promise.all([
+  const [reply,me,roomObjects,creepMemoryReply]=await Promise.all([
     api.userMemory('bot'),
     api.authMe().catch(()=>null),
-    api.gameRoomObjects(HOME).catch(()=>null)
+    api.gameRoomObjects(HOME).catch(()=>null),
+    api.userMemory('creeps').catch(()=>null)
   ]);
   const result=inspectNewbielandExpansion(reply,branches);
   result.roomDefenseObjects=summarizeRoomDefenseObjects(roomObjects,me);
   const bot=parseBotMemory(reply);
   result.activeSpawnJob=summarizeActiveSpawnJob(
     roomObjects,bot,me,result.journalLatestTick);
+  result.spawnJobMemoryRole=summarizeSpawnRoleFromCreepMemory(
+    roomObjects,creepMemoryReply,me);
   result.recentSpawnReceipts=summarizeRecentSpawnReceipts(
     bot,result.journalLatestTick);
   // One further GET after 15 seconds, never a gameplay intent. A stable
@@ -453,6 +542,8 @@ async function main() {
   result.roomDefenseComparison=compareRoomDefenseGetPairs(
     roomObjects,later,me);
   result.towerEnergyComparison=compareTowerEnergyGetPairs(
+    roomObjects,later,me);
+  result.spawnJobComparison=compareActiveSpawnJobs(
     roomObjects,later,me);
   result.retainedJournalProgress=compareRetainedJournalProgress(
     reply,laterMemory,branches);
