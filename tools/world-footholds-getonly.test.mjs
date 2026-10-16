@@ -487,4 +487,18 @@ const safelyUnknown=compareWorldRetainedMemoryPairs(
  {data:JSON.stringify(malformedHome)},601,606);
 assert.equal(safelyUnknown.latestAlignedInGameHomeSnapshot.spawnMissingReported,null);
 
+
+const recentButNotAligned=structuredClone(JSON.parse(alignedBotMemory.data));
+recentButNotAligned.telemetryJournal.events.push({
+ c:'BOT_HEARTBEAT',t:625,x:{rooms:1,creeps:0,cpu:1.2,bucket:10000}
+});
+const matchedOlder=compareWorldRetainedMemoryPairs(
+ {data:JSON.stringify(recentButNotAligned)},
+ {data:JSON.stringify(recentButNotAligned)},627,630);
+assert.equal(matchedOlder.latestBotHeartbeat.tick,625);
+assert.equal(matchedOlder.latestAlignedInGameHomeSnapshot.tick,600,
+ 'older aligned 100-tick pair must survive a newer 25-tick heartbeat');
+assert.equal(matchedOlder.latestAlignedInGameHomeSnapshot.spawnMissingReported,true);
+assert.equal(matchedOlder.latestAlignedInGameHomeSnapshot.gameTotalCreeps,0);
+
 console.log('World O22 GET-only cross-shard foothold safety regression PASS');
