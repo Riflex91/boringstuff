@@ -152,7 +152,7 @@ const mainText=fs.readFileSync(new URL('../game/main.js',import.meta.url),'utf8'
 assert.ok(mainText.includes('spawnJobEvidence.sample(state, Game, Memory)'),
   'real runtime must call the longitudinal witness, not one-tick observer');
 const homeStart=mainText.indexOf('rooms[state.room.name] = {');
-const homeEnd=mainText.indexOf('};',homeStart);
+const homeEnd=mainText.indexOf("    };\n  }\n  logger.info('STATUS_SNAPSHOT'",homeStart);
 assert.ok(homeStart>=0&&homeEnd>homeStart);
 const roomFields=mainText.slice(homeStart,homeEnd);
 assert.ok(roomFields.includes('spawnJobEvidence:'));
