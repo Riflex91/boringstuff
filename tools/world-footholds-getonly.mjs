@@ -42,6 +42,20 @@ export function summarizeRoomListingResponseShape(input) {
     } else if(value&&typeof value==='object') {
       row.shardKeys=Object.keys(value)
         .filter(key=>SHARD.test(key)).slice(0,15);
+      row.shardShapes=row.shardKeys.map(shard=>{
+        const content=value[shard];
+        const info={shard,kind:kind(content)};
+        if(Array.isArray(content)) {
+          info.length=content.length;
+          info.sampleItemKind=content.length?kind(content[0]):null;
+          if(content[0]&&typeof content[0]==='object'&&
+             !Array.isArray(content[0]))
+            info.sampleKnownFields=['room','name','shard',
+              'rooms','level','controller','_id','id']
+              .filter(field=>Object.hasOwn(content[0],field));
+        }
+        return info;
+      });
       const shardKey=row.shardKeys[0];
       if(shardKey) {
         const shardValue=value[shardKey];
