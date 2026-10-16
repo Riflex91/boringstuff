@@ -82,6 +82,19 @@ export function summarizeRoomDefenseObjects(reply, me) {
       ['attack','ranged_attack','work','heal'].includes(part.type)).length;
   };
   const foreignCombat=otherCreeps.map(countActiveCombat);
+  const trustedBody=foreignCombat.every(v=>v!==null);
+  const activeTypes=['attack','ranged_attack','heal','work','tough'];
+  const activeForeignParts=trustedBody
+    ?Object.fromEntries(activeTypes.map(type=>[type,
+      otherCreeps.reduce((total,c)=>total+
+        c.body.filter(part=>part.hits>0&&part.type===type).length,0)]))
+    :null;
+  const pos=o=>Number.isSafeInteger(o?.x)&&o.x>=0&&o.x<50 &&
+    Number.isSafeInteger(o?.y)&&o.y>=0&&o.y<50;
+  const positionsVerifiable=towers.length>0&&otherCreeps.length>0&&
+    [...towers,...otherCreeps].every(pos);
+  const ranges=positionsVerifiable?towers.flatMap(t=>otherCreeps.map(c=>
+    Math.max(Math.abs(t.x-c.x),Math.abs(t.y-c.y)))):[];
   return {
     status:'ROOM_OBJECTS_GET_OBSERVED',room:HOME,
     currentGameTickVerified:false,gameHostilityVerified:false,
@@ -98,8 +111,36 @@ export function summarizeRoomDefenseObjects(reply, me) {
     unknownOwnerCreeps:unknownOwnership,
     otherOwnerCombatOrSupportCreeps:foreignCombat.every(v=>v!==null)?
       foreignCombat.filter(v=>v>0).length:null,
-    otherOwnerUnarmedCreeps:foreignCombat.every(v=>v!==null)?
-      foreignCombat.filter(v=>v===0).length:null
+    otherOwnerUnarmedCreeps:trustedBody?
+      foreignCombat.filter(v=>v===0).length:null,
+    otherOwnerActiveParts:activeForeignParts,
+    closestTowerToForeignCreepRange:positionsVerifiable?
+      Math.min(...ranges):null,
+    furthestTowerToForeignCreepRange:positionsVerifiable?
+      Math.max(...ranges):null
+  };
+}
+
+// Diagnostic TOWER_ENGAGE logging is an issued tower action path, NOT proof
+// of actual hits. Lack of retained WARN events cannot prove no attacks.
+export function summarizeRetainedTowerEngagements(bot, journalTick) {
+  const events=bot?.telemetryJournal?.events;
+  if (!goodTick(journalTick) || !Array.isArray(events) ||
+      events.length>1500)
+    return {status:'UNVERIFIED',reason:'EVENT_WINDOW_NOT_VERIFIABLE'};
+  const matched=events.filter(e=>e?.c==='TOWER_ENGAGE' &&
+    e?.x?.room===HOME);
+  if (matched.some(e=>!goodTick(e.t) || e.t>journalTick))
+    return {status:'UNVERIFIED',reason:'TOWER_EVENT_TICK_INVALID'};
+  const recent=matched.filter(e=>journalTick-e.t<=150);
+  return {
+    status:'RETAINED_EVENTS_ONLY',
+    journalTick,
+    timeWindowJournalTicks:150,
+    fullWindowCoverageVerified:false,
+    attackSuccessVerified:false,
+    eventCount:recent.length,
+    lastEventTick:recent.length?Math.max(...recent.map(e=>e.t)):null
   };
 }
 
@@ -142,6 +183,7 @@ export function inspectNewbielandExpansion(reply, branches) {
     currentGameTickVerified:false,
     expansionEvidence:evidence,
     parentBlockerEvidence:summarizeParentBlockerEvidence(latest,HOME),
+    retainedTowerEngagements:summarizeRetainedTowerEngagements(bot,journalLatestTick),
     retainedIntelFrontier:summarizeRetainedIntelFrontier(bot,journalLatestTick,HOME)
   };
 }
