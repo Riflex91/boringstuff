@@ -280,4 +280,23 @@ const idChanged=compareWorldRoomGetPairs(changingRoom1,
 assert.equal(idChanged.controllerDowngradeTicksDelta,null);
 assert.equal(idChanged.spawnEnergyDelta,null);
 
+
+// Even a PARTIAL shard-map must not bypass the total 30-room request cap,
+// including when an additional unknown section (e.g. "sim") is present.
+const overGlobal={ok:1,shards:{
+ shard0:Array.from({length:16},(_,i)=>'W'+(i+1)+'S79'),
+ shard1:Array.from({length:15},(_,i)=>'E'+(i+1)+'N1'),
+ sim:['ignored']
+}};
+const rejected=summarizeUserRoomListing(overGlobal);
+assert.equal(rejected.status,'UNVERIFIED');
+assert.equal(rejected.reason,'USER_ROOMS_LIMIT_EXCEEDED');
+assert.equal(rejected.returnedRooms.length,0,
+ 'unbounded partial lists must never reach API room GET fanout');
+const duplicatePartial=summarizeUserRoomListing({ok:1,shards:{
+ shard0:['W37S79','W37S79'],sim:[]}
+});
+assert.equal(duplicatePartial.status,'UNVERIFIED');
+assert.equal(duplicatePartial.reason,'USER_ROOMS_DUPLICATES');
+
 console.log('World O22 GET-only cross-shard foothold safety regression PASS');
