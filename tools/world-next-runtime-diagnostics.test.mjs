@@ -14,4 +14,38 @@ assert.ok(assessWorldRuntime({...good,memory:null}).warnings.includes('RECOVERY_
 
 for(const patch of [{room:{objects:[]}},{branches:{list:[{branch:'chatgpt',activeWorld:true}]}},{status:{status:'empty'}},{me:{_id:'other'}}])
   assert.equal(assessWorldRuntime({...good,...patch}).ok,false);
+
+// Regression: a Screeps World account can be LOST even while the room-object
+// API still reports a matching historical spawn object. Never treat the
+// matching object alone as proof of a healthy, deployable colony.
+const lostMemory={data:JSON.stringify({
+  telemetryJournal:{events:[],snapshots:[{
+    c:'STATUS_SNAPSHOT',t:1000,x:{
+      expansionReadiness:{status:'AT_CAPACITY',reasons:['NO_AVAILABLE_CLAIM_SLOT']},
+      rooms:{W37S79:{rcl:4,energyAvailable:0,energyCapacity:0,
+        health:{status:'CRITICAL',overallScore:45,
+          reasons:['SPAWN_MISSING','MINING_DEFICIT']}}}
+    }
+  }]}
+})};
+const lost=assessWorldRuntime({...good,status:{status:'lost'},
+  room:{objects:[good.room.objects[0],good.room.objects[2]]},
+  memory:lostMemory});
+assert.equal(lost.ok,false);
+assert.ok(lost.failures.includes('WORLD_ACCOUNT_LOST'));
+assert.equal(lost.spawnVerified,true);
+assert.equal(lost.ownedCreepCount,0);
+assert.equal(lost.operationalReady,false);
+assert.equal(lost.spawnEvidenceDisagreement,true);
+assert.equal(lost.spawnEvidenceSameTickVerified,false);
+assert.ok(lost.warnings.includes('API_SPAWN_VS_RETAINED_SNAPSHOT_DISAGREE'));
+assert.equal(lost.recoveryEvidence.expansion.home.healthStatus,'CRITICAL');
+const staleButNormal=assessWorldRuntime({...good,memory:lostMemory});
+assert.equal(staleButNormal.ok,true,'do not convert stale snapshot to a current game-state veto');
+assert.equal(staleButNormal.operationalReady,false);
+assert.equal(staleButNormal.spawnEvidenceDisagreement,true);
+assert.equal(assessWorldRuntime(good).operationalReady,true);
+assert.ok(assessWorldRuntime({...good,status:{status:'unrecognized'}})
+  .failures.includes('WORLD_STATUS_INVALID'));
+
 console.log('W37S79 runtime diagnostics: PASS');
