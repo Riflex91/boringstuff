@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { gzipSync } from 'node:zlib';
-import { inspectNewbielandExpansion } from './newbieland-expansion-readonly.mjs';
+import { inspectNewbielandExpansion, summarizeRoomDefenseObjects } from './newbieland-expansion-readonly.mjs';
 
 const branch={list:[{branch:'chatgpt',activeWorld:true}]};
 const snapshot={c:'STATUS_SNAPSHOT',t:2100,x:{
@@ -180,5 +180,45 @@ corruptReasons.telemetryJournal.snapshots[1].x.rooms.E8N1.health
 const corruptResult=inspectNewbielandExpansion(
   {data:JSON.stringify(corruptReasons)},branch);
 assert.equal(corruptResult.parentBlockerEvidence.parentHealthReasons,null);
+
+
+// O17 separate GET-only room-object snapshot. Never infer full Game hostility,
+// never assume that a room-object API response shares a tick with bot Memory.
+const roomDefense=summarizeRoomDefenseObjects({objects:[
+  {type:'spawn',user:'our-id',name:'private-spawn'},
+  {type:'tower',user:'our-id',id:'private-tower',energy:120},
+  {type:'tower',user:'our-id',id:'private-tower-2',store:{energy:0}},
+  {type:'creep',user:'our-id',name:'private-ours',body:[]},
+  {type:'creep',user:'other-id',name:'private-armed',
+    body:[{type:'attack',hits:100},{type:'move',hits:100}]},
+  {type:'creep',user:'another-id',name:'private-unarmed',
+    body:[{type:'move',hits:100}]}
+]}, {_id:'our-id'});
+assert.equal(roomDefense.status,'ROOM_OBJECTS_GET_OBSERVED');
+assert.equal(roomDefense.currentGameTickVerified,false);
+assert.equal(roomDefense.gameHostilityVerified,false);
+assert.equal(roomDefense.crossSnapshotSameTickVerified,false);
+assert.equal(roomDefense.ownTowerObjects,2);
+assert.equal(roomDefense.ownTowersWithEnergyKnown,2);
+assert.equal(roomDefense.towersReadyToAttack,1);
+assert.equal(roomDefense.towerEnergySum,120);
+assert.equal(roomDefense.ownSpawnObjects,1);
+assert.equal(roomDefense.otherOwnerCreeps,2);
+assert.equal(roomDefense.otherOwnerCombatOrSupportCreeps,1);
+assert.equal(roomDefense.otherOwnerUnarmedCreeps,1);
+assert.equal(roomDefense.roomLocalOwnedCreeps,1);
+assert.ok(!JSON.stringify(roomDefense).includes('private-'));
+const incompleteDefense=summarizeRoomDefenseObjects({objects:[
+  {type:'tower',user:'our-id',energy:undefined},
+  {type:'creep',user:'other-id',body:[{type:'attack',hits:'100'}]},
+  {type:'creep',body:[]}
+]}, {_id:'our-id'});
+assert.equal(incompleteDefense.towersReadyToAttack,null);
+assert.equal(incompleteDefense.towerEnergySum,null);
+assert.equal(incompleteDefense.otherOwnerCombatOrSupportCreeps,null);
+assert.equal(incompleteDefense.unknownOwnerCreeps,1);
+assert.equal(summarizeRoomDefenseObjects({objects:[]},null).status,'UNVERIFIED');
+assert.equal(summarizeRoomDefenseObjects({objects:Array(2501).fill({})},
+  {_id:'our-id'}).status,'UNVERIFIED');
 
 console.log('Newbieland GET-only expansion evidence tests passed');
