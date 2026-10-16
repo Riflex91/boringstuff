@@ -19,6 +19,46 @@ function parseRow(row,defaultShard='shard0') {
     typeof shard==='string'&&SHARD.test(shard)?
     {room,shard}:null;
 }
+// Structural discovery ONLY. Does not emit user IDs, room names, player
+// names, user-defined keys, raw response values or tokens.
+export function summarizeRoomListingResponseShape(input) {
+  const kind=x=>Array.isArray(x)?'array':
+    x===null?'null':typeof x;
+  if(!input||typeof input!=='object'||Array.isArray(input))
+    return {responseType:kind(input),knownTopFields:[]};
+  const allowed=['ok','rooms','shards','data','list','stats','ownedRooms'];
+  const top=allowed.filter(k=>Object.hasOwn(input,k));
+  const out={responseType:'object',knownTopFields:top};
+  for(const k of ['rooms','shards','data','list','ownedRooms']) {
+    if(!Object.hasOwn(input,k))continue;
+    const value=input[k];
+    const row={kind:kind(value)};
+    if(Array.isArray(value)) {
+      row.length=value.length;
+      row.sampleItemKind=value.length?kind(value[0]):null;
+      if(value[0]&&typeof value[0]==='object'&&!Array.isArray(value[0]))
+        row.sampleKnownFields=['room','name','shard','rooms','level']
+          .filter(field=>Object.hasOwn(value[0],field));
+    } else if(value&&typeof value==='object') {
+      row.shardKeys=Object.keys(value)
+        .filter(key=>SHARD.test(key)).slice(0,15);
+      const shardKey=row.shardKeys[0];
+      if(shardKey) {
+        const shardValue=value[shardKey];
+        row.firstShardValueKind=kind(shardValue);
+        if(shardValue && typeof shardValue==='object' &&
+           !Array.isArray(shardValue))
+          row.firstShardKnownFields=['rooms','owned','room','name','list']
+            .filter(field=>Object.hasOwn(shardValue,field));
+      }
+      row.knownFields=['rooms','shards','list','room','name','shard']
+        .filter(field=>Object.hasOwn(value,field));
+    }
+    out[k]=row;
+  }
+  return out;
+}
+
 export function summarizeUserRoomListing(input) {
   const unknown={status:'UNVERIFIED',reason:'USER_ROOMS_SHAPE_UNVERIFIED',
     returnedRooms:[],listingComplete:false};
@@ -109,6 +149,8 @@ export async function inspectWorldFootholds(api) {
     accountStatusStable,
     userRoomsStatus:rooms.status,
     userRoomsReason:fetchFailed?'USER_ROOMS_GET_FAILED':rooms.reason,
+    // Only schema metadata; no raw data or even room IDs.
+    userRoomsResponseShape:summarizeRoomListingResponseShape(listing),
     userRoomCount:rooms.listingComplete?rooms.returnedRooms.length:null,
     allListedRoomsChecked:allRoomsChecked,
     roomsWithOwnController:allRoomsChecked?roomsWithController:null,
