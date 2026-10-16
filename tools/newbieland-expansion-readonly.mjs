@@ -333,7 +333,7 @@ function decodeCreepMemoryReply(reply) {
   }
   return null;
 }
-export function summarizeSpawnRoleFromCreepMemory(roomReply,creepReply,me){
+export function summarizeSpawnRoleFromCreepMemory(roomReply,creepReply,me,journalTick){
   const self=me?._id??me?.id;
   if(typeof self!=='string'||!self||!Array.isArray(roomReply?.objects)||
      roomReply.objects.length>2500)return {status:'UNVERIFIED',
@@ -354,9 +354,19 @@ export function summarizeSpawnRoleFromCreepMemory(roomReply,creepReply,me){
   const role=memory[spawning.name]?.role;
   if(!ROLES.has(role))return {status:'UNVERIFIED',
     reason:'SPAWNING_CREEP_ROLE_UNVERIFIED'};
+  // The bot writes "born: Game.time" when issuing spawnCreep. Memory and
+  // journal are separate GETs. Age is retained-journal-relative evidence;
+  // it is not a same-tick server clock or independently verified active job.
+  const born=memory[spawning.name]?.born;
+  const estimatedAge=goodTick(born)&&goodTick(journalTick)&&
+    journalTick>=born ? journalTick-born:null;
   return {status:'SPAWNING_ROLE_CONFIRMED_BY_CREEP_MEMORY',
     role,activeSpawnJobVerified:true,
-    observationSharedServerTickVerified:false};
+    observationSharedServerTickVerified:false,
+    jobAgeFromRetainedJournalTicks:estimatedAge,
+    exceeds150TickMaximumIfSameJob:estimatedAge===null?null:
+      estimatedAge>150,
+    sameJobAndTickProvenanceVerified:false};
 }
 
 // Same opaque job name and own spawn identity across two GETs; does not
@@ -528,7 +538,7 @@ async function main() {
   result.activeSpawnJob=summarizeActiveSpawnJob(
     roomObjects,bot,me,result.journalLatestTick);
   result.spawnJobMemoryRole=summarizeSpawnRoleFromCreepMemory(
-    roomObjects,creepMemoryReply,me);
+    roomObjects,creepMemoryReply,me,result.journalLatestTick);
   result.recentSpawnReceipts=summarizeRecentSpawnReceipts(
     bot,result.journalLatestTick);
   // One further GET after 15 seconds, never a gameplay intent. A stable
