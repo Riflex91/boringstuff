@@ -296,6 +296,43 @@ export function summarizeWorldRetainedMemory(reply) {
     recentEventWindowTicks:25,
     recentRetainedEventCount:recent.length,
     recentRetainedEventTypes:types,
+    // A matching 100-tick STATUS_SNAPSHOT and BOT_HEARTBEAT are produced
+    // by the same game loop at the same Game.time, unlike API room GETs.
+    // Health SPAWN_MISSING is diagnostic evidence, not a permission to reset.
+    inGameSameTickHomeSnapshot:(()=>{
+      const heartbeats=events.filter(row=>row?.c==='BOT_HEARTBEAT'&&
+        validTick(row.t));
+      if(!heartbeats.length)return null;
+      const beat=heartbeats.reduce((a,b)=>a.t>b.t?a:b);
+      const rows=snapshots.filter(row=>row?.c==='STATUS_SNAPSHOT'&&
+        row?.t===beat.t && row.x &&
+        typeof row.x==='object' && !Array.isArray(row.x));
+      if(rows.length!==1)return null;
+      const home=rows[0].x.rooms?.W37S79;
+      if(!home||typeof home!=='object'||Array.isArray(home))return null;
+      const reasons=home.health?.reasons;
+      const reasonsVerified=Array.isArray(reasons)&&reasons.length<=20 &&
+        reasons.every(v=>typeof v==='string'&&
+          /^[A-Z][A-Z0-9_]{0,55}$/.test(v));
+      const count=value=>Number.isSafeInteger(value)&&
+        value>=0&&value<=5000?value:null;
+      const status=typeof home.health?.status==='string'&&
+        ['HEALTHY','WATCH','DEGRADED','CRITICAL']
+        .includes(home.health.status)?home.health.status:null;
+      return {
+        tick:beat.t,room:'W37S79',
+        healthStatus:status,
+        spawnMissingReported:reasonsVerified?
+          reasons.includes('SPAWN_MISSING'):null,
+        energyAvailable:count(home.energyAvailable),
+        energyCapacity:count(home.energyCapacity),
+        constructionSiteCount:count(home.constructionSites),
+        gameTotalCreeps:count(rows[0].x.totalCreeps),
+        gameSpawnObjectDirectlyVerified:false,
+        sameGameTickAsRetainedHeartbeat:true,
+        originalGameTimeCurrentlyLiveVerified:false
+      };
+    })(),
     latestRetainedHeartbeat:(()=>{
       const heartbeats=events.filter(row=>row?.c==='BOT_HEARTBEAT'&&
         validTick(row?.t)&&row.x&&typeof row.x==='object'&&
@@ -353,6 +390,8 @@ export function compareWorldRetainedMemoryPairs(first,second,clockBefore,clockAf
       b.recentRetainedEventTypes:null,
     latestBotHeartbeat:b.status==='RETAINED_MEMORY_JOURNAL_OBSERVED'?
       b.latestRetainedHeartbeat:null,
+    latestAlignedInGameHomeSnapshot:b.status==='RETAINED_MEMORY_JOURNAL_OBSERVED'?
+      b.inGameSameTickHomeSnapshot:null,
     latestHeartbeatAgeFromServerClock:b.latestRetainedHeartbeat &&
       validTick(clockAfter)&&clockAfter>=b.latestRetainedHeartbeat.tick
       ?clockAfter-b.latestRetainedHeartbeat.tick:null,
