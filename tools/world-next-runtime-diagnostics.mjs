@@ -13,7 +13,8 @@ export function assessWorldRuntime({me,branches,status,room,memory}){
   const list=Array.isArray(branches?.list)?branches.list:[];
   const active=list.filter(b=>b?.activeWorld===true);
   if(active.length!==1||active[0]?.branch!==STAGING_BRANCH)failures.push('EXPECTED_BRANCH_NOT_ACTIVE');
-  if(status?.status==='empty'||typeof status?.status!=='string')failures.push('WORLD_STATUS_INVALID');
+  if(status?.status==='lost')failures.push('WORLD_ACCOUNT_LOST');
+  else if(status?.status!=='normal')failures.push('WORLD_STATUS_INVALID');
   if(!Array.isArray(room?.objects))failures.push('ROOM_OBJECTS_UNAVAILABLE');
   const objects=Array.isArray(room?.objects)?room.objects:[];
   const spawn=objects.find(o=>(o?.type==='spawn'||o?.structureType==='spawn')&&
@@ -29,10 +30,24 @@ export function assessWorldRuntime({me,branches,status,room,memory}){
   const recoveryEvidence=inspectWorldRecoveryEvidence(memory);
   if(recoveryEvidence.availability==='UNKNOWN')
     warnings.push('RECOVERY_MEMORY_UNVERIFIED');
+  const retainedHome=recoveryEvidence.expansion?.home;
+  const retainedSpawnMissing=Array.isArray(retainedHome?.healthReasons) &&
+    retainedHome.healthReasons.includes('SPAWN_MISSING');
+  // Two different observation clocks: do not claim the API and the retained
+  // game snapshot describe the same tick. Flag the disagreement for review.
+  const spawnEvidenceDisagreement=Boolean(spawn && retainedSpawnMissing);
+  if(spawnEvidenceDisagreement)
+    warnings.push('API_SPAWN_VS_RETAINED_SNAPSHOT_DISAGREE');
   const result={ok:failures.length===0,failures,warnings,mode:'GET_ONLY',
     target:{shard:target.shard,room:target.room,x:target.x,y:target.y},
     activeBranch:active.length===1?active[0].branch:null,
     worldStatus:status?.status??null,spawnVerified:Boolean(spawn),
+    spawnEvidenceDisagreement,
+    spawnEvidenceSameTickVerified:false,
+    // `lost` is a verified account-state veto independent of a potentially
+    // older object listing that still contains a matching spawn object.
+    operationalReady:failures.length===0 &&
+      Boolean(spawn) && !spawnEvidenceDisagreement,
     spawnSpawning:spawn?.spawning??null,
     spawnEnergy:Number.isFinite(energy)?energy:null,
     spawnEnergyCapacity:Number.isFinite(capacity)?capacity:null,
