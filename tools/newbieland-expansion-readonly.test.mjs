@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { gzipSync } from 'node:zlib';
-import { inspectNewbielandExpansion, summarizeRoomDefenseObjects } from './newbieland-expansion-readonly.mjs';
+import { inspectNewbielandExpansion, summarizeRoomDefenseObjects, summarizeRetainedTowerEngagements } from './newbieland-expansion-readonly.mjs';
 
 const branch={list:[{branch:'chatgpt',activeWorld:true}]};
 const snapshot={c:'STATUS_SNAPSHOT',t:2100,x:{
@@ -220,5 +220,41 @@ assert.equal(incompleteDefense.unknownOwnerCreeps,1);
 assert.equal(summarizeRoomDefenseObjects({objects:[]},null).status,'UNVERIFIED');
 assert.equal(summarizeRoomDefenseObjects({objects:Array(2501).fill({})},
   {_id:'our-id'}).status,'UNVERIFIED');
+
+
+// The journal may have silently dropped earlier events. A retained WARN is a
+// witnessed engagement path only, never proof of tower hits or room safety.
+const towerWarnings={telemetryJournal:{events:[
+  {c:'TOWER_ENGAGE',t:2080,x:{room:'E8N1',hostileId:'private-id'}},
+  {c:'TOWER_ENGAGE',t:2110,x:{room:'E8N1'}},
+  {c:'TOWER_ENGAGE',t:2115,x:{room:'W1N1'}},
+  {c:'BOT_HEARTBEAT',t:2125}
+]}};
+const engagement=summarizeRetainedTowerEngagements(towerWarnings,2125);
+assert.equal(engagement.status,'RETAINED_EVENTS_ONLY');
+assert.equal(engagement.eventCount,2);
+assert.equal(engagement.lastEventTick,2110);
+assert.equal(engagement.attackSuccessVerified,false);
+assert.equal(engagement.fullWindowCoverageVerified,false);
+assert.ok(!JSON.stringify(engagement).includes('private-id'));
+assert.equal(summarizeRetainedTowerEngagements({
+  telemetryJournal:{events:[]}},2125).eventCount,0);
+assert.equal(summarizeRetainedTowerEngagements({
+  telemetryJournal:{events:[{c:'TOWER_ENGAGE',t:2126,x:{room:'E8N1'}}]}},2125)
+  .status,'UNVERIFIED');
+const towerThreat=summarizeRoomDefenseObjects({objects:[
+  {type:'tower',user:'our-id',energy:1000,x:5,y:5},
+  {type:'tower',user:'our-id',energy:1000,x:10,y:10},
+  {type:'creep',user:'other-id',x:6,y:6,body:[
+    {type:'attack',hits:100},{type:'heal',hits:100},
+    {type:'tough',hits:100},{type:'move',hits:100}
+  ]}
+]}, {_id:'our-id'});
+assert.equal(towerThreat.towerEnergySum,2000);
+assert.equal(towerThreat.closestTowerToForeignCreepRange,1);
+assert.equal(towerThreat.furthestTowerToForeignCreepRange,4);
+assert.deepEqual(towerThreat.otherOwnerActiveParts,{
+  attack:1,ranged_attack:0,heal:1,work:0,tough:1
+});
 
 console.log('Newbieland GET-only expansion evidence tests passed');
