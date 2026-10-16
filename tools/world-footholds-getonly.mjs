@@ -4,6 +4,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { setTimeout as pause } from 'node:timers/promises';
 import { ScreepsHttpClient } from './screeps-client.mjs';
 import { buildWorldConfig } from './world-deployment-profile.mjs';
+import { parseBotMemory } from './ci-deployment-guard.mjs';
 
 // World recovery O22. API GETs ONLY, no POST, no game code/console/memory
 // mutations. Unknown or malformed API shapes MUST NOT be called "no rooms".
@@ -180,6 +181,71 @@ export function compareWorldRoomGetPairs(first,second,accountId,location) {
     liveOperationalSpawnVerified:false};
 }
 
+// Memory is a third, independently timed GET source. A retained game-tick
+// advance demonstrates a newer journal record, not that Game.spawns is alive
+// nor that the room-objects and memory snapshots are from the same tick.
+const TICK_LIMIT=2_000_000_000;
+const validTick=n=>Number.isSafeInteger(n)&&n>=0&&n<=TICK_LIMIT;
+export function summarizeWorldRetainedMemory(reply) {
+  const unknown={status:'UNVERIFIED',latestStatusSnapshotTick:null,
+    latestJournalEventTick:null,latestRetainedTick:null,
+    storedDeploymentIdKnown:false};
+  const bot=parseBotMemory(reply);
+  if(!bot)return unknown;
+  const journal=bot.telemetryJournal;
+  const snapshots=journal?.snapshots,events=journal?.events;
+  if(!Array.isArray(snapshots)||snapshots.length>512||
+     !Array.isArray(events)||events.length>1500)
+    return unknown;
+  const valid=(rows,code)=>{
+    const matches=rows.filter(row=>row?.c===code);
+    if(matches.some(row=>!validTick(row?.t)))return null;
+    return matches.length?Math.max(...matches.map(row=>row.t)):null;
+  };
+  const latestSnapshot=valid(snapshots,'STATUS_SNAPSHOT');
+  const eventTicks=events.map(row=>row?.t);
+  if(eventTicks.some(t=>!validTick(t)))return unknown;
+  const latestEvent=eventTicks.length?Math.max(...eventTicks):null;
+  return {
+    status:'RETAINED_MEMORY_JOURNAL_OBSERVED',
+    latestStatusSnapshotTick:latestSnapshot,
+    latestJournalEventTick:latestEvent,
+    latestRetainedTick:latestSnapshot===null?latestEvent:
+      latestEvent===null?latestSnapshot:Math.max(latestSnapshot,latestEvent),
+    storedDeploymentIdKnown:typeof bot.deploymentId==='string'&&
+      bot.deploymentId.length>0
+  };
+}
+export function compareWorldRetainedMemoryPairs(first,second,clockBefore,clockAfter) {
+  const a=summarizeWorldRetainedMemory(first);
+  const b=summarizeWorldRetainedMemory(second);
+  const valid=a.status==='RETAINED_MEMORY_JOURNAL_OBSERVED'&&
+    b.status==='RETAINED_MEMORY_JOURNAL_OBSERVED';
+  const start=a.latestRetainedTick,end=b.latestRetainedTick;
+  const delta=valid&&start!==null&&end!==null&&end>=start?
+    end-start:null;
+  const lagStart=validTick(clockBefore)&&validTick(start)&&
+    clockBefore>=start?clockBefore-start:null;
+  const lagEnd=validTick(clockAfter)&&validTick(end)&&
+    clockAfter>=end?clockAfter-end:null;
+  return {
+    status:valid?'TWO_RETAINED_MEMORY_GETS_OBSERVED':'UNVERIFIED',
+    firstSnapshotTick:a.latestStatusSnapshotTick,
+    secondSnapshotTick:b.latestStatusSnapshotTick,
+    firstRetainedJournalTick:start,
+    secondRetainedJournalTick:end,
+    retainedJournalTickDelta:delta,
+    retainedJournalAdvanced:delta===null?null:delta>0,
+    approximateRetainedLagAtFirstGet:lagStart,
+    approximateRetainedLagAtSecondGet:lagEnd,
+    serverClockComparisonVerified:validTick(clockBefore)&&
+      validTick(clockAfter)&&clockAfter>=clockBefore,
+    getResponsesSameServerTickVerified:false,
+    gameCodeExecutingNowVerified:false,
+    ownSpawnOperationalVerified:false
+  };
+}
+
 export async function inspectWorldFootholds(api,options={}) {
   if(!api||typeof api.authMe!=='function'||
      typeof api.userWorldStatus!=='function'||
@@ -193,9 +259,11 @@ export async function inspectWorldFootholds(api,options={}) {
   try{listing=await api.userRooms(id);}
   catch{fetchFailed=true;listing=null;}
   const rooms=summarizeUserRoomListing(listing);
-  let time1=null,time2=null;
+  let time1=null,time2=null,mem1=null,mem2=null;
   try{time1=numericGameTick(await api._request('GET',
     '/api/game/time',{shard:'shard0'}));}catch{/* current tick unknown */}
+  try{mem1=await api.userMemory('bot','shard0');}
+  catch{/* missing bot Memory cannot prove absence of code execution */}
   const observed=[],initialObjects=[];
   for(const candidate of rooms.returnedRooms){
     let reply=null;
@@ -215,6 +283,8 @@ export async function inspectWorldFootholds(api,options={}) {
     comparison.push({...candidate,
       ...compareWorldRoomGetPairs(initialObjects[i],later,id,candidate)});
   }
+  try{mem2=await api.userMemory('bot','shard0');}
+  catch{/* missing bot Memory cannot prove absence of code execution */}
   try{time2=numericGameTick(await api._request('GET',
     '/api/game/time',{shard:'shard0'}));}catch{/* tick unknown */}
   const after=await api.userWorldStatus();
@@ -253,6 +323,8 @@ export async function inspectWorldFootholds(api,options={}) {
     serverGameTickAdvanced:time1!==null&&time2!==null?
       time2>time1:null,
     gameTimeAndRoomSnapshotsSameTickVerified:false,
+    retainedBotMemoryProgress:compareWorldRetainedMemoryPairs(
+      mem1,mem2,time1,time2),
     mode:'GET_ONLY',apiMutationsAttempted:0,
     respawnAuthorized:false,placementAuthorized:false,
     activationAuthorized:false,deployAuthorized:false
