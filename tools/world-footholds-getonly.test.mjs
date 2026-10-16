@@ -371,4 +371,34 @@ assert.equal(boundedKinds.recentRetainedEventCount,1);
 assert.equal(boundedKinds.recentRetainedEventTypes.TOWER_ENGAGE,1);
 assert.equal(boundedKinds.recentRetainedEventTypes.SPAWN_OK,undefined);
 
+
+// An unknown grouping key can be considered complete ONLY if it contains
+// literally zero values. We do not need to reveal or trust its key to know
+// there are no missing room locators inside an empty array.
+const secretExtraEmpty={ok:1,shards:{
+ shard0:['W37S79'],shard1:[],shard2:[],shard3:[],
+ privateSecretGroup:[]
+}};
+const safeListing=summarizeUserRoomListing(secretExtraEmpty);
+assert.equal(safeListing.status,'EXPLICIT_USER_ROOMS_LIST');
+assert.equal(safeListing.listingComplete,true);
+assert.equal(safeListing.returnedRooms.length,1);
+const safeProbe=await inspectWorldFootholds(
+ mock({rooms:secretExtraEmpty}).api,{observeDelayMs:0});
+assert.equal(safeProbe.status,'READONLY_LISTING_AND_ROOM_OBJECTS_VERIFIED');
+assert.equal(safeProbe.userRoomCount,1);
+assert.equal(safeProbe.worldStatusBefore,'lost');
+assert.equal(safeProbe.worldAccountOperational,false);
+assert.equal(safeProbe.operationalFootholdVerified,false);
+assert.equal(safeProbe.noRecoverableFootholdVerified,false);
+assert.equal(safeProbe.respawnAuthorized,false);
+assert.ok(!JSON.stringify(safeProbe).includes('privateSecretGroup'));
+for(const dangerousExtra of [['W1N1'],{rooms:[]},'unverified',null]){
+ const unsafeListing=summarizeUserRoomListing({ok:1,shards:{
+  shard0:['W37S79'],privateSecretGroup:dangerousExtra
+ }});
+ assert.equal(unsafeListing.status,'PARTIAL_USER_ROOMS_LIST');
+ assert.equal(unsafeListing.listingComplete,false);
+}
+
 console.log('World O22 GET-only cross-shard foothold safety regression PASS');
