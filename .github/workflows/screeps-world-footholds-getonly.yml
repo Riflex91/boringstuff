@@ -32,6 +32,53 @@ jobs:
         env:
           SCREEPS_TOKEN_WORLD: ${{ secrets.SCREEPS_TOKEN_WORLD }}
         run: node world-next-staged-readiness.mjs
+      - name: Inspect active World branches and exact inactive code presence (GET only)
+        env:
+          SCREEPS_TOKEN_WORLD: ${{ secrets.SCREEPS_TOKEN_WORLD }}
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import path from 'node:path';
+          import crypto from 'node:crypto';
+          import {ScreepsHttpClient} from './screeps-client.mjs';
+          import {buildWorldConfig} from './world-deployment-profile.mjs';
+          const fn=path.join(process.env.RUNNER_TEMP,'world-branch-readonly-'+process.pid+'.json');
+          fs.writeFileSync(fn,JSON.stringify(buildWorldConfig(process.env)),{mode:0o600,flag:'wx'});
+          try {
+            const api=await ScreepsHttpClient.fromConfig('world',{file:fn,shard:'shard0'});
+            const [world,branches]=await Promise.all([api.userWorldStatus(),api.userBranches()]);
+            const list=Array.isArray(branches?.list)?branches.list:[];
+            const names=['default','chatgpt','chatgpt-w37s79-stage'];
+            const game=path.resolve('../game');
+            const expected=Object.fromEntries(fs.readdirSync(game)
+              .filter(n=>n.endsWith('.js')).sort().map(n=>
+                [n.slice(0,-3),fs.readFileSync(path.join(game,n),'utf8')]));
+            const hash=x=>crypto.createHash('sha256').update(x).digest('hex');
+            const outputs=[];
+            for(const name of names) {
+              const matches=list.filter(q=>q.branch===name);
+              let count=null,exact=null,codeOk=false;
+              if(matches.length===1){
+                try{
+                  const got=(await api._request('GET','/api/user/code',{branch:name})).modules;
+                  if(got&&typeof got==='object'&&!Array.isArray(got)){
+                    const a=Object.keys(got).sort(),e=Object.keys(expected).sort();
+                    count=a.length;codeOk=typeof got.main==='string'&&typeof got.config==='string';
+                    exact=a.length===e.length&&e.every((k,i)=>
+                      a[i]===k&&typeof got[k]==='string'&&hash(got[k])===hash(expected[k]));
+                  }
+                }catch{}
+              }
+              outputs.push({branch:name,present:matches.length===1,
+                duplicates:matches.length>1,active:matches.length===1?matches[0].activeWorld===true:null,
+                moduleCount:count,validMainConfig:codeOk,exactMainMatch:exact});
+            }
+            console.log('WORLD_BRANCH_BOOTSTRAP_GET_ONLY '+JSON.stringify({
+              worldStatus:world?.status??null,activeCount:list.filter(x=>x.activeWorld===true).length,
+              branches:outputs,apiMutationsAttempted:0
+            }));
+          }finally{fs.rmSync(fn,{force:true});}
+          NODE
       - name: List owned World rooms and corroborate possible footholds via GET only
         env:
           SCREEPS_TOKEN_WORLD: ${{ secrets.SCREEPS_TOKEN_WORLD }}
