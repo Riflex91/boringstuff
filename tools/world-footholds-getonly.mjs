@@ -54,7 +54,7 @@ export function summarizeRoomListingResponseShape(input) {
             info.sampleMatchesRoom=ROOM.test(content[0]);
             info.sampleTrimChanges=content[0].trim()!==content[0];
             info.sampleLooksHexId=/^[0-9a-f]{24}$/i.test(content[0]);
-            info.sampleHasShardPrefix=/^shard\\d+\\//.test(content[0]);
+            info.sampleHasShardPrefix=content[0].startsWith('shard') && content[0].includes('/');
           }
           if(content[0]&&typeof content[0]==='object'&&
              !Array.isArray(content[0]))
