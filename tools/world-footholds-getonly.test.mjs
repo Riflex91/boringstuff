@@ -152,10 +152,10 @@ const changedRoom={objects:[
  {type:'controller',id:'private-controller',user:'private-account',level:4},
  {type:'spawn',id:'second-spawn',user:'private-account',energy:1000}
 ]};
-const changed=compareWorldRoomGetPairs(sameRoom,changedRoom,
+const changedRoomPair=compareWorldRoomGetPairs(sameRoom,changedRoom,
  'private-account',location);
-assert.equal(changed.sameSpawnIdVerified,false);
-assert.equal(changed.sameControllerIdVerified,true);
+assert.equal(changedRoomPair.sameSpawnIdVerified,false);
+assert.equal(changedRoomPair.sameControllerIdVerified,true);
 assert.equal(compareWorldRoomGetPairs(sameRoom,null,
  'private-account',location).status,'UNVERIFIED');
 
