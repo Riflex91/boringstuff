@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { summarizeUserRoomListing, summarizeCandidateRoom,
-  inspectWorldFootholds } from './world-footholds-getonly.mjs';
+  summarizeRoomListingResponseShape, inspectWorldFootholds } from './world-footholds-getonly.mjs';
 
 const p={ok:1,rooms:{shard0:['W37S79'],shard1:['E8N1']}};
 assert.deepEqual(summarizeUserRoomListing(p).returnedRooms,[
@@ -101,4 +101,17 @@ const explicitEmpty=await inspectWorldFootholds(
 assert.equal(explicitEmpty.userRoomCount,0);
 assert.equal(explicitEmpty.noRecoverableFootholdVerified,false);
 assert.equal(explicitEmpty.operationalFootholdVerified,false);
+
+const schema=summarizeRoomListingResponseShape({
+  ok:1,rooms:{shard0:{rooms:['W37S79'],secret:'hidden-room-value'}},
+  privateAccountId:'private-account',token:'private-token'
+});
+assert.deepEqual(schema.knownTopFields,['ok','rooms']);
+assert.equal(schema.rooms.kind,'object');
+assert.deepEqual(schema.rooms.shardKeys,['shard0']);
+assert.equal(schema.rooms.firstShardValueKind,'object');
+assert.deepEqual(schema.rooms.firstShardKnownFields,['rooms']);
+assert.ok(!JSON.stringify(schema).includes('private'),
+  'schema probe must not expose user data or raw list values');
+
 console.log('World O22 GET-only cross-shard foothold safety regression PASS');
