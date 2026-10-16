@@ -307,6 +307,44 @@ export function summarizeActiveSpawnJob(roomReply,bot,me,journalTick) {
     receiptTick:matches[0].t,currentGameTickVerified:false};
 }
 
+// Histories reveal sampled busy persistence but lack the job's identity;
+// they cannot by themselves prove the same creep was continuously spawning.
+export function summarizeRetainedSpawnBusyHistory(bot){
+  const all=bot?.telemetryJournal?.snapshots;
+  if(!Array.isArray(all)||all.length>512)return {
+    status:'UNVERIFIED',reason:'STATUS_SNAPSHOT_HISTORY_UNAVAILABLE'
+  };
+  const rows=all.filter(x=>x?.c==='STATUS_SNAPSHOT'&&goodTick(x?.t))
+    .sort((a,b)=>a.t-b.t).slice(-12).map(x=>({
+      tick:x.t,
+      busy:typeof x.x?.rooms?.[HOME]?.spawnBusy==='boolean'?
+        x.x.rooms[HOME].spawnBusy:null,
+      remainingTime:Number.isSafeInteger(
+        x.x?.rooms?.[HOME]?.spawnRemainingTime) &&
+        x.x.rooms[HOME].spawnRemainingTime>=0 &&
+        x.x.rooms[HOME].spawnRemainingTime<=150?
+        x.x.rooms[HOME].spawnRemainingTime:null
+    }));
+  if(!rows.length)return {status:'UNVERIFIED',
+    reason:'NO_RETAINED_STATUS_SNAPSHOTS'};
+  if(rows.some((x,i)=>i>0 && x.tick<=rows[i-1].tick))
+    return {status:'UNVERIFIED',reason:'SNAPSHOT_TICK_COLLISION'};
+  const known=rows.every(row=>row.busy!==null);
+  const allBusy=known && rows.every(row=>row.busy);
+  return {
+    status:'RETAINED_SNAPSHOT_SAMPLES_ONLY',
+    firstTick:rows[0].tick,lastTick:rows.at(-1).tick,
+    observedGameTickSpan:rows.at(-1).tick-rows[0].tick,
+    snapshotCount:rows.length,
+    allSamplesSpawnBusy:known?allBusy:null,
+    allRemainingTimeKnown:rows.every(row=>row.remainingTime!==null),
+    sampleRemainingTimes:rows.map(x=>x.remainingTime),
+    sameSpawnJobVerified:false,
+    continuousBusyBetweenSamplesVerified:false,
+    currentGameTickIndependentlyVerified:false
+  };
+}
+
 // Role from Memory.creeps is fetched through authenticated GET only;
 // no raw memory, names, object IDs, position or body fields are ever emitted.
 // Missing names, payload formats and untrusted role names remain UNKNOWN.
@@ -512,6 +550,7 @@ export function inspectNewbielandExpansion(reply, branches) {
     parentBlockerEvidence:summarizeParentBlockerEvidence(latest,HOME),
     retainedTowerEngagements:summarizeRetainedTowerEngagements(bot,journalLatestTick),
     retainedDefenderSpawns:summarizeRetainedDefenderSpawns(bot,journalLatestTick),
+    retainedSpawnBusyHistory:summarizeRetainedSpawnBusyHistory(bot),
     retainedIntelFrontier:summarizeRetainedIntelFrontier(bot,journalLatestTick,HOME)
   };
 }
