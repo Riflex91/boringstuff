@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { gzipSync } from 'node:zlib';
-import { inspectNewbielandExpansion, summarizeRoomDefenseObjects, summarizeRetainedTowerEngagements } from './newbieland-expansion-readonly.mjs';
+import { inspectNewbielandExpansion, summarizeRoomDefenseObjects, summarizeRetainedTowerEngagements, compareRoomDefenseGetPairs } from './newbieland-expansion-readonly.mjs';
 
 const branch={list:[{branch:'chatgpt',activeWorld:true}]};
 const snapshot={c:'STATUS_SNAPSHOT',t:2100,x:{
@@ -285,5 +285,38 @@ assert.equal(unknownHits.soleForeignCreepHits,null);
 assert.equal(unknownHits.soleForeignCreepActiveBoostedToughParts,null);
 assert.equal(summarizeRoomDefenseObjects({objects:[]},{_id:'ours'})
   .soleForeignCreepHits,null);
+
+
+const firstCombatGet={objects:[
+  {type:'creep',id:'private-hostile-id',user:'other-id',hits:5000,hitsMax:5000}
+]};
+const sameCombatGet={objects:[
+  {type:'creep',id:'private-hostile-id',user:'other-id',hits:4980,hitsMax:5000}
+]};
+const compared=compareRoomDefenseGetPairs(firstCombatGet,sameCombatGet,
+  {_id:'our-id'});
+assert.equal(compared.status,'SAME_FOREIGN_CREEP_OBSERVED_TWICE');
+assert.equal(compared.hpChange,-20);
+assert.equal(compared.healthLossObserved,true);
+assert.equal(compared.gameTickProgressVerified,false);
+assert.equal(compared.attackIntentOrDamageVerified,false);
+assert.ok(!JSON.stringify(compared).includes('private-'));
+const fullAgain=compareRoomDefenseGetPairs(
+  firstCombatGet,firstCombatGet,{_id:'our-id'});
+assert.equal(fullAgain.hpChange,0);
+assert.equal(fullAgain.healthLossObserved,false);
+const changedForeign={objects:[{type:'creep',
+  id:'another-id',user:'other-id',hits:5000,hitsMax:5000}]};
+assert.equal(compareRoomDefenseGetPairs(
+  firstCombatGet,changedForeign,{_id:'our-id'}).reason,
+  'FOREIGN_CREEP_ID_CHANGED');
+assert.equal(compareRoomDefenseGetPairs(firstCombatGet,
+  {objects:[]},{_id:'our-id'}).status,'UNVERIFIED');
+assert.equal(compareRoomDefenseGetPairs(firstCombatGet,
+  {objects:[{type:'creep',id:'private-hostile-id',user:'other-id',
+    hits:'4980',hitsMax:5000}]},{_id:'our-id'}).reason,
+  'FOREIGN_CREEP_HEALTH_UNVERIFIED');
+assert.equal(compareRoomDefenseGetPairs(firstCombatGet,sameCombatGet,
+  null).status,'UNVERIFIED');
 
 console.log('Newbieland GET-only expansion evidence tests passed');
