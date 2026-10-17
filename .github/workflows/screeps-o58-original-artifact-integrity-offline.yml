@@ -1,0 +1,45 @@
+name: Screeps O58 pinned original Actions artifact byte attestation (OFFLINE)
+on:
+  push:
+    branches: [safety/o58-original-actions-artifact-byte-attestation-20261017]
+permissions:
+  contents: read
+concurrency:
+  group: o58-original-actions-archive-offline
+  cancel-in-progress: false
+jobs:
+  node24-p3-source-pin:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: tools
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Verify original Main and identical gameplay code
+        shell: bash
+        run: |
+          git -C .. fetch origin main --quiet
+          test "$(git -C .. rev-parse origin/main)" = bc43f2faf1f345e63d9bfe78b6bbaa59e5eaab0c
+          git -C .. diff --exit-code origin/main HEAD -- game
+      - name: Complete Node24 O39-O58 offline tests
+        run: |
+          npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+          npm test
+      - name: Original exact P3 baseline
+        run: npm run bench:p3
+      - name: Publish source boundary note
+        shell: bash
+        run: |
+          echo '### O58 original GitHub Actions artifact content attestation' >> "$GITHUB_STEP_SUMMARY"
+          echo 'World and Newbieland original ZIP byte SHA256 and lengths pinned from authenticated read-only GitHub artifact download.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Archive command now refuses synthetic/spoofed ZIPs before creating output, and checks CRC, 82 game modules and receipt continuity.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Real ZIP files are NOT committed or uploaded into Actions CI, which only tests synthetic archives.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'No independent durable private storage, original Main World 100t pass, authorized production POST, or Main merge.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'HOLD_EXACT_PREDECESSOR_PAIR_MISSING.' >> "$GITHUB_STEP_SUMMARY"

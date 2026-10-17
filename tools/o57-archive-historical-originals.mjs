@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {verifyPinnedOriginalArtifactZip} from './o58-original-artifact-integrity.mjs';
 import {
  ROADMAP_HISTORICAL_ARTIFACTS,sealPrivateRoadmapEvidence
 } from './o57-private-roadmap-evidence-vault.mjs';
@@ -42,6 +43,11 @@ export function archivePinnedRoadmapOriginals(args){
  const pem=fs.readFileSync(inputs['--public-key'],'utf8');
  const world=readExistingFile(inputs['--world-zip'],32*1024*1024);
  const newb=readExistingFile(inputs['--newbieland-zip'],32*1024*1024);
+ // O58: ZIP magic alone is not evidence provenance. Only the two exact
+ // original downloaded Actions artifact byte streams may be labeled as
+ // historical originals. This runs before creating the destination.
+ verifyPinnedOriginalArtifactZip(world,'world');
+ verifyPinnedOriginalArtifactZip(newb,'newbieland');
  // Commit the pair only after BOTH encrypted bundles exist. No backups
  // or original ZIPs are left in the destination root on failure.
  const name='o57-original-evidence-v1';
