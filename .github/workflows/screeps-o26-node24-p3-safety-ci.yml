@@ -1,0 +1,27 @@
+name: Screeps O26 isolated Node24 P3 safety CI
+on:
+  push:
+    branches: [safety/o26-world-chatgpt-autodeploy-hold-20261017]
+permissions:
+  contents: read
+jobs:
+  canonical-offline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: tools
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Canonical full Node24 tests and game module checks
+        run: |
+          npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+          npm test
+      - name: Exact P3 paired benchmark
+        run: npm run bench:p3
