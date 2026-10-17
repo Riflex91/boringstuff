@@ -18,7 +18,7 @@ jobs:
         working-directory: tools
     env:
       SCREEPS_SERVER: world
-      SCREEPS_BRANCH: chatgpt-w37s79-stage
+      SCREEPS_BRANCH: chatgpt
       SCREEPS_SHARD: shard0
       SCREEPS_ROOM: W37S79
       SCREEPS_TOKEN_WORLD: ${{ secrets.SCREEPS_TOKEN_WORLD }}
@@ -47,6 +47,15 @@ jobs:
           echo "SCREEPS_LOG_DIR=$RUNNER_TEMP/w37s79-auto-deploy-evidence" >> "$GITHUB_ENV"
       - name: Verify pinned owned spawn and active branch (GET only)
         run: node world-next-auto-deploy-guard.mjs
+      # O26 safety hold: this workflow has no independently verifiable
+      # predecessor-Main dual-server canonical LIVE_100T_PASS attestation.
+      # Health/GET checks do NOT authorize a World code upload.
+      - name: Block auto-upload until verified paired predecessor LIVE_100T_PASS
+        shell: bash
+        run: |
+          echo 'WORLD_AUTO_DEPLOY_RELEASE_HOLD: canonical paired predecessor-Main LIVE_100T_PASS unavailable'
+          echo 'No game code has been uploaded by this workflow.'
+          exit 1
       - name: Verify exact active branch and backup access
         run: node ci-deployment-guard.mjs preflight
       - name: Upload exact tested game modules
