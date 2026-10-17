@@ -154,24 +154,43 @@ export async function performApprovedWorldAutoRecovery(api,{
   if(reserved!==true)
     return {status:'HOLD_RESPAWN_ATTEMPT_ALREADY_RECORDED_OR_UNVERIFIED',
       respawnPosts:0,placementPosts:0};
-  // The durable reservation itself takes time. Check official World account
-  // state once more; never POST if it recovered while the lock was recorded.
-  let finalStatus,finalRoomObjects;
+  // The reservation may take time; ownership can change independently.
+  // Reauthenticate, check ALL known holdings, and reject positive recovery
+  // evidence again. These independent GETs are conservative, not atomic.
+  let finalAccount,finalStatus,finalRooms,finalRoomObjects;
   try{
-    [finalStatus,finalRoomObjects]=await Promise.all([
-      api.userWorldStatus(),api.gameRoomObjects(ROOM,SHARD)
+    [finalAccount,finalStatus,finalRooms,finalRoomObjects]=await Promise.all([
+      api.authMe(),api.userWorldStatus(),api.userRooms(id),
+      api.gameRoomObjects(ROOM,SHARD)
     ]);
-  }catch{return {status:'HOLD_FINAL_STATUS_GET_UNVERIFIED',
+  }catch{return {status:'HOLD_FINAL_EVIDENCE_GET_UNVERIFIED',
     respawnPosts:0,placementPosts:0};}
+  if(finalAccount?.ok===false||
+     finalAccount?.username!==EXPECTED_USERNAME||
+     String(finalAccount?._id||finalAccount?.id||'')!==String(id))
+    return {status:'HOLD_FINAL_ACCOUNT_IDENTITY_MISMATCH',
+      respawnPosts:0,placementPosts:0};
   if(finalStatus?.ok===false||finalStatus?.status!=='lost')
     return {status:'HOLD_FINAL_STATUS_NO_LONGER_LOST',
       respawnPosts:0,placementPosts:0};
+  if(!checkApprovedWorldHoldings(finalRooms).scopeVerified)
+    return {status:'HOLD_FINAL_RECOVERABLE_HOLDINGS_OR_SCOPE_UNVERIFIED',
+      respawnPosts:0,placementPosts:0};
   const finalObjects=finalRoomObjects?.objects;
-  if(finalRoomObjects?.ok===false||!Array.isArray(finalObjects)||finalObjects.some(o=>
-    String(o?.user||'')===String(id)&&
-    (o?.type==='creep'||o?.type==='spawn'||
-      o?.structureType==='spawn')))
+  if(finalRoomObjects?.ok===false||!Array.isArray(finalObjects)||
+     finalObjects.some(o=>String(o?.user||'')===String(id)&&
+       (o?.type==='creep'||o?.type==='spawn'||
+        o?.structureType==='spawn')))
     return {status:'HOLD_FINAL_OWNED_ASSETS_OR_ROOM_GET_UNVERIFIED',
+      respawnPosts:0,placementPosts:0};
+  // A last independent status read limits, but cannot eliminate, the
+  // read/write race. A definitive global cross-shard census is still absent.
+  let lastStatus;
+  try{lastStatus=await api.userWorldStatus();}
+  catch{return {status:'HOLD_LAST_WORLD_STATUS_GET_UNVERIFIED',
+    respawnPosts:0,placementPosts:0};}
+  if(lastStatus?.ok===false||lastStatus?.status!=='lost')
+    return {status:'HOLD_LAST_WORLD_STATUS_NO_LONGER_LOST',
       respawnPosts:0,placementPosts:0};
   // Verified in the maintained screepers/node-screeps-api library:
   // userRespawn(): POST /api/user/respawn with no payload.
