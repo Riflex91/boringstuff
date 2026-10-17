@@ -54,11 +54,26 @@ export function assessReadOnlyPulse(raw,{room,branch,expected}){
   const expectedNames=Object.keys(expected||{}).sort();
   const actualNames=modules&&typeof modules==='object'&&!Array.isArray(modules)?
     Object.keys(modules).sort():[];
+  const expectedSet=new Set(expectedNames),actualSet=new Set(actualNames);
+  const missingExpectedNames=expectedNames.filter(name=>!actualSet.has(name));
+  const unexpectedCount=actualNames.filter(name=>!expectedSet.has(name)).length;
+  const mismatchingExpectedNames=expectedNames.filter(name=>
+    actualSet.has(name)&&(typeof modules[name]!=='string'||
+      hash(modules[name])!==expected[name]));
   const exact=code?.ok!==false && expectedNames.length>=70 &&
-    expectedNames.length===actualNames.length &&
-    expectedNames.every((name,i)=>name===actualNames[i]&&
-      typeof modules[name]==='string'&&hash(modules[name])===expected[name]);
+    missingExpectedNames.length===0&&unexpectedCount===0 &&
+    mismatchingExpectedNames.length===0;
   if(!exact)failures.push('ACTIVE_CODE_NOT_EXACT_MAIN');
+  // Author-only source-module names; never print returned code contents,
+  // names of previously unknown modules or raw account/runtime API data.
+  const codeFingerprint={
+    expectedModuleCount:expectedNames.length,
+    actualModuleCount:actualNames.length,
+    missingExpectedCount:missingExpectedNames.length,
+    unexpectedCount,
+    mismatchingExpectedCount:mismatchingExpectedNames.length,
+    differingKnownModules:mismatchingExpectedNames.slice(0,12)
+  };
   const bot=parseBotMemory(raw?.memory);
   if(!bot||typeof bot.deploymentId!=='string'||!bot.deploymentId)
     failures.push('BOT_MEMORY_UNVERIFIED');
@@ -97,6 +112,7 @@ export function assessReadOnlyPulse(raw,{room,branch,expected}){
     deploymentFingerprint:typeof bot?.deploymentId==='string'?
       hash(bot.deploymentId):null,
     exactMainCodeVerified:Boolean(exact),
+    codeFingerprint,
     source:'SEPARATE_AUTHENTICATED_GET_RESPONSES',
     observedGameTickProofOnly:true,
     canonicalLive100tPass:false,
