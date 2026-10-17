@@ -23,6 +23,20 @@ function validateLocation(directory) {
   return absolute;
 }
 
+function assertNoSymlinkPathComponents(target) {
+  let current = target;
+  while (true) {
+    try {
+      if (fs.lstatSync(current).isSymbolicLink()) fail();
+    } catch (err) {
+      if (err?.code !== 'ENOENT') fail();
+    }
+    const parent = path.dirname(current);
+    if (parent === current) break;
+    current = parent;
+  }
+}
+
 function assertPrivateRegularFile(file) {
   const stat = fs.lstatSync(file);
   if (!stat.isFile() || stat.isSymbolicLink()) fail();
@@ -66,7 +80,19 @@ export function writeDurableCodeBackup({
 
   const dir = validateLocation(directory);
   try {
+    // Check ancestors before creating a directory: lexical containment alone
+    // is insufficient if a parent component redirects through a symlink.
+    assertNoSymlinkPathComponents(dir);
     fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+    assertNoSymlinkPathComponents(dir);
+    if (process.env.GITHUB_ACTIONS === 'true') {
+      const runnerReal = fs.realpathSync(process.env.RUNNER_TEMP);
+      const actualReal = fs.realpathSync(dir);
+      const relativeReal = path.relative(runnerReal, actualReal);
+      if (!relativeReal || relativeReal === '..' ||
+          relativeReal.startsWith('..' + path.sep) ||
+          path.isAbsolute(relativeReal)) fail();
+    }
     const stat = fs.lstatSync(dir);
     if (!stat.isDirectory() || stat.isSymbolicLink()) fail();
     // Existing local log directories may have been created with 0755.
