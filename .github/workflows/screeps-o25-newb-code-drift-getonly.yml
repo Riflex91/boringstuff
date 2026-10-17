@@ -4,6 +4,8 @@ on:
     branches: [diagnostics/o25-paired-live-100tick-readonly-20261017]
     paths:
       - .github/workflows/screeps-o25-newb-code-drift-getonly.yml
+      - tools/o25-paired-100t-witness.mjs
+      - tools/o25-paired-100t-witness.test.mjs
 permissions:
   contents: read
 jobs:
