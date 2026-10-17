@@ -33,7 +33,8 @@ const deny=()=>{throw new Error(O59_ORIGINAL_LOG_HOLD);};
 const check=v=>{if(!v)deny();};
 const stamp=/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d+Z /;
 function singleBy(lines,re){
- const matches=lines.map((line,index)=>({line,index})).filter(e=>re.test(e.line));
+ const test=typeof re==='function'?re:line=>re.test(line);
+ const matches=lines.map((line,index)=>({line,index})).filter(e=>test(e.line));
  check(matches.length===1);
  return matches[0];
 }
