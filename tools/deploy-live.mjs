@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ScreepsHttpClient } from './screeps-client.mjs';
 import { DEFAULT_VERIFICATION_LOG_DIR, writeDeploymentReceipt } from './deployment-receipt.mjs';
+import { assertUniqueActiveCodeBranch } from './o39-code-upload-active-branch-policy.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const parent = path.resolve(here, '..');
@@ -65,11 +66,7 @@ const api = await ScreepsHttpClient.fromConfig(serverName);
 // or making the single permitted code POST. A prior CI preflight is insufficient
 // because account branch activation may change between CI steps.
 const branches = await api.userBranches();
-const list = Array.isArray(branches?.list) ? branches.list : [];
-const active = list.filter(entry => entry?.activeWorld === true);
-if (active.length !== 1 || active[0]?.branch !== branch) {
-  throw new Error('CODE_UPLOAD_HOLD_EXACT_ACTIVE_BRANCH_NOT_VERIFIED');
-}
+assertUniqueActiveCodeBranch(branches, branch);
 console.log('Branch activeWorld: true');
 
 const before = await api._request('GET', '/api/user/code', { branch });
