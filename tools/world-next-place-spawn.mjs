@@ -24,6 +24,9 @@ export function assessPlacementApproval(approval,readiness){
   return {ok:failures.length===0,failures};
 }
 export async function placeW37S79Only(api,id,approval,onPhase=()=>{}){
+  // O49: imported World mutator remains quarantined even with an injected
+  // duck-typed API that bypasses ScreepsHttpClient's HTTP firewall.
+  assertLegacyWorldMutationDisabled('legacy-spawn-placement');
   if(api?.defaultShard!==target.shard||!id)throw new Error('EXACT_SHARD_AND_ID_REQUIRED');
   onPhase('FIRST_GET_ONLY_GATE');
   const first=await inspectStagedReadiness(api);
