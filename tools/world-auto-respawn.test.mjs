@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {checkApprovedWorldHoldings,checkSameTickWorldLoss,
-  performApprovedWorldAutoRecovery,githubDurableRespawnAttemptLock} from './world-auto-respawn.mjs';
+  performApprovedWorldAutoRecovery,githubDurableRespawnAttemptLock,
+  validateGlobalCreepCensus} from './world-auto-respawn.mjs';
 
 const roomSet={shards:{shard0:['W37S79'],shard1:[],shard2:[],
  shard3:[],sim:[]},reservations:{shard0:[]}};
@@ -37,7 +38,9 @@ function mock({status='lost',statusAfter='empty',user='riflex91',
   noHeartbeat=false,spawnGhost=false,creepGhost=false,
   spawnAfterReserve=false,roomObjectsRejected=false,
   finalRoomObjectsRejected=false,holdingsAfterReserve=null,
-  userAfterReserve=null,finalAccountId=null,lastStatusNormal=false}={}){
+  userAfterReserve=null,finalAccountId=null,lastStatusNormal=false,
+  missingGlobalCensus=false,globalCreepCount=0,
+  finalGlobalCensusInvalid=false}={}){
  const actions={respawnPosts:0,placements:0,worldChecks:0,reservations:0};
  let clockCalls=0,lossReads=0;
  const api={
@@ -93,6 +96,12 @@ function mock({status='lost',statusAfter='empty',user='riflex91',
   wait:async()=>{},
   now:()=>nowSeq.shift()??1421,
   reserveAttempt:async()=>{actions.reservations++;return true},
+  verifyGlobalCreepAbsence:async(_api,{accountId,phase,requiredShards})=>({
+    authenticated:true,
+    accountId,coveredShards:[...requiredShards],
+    ownedCreepCount:phase==='AFTER_LOCK'&&finalGlobalCensusInvalid?1:globalCreepCount,
+    independentCurrentCensus:true
+  }),
   place:async(a,id,approval)=>{
    actions.placements++;
    assert.equal(id,'private-id');
@@ -100,8 +109,18 @@ function mock({status='lost',statusAfter='empty',user='riflex91',
    return {status:'PASS',spawnVerified:true,placementApiCalls:1};
   }
  };
+ if(missingGlobalCensus)delete deps.verifyGlobalCreepAbsence;
  return {api,deps,actions};
 }
+const proof={authenticated:true,accountId:'private-id',
+  ownedCreepCount:0,coveredShards:['shard0','shard1','shard2','shard3'],
+  independentCurrentCensus:true};
+assert.equal(validateGlobalCreepCensus(proof,'private-id'),true);
+for(const change of [
+ {ownedCreepCount:1},{authenticated:false},{accountId:'other'},
+ {coveredShards:['shard0']},{coveredShards:['shard0','shard0','shard1','shard2']},
+ {independentCurrentCensus:false}
+])assert.equal(validateGlobalCreepCensus({...proof,...change},'private-id'),false);
 const normal=mock({status:'normal'});
 assert.equal((await performApprovedWorldAutoRecovery(normal.api,
  normal.deps)).status,'NO_ACTION_WORLD_NORMAL');
@@ -127,7 +146,9 @@ for(const opts of [
    shard0:['W37S79'],shard1:['E4N1'],shard2:[],shard3:[],sim:[]}}},
  {userAfterReserve:'another-user'},
  {finalAccountId:'another-private-id'},
- {lastStatusNormal:true}
+ {lastStatusNormal:true},
+ {missingGlobalCensus:true},{globalCreepCount:1},
+ {finalGlobalCensusInvalid:true}
  ]){
   const m=mock(opts);
   if(opts.user==='another-user'){
@@ -144,6 +165,12 @@ for(const opts of [
       assert.equal(r.status,'HOLD_FINAL_ACCOUNT_IDENTITY_MISMATCH');
     if(opts.lastStatusNormal)
       assert.equal(r.status,'HOLD_LAST_WORLD_STATUS_NO_LONGER_LOST');
+    if(opts.missingGlobalCensus)
+      assert.equal(r.status,'HOLD_GLOBAL_CREEP_CENSUS_UNAVAILABLE');
+    if(opts.globalCreepCount===1)
+      assert.ok(r.blockers?.includes('GLOBAL_OWNED_CREEP_ABSENCE_NOT_VERIFIED'));
+    if(opts.finalGlobalCensusInvalid)
+      assert.equal(r.status,'HOLD_FINAL_GLOBAL_CREEP_CENSUS_UNVERIFIED');
   }
   assert.equal(m.actions.respawnPosts,0);
   assert.equal(m.actions.placements,0);
