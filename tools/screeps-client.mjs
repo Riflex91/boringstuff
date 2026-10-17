@@ -406,7 +406,7 @@ export class ScreepsSocketClient extends EventEmitter {
                 resolve();
               }
             } else {
-              const err = new Error(`WebSocket authentication failed: ${msg}`);
+              const err = new Error('WebSocket authentication rejected (details redacted)');
               this.emit(ScreepsSocketClient.AUTH, { data: { status, token } });
               failBeforeAuth(err);
             }
