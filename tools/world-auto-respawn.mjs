@@ -346,8 +346,9 @@ async function main(){
       reserveAttempt:githubDurableRespawnAttemptLock
     });
     console.log('WORLD_AUTO_RESPAWN '+JSON.stringify(r));
-    if(!['NO_ACTION_WORLD_NORMAL','RESPAWN_AND_SPAWN1_VERIFIED',
-      'HOLD_WORLD_NOT_LOST'].includes(r.status))process.exitCode=2;
+    // A placed Spawn1 is NOT an operationally recovered colony. A green
+    // scheduled run must never imply live bot restart or release acceptance.
+    if(r.status!=='NO_ACTION_WORLD_NORMAL')process.exitCode=2;
   }finally{fs.rmSync(config,{force:true});}
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url))
