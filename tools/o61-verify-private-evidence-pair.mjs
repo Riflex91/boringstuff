@@ -7,6 +7,8 @@ import {ROADMAP_HISTORICAL_ARTIFACTS,
   from './o57-private-roadmap-evidence-vault.mjs';
 import {ORIGINAL_ARTIFACT_SHA256,ORIGINAL_ARTIFACT_LENGTH,
   verifyPinnedOriginalArtifactZip} from './o58-original-artifact-integrity.mjs';
+import {assertPrivateArchiveDirectory,assertPrivateArchiveFiles}
+ from './o63-private-vault-file-policy.mjs';
 
 // O61: a private, offline, pair-wide read-only recovery audit. It NEVER
 // generates private keys, downloads archives, sends bytes, writes restored
@@ -43,6 +45,7 @@ function context(server){
 }
 function readPair(directory){
  const rp=resolveExternalDir(directory);
+ assertPrivateArchiveDirectory(rp);
  const names=fs.readdirSync(rp).sort();
  if(JSON.stringify(names)!==JSON.stringify(['newbieland','world']))refuse();
  const results={};
@@ -51,6 +54,7 @@ function readPair(directory){
   const subStat=fs.lstatSync(sub);
   if(!subStat.isDirectory()||subStat.isSymbolicLink())refuse();
   if(fs.realpathSync.native(sub)!==sub)refuse();
+  assertPrivateArchiveFiles(sub);
   const entries=fs.readdirSync(sub).sort();
   if(JSON.stringify(entries)!==JSON.stringify(['archive-manifest.json','archive.enc']))
    refuse();
