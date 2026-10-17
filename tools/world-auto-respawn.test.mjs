@@ -7,6 +7,8 @@ const roomSet={shards:{shard0:['W37S79'],shard1:[],shard2:[],
 const rooms=checkApprovedWorldHoldings(roomSet);
 assert.equal(rooms.complete,true);
 assert.equal(rooms.scopeVerified,true);
+assert.equal(checkApprovedWorldHoldings({...roomSet,ok:false}).scopeVerified,false);
+assert.equal(checkApprovedWorldHoldings({...roomSet,ok:false}).complete,false);
 for(const extra of [
  {shards:{shard0:['W37S79','W40S80'],shard1:[],shard2:[],shard3:[]}},
  {shards:{shard0:['W37S79'],shard1:['E4N1'],shard2:[],shard3:[]}},
