@@ -152,9 +152,6 @@ function roomsFromReport(file, count) {
 }
 
 function safeWriteJson(name, data) {
-  // O51: refuse the World placement/activation mode before credentials,
-  // cache writes or any API requests. Newbieland spawn:auto remains supported.
-  assertWorldPlannerReadOnly(args);
   fs.mkdirSync(LOG_DIR, { recursive: true });
   const p = path.join(LOG_DIR, name);
   const tmp = `${p}.tmp`;
@@ -676,6 +673,10 @@ async function main() {
   let args;
   try { args = parseArgs(process.argv.slice(2)); }
   catch (err) { console.error(`Argument error: ${err.message}`); usage(2); }
+
+  // O51: refuse the World placement/activation mode before credentials,
+  // cache writes or any API requests. Newbieland spawn:auto remains supported.
+  assertWorldPlannerReadOnly(args);
 
   fs.mkdirSync(LOG_DIR, { recursive: true });
   let sourceReportPath = null;
