@@ -3,6 +3,7 @@ import crypto from 'node:crypto';
 import {assessRetainedReleaseEvidence,runReadOnlyReleaseAudit}
   from './o31-postdeploy-readonly-audit.mjs';
 
+const TARGET_ROOM=process.env.SCREEPS_ROOM||'E8N1';
 const secretId='PRIVATE_DEPLOYMENT_ID';
 const secretUser='PRIVATE_USER_ID';
 const hash=x=>crypto.createHash('sha256').update(x).digest('hex');
@@ -20,7 +21,7 @@ const bot={
     ],
     snapshots:[{c:'STATUS_SNAPSHOT',t:1200,x:{
       cpu:8,bucket:8500,totalCreeps:2,
-      rooms:{E8N1:{rcl:4,creeps:{harvester:2},
+      rooms:{[TARGET_ROOM]:{rcl:4,creeps:{harvester:2},
         health:{status:'HEALTHY'},constructionSites:0}}
     }}]
   }
@@ -86,7 +87,7 @@ const api={
   }
 };
 const result=await runReadOnlyReleaseAudit(api,{
-  server:'newbieland',room:'E8N1',shard:null,branch:'chatgpt'
+  server:'newbieland',room:TARGET_ROOM,shard:null,branch:'chatgpt'
 },{expected});
 assert.equal(result.result,'RETAINED_POSTDEPLOY_100T_SAMPLED');
 assert.equal(result.currentServerTick,1210);
@@ -104,7 +105,7 @@ const badApi={...api,async _request(method,endpoint){
     {modules:{...modules,testModule0:'altered'}}:v;
 }};
 assert.equal((await runReadOnlyReleaseAudit(badApi,{
-  server:'newbieland',room:'E8N1',shard:null,branch:'chatgpt'
+  server:'newbieland',room:TARGET_ROOM,shard:null,branch:'chatgpt'
 },{expected})).result,'HOLD');
 
 console.log('O31 bounded GET-only retained release provenance and no-false-LIVE_100T_PASS PASS');
