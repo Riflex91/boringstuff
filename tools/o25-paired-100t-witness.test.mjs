@@ -38,11 +38,13 @@ assert.equal(first.exactMainCodeVerified,true);
 assert.deepEqual(first.codeFingerprint,{
  expectedModuleCount:82,actualModuleCount:82,
  missingExpectedCount:0,unexpectedCount:0,mismatchingExpectedCount:0,
+ unexplainedMismatchCount:0,injectedConfigDeploymentIdVerified:false,
  differingKnownModules:[]
 });
 const differing=assessReadOnlyPulse(raw(1005,{alternateCode:true}),config);
 assert.equal(differing.ok,false);
 assert.equal(differing.codeFingerprint.mismatchingExpectedCount,1);
+assert.equal(differing.codeFingerprint.unexplainedMismatchCount,1);
 assert.deepEqual(differing.codeFingerprint.differingKnownModules,['m1']);
 assert.ok(!JSON.stringify(differing).includes('CHANGED'));
 assert.equal(first.snapshotTick,1000);
@@ -95,4 +97,46 @@ const badRun=await runReadOnlyWitness({},config,{
 });
 assert.equal(badRun.result,'HOLD');
 assert.equal(badRun.apiMutationsAttempted,0);
+// deploy-live.mjs legitimately inserts exactly one deployment ID into
+// config.js. The changed line is trusted only when Memory.bot confirms it.
+const canonicalConfig="module.exports = {\n  VERSION: 'O16',\n};\n";
+const injectedId='20261017123456-101';
+const publishedConfig=canonicalConfig.replace('module.exports = {\n',
+  "module.exports = {\n  DEPLOYMENT_ID: '"+injectedId+"',\n");
+const installedModules={...code,config:publishedConfig};
+const installedExpected={...expected,config:hash(canonicalConfig)};
+const injectedRaw=raw(1005,{codeSource:installedModules});
+const injectedMemory=JSON.parse(injectedRaw.memory.data);
+injectedMemory.deploymentId=injectedId;
+injectedRaw.memory={data:JSON.stringify(injectedMemory)};
+const normalized=assessReadOnlyPulse(injectedRaw,{
+ ...config,expected:installedExpected
+});
+assert.equal(normalized.ok,true);
+assert.equal(normalized.codeFingerprint.mismatchingExpectedCount,1);
+assert.equal(normalized.codeFingerprint.unexplainedMismatchCount,0);
+assert.equal(normalized.codeFingerprint.injectedConfigDeploymentIdVerified,true);
+assert.deepEqual(normalized.codeFingerprint.differingKnownModules,['config']);
+assert.ok(!JSON.stringify(normalized).includes(injectedId));
+const wrongMemory={...injectedRaw,memory:{data:JSON.stringify({
+ ...injectedMemory,deploymentId:'20261017123456-102'
+})}};
+const mismatch=assessReadOnlyPulse(wrongMemory,{
+ ...config,expected:installedExpected
+});
+assert.equal(mismatch.ok,false);
+assert.equal(mismatch.codeFingerprint.injectedConfigDeploymentIdVerified,false);
+const badlyChanged={...injectedRaw,code:{modules:{
+ ...installedModules,config:publishedConfig+"\n//surprise code change"
+}}};
+assert.equal(assessReadOnlyPulse(badlyChanged,{
+ ...config,expected:installedExpected}).ok,false);
+const doubleInjected={...injectedRaw,code:{modules:{
+ ...installedModules,config:publishedConfig.replace(
+  "  DEPLOYMENT_ID: '"+injectedId+"',",
+  "  DEPLOYMENT_ID: '"+injectedId+"',\n  DEPLOYMENT_ID: '"+injectedId+"',")
+}}};
+assert.equal(assessReadOnlyPulse(doubleInjected,{
+ ...config,expected:installedExpected}).ok,false);
+
 console.log('O25 independent 100-game-tick GET-only witness offline safety PASS');
