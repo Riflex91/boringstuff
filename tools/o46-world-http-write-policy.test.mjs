@@ -99,6 +99,20 @@ try{
   assert.ok(hits.length>second);
   assert.ok(hits.slice(second).every(x=>x.method==='GET'));
 
+  // World identity must not be reassignable to defeat a check that trusts
+  // the mutable client property.
+  const identityPinned=fixtureWorld();
+  assert.equal(identityPinned.serverName,'world');
+  assert.throws(()=>{identityPinned.serverName='offline-routing-fixture';},TypeError);
+  assert.equal(identityPinned.serverName,'world');
+  assert.throws(()=>Object.defineProperty(identityPinned,'serverName',{
+    value:'offline-routing-fixture'
+  }),TypeError);
+  const afterTamper=hits.length;
+  await assert.rejects(()=>identityPinned._request('POST','/api/user/code',{}),
+    /O46_WORLD_HTTP_MUTATION_HOLD_NO_APPROVED_FENCED_EXECUTOR/);
+  assert.equal(hits.length,afterTamper);
+
   // Wrapper guards also prevent a caller from swapping _request out after
   // constructing an actual World client.
   const swapped=fixtureWorld();
