@@ -4,6 +4,7 @@ import { parse } from 'acorn';
 import {
   LEGACY_WORLD_MUTATOR_EXPORTS,WRITE_PATH_CLASSES
 } from './o50-world-write-path-audit.mjs';
+import { validateWorldGuardProvenance } from './o52-world-guard-provenance.mjs';
 
 // O51 bounded independent AST layer over O50's known-pattern inventory.
 // Soundness LIMIT: AST syntax analysis and local const alias folding is not
@@ -153,8 +154,13 @@ function candidateKind(node,bindings){
     return 'DYNAMIC_API_MEMBER';
   if(member==='_request'){
     const verb=primitive(node.arguments[0],consts);
-    if(verb==='GET')return null;
-    return verb===null?'UNKNOWN_HTTP_VERB':'MUTATING_API_REQUEST';
+    // O52: globally collected const aliases are not lexical-scope proofs.
+    // Only a directly written GET literal is provably read-only here.
+    // A shadowed variable called "verb" could otherwise hide a POST.
+    if(node.arguments[0]?.type==='Literal'&&
+       node.arguments[0].value==='GET')return null;
+    return verb===null||verb==='GET'?'UNKNOWN_HTTP_VERB':
+      'MUTATING_API_REQUEST';
   }
   if(MUTATORS.has(member))return 'MUTATING_CLIENT_WRAPPER';
   if(member==='fetch'&&(object==='globalThis'||object===''))
@@ -187,6 +193,7 @@ export function inspectWorldAstSource(filename,source){
   const bindings=collectDeclarations(ast),findings=[],violations=[];
   const reviewed=WRITE_PATH_CLASSES[filename]||null;
   const exposed=LEGACY_WORLD_MUTATOR_EXPORTS[filename]||[];
+  violations.push(...validateWorldGuardProvenance(ast,filename,exposed));
   const guardedImport=[...bindings.imports.entries()].some(([local,uri])=>
     local==='assertLegacyWorldMutationDisabled'&&
     uri==='./o45-world-mutation-entrypoint-hold.mjs');
