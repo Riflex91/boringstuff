@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 import {
   EXPECTED_MAIN_SHA,HISTORICAL_RUNS,extractOriginalLivePass,
-  assessHistoricalRun,assessHistoricalPair,inspectGithubHistoricalRun
+  assessHistoricalRun,assessHistoricalPair,inspectGithubHistoricalRun,
+  originalDeploymentLogDigest
 } from './o34-historical-actions-evidence.mjs';
 
 const old='3f14590592d30dded0b6f61ab0e301e475ed6bf3';
@@ -12,6 +14,16 @@ const payload={status:'PASS',deploymentTick:1000,observedTicks:131,
   roomEvidence:{PRIVATE_CREEP:'SECRET_USERNAME_SHOULD_NOT_LEAK'}};
 const line='2026-10-16T04:16:49.1086284Z LIVE_100T_PASS '+
   JSON.stringify(payload)+'\n';
+// Keep timestamp parsing aligned with real Actions log output. The
+// comparison uses SHA-256 only; IDs must never appear in emitted audit JSON.
+const uploaded='20261016040545315-1234';
+const originalLine='2026-10-16T04:05:45.3150310Z Deployment ID:     '+
+  uploaded+'\\n';
+assert.match(originalDeploymentLogDigest(originalLine),/^[a-f0-9]{64}$/);
+assert.equal(originalDeploymentLogDigest(originalLine),
+  crypto.createHash('sha256').update(uploaded).digest('hex'));
+assert.equal(originalDeploymentLogDigest(originalLine+originalLine),null);
+assert.equal(originalDeploymentLogDigest('Deployment ID: '+uploaded),null);
 assert.deepEqual(extractOriginalLivePass(line).valid,true);
 assert.equal(extractOriginalLivePass(line).observedTicks,131);
 assert.equal(extractOriginalLivePass(line).snapshotTick,1131);
