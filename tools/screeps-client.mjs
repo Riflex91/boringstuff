@@ -4,6 +4,7 @@ import http from 'node:http';
 import https from 'node:https';
 import { EventEmitter } from 'node:events';
 import { fileURLToPath } from 'node:url';
+import { assertWorldHttpReadOnly } from './o46-world-http-write-policy.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -101,6 +102,9 @@ export class ScreepsHttpClient {
   }
 
   async _request(method, endpoint, params = {}, opts = {}) {
+    // O46 network chokepoint: deny ALL World mutating HTTP methods before
+    // authentication or socket creation, even via legacy raw _request.
+    assertWorldHttpReadOnly(this.serverName, method, endpoint);
     if (!opts.skipAuth && !this.token) await this.auth();
 
     // O40: retries are safe by default ONLY for GET and authentication.
@@ -250,10 +254,12 @@ export class ScreepsHttpClient {
   }
 
   gameCheckUniqueObjectName(type, name, shard) {
+    assertWorldHttpReadOnly(this.serverName, 'POST', '/api/game/check-unique-object-name');
     return this._request('POST', '/api/game/check-unique-object-name', { type, name, shard: shard ?? this.defaultShard });
   }
 
   gamePlaceSpawn(room, x, y, name, shard) {
+    assertWorldHttpReadOnly(this.serverName, 'POST', '/api/game/place-spawn');
     // The server may commit placement even if the response is lost. Avoid all
     // automatic transport, 429/5xx or login retries of this irreversible POST.
     return this._request('POST', '/api/game/place-spawn',
@@ -266,6 +272,7 @@ export class ScreepsHttpClient {
   }
 
   userUploadCodeOnce(branch, modules) {
+    assertWorldHttpReadOnly(this.serverName, 'POST', '/api/user/code');
     // A code upload can commit even if HTTP times out, 429/5xx is returned,
     // or the response body is lost. One invocation gets ONE POST attempt.
     // Refuse malformed or partial O16 payloads before touching the network.
@@ -289,6 +296,7 @@ export class ScreepsHttpClient {
   }
 
   userSetActiveBranch(branch, activeName = 'activeWorld') {
+    assertWorldHttpReadOnly(this.serverName, 'POST', '/api/user/set-active-branch');
     // An activation may have succeeded even if the HTTP result is uncertain.
     // Require independent GET-only recovery rather than a hidden second POST.
     return this._request('POST', '/api/user/set-active-branch',
