@@ -28,12 +28,13 @@ try{
  assert.throws(()=>archivePinnedRoadmapOriginals(args),
    /O58_ORIGINAL_ARCHIVE_HOLD/);
  assert.equal(fs.existsSync(path.join(tmp,'o57-original-evidence-v1')),false);
- const other=path.join(tmp,'another');fs.mkdirSync(other);
+ const other=path.join(tmp,'another');fs.mkdirSync(other,{mode:0o700});
+ if(process.platform!=='win32')fs.chmodSync(other,0o700);
  fs.writeFileSync(newb,Buffer.from('NOT_ZIP'));
  assert.throws(()=>archivePinnedRoadmapOriginals([
    '--output-parent',other,'--world-zip',world,
    '--newbieland-zip',newb,'--public-key',publicFile
- ]),/O57_ARCHIVE_ORIGINALS_HOLD/);
+ ]),/O62_PRIVATE_ARCHIVE_FS_HOLD/);
  assert.deepEqual(fs.readdirSync(other),[]);
  assert.throws(()=>archivePinnedRoadmapOriginals([
    ...args,'--force','DANGEROUS'
