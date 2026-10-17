@@ -1,0 +1,81 @@
+name: Screeps O38 World exact-main proof approval dossier (GET only)
+on:
+  push:
+    branches: [diagnostics/o38-exact-world-proof-operator-dossier-20261017]
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: o38-world-proof-review-no-write
+  cancel-in-progress: false
+jobs:
+  exact-head-node24-p3:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: tools
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Exact HEAD canonical Node24 game and read-only review tests
+        run: |
+          npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+          npm test
+          python3 o34-artifact-receipt.test.py
+      - name: Exact HEAD P3 paired CPU baseline benchmarks
+        run: npm run bench:p3
+  create-human-review-dossier:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: tools
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
+      GITHUB_REPOSITORY: Riflex91/boringstuff
+      SCREEPS_SERVER: world
+      SCREEPS_BRANCH: chatgpt
+      SCREEPS_SHARD: shard0
+      SCREEPS_ROOM: W37S79
+      SCREEPS_TOKEN_WORLD: ${{ secrets.SCREEPS_TOKEN_WORLD }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Verify pinned predecessor Main and identical game tree
+        shell: bash
+        run: |
+          git -C .. fetch origin main --quiet
+          test "$(git -C .. rev-parse origin/main)" = bc43f2faf1f345e63d9bfe78b6bbaa59e5eaab0c
+          git -C .. diff --exit-code origin/main HEAD -- game
+      - name: Regress fake or incomplete CI and unauthorized release paths
+        run: |
+          node o38-world-proof-operator-dossier.test.mjs
+          node o37-world-proof-acquisition-preflight.test.mjs
+      - name: GET only original Node24 Main CI, both genuine receipt ZIPs and current World health
+        run: node o38-world-proof-operator-dossier.mjs
+      - name: Store review-only JSON dossier without any original backups or tokens
+        uses: actions/upload-artifact@v4
+        with:
+          name: o38-world-human-review-only-${{ github.sha }}
+          path: ${{ runner.temp }}/o38-world-review-only-dossier.json
+          if-no-files-found: error
+          retention-days: 30
+      - name: Release remains blocked pending explicit separate human approval
+        shell: bash
+        run: |
+          echo '### World proof-generation review, not approval' >> "$GITHUB_STEP_SUMMARY"
+          echo 'All inputs are read using authenticated GET. A healthy existing World is preserved.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'This workflow has NO code-upload, release or respawn implementation.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'A controlled new World deployment would need separate affirmative authorization and a reviewed rollback protocol.' >> "$GITHUB_STEP_SUMMARY"
+          echo '**HOLD_EXACT_PREDECESSOR_PAIR_MISSING — NO SCREEPS WRITES AND NO MERGE.**' >> "$GITHUB_STEP_SUMMARY"
