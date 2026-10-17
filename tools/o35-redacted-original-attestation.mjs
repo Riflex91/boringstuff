@@ -30,6 +30,10 @@ export function buildPublicHistoricalAttestation({world,newbieland,
     const proof=r?.livePass;
     const integrity=r?.originalArtifactIntegrity;
     if(r?.historicalCanonicalPass!==true||
+       r.runId!==HISTORICAL_RUNS[server]||
+       r.predecessorMainSha!==EXPECTED_MAIN_SHA||
+       r.exactMainSha!==(server==='newbieland')||
+       r.eligibleExactPredecessor!==(server==='newbieland')||
        r.originalReceiptFileContentsVerified!==true||
        !safeId(r?.runId)||!isSha(r?.sourceHeadSha)||
        !isDigest(integrity?.archiveSha256)||
