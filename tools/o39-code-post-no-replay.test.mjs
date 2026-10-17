@@ -45,13 +45,13 @@ const rejected=[
  {...modules,extra:'data'}
 ];
 for(const payload of rejected){
- await assert.rejects(
-   fakeClient.userUploadCodeOnce('chatgpt',payload),
+ assert.throws(
+   ()=>fakeClient.userUploadCodeOnce('chatgpt',payload),
    /EXACT_82_MODULE_CODE_UPLOAD_PAYLOAD_REQUIRED/
  );
 }
-await assert.rejects(
-  fakeClient.userUploadCodeOnce('../unsafe',modules),
+assert.throws(
+  ()=>fakeClient.userUploadCodeOnce('../unsafe',modules),
   /EXACT_82_MODULE_CODE_UPLOAD_PAYLOAD_REQUIRED/
 );
 
