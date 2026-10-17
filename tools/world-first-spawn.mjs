@@ -1,3 +1,4 @@
+import { assertLegacyWorldMutationDisabled } from './o45-world-mutation-entrypoint-hold.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -256,6 +257,9 @@ export async function placePinnedWorldSpawn(api,id) {
 }
 
 async function main() {
+  // O45: refuse World mutations even with old approval strings and secrets.
+  // No credentials, config file or network call may precede this HOLD.
+  assertLegacyWorldMutationDisabled('legacy-first-spawn');
   const required={
     WORLD_FIRST_SPAWN_CONFIRM:PLACEMENT_CONFIRM,
     WORLD_RCL8_RISK_CONFIRM:RIVAL_CONFIRM,
