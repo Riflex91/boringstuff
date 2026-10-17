@@ -68,13 +68,20 @@ export async function followOneSignedJobLogRedirect(response) {
 
   // This is a completely NEW request with no Authorization and no GitHub
   // token material. Manual mode stops automatic redirects at this hop.
-  const downloaded=await fetch(location,{
-    method:'GET',
-    redirect:'manual',
-    headers:{Accept:'text/plain'},
-    cache:'no-store',
-    signal:AbortSignal.timeout(15000)
-  });
+  let downloaded;
+  try{
+    downloaded=await fetch(location,{
+      method:'GET',
+      redirect:'manual',
+      headers:{Accept:'text/plain'},
+      cache:'no-store',
+      signal:AbortSignal.timeout(15000)
+    });
+  }catch{
+    // A failed fetch may embed the signed capability URL in the thrown
+    // TypeError/cause. Do not forward that error into CI logs or reports.
+    refuse(O56_LOG_REDIRECT_HOLD);
+  }
   if(!downloaded||!downloaded.ok||
      downloaded.status!==200||downloaded.redirected||
      downloaded.type==='opaqueredirect')refuse(O56_LOG_REDIRECT_HOLD);
