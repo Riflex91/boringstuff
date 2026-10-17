@@ -53,32 +53,15 @@ function fake({missingSpawn=false,codeChanged=false,alreadyActive=false,
  };
  return {api,calls,count:()=>count};
 }
-{
- const f=fake();
- const actual=await activateVerifiedWorldSpawn(f.api,'my-user-id',placement);
- assert.equal(actual.status,'PASS');
- assert.equal(actual.spawnVerified,true);
- assert.equal(actual.worldCodeActivated,true);
- assert.equal(actual.activeBranch,'chatgpt');
- assert.equal(actual.activationApiCalls,1);
- assert.equal(f.count(),1);
- assert.equal(f.calls.at(-1),'GET_BRANCHES');
-}
-{
- const f=fake();
- await assert.rejects(()=>activateVerifiedWorldSpawn(f.api,'my-user-id',
-   {...placement,spawnVerified:false}),/REQUIRES_VERIFIED_PLACEMENT/);
- assert.equal(f.calls.length,0);
-}
-for(const scenario of [{missingSpawn:true},{codeChanged:true},
- {alreadyActive:true}]) {
- const f=fake(scenario);
- await assert.rejects(()=>activateVerifiedWorldSpawn(f.api,'my-user-id',placement));
- assert.equal(f.count(),0,'Never activate when spawn/code/branch is unverified');
-}
-for(const scenario of [{reject:true},{throwActivation:true}]) {
- const f=fake(scenario);
- await assert.rejects(()=>activateVerifiedWorldSpawn(f.api,'my-user-id',placement));
- assert.equal(f.count(),1,'Never retry an uncertain branch activation');
+// O49: the mutator export cannot be invoked with a duck-typed API in the
+// real tool path, even when it forges placement evidence and approval.
+for(const scenario of [{},{missingSpawn:true},{codeChanged:true},
+  {alreadyActive:true},{reject:true},{throwActivation:true}]){
+  const f=fake(scenario);
+  await assert.rejects(()=>activateVerifiedWorldSpawn(f.api,
+    'my-user-id',placement),
+    /O45_WORLD_MUTATION_HOLD_NO_APPROVED_FENCED_EXECUTOR/);
+  assert.equal(f.calls.length,0,'No injected World API operation');
+  assert.equal(f.count(),0,'No activation');
 }
 console.log('World exact Spawn1 post-placement activation guards: PASS');
