@@ -5,7 +5,7 @@ import {checkApprovedWorldHoldings,checkSameTickWorldLoss,
   validateGlobalCreepCensus} from './world-auto-respawn.mjs';
 
 const roomSet={shards:{shard0:['W37S79'],shard1:[],shard2:[],
- shard3:[],sim:[]},reservations:{shard0:[]}};
+ shard3:[],sim:[]},reservations:{shard0:[],shard1:[],shard2:[],shard3:[],sim:[]}};
 const rooms=checkApprovedWorldHoldings(roomSet);
 assert.equal(rooms.complete,true);
 assert.equal(rooms.scopeVerified,true);
@@ -19,6 +19,27 @@ for(const extra of [
   reservations:{shard0:['W37S79']}},
  {shards:{shard0:['W37S79']}}
  ])assert.equal(checkApprovedWorldHoldings(extra).scopeVerified,false);
+
+// Incomplete shard/sim, missing reservations, duplicates and unknown
+// recoverable groups must not be inferred to be empty by the reset policy.
+for(const partial of [
+  {shards:{shard0:['W37S79'],shard1:[],shard2:[],shard3:[]}},
+  {reservations:{shard0:[]}},
+  {reservations:undefined},
+  {shards:{...roomSet.shards,shard0:['W37S79','W37S79']}},
+  {shards:{...roomSet.shards,extra:['W40S80']}},
+  {reservations:{...roomSet.reservations,shard1:['E4N1']}},
+  {shards:{...roomSet.shards,sim:['sim']}},
+  {shards:{...roomSet.shards,unknown:null}},
+  {shards:{...roomSet.shards,shard0:[null]}},
+  {reservations:{...roomSet.reservations,shard3:null}}
+]){
+  const probe=checkApprovedWorldHoldings({...roomSet,...partial});
+  assert.equal(probe.scopeVerified,false,JSON.stringify(partial));
+  assert.equal(probe.complete,false,JSON.stringify(partial));
+}
+assert.equal(checkApprovedWorldHoldings({...roomSet,
+  shards:{...roomSet.shards,additionalEmpty:[]}}).scopeVerified,true);
 
 const mem=t=>({data:JSON.stringify({deploymentId:'test-world-main',telemetryJournal:{
  snapshots:[{c:'STATUS_SNAPSHOT',t,x:{
