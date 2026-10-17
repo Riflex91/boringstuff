@@ -3,6 +3,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {inspectWorldAstSource,auditWorldAstRepo}
   from './o51-world-ast-egress-audit.mjs';
+import {reviewedTransportFixtures} from './o54-reviewed-readonly-transport-shapes.mjs';
 
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const report=auditWorldAstRepo(root);
@@ -51,20 +52,19 @@ contains("const sock={send(){}};ws.send('console something')",'SOCKET_SEND');
 // Reviewed read-only transports are an explicit AST-shape allowlist, not a
 // blanket file-name exemption. A fetch POST or changed local child argv must
 // become a new, independently reviewable violation.
-const githubGetReadOnly=
-  "async function githubGet(url){return fetch(url,{headers:{Accept:'application/json'}});}";
+const {githubGet,scoutChild}=reviewedTransportFixtures();
+const githubGetReadOnly="async function githubGet(url,token){return "+githubGet+";}";
 assert.deepEqual(inspectWorldAstSource(
   'world-first-spawn-live-gate.mjs',githubGetReadOnly).violations,[]);
 assert.ok(inspectWorldAstSource('world-first-spawn-live-gate.mjs',
-  "async function githubGet(url){return fetch(url,{headers:{},method:'POST'});}"
+  githubGetReadOnly.replace("'2022-11-28'","'2023-01-01'")
 ).violations.some(x=>x.startsWith('READONLY_TRANSPORT_CHANGED_OR_ADDED_')));
 const scoutBase=
   "import {spawnSync} from 'node:child_process';"+
   "import {assertWorldScoutRoomArguments} from './o51-world-planner-readonly-gate.mjs';"+
   "const selected=['W37S79'];assertWorldScoutRoomArguments(selected);";
-const scoutCall=(server)=>
-  "spawnSync(process.execPath,['initial-spawn-planner.mjs','--server','"+
-    server+"',...selected]);";
+const scoutCall=(server)=>scoutChild.replace("'--server','world'",
+  "'--server','"+server+"'");
 assert.deepEqual(inspectWorldAstSource('world-scout.mjs',
   scoutBase+scoutCall('world')).violations,[]);
 assert.ok(inspectWorldAstSource('world-scout.mjs',
