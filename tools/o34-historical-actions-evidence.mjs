@@ -141,7 +141,7 @@ export function inspectOriginalReceiptArchive(bytes,{server,run,jobLog}){
      !Buffer.isBuffer(bytes)||bytes.length>24_000_000)return invalid;
   const branch=server==='world'?'chatgpt-w37s79-stage':'chatgpt';
   const rows=[...jobLog.matchAll(
-    /^20\d\d-[^\\r\\n]{12,48}Z Deployment ID:\\s+([0-9]{17}-[0-9]{1,10})\\r?$/gm
+    /^20\d\d-[^\r\n]{12,48}Z Deployment ID:\s+([0-9]{17}-[0-9]{1,10})\r?$/gm
   )];
   if(rows.length!==1)return {...invalid,
     reason:'ORIGINAL_DEPLOYMENT_ID_LOG_LINE_UNVERIFIED'};
