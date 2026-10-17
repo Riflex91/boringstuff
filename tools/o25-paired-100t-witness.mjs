@@ -54,15 +54,33 @@ export function assessReadOnlyPulse(raw,{room,branch,expected}){
   const expectedNames=Object.keys(expected||{}).sort();
   const actualNames=modules&&typeof modules==='object'&&!Array.isArray(modules)?
     Object.keys(modules).sort():[];
+  const bot=parseBotMemory(raw?.memory);
+  // deploy-live.mjs deliberately injects exactly one unique deployment ID
+  // into config.js. That ONE known line may differ, but it must match the
+  // currently retained Memory.bot.deploymentId and removal must reproduce
+  // the exact checked-out Main config bytes. No other normalization allowed.
+  const serverConfig=typeof modules?.config==='string'?modules.config:null;
+  const deployedLine=/^  DEPLOYMENT_ID: '([0-9]{14}-[0-9]{1,10})',\\r?\\n/gm;
+  const deploymentMarkers=serverConfig?
+    [...serverConfig.matchAll(deployedLine)]:[];
+  const knownDeploymentLineVerified=Boolean(
+    deploymentMarkers.length===1&&
+    typeof bot?.deploymentId==='string'&&
+    bot.deploymentId===deploymentMarkers[0][1]&&
+    expected?.config&&
+    hash(serverConfig.replace(deployedLine,''))===expected.config
+  );
   const expectedSet=new Set(expectedNames),actualSet=new Set(actualNames);
   const missingExpectedNames=expectedNames.filter(name=>!actualSet.has(name));
   const unexpectedCount=actualNames.filter(name=>!expectedSet.has(name)).length;
   const mismatchingExpectedNames=expectedNames.filter(name=>
     actualSet.has(name)&&(typeof modules[name]!=='string'||
       hash(modules[name])!==expected[name]));
+  const unexplainedMismatches=mismatchingExpectedNames.filter(name=>
+    name!=='config'||!knownDeploymentLineVerified);
   const exact=code?.ok!==false && expectedNames.length>=70 &&
     missingExpectedNames.length===0&&unexpectedCount===0 &&
-    mismatchingExpectedNames.length===0;
+    unexplainedMismatches.length===0;
   if(!exact)failures.push('ACTIVE_CODE_NOT_EXACT_MAIN');
   // Author-only source-module names; never print returned code contents,
   // names of previously unknown modules or raw account/runtime API data.
@@ -72,9 +90,10 @@ export function assessReadOnlyPulse(raw,{room,branch,expected}){
     missingExpectedCount:missingExpectedNames.length,
     unexpectedCount,
     mismatchingExpectedCount:mismatchingExpectedNames.length,
+    unexplainedMismatchCount:unexplainedMismatches.length,
+    injectedConfigDeploymentIdVerified:knownDeploymentLineVerified,
     differingKnownModules:mismatchingExpectedNames.slice(0,12)
   };
-  const bot=parseBotMemory(raw?.memory);
   if(!bot||typeof bot.deploymentId!=='string'||!bot.deploymentId)
     failures.push('BOT_MEMORY_UNVERIFIED');
   const snapshots=Array.isArray(bot?.telemetryJournal?.snapshots)?
