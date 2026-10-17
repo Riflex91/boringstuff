@@ -18,6 +18,13 @@ is not evidence that a canonical production LIVE_100T_PASS took place.
    expiry 2026-10-29 21:26:02 UTC;
    Newbieland run 38848802082, artifact 12024822115,
    exact current Main SHA, expiry 2026-10-30 04:16:49 UTC.
+3a. tools/o57-original-artifact-metadata.mjs: read-only authenticated
+    GitHub API metadata shape verifier for original historical run IDs,
+    commit SHAs, artifact IDs, download endpoints and expiry status.
+    Independent GitHub GET on 2026-10-17 observed both artifacts
+    expired:false, size 193951 bytes (World) / 192120 bytes (Newbieland).
+    This proves metadata availability only, NOT a ZIP download,
+    ZIP receipt authenticity or private long-term replication.
 3. tools/o57-roadmap-release-closeout.mjs: fail-closed, review-only ledger
    for SHA-exact paired proofs, read-only World, remote backup, separately
    held recovery key, single writer, private original archive, reviews and
