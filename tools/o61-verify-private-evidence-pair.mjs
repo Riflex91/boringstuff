@@ -127,22 +127,27 @@ export function verifyPrivateEvidencePairOffline({
    // Production recovery additionally requires exact original byte pins.
    if(pair[server].manifest.plaintextBytes!==ORIGINAL_ARTIFACT_LENGTH[server]||
       pair[server].manifest.plaintextSha256!==ORIGINAL_ARTIFACT_SHA256[server])refuse();
-   const restored=restorePrivateRoadmapEvidenceOffline({
-    directory:pair[server].directory,context:context(server),
-    recipientPrivateKeyPem:keyBytes
-   });
-   if(restored.sha256!==ORIGINAL_ARTIFACT_SHA256[server]||
-      restored.zipBytes.length!==ORIGINAL_ARTIFACT_LENGTH[server])refuse();
-   const original=verifyPinnedOriginalArtifactZip(restored.zipBytes,server);
-   if(!original.originalGitHubArtifactBytesMatched||
-      original.moduleCount!==82)refuse();
-   check[server]=Object.freeze({
-    originalZipSha256:restored.sha256,
-    moduleCount:original.moduleCount,
-    matchedPinnedOriginal:true
-   });
-   // These buffers have completed their use; do not output or store them.
-   restored.zipBytes.fill(0);
+   let restored;
+   try{
+    restored=restorePrivateRoadmapEvidenceOffline({
+     directory:pair[server].directory,context:context(server),
+     recipientPrivateKeyPem:keyBytes
+    });
+    if(restored.sha256!==ORIGINAL_ARTIFACT_SHA256[server]||
+       restored.zipBytes.length!==ORIGINAL_ARTIFACT_LENGTH[server])refuse();
+    const original=verifyPinnedOriginalArtifactZip(restored.zipBytes,server);
+    if(!original.originalGitHubArtifactBytesMatched||
+       original.moduleCount!==82)refuse();
+    check[server]=Object.freeze({
+     originalZipSha256:restored.sha256,
+     moduleCount:original.moduleCount,
+     matchedPinnedOriginal:true
+    });
+   }finally{
+    // O63: plaintext needs scrubbing even if a later hash, ZIP, or
+    // deployment-receipt verification rejects the restored archive.
+    if(restored?.zipBytes)restored.zipBytes.fill(0);
+   }
   }
   return Object.freeze({
    checked:check,archivesRecovered:2,recipientKeyMatches:true,
