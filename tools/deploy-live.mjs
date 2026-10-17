@@ -3,7 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ScreepsHttpClient } from './screeps-client.mjs';
 import { DEFAULT_VERIFICATION_LOG_DIR, writeDeploymentReceipt } from './deployment-receipt.mjs';
-import { assertUniqueActiveCodeBranch } from './o39-code-upload-active-branch-policy.mjs';
+import { assertUniqueActiveCodeBranch, assertRestorablePreuploadCodeBackup } from './o39-code-upload-active-branch-policy.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const parent = path.resolve(here, '..');
@@ -70,6 +70,7 @@ assertUniqueActiveCodeBranch(branches, branch);
 console.log('Branch activeWorld: true');
 
 const before = await api._request('GET', '/api/user/code', { branch });
+assertRestorablePreuploadCodeBackup(before, modules);
 const beforeVersion = extractVersion(before?.modules?.config);
 console.log('Server before:     ' + beforeVersion);
 
@@ -92,12 +93,14 @@ fs.writeFileSync(
     deploymentId,
     modules: before?.modules || {}
   }, null, 2),
-  'utf8'
+  { encoding: 'utf8', mode: 0o600, flag: 'wx' }
 );
 console.log('Backup written:    ' + backupPath);
 
 // A missing HTTP acknowledgement is an UNKNOWN result. Never implicitly
 // retry this code POST: the API may already have committed the upload.
+// Active branch may change after initial preflight or backup capture.
+assertUniqueActiveCodeBranch(await api.userBranches(), branch);
 await api.userUploadCodeOnce(branch, modules);
 console.log('Upload completed.');
 
