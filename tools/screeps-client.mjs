@@ -109,7 +109,7 @@ export class ScreepsHttpClient {
   async _request(method, endpoint, params = {}, opts = {}) {
     // O46 network chokepoint: deny ALL World mutating HTTP methods before
     // authentication or socket creation, even via legacy raw _request.
-    assertWorldHttpReadOnly(this.serverName, method, endpoint);
+    assertWorldHttpReadOnly(this.serverName, method, endpoint, this.server?.baseUrl);
     if (!opts.skipAuth && !this.token) await this.auth();
 
     // O40: retries are safe by default ONLY for GET and authentication.
@@ -126,7 +126,11 @@ export class ScreepsHttpClient {
     let retry5xx = 0;
 
     while (true) {
-      const url = new URL(endpoint.replace(/^\//, ''), this.server.baseUrl);
+      // O47: the target address might have changed during an awaited auth()
+      // or between bounded GET retries. Recheck the exact URL input here.
+      const configuredBaseUrl = this.server.baseUrl;
+      assertWorldHttpReadOnly(this.serverName, method, endpoint, configuredBaseUrl);
+      const url = new URL(endpoint.replace(/^\//, ''), configuredBaseUrl);
       if (method === 'GET') addSearchParams(url, params);
       const payload = method === 'GET' ? null : JSON.stringify(params || {});
       const transport = url.protocol === 'https:' ? https : http;
@@ -259,12 +263,12 @@ export class ScreepsHttpClient {
   }
 
   gameCheckUniqueObjectName(type, name, shard) {
-    assertWorldHttpReadOnly(this.serverName, 'POST', '/api/game/check-unique-object-name');
+    assertWorldHttpReadOnly(this.serverName, 'POST', '/api/game/check-unique-object-name', this.server?.baseUrl);
     return this._request('POST', '/api/game/check-unique-object-name', { type, name, shard: shard ?? this.defaultShard });
   }
 
   gamePlaceSpawn(room, x, y, name, shard) {
-    assertWorldHttpReadOnly(this.serverName, 'POST', '/api/game/place-spawn');
+    assertWorldHttpReadOnly(this.serverName, 'POST', '/api/game/place-spawn', this.server?.baseUrl);
     // The server may commit placement even if the response is lost. Avoid all
     // automatic transport, 429/5xx or login retries of this irreversible POST.
     return this._request('POST', '/api/game/place-spawn',
@@ -277,7 +281,7 @@ export class ScreepsHttpClient {
   }
 
   userUploadCodeOnce(branch, modules) {
-    assertWorldHttpReadOnly(this.serverName, 'POST', '/api/user/code');
+    assertWorldHttpReadOnly(this.serverName, 'POST', '/api/user/code', this.server?.baseUrl);
     // A code upload can commit even if HTTP times out, 429/5xx is returned,
     // or the response body is lost. One invocation gets ONE POST attempt.
     // Refuse malformed or partial O16 payloads before touching the network.
@@ -301,7 +305,7 @@ export class ScreepsHttpClient {
   }
 
   userSetActiveBranch(branch, activeName = 'activeWorld') {
-    assertWorldHttpReadOnly(this.serverName, 'POST', '/api/user/set-active-branch');
+    assertWorldHttpReadOnly(this.serverName, 'POST', '/api/user/set-active-branch', this.server?.baseUrl);
     // An activation may have succeeded even if the HTTP result is uncertain.
     // Require independent GET-only recovery rather than a hidden second POST.
     return this._request('POST', '/api/user/set-active-branch',

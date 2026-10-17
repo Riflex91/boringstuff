@@ -148,7 +148,7 @@ try{
 
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const clientSource=fs.readFileSync(path.join(root,'tools','screeps-client.mjs'),'utf8');
-const guard=clientSource.indexOf('assertWorldHttpReadOnly(this.serverName, method, endpoint);');
+const guard=clientSource.indexOf('assertWorldHttpReadOnly(this.serverName, method, endpoint, this.server?.baseUrl);');
 const auth=clientSource.indexOf('if (!opts.skipAuth && !this.token) await this.auth()');
 const network=clientSource.indexOf('const req = transport.request(');
 assert.ok(guard>0 && auth>guard && network>auth,

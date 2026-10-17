@@ -3,7 +3,7 @@ import { ScreepsHttpClient } from './screeps-client.mjs';
 
 // No network requests. The existing strategic planner uses these same client methods.
 function probe(shard, serverName='world') {
-  const api = new ScreepsHttpClient(serverName, { token: 'offline-test', baseUrl: 'https://screeps.com/' }, { shard });
+  const api = new ScreepsHttpClient(serverName, { token: 'offline-test', baseUrl: 'https://synthetic-shard-routing.invalid/' }, { shard });
   const calls = [];
   api._request = async (method, endpoint, params) => { calls.push({ method, endpoint, params }); return { ok: 1 }; };
   return { api, calls };
