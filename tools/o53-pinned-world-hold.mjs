@@ -12,7 +12,7 @@ export const WORLD_HOLD_IMPLEMENTATION_MISMATCH =
 export function gitBlobSha(source){
   if(typeof source!=='string')throw new Error(WORLD_HOLD_IMPLEMENTATION_MISMATCH);
   const data=Buffer.from(source,'utf8');
-  return createHash('sha1').update(Buffer.from(`blob ${data.length}\\0`.replace('\\0','\0'))).update(data).digest('hex');
+  return createHash('sha1').update(Buffer.from('blob '+data.length+'\0')).update(data).digest('hex');
 }
 export function verifyPinnedWorldHoldImplementation(source){
   const actual=gitBlobSha(source);
