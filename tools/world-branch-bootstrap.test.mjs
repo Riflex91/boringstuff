@@ -69,68 +69,21 @@ function createMock({
   };
   return {api,calls,state};
 }
-{
-  const {api,calls,state}=createMock();
-  const phases=[];
-  const result=await stageInactiveWorldCode(api,modules,p=>phases.push(p));
-  assert.deepEqual(result,{
-    status:'PASS',branch:'chatgpt',moduleCount:8,
-    exactByteMatch:true,activeWorld:'default',spawnPlaced:false});
-  const writes=calls.filter(c=>c[0]==='POST');
-  assert.deepEqual(writes.map(c=>c[1]),[
-    '/api/user/clone-branch','/api/user/code'
-  ]);
-  assert.equal(phases.at(-1),'STAGED_INACTIVE_VERIFIED');
-  assert.equal(state.branches[0].activeWorld,true);
-  assert.equal(state.branches[1].activeWorld,false);
+// O49: legacy runtime entrypoint must refuse *before* reading a user-supplied
+// duck-typed API. Earlier positive mutation simulations are not a release
+// authorization; their pure policy checks above remain.
+for(const configuration of [{},{worldEmpty:false},{missingDefault:true},
+  {cloneFailure:true},{uploadFailure:true},{activeClone:true},{wrongUpload:true}]){
+  const {api,calls}=createMock(configuration);
   await assert.rejects(()=>stageInactiveWorldCode(api,modules),
-    /INITIAL_WORLD_GATE_BLOCKED/,'Re-run fails when branch exists');
-  assert.equal(calls.filter(c=>c[0]==='POST').length,2,
-    'Idempotence gate blocks duplicate mutation');
+    /O45_WORLD_MUTATION_HOLD_NO_APPROVED_FENCED_EXECUTOR/);
+  assert.equal(calls.length,0,'No injected World API read or mutation');
 }
-{
-  const {api,calls}=createMock({worldEmpty:false});
-  await assert.rejects(()=>stageInactiveWorldCode(api,modules),
-    /INITIAL_WORLD_GATE_BLOCKED/);
-  assert.equal(calls.filter(c=>c[0]==='POST').length,0);
-}
-{
-  const {api,calls}=createMock({missingDefault:true});
-  await assert.rejects(()=>stageInactiveWorldCode(api,modules),
-    /INITIAL_WORLD_GATE_BLOCKED/);
-  assert.equal(calls.filter(c=>c[0]==='POST').length,0);
-}
-{
-  const {api,calls}=createMock({cloneFailure:true});
-  await assert.rejects(()=>stageInactiveWorldCode(api,modules),/secret/);
-  assert.deepEqual(calls.filter(c=>c[0]==='POST').map(c=>c[1]),
-    ['/api/user/clone-branch']);
-}
-{
-  const {api,calls}=createMock({activeClone:true});
-  await assert.rejects(()=>stageInactiveWorldCode(api,modules),
-    /WORLD_CLONE_NOT_INACTIVE/);
-  assert.equal(calls.filter(c=>c[0]==='POST').length,1,
-    'Must not upload to unexpectedly active code branch');
-}
-{
-  const {api,calls}=createMock({uploadFailure:true});
-  await assert.rejects(()=>stageInactiveWorldCode(api,modules),/token leak/);
-  assert.deepEqual(calls.filter(c=>c[0]==='POST').map(c=>c[1]),
-    ['/api/user/clone-branch','/api/user/code']);
-  assert.equal(calls.some(c=>c[1]==='/api/user/set-active-branch'),false);
-}
-{
-  const {api}=createMock({wrongUpload:true});
-  await assert.rejects(()=>stageInactiveWorldCode(api,modules),
-    /WORLD_EXACT_UPLOAD_VERIFICATION_FAILED/);
-}
-{
-  const {api,calls}=createMock();
-  await assert.rejects(()=>stageInactiveWorldCode(api,{main:'bad'}),
-    /INVALID_LOCAL_GAME_MODULE_SET/);
-  assert.equal(calls.length,0);
-}
+const invalid=createMock();
+await assert.rejects(()=>stageInactiveWorldCode(invalid.api,{main:'bad'}),
+  /O45_WORLD_MUTATION_HOLD_NO_APPROVED_FENCED_EXECUTOR/);
+assert.equal(invalid.calls.length,0);
+
 assert.deepEqual(classifyWorldStageFailure(
   Object.assign(new Error('secret token x'),{statusCode:403})),{
     kind:'AUTHORIZATION_OR_SCOPE',httpStatus:403
