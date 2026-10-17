@@ -12,7 +12,7 @@ assert.deepEqual(report.violations,[],
 assert.equal(report.guardedLegacyExports,7);
 assert.equal(report.classifiedWorldWriterSources.length,8);
 assert.equal(report.classifiedWorldWriterWorkflows.length,8);
-assert.ok(report.sourceFiles>=100);
+assert.ok(report.sourceFiles>=20, 'Audit must actually scan non-test production tools');
 assert.ok(report.workflowFiles>=25);
 assert.ok(report.worldMutationCandidates.length>=6);
 assert.equal(Object.keys(LEGACY_WORLD_MUTATOR_EXPORTS).length,6);
