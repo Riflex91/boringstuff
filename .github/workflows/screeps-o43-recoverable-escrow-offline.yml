@@ -1,0 +1,60 @@
+name: Screeps O43 recoverable escrow and fail-closed two-phase World gate (OFFLINE)
+on:
+  push:
+    branches: [safety/o43-recoverable-keywrap-two-phase-gate-20261017]
+permissions:
+  contents: read
+concurrency:
+  group: o43-offline-recipient-recovery-test
+  cancel-in-progress: false
+jobs:
+  node24-p3-and-remote-recovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: tools
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Verify pinned predecessor Main and exact game blob equality
+        shell: bash
+        run: |
+          git -C .. fetch origin main --quiet
+          test "$(git -C .. rev-parse origin/main)" = bc43f2faf1f345e63d9bfe78b6bbaa59e5eaab0c
+          git -C .. diff --exit-code origin/main HEAD -- game
+      - name: Complete Node24 canonical tests including O43 adversarial pre-post GET-only gate
+        run: |
+          npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+          npm test
+      - name: Exact baseline P3 benchmark
+        run: npm run bench:p3
+      - name: Prepare synthetic encrypted RSA-wrapped recovery archive
+        run: node o43-escrow-offline-ci.mjs prepare
+      - name: Upload only ciphertext and envelope to GitHub artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: o43-recoverable-synthetic-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/o43-encrypted-archive/backup.enc
+            ${{ runner.temp }}/o43-encrypted-archive/escrow-envelope.json
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 1
+      - name: Independently download GitHub-hosted encrypted archive
+        uses: actions/download-artifact@v4
+        with:
+          name: o43-recoverable-synthetic-${{ github.run_id }}
+          path: ${{ runner.temp }}/o43-downloaded-archive
+      - name: Independently authenticate download and recover with offline private RSA key
+        run: node o43-escrow-offline-ci.mjs verify
+      - name: Record strict no-write limits
+        run: |
+          echo 'O43 rehearsal only: no Screeps API key, upload, active-branch switch, reset or respawn.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'No approved actual World POST executor. Original World upload path now fails closed.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'No World exact-main 100-tick release witness; no Main merge authorized.' >> "$GITHUB_STEP_SUMMARY"
