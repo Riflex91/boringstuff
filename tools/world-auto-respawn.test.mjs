@@ -34,7 +34,8 @@ assert.equal(checkSameTickWorldLoss({data:JSON.stringify(wrong)},1004).verified,
 
 function mock({status='lost',statusAfter='empty',user='riflex91',
   holdings=roomSet,advanced=true,throwPost=false,rejectedPost=false,
-  noHeartbeat=false}={}){
+  noHeartbeat=false,spawnGhost=false,creepGhost=false,
+  spawnAfterReserve=false}={}){
  const actions={respawnPosts:0,placements:0,worldChecks:0,reservations:0};
  let clockCalls=0,lossReads=0;
  const api={
@@ -51,8 +52,10 @@ function mock({status='lost',statusAfter='empty',user='riflex91',
    return mem(advanced&&lossReads>1?1100:1000);
   },
   async gameRoomObjects(){return {objects:[
-   {type:'controller',user:'private-id'}, // historical own controller
-   {type:'spawn',user:'private-id'} // stale room-object API spawn ghost
+   {type:'controller',user:'private-id'},
+   ...((spawnGhost||(spawnAfterReserve&&actions.reservations>0))?
+     [{type:'spawn',user:'private-id'}]:[]),
+   ...(creepGhost?[{type:'creep',user:'private-id'}]:[])
   ]}},
   async _request(method,endpoint,body,opts){
    if(method==='GET'){
@@ -96,12 +99,15 @@ const successful=await performApprovedWorldAutoRecovery(healthy.api,
 assert.equal(successful.status,'RESPAWN_AND_SPAWN1_VERIFIED');
 assert.equal(successful.respawnPosts,1);
 assert.equal(successful.placementPosts,1);
+assert.equal(successful.runtimeOperationalVerified,false);
+assert.equal(successful.codeUploadAttempted,false);
 assert.equal(healthy.actions.respawnPosts,1);
 assert.equal(healthy.actions.placements,1);
 for(const opts of [
  {user:'another-user'},{status:'empty'},{holdings:{
   shards:{shard0:['W37S79','W37S80'],shard1:[],shard2:[],shard3:[]}}},
- {noHeartbeat:true},{advanced:false}
+ {noHeartbeat:true},{advanced:false},
+ {spawnGhost:true},{creepGhost:true},{spawnAfterReserve:true}
  ]){
   const m=mock(opts);
   if(opts.user==='another-user'){
@@ -110,6 +116,8 @@ for(const opts of [
   }else{
     const r=await performApprovedWorldAutoRecovery(m.api,m.deps);
     assert.ok(r.status.startsWith('HOLD'),r.status);
+    if(opts.spawnAfterReserve)
+      assert.equal(r.status,'HOLD_FINAL_OWNED_ASSETS_OR_ROOM_GET_UNVERIFIED');
   }
   assert.equal(m.actions.respawnPosts,0);
   assert.equal(m.actions.placements,0);
