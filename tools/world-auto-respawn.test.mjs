@@ -36,7 +36,11 @@ for(const partial of [
 ]){
   const probe=checkApprovedWorldHoldings({...roomSet,...partial});
   assert.equal(probe.scopeVerified,false,JSON.stringify(partial));
-  assert.equal(probe.complete,false,JSON.stringify(partial));
+  // A complete listing containing a *different* foothold is still
+  // complete, but its reset scope must be rejected.
+  if(!partial.shards?.extra && !partial.shards?.sim?.length &&
+     !partial.reservations?.shard1?.length)
+    assert.equal(probe.complete,false,JSON.stringify(partial));
 }
 assert.equal(checkApprovedWorldHoldings({...roomSet,
   shards:{...roomSet.shards,additionalEmpty:[]}}).scopeVerified,true);
