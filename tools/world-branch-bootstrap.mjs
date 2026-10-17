@@ -82,6 +82,9 @@ export function classifyWorldStageFailure(err) {
  * never auto-retry it or delete/activate it.
  */
 export async function stageInactiveWorldCode(api,modules,onPhase=()=>{}) {
+  // O49: imported World mutator remains quarantined even with an injected
+  // duck-typed API that bypasses ScreepsHttpClient's HTTP firewall.
+  assertLegacyWorldMutationDisabled('legacy-code-bootstrap');
   if (!validNewModuleSet(modules))
     throw new Error('INVALID_LOCAL_GAME_MODULE_SET');
   onPhase('READ_INITIAL_STATE');
