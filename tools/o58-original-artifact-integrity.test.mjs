@@ -15,22 +15,32 @@ function crc32(b){
 }
 // Fully synthetic ZIP generator for structural and adversarial tests. No
 // historical evidence ZIP or credentials are embedded into git or CI.
-function zip(files){
+function zip(files,{descriptors=false}={}){
  const local=[],central=[];let offset=0;
  for(const [name,content] of files){
   const nameBuf=Buffer.from(name),body=Buffer.from(content);
   const data=deflateRawSync(body),crc=crc32(body);
   const h=Buffer.alloc(30);h.writeUInt32LE(0x04034b50);
-  h.writeUInt16LE(20,4);h.writeUInt16LE(8,8);
-  h.writeUInt32LE(crc,14);h.writeUInt32LE(data.length,18);
-  h.writeUInt32LE(body.length,22);h.writeUInt16LE(nameBuf.length,26);
+  h.writeUInt16LE(20,4);h.writeUInt16LE(descriptors?8:0,6);
+  h.writeUInt16LE(8,8);
+  if(!descriptors){
+   h.writeUInt32LE(crc,14);h.writeUInt32LE(data.length,18);
+   h.writeUInt32LE(body.length,22);
+  }
+  h.writeUInt16LE(nameBuf.length,26);
+  const descriptor=Buffer.alloc(16);
+  descriptor.writeUInt32LE(0x08074b50,0);descriptor.writeUInt32LE(crc,4);
+  descriptor.writeUInt32LE(data.length,8);descriptor.writeUInt32LE(body.length,12);
   local.push(h,nameBuf,data);
+  if(descriptors)local.push(descriptor);
   const c=Buffer.alloc(46);c.writeUInt32LE(0x02014b50);
   c.writeUInt16LE(20,4);c.writeUInt16LE(20,6);
+  c.writeUInt16LE(descriptors?8:0,8);
   c.writeUInt16LE(8,10);c.writeUInt32LE(crc,16);
   c.writeUInt32LE(data.length,20);c.writeUInt32LE(body.length,24);
   c.writeUInt16LE(nameBuf.length,28);c.writeUInt32LE(offset,42);
-  central.push(c,nameBuf);offset+=h.length+nameBuf.length+data.length;
+  central.push(c,nameBuf);
+  offset+=h.length+nameBuf.length+data.length+(descriptors?16:0);
  }
  const centralData=Buffer.concat(central),end=Buffer.alloc(22);
  end.writeUInt32LE(0x06054b50);end.writeUInt16LE(files.length,8);
@@ -74,7 +84,41 @@ for(const bytes of [
 ]){
  assert.throws(()=>inspectBoundedZipArchive(bytes),hold);
 }
+
+// O60: GitHub's two original ZIPs are streamed with a signed descriptor
+// after EACH local compressed entry. Validate its CRC, sizes and position.
+const fixtureEntry=['fixtures/one.json','{"answer":42}'];
+const withDescriptors=zip([fixtureEntry],{descriptors:true});
+assert.equal(inspectBoundedZipArchive(withDescriptors).entryCount,1);
+const zippedBody=Buffer.from(fixtureEntry[1]);
+const zippedName=Buffer.from(fixtureEntry[0]);
+const descriptorAt=30+zippedName.length+deflateRawSync(zippedBody).length;
+assert.equal(withDescriptors.readUInt32LE(descriptorAt),0x08074b50);
+for(const delta of [0,4,8,12]){
+ const bad=Buffer.from(withDescriptors);
+ bad[descriptorAt+delta]^=1;
+ assert.throws(()=>inspectBoundedZipArchive(bad),hold,
+   'corrupted signed descriptor byte '+delta);
+}
+// The old parser silently tolerated a gap before the central directory,
+// provided EOCD pointed to it. That could conceal arbitrary extra bytes.
+const endOffset=withDescriptors.length-22;
+const originalCentral=withDescriptors.readUInt32LE(endOffset+16);
+const withGap=Buffer.concat([
+ withDescriptors.subarray(0,originalCentral),Buffer.from('HIDDEN'),
+ withDescriptors.subarray(originalCentral)
+]);
+withGap.writeUInt32LE(originalCentral+6,withGap.length-22+16);
+assert.throws(()=>inspectBoundedZipArchive(withGap),hold);
+// A trailing prefix before the first local entry must not be accepted
+// even if all central offsets are adjusted to preserve a valid inflate.
+const prepended=Buffer.concat([Buffer.from('UNTRUSTED'),withDescriptors]);
+const centerAt=originalCentral+9;
+prepended.writeUInt32LE(9,centerAt+42); // one local-header offset
+prepended.writeUInt32LE(centerAt,prepended.length-22+16);
+assert.throws(()=>inspectBoundedZipArchive(prepended),hold);
+
 assert.throws(()=>verifyPinnedOriginalArtifactZip(example,'unknown'),hold);
 const result=inspectBoundedZipArchive(example);
 assert.equal(Object.hasOwn(result,'releaseAuthorized'),false);
-console.log('O58 bounded ZIP parsing, CRC/inflate safety, traversal/duplicate and pinned original bytes controls: PASS');
+console.log('O60 strict ZIP signed data descriptors, CRC/length and contiguous local layout plus O58 controls: PASS');
