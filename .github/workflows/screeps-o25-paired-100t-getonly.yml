@@ -1,0 +1,65 @@
+name: Screeps O25 paired independent 100-game-tick GET-only witness
+on:
+  push:
+    branches: [diagnostics/o25-paired-live-100tick-readonly-20261017]
+    paths:
+      - .github/workflows/screeps-o25-paired-100t-getonly.yml
+      - tools/o25-paired-100t-witness.mjs
+      - tools/o25-paired-100t-witness.test.mjs
+      - tools/package.json
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: screeps-o25-paired-100tick-getonly
+  cancel-in-progress: false
+jobs:
+  world:
+    runs-on: ubuntu-latest
+    timeout-minutes: 24
+    defaults:
+      run:
+        working-directory: tools
+    env:
+      SCREEPS_TOKEN_WORLD: ${{ secrets.SCREEPS_TOKEN_WORLD }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Verify no-write 100-tick witness contract offline
+        run: node o25-paired-100t-witness.test.mjs
+      - name: Observe World 100 actual server game ticks with exact-code fingerprints (GET only)
+        run: node o25-paired-100t-witness.mjs world
+  newbieland:
+    runs-on: ubuntu-latest
+    timeout-minutes: 24
+    defaults:
+      run:
+        working-directory: tools
+    env:
+      SCREEPS_TOKEN_NEWBIELAND: ${{ secrets.SCREEPS_TOKEN_NEWBIELAND }}
+      SCREEPS_USERNAME_NEWBIELAND: Riflex91
+      SCREEPS_PASSWORD_NEWBIELAND: ${{ secrets.SCREEPS_PASSWORD_NEWBIELAND }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Verify no-write 100-tick witness contract offline
+        run: node o25-paired-100t-witness.test.mjs
+      - name: Construct temporary Newbieland GET-only credentials
+        working-directory: .
+        run: echo "SCREEPS_CONFIG=$RUNNER_TEMP/o25-newbieland-readonly.json" >> "$GITHUB_ENV"
+      - name: Prepare authenticated Newbieland API (no writes)
+        run: node ci-deployment-credentials.mjs
+      - name: Observe Newbieland 100 actual server game ticks with exact-code fingerprints (GET only)
+        run: node o25-paired-100t-witness.mjs newbieland
+      - name: Destroy temporary Newbieland credential file
+        if: always()
+        working-directory: .
+        run: rm -f "$SCREEPS_CONFIG"
