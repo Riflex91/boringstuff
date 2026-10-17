@@ -4,6 +4,7 @@ import os from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { ScreepsHttpClient } from './screeps-client.mjs';
+import { assertWorldScoutRoomArguments } from './o51-world-planner-readonly-gate.mjs';
 import { buildWorldConfig } from './world-deployment-profile.mjs';
 import { inspectWorld } from './world-readonly-preflight.mjs';
 import { summarizeRoom } from './spawn-planner-core.mjs';
@@ -108,6 +109,9 @@ async function main() {
         const env = {...process.env,SCREEPS_CONFIG:configFile,SCREEPS_LOG_DIR:logDir};
         delete env.SCREEPS_TOKEN_WORLD;
         delete env.SCREEPS_TOKEN_NEWBIELAND;
+        // O51: remote room names must never be treated as CLI flags
+        // such as --place in the dual-use planner.
+        assertWorldScoutRoomArguments(selected);
         let run;
         try {
           run = spawnSync(process.execPath,['initial-spawn-planner.mjs','--server','world',
