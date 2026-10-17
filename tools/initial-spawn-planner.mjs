@@ -1,4 +1,5 @@
 import { ScreepsHttpClient } from './screeps-client.mjs';
+import { assertWorldPlannerReadOnly } from './o51-world-planner-readonly-gate.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -151,6 +152,9 @@ function roomsFromReport(file, count) {
 }
 
 function safeWriteJson(name, data) {
+  // O51: refuse the World placement/activation mode before credentials,
+  // cache writes or any API requests. Newbieland spawn:auto remains supported.
+  assertWorldPlannerReadOnly(args);
   fs.mkdirSync(LOG_DIR, { recursive: true });
   const p = path.join(LOG_DIR, name);
   const tmp = `${p}.tmp`;
