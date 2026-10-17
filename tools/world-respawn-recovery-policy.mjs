@@ -1,7 +1,9 @@
 // O23: fail-closed respawn *decision* contract. Pure function, no HTTP calls.
 // Owner has approved respawn and future automatic recovery on 2026-10-16.
-// No documented authenticated respawn transport or signed-in game browser is
-// connected. This module MUST NOT manufacture a POST URL or execute resets.
+// A maintained Screeps client documents POST /api/user/respawn, but this
+// pure policy module NEVER executes the endpoint. The separate executor
+// requires exact-account proof, explicit operator consent, a durable attempt
+// marker and a final freshly checked LOST state before one non-replayed POST.
 export const WORLD_RECOVERY_POLICY = Object.freeze({
   autoRespawnUserApproved: true,
   approvalSource: 'user-2026-10-16',
