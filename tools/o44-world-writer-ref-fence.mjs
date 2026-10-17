@@ -88,21 +88,22 @@ export async function inspectWorldWriterFence({transport,held}) {
   return lockState(sha,held.ownerRunId);
 }
 
-// A controller may clean up only after explicit operator review AND a
-// mutation-outcome resolution. No implicit timeout/TTL takeover, no release
-// in the presence of a potentially committed Screeps mutation.
-// Deleting this ref does not grant the next writer any release approval.
+// O45: the REST Git-ref DELETE endpoint has no atomic "delete only if
+// current SHA equals owner SHA" precondition. An owner GET followed by DELETE
+// is subject to a TOCTOU race: another writer might replace the ref between
+// requests and the old holder could delete the new holder's lock.
+// Therefore NO caller, even one with the operator phrase and a resolved
+// mutation outcome, may perform DELETE through this helper. An external
+// operator-controlled CAS-capable cleanup design must be reviewed first.
 export async function releaseWorldWriterFence({
   transport,held,operatorReleasePhrase,mutationOutcomeResolved
 }) {
   if (operatorReleasePhrase!=='RELEASE_WORLD_WRITER_LOCK' ||
       mutationOutcomeResolved!==true) fail('EXPLICIT_REVIEW_REQUIRED');
+  // Confirm for diagnostics only: even matching ownership is not permission
+  // to delete because it can change immediately afterward.
   await inspectWorldWriterFence({transport,held});
-  const result=await send(transport,'DELETE',REF_PATH);
-  if (result.status!==204) fail('DELETE_OUTCOME_UNCERTAIN_NO_RETRY');
-  const remaining=await readRef(transport);
-  if (remaining!==null) fail('DELETION_NOT_CONFIRMED');
-  return Object.freeze({released:true,ref:ROOT,...DENIAL});
+  fail('UNSAFE_NON_ATOMIC_REF_DELETE_DISABLED');
 }
 
 // Real GitHub REST adapter for a future manually controlled operator workflow.
@@ -120,10 +121,9 @@ export function createGithubWriterFenceTransport({
       base.pathname!=='/' || base.search || base.hash)
     fail('UNTRUSTED_GITHUB_ENDPOINT');
   return async ({method,path,body}) => {
-    if (!['GET','POST','DELETE'].includes(method) ||
+    if (!['GET','POST'].includes(method) ||
         ![REF_PATH,'/git/tags','/git/refs'].includes(path) ||
         (method==='GET'&&path!==REF_PATH) ||
-        (method==='DELETE'&&path!==REF_PATH) ||
         (method==='POST'&&!['/git/tags','/git/refs'].includes(path)))
       fail('UNEXPECTED_REQUEST');
     const response=await fetch('https://api.github.com/repos/'+repository+path,{
