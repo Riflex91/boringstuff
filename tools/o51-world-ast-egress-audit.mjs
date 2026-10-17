@@ -6,6 +6,7 @@ import {
 } from './o50-world-write-path-audit.mjs';
 import { validateWorldGuardProvenance } from './o52-world-guard-provenance.mjs';
 import {verifyPinnedWorldHoldImplementation} from './o53-pinned-world-hold.mjs';
+import {REVIEWED_READONLY_TRANSPORT_SHAPES, isExactlyReviewedReadOnlyTransport, detectDynamicDispatch} from './o54-reviewed-readonly-transport-shapes.mjs';
 
 // O51 bounded independent AST layer over O50's known-pattern inventory.
 // Soundness LIMIT: AST syntax analysis and local const alias folding is not
@@ -25,37 +26,9 @@ const NETWORK_METHODS=new Set(['request','get','connect','createConnection',
 const RECORD_LIMIT=250;
 // Reviewed read-only transports still receive strict AST-shape checks.
 // Future method/argument changes deliberately require manual review.
-const REVIEWED_READONLY_TRANSPORTS=Object.freeze({
-  'world-first-spawn-live-gate.mjs':'FETCH_TRANSPORT',
-  'world-scout.mjs':'ALTERNATE_NETWORK_TRANSPORT'
-});
+const REVIEWED_READONLY_TRANSPORTS=REVIEWED_READONLY_TRANSPORT_SHAPES;
 function allowReviewedReadOnlyTransport(filename,node,kind,bindings){
-  const expected=REVIEWED_READONLY_TRANSPORTS[filename];
-  if(!expected||kind!==expected||node.type!=='CallExpression')return false;
-  if(filename==='world-first-spawn-live-gate.mjs'){
-    // Native fetch defaults to GET only when options omit method and body.
-    // This shape also rejects spread/variable options that could hide POST.
-    const options=node.arguments[1];
-    return node.callee?.type==='Identifier'&&node.callee.name==='fetch'&&
-      node.arguments.length===2&&options?.type==='ObjectExpression'&&
-      options.properties.length===1&&
-      options.properties[0].type==='Property'&&
-      options.properties[0].key?.name==='headers';
-  }
-  if(filename==='world-scout.mjs'){
-    // Review exactly the local Node invocation of the read-only planner.
-    const executable=node.arguments[0],args=node.arguments[1];
-    return node.callee?.type==='Identifier'&&
-      node.callee.name==='spawnSync'&&
-      bindings.imports.get('spawnSync')==='node:child_process'&&
-      executable?.type==='MemberExpression'&&!executable.computed&&
-      executable.object?.name==='process'&&
-      executable.property?.name==='execPath'&&
-      args?.type==='ArrayExpression'&&
-      args.elements[0]?.value==='initial-spawn-planner.mjs'&&
-      args.elements[1]?.value==='--server'&&args.elements[2]?.value==='world';
-  }
-  return false;
+  return isExactlyReviewedReadOnlyTransport(filename,node,kind,bindings);
 }
 function nodes(root,cb){
   function visit(x,parent){
@@ -257,7 +230,9 @@ export function inspectWorldAstSource(filename,source){
   }
   let reviewedReadonlyCalls=0;
   nodes(ast,node=>{
-    const kind=candidateKind(node,bindings);
+    // O54: indirect invocation is itself review-required even when an
+    // earlier scanner sees no literal network call (Reflect/call/apply).
+    const kind=detectDynamicDispatch(node)||candidateKind(node,bindings);
     if(!kind)return;
     if(allowReviewedReadOnlyTransport(filename,node,kind,bindings)){
       reviewedReadonlyCalls++;
