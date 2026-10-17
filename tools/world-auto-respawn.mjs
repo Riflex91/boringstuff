@@ -12,6 +12,21 @@ import { assessWorldRespawnReadiness } from './world-respawn-recovery-policy.mjs
 const EXPECTED_USERNAME='riflex91';
 const ROOM='W37S79',SHARD='shard0';
 const READ_LIMIT=2000;
+const WORLD_SHARDS=Object.freeze(['shard0','shard1','shard2','shard3']);
+
+// No existing API in this client proves zero global living creeps.
+// Production has no census provider; fail closed until one is reviewed.
+export function validateGlobalCreepCensus(evidence,accountId) {
+  return Boolean(accountId && evidence?.authenticated===true &&
+    evidence?.accountId===accountId &&
+    Number.isSafeInteger(evidence?.ownedCreepCount) &&
+    evidence.ownedCreepCount===0 &&
+    Array.isArray(evidence?.coveredShards) &&
+    evidence.coveredShards.length===WORLD_SHARDS.length &&
+    WORLD_SHARDS.every(name=>evidence.coveredShards.includes(name)) &&
+    new Set(evidence.coveredShards).size===WORLD_SHARDS.length &&
+    evidence?.independentCurrentCensus===true);
+}
 
 export function checkApprovedWorldHoldings(reply) {
   if(reply?.ok===false)return {complete:false,scopeVerified:false};
@@ -87,7 +102,8 @@ async function readLossEvidence(api,accountId) {
 }
 export async function performApprovedWorldAutoRecovery(api,{
   wait=ms=>pause(ms),now=()=>Math.floor(Date.now()/1000),
-  waitForLossMs=420000,place=placeW37S79Only,reserveAttempt=null
+  waitForLossMs=420000,place=placeW37S79Only,reserveAttempt=null,
+  verifyGlobalCreepAbsence=null
 }={}){
   if(api?.defaultShard!==SHARD)throw Error('WORLD_SHARD_NOT_VERIFIED');
   const me=await api.authMe();
@@ -101,6 +117,10 @@ export async function performApprovedWorldAutoRecovery(api,{
   if(firstStatus?.status!=='lost')
     return {status:'HOLD_WORLD_NOT_LOST',respawnPosts:0,
       placementPosts:0};
+  // 'lost' only proves missing spawns, not absent remote creeps.
+  if(typeof verifyGlobalCreepAbsence!=='function')
+    return {status:'HOLD_GLOBAL_CREEP_CENSUS_UNAVAILABLE',
+      respawnPosts:0,placementPosts:0};
   const start=now();
   const first=await readLossEvidence(api,id);
   if(first.status!=='lost'||!first.holdings.scopeVerified||
@@ -116,6 +136,13 @@ export async function performApprovedWorldAutoRecovery(api,{
   const distinct=second.engine.verified&&
     second.engine.snapshotTick>=first.engine.snapshotTick+100;
   const immediate=await api.userWorldStatus();
+  let globalCensus;
+  try{
+    globalCensus=await verifyGlobalCreepAbsence(api,{
+      accountId:id,phase:'BEFORE_LOCK',requiredShards:WORLD_SHARDS
+    });
+  }catch {/* conservative unknown */ }
+  const globalVerified=validateGlobalCreepCensus(globalCensus,id);
   const verdict=assessWorldRespawnReadiness({
     observations:[
       {status:first.status,unixSeconds:start},
@@ -126,6 +153,7 @@ export async function performApprovedWorldAutoRecovery(api,{
       second.holdings.complete,
     sameTickEngineSpawnCount:distinct?second.engine.engineSpawnCount:null,
     sameTickEngineCreepCount:distinct?second.engine.engineCreepCount:null,
+    globalAllShardCreepAbsenceVerified:globalVerified,
     otherRecoverableFootholdAbsentVerified:distinct&&
       first.holdings.scopeVerified&&second.holdings.scopeVerified&&
       second.noOwnedRoomObjectCreeps&&second.noOwnedRoomObjectSpawns,
@@ -183,8 +211,18 @@ export async function performApprovedWorldAutoRecovery(api,{
         o?.structureType==='spawn')))
     return {status:'HOLD_FINAL_OWNED_ASSETS_OR_ROOM_GET_UNVERIFIED',
       respawnPosts:0,placementPosts:0};
-  // A last independent status read limits, but cannot eliminate, the
-  // read/write race. A definitive global cross-shard census is still absent.
+  // Require independent all-shard evidence again after recording the lock.
+  // The production workflow intentionally supplies no provider today.
+  let finalCensus;
+  try{
+    finalCensus=await verifyGlobalCreepAbsence(api,{
+      accountId:id,phase:'AFTER_LOCK',requiredShards:WORLD_SHARDS
+    });
+  }catch {/* conservative unknown */ }
+  if(!validateGlobalCreepCensus(finalCensus,id))
+    return {status:'HOLD_FINAL_GLOBAL_CREEP_CENSUS_UNVERIFIED',
+      respawnPosts:0,placementPosts:0};
+  // A last independent status read limits, but cannot eliminate, the race.
   let lastStatus;
   try{lastStatus=await api.userWorldStatus();}
   catch{return {status:'HOLD_LAST_WORLD_STATUS_GET_UNVERIFIED',
