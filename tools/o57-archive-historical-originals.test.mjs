@@ -3,58 +3,40 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import {archivePinnedRoadmapOriginals}
- from './o57-archive-historical-originals.mjs';
-import {restorePrivateRoadmapEvidenceOffline,ROADMAP_HISTORICAL_ARTIFACTS}
- from './o57-private-roadmap-evidence-vault.mjs';
+import {archivePinnedRoadmapOriginals} from './o57-archive-historical-originals.mjs';
 
-const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'o57-zip-archives-'));
+// O58 changed the production archival CLI to accept only the exact two
+// cryptographically pinned, authenticated original GitHub ZIP byte streams.
+// Synthetic ZIPs must now HOLD, instead of being mislabeled as originals.
+// Positive synthetic encryption/decryption remains covered by
+// o57-private-roadmap-evidence-vault.test.mjs.
+const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'o58-originals-no-spoof-'));
 try{
- const pair=crypto.generateKeyPairSync('rsa',{
+ const keys=crypto.generateKeyPairSync('rsa',{
   modulusLength:3072,
   publicKeyEncoding:{format:'pem',type:'spki'},
   privateKeyEncoding:{format:'pem',type:'pkcs8'}
  });
- const keyFile=path.join(tmp,'operator.pub');
- fs.writeFileSync(keyFile,pair.publicKey,{mode:0o600});
- const worldBytes=Buffer.concat([Buffer.from([0x50,0x4b,0x03,0x04]),
-  Buffer.from('synthetic world archive no real credentials')]);
- const newbBytes=Buffer.concat([Buffer.from([0x50,0x4b,0x03,0x04]),
-  Buffer.from('synthetic newbieland archive no real credentials')]);
- const w=path.join(tmp,'world.zip'),n=path.join(tmp,'newb.zip');
- fs.writeFileSync(w,worldBytes);
- fs.writeFileSync(n,newbBytes);
- const args=['--output-parent',tmp,'--world-zip',w,
-  '--newbieland-zip',n,'--public-key',keyFile];
- const outcome=archivePinnedRoadmapOriginals(args);
- assert.equal(outcome.sourceArtifacts,2);
- assert.equal(outcome.releaseAuthorized,false);
- assert.equal(outcome.durableRemoteStorageVerified,false);
- assert.deepEqual(fs.readdirSync(outcome.encryptedDirectory).sort(),
-  ['newbieland','world']);
- for(const [server,bytes] of [['world',worldBytes],['newbieland',newbBytes]]){
-  const restored=restorePrivateRoadmapEvidenceOffline({
-   directory:path.join(outcome.encryptedDirectory,server),
-   context:{repository:'Riflex91/boringstuff',...ROADMAP_HISTORICAL_ARTIFACTS[server]},
-   recipientPrivateKeyPem:pair.privateKey
-  });
-  assert.deepEqual(restored.zipBytes,bytes);
- }
+ const publicFile=path.join(tmp,'recipient.pub.pem');
+ fs.writeFileSync(publicFile,keys.publicKey,{mode:0o600});
+ const spoofZip=Buffer.from([0x50,0x4b,0x03,0x04,1,2,3,4]);
+ const world=path.join(tmp,'synthetic-world.zip');
+ const newb=path.join(tmp,'synthetic-newb.zip');
+ fs.writeFileSync(world,spoofZip);fs.writeFileSync(newb,spoofZip);
+ const args=['--output-parent',tmp,'--world-zip',world,
+   '--newbieland-zip',newb,'--public-key',publicFile];
  assert.throws(()=>archivePinnedRoadmapOriginals(args),
-  /O57_ARCHIVE_ORIGINALS_HOLD/);
- const bad=path.join(tmp,'bad.zip');
- fs.writeFileSync(bad,Buffer.from('NOT_A_ZIP'));
- const another=path.join(tmp,'other');
- fs.mkdirSync(another);
+   /O58_ORIGINAL_ARCHIVE_HOLD/);
+ assert.equal(fs.existsSync(path.join(tmp,'o57-original-evidence-v1')),false);
+ const other=path.join(tmp,'another');fs.mkdirSync(other);
+ fs.writeFileSync(newb,Buffer.from('NOT_ZIP'));
  assert.throws(()=>archivePinnedRoadmapOriginals([
-  '--output-parent',another,'--world-zip',bad,
-  '--newbieland-zip',n,'--public-key',keyFile
+   '--output-parent',other,'--world-zip',world,
+   '--newbieland-zip',newb,'--public-key',publicFile
  ]),/O57_ARCHIVE_ORIGINALS_HOLD/);
- assert.deepEqual(fs.readdirSync(another),[]);
+ assert.deepEqual(fs.readdirSync(other),[]);
  assert.throws(()=>archivePinnedRoadmapOriginals([
-  '--output-parent',another,'--world-zip',w,
-  '--newbieland-zip',n,'--public-key',keyFile,
-  '--approval','DEPLOY_WORLD'
+   ...args,'--force','DANGEROUS'
  ]),/O57_ARCHIVE_ORIGINALS_HOLD/);
- console.log('O57 offline paired original ZIP encryption with atomic private archive handoff: PASS');
+ console.log('O58 operator original archive CLI refuses unlabeled or spoofed ZIP bytes before any destination write: PASS');
 }finally{fs.rmSync(tmp,{recursive:true,force:true});}
