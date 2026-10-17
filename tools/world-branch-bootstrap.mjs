@@ -197,7 +197,10 @@ async function main() {
   }
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href)
-  main().catch(()=>{
-    console.error('World code bootstrap failed before protected World staging');
+  main().catch(err=>{
+    // Only expose the fixed safety HOLD; do not log raw API or credential errors.
+    console.error(String(err?.message || '').startsWith('O45_WORLD_MUTATION_HOLD_')
+      ? 'O45_WORLD_MUTATION_HOLD_NO_APPROVED_FENCED_EXECUTOR'
+      : 'World code bootstrap failed before protected World staging');
     process.exitCode=1;
   });
