@@ -1,3 +1,4 @@
+import { assertLegacyWorldMutationDisabled } from './o45-world-mutation-entrypoint-hold.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -151,6 +152,9 @@ function writeStageReceipt(folder,name,record) {
 }
 
 async function main() {
+  // O45: refuse World mutations even with old approval strings and secrets.
+  // No credentials, config file or network call may precede this HOLD.
+  assertLegacyWorldMutationDisabled('legacy-code-bootstrap');
   const temp=process.env.RUNNER_TEMP;
   if(!temp || process.env.WORLD_BOOTSTRAP_CONFIRM!=='STAGE_WORLD_CODE')
     throw new Error('World code staging requires explicit authorized workflow gate');
