@@ -11,7 +11,7 @@ permissions:
 jobs:
   fingerprint:
     runs-on: ubuntu-latest
-    timeout-minutes: 6
+    timeout-minutes: 24
     defaults:
       run:
         working-directory: tools
@@ -33,7 +33,7 @@ jobs:
         run: echo "SCREEPS_CONFIG=$RUNNER_TEMP/o25-newb-code-fingerprint.json" >> "$GITHUB_ENV"
       - name: Configure credential source without printing secrets
         run: node ci-deployment-credentials.mjs
-      - name: Observe module fingerprint and fail closed before any wait (GET only)
+      - name: Observe module fingerprint and if exact await genuine 100 game ticks (GET only)
         run: node o25-paired-100t-witness.mjs newbieland
       - name: Erase ephemeral credentials
         if: always()
