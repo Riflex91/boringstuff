@@ -21,6 +21,40 @@ const NET_MODULES=new Set([
 const NETWORK_METHODS=new Set(['request','get','connect','createConnection',
   'exec','execFile','spawn','fork']);
 const RECORD_LIMIT=250;
+// Reviewed read-only transports still receive strict AST-shape checks.
+// Future method/argument changes deliberately require manual review.
+const REVIEWED_READONLY_TRANSPORTS=Object.freeze({
+  'world-first-spawn-live-gate.mjs':'FETCH_TRANSPORT',
+  'world-scout.mjs':'ALTERNATE_NETWORK_TRANSPORT'
+});
+function allowReviewedReadOnlyTransport(filename,node,kind,bindings){
+  const expected=REVIEWED_READONLY_TRANSPORTS[filename];
+  if(!expected||kind!==expected||node.type!=='CallExpression')return false;
+  if(filename==='world-first-spawn-live-gate.mjs'){
+    // Native fetch defaults to GET only when options omit method and body.
+    // This shape also rejects spread/variable options that could hide POST.
+    const options=node.arguments[1];
+    return node.callee?.type==='Identifier'&&node.callee.name==='fetch'&&
+      node.arguments.length===2&&options?.type==='ObjectExpression'&&
+      options.properties.length===1&&
+      options.properties[0].type==='Property'&&
+      options.properties[0].key?.name==='headers';
+  }
+  if(filename==='world-scout.mjs'){
+    // Review exactly the local Node invocation of the read-only planner.
+    const executable=node.arguments[0],args=node.arguments[1];
+    return node.callee?.type==='Identifier'&&
+      node.callee.name==='spawnSync'&&
+      bindings.imports.get('spawnSync')==='node:child_process'&&
+      executable?.type==='MemberExpression'&&!executable.computed&&
+      executable.object?.name==='process'&&
+      executable.property?.name==='execPath'&&
+      args?.type==='ArrayExpression'&&
+      args.elements[0]?.value==='initial-spawn-planner.mjs'&&
+      args.elements[1]?.value==='--server'&&args.elements[2]?.value==='world';
+  }
+  return false;
+}
 function nodes(root,cb){
   function visit(x,parent){
     if(!x||typeof x!=='object')return;
@@ -174,16 +208,28 @@ export function inspectWorldAstSource(filename,source){
     if(entry.length!==1||!isGuard(firstExecutableStatement(entry[0]?.fn)))
       violations.push('MAIN_FIRST_EXECUTABLE_HOLD_MISSING');
   }
+  let reviewedReadonlyCalls=0;
   nodes(ast,node=>{
     const kind=candidateKind(node,bindings);
-    if(kind&&findings.length<RECORD_LIMIT)
+    if(!kind)return;
+    if(allowReviewedReadOnlyTransport(filename,node,kind,bindings)){
+      reviewedReadonlyCalls++;
+    }else if(REVIEWED_READONLY_TRANSPORTS[filename]){
+      violations.push('READONLY_TRANSPORT_CHANGED_OR_ADDED_'+kind);
+    }
+    if(findings.length<RECORD_LIMIT)
       findings.push({kind,line:node.loc?.start?.line??0});
   });
+  if(REVIEWED_READONLY_TRANSPORTS[filename]&&reviewedReadonlyCalls!==1)
+    violations.push('EXPECTED_REVIEWED_READONLY_TRANSPORT_NOT_UNIQUE');
+  if(filename==='initial-spawn-planner.mjs'&&findings.length)
+    violations.push('SCOUT_CHILD_PLANNER_POTENTIAL_MUTATION');
   // The known guarded sources are deliberately exempt from a simple
   // presence-of-write classification, NOT exempt from their AST HOLD proof.
   // A new world-*.mjs transport or dynamic call cannot silently expand the
   // reviewed writer inventory.
-  if(!reviewed&&/^world-.*\.mjs$/.test(filename)&&findings.length)
+  if(!reviewed&&/^world-.*\.mjs$/.test(filename)&&findings.length&&
+      !REVIEWED_READONLY_TRANSPORTS[filename])
     violations.push('UNREVIEWED_WORLD_EXECUTABLE_SINK');
   return {filename,reviewed,findings,violations,guardedExports:exposed.length};
 }
