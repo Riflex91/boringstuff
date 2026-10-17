@@ -1,0 +1,65 @@
+name: Screeps O36 original World/Main exact game-tree equality (GET only)
+on:
+  push:
+    branches: [diagnostics/o36-world-git-tree-byte-equivalence-20261017]
+permissions:
+  contents: read
+concurrency:
+  group: o36-original-world-game-tree-getonly
+  cancel-in-progress: false
+jobs:
+  exact-head-node24-p3:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: tools
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Run entire feature-head canonical Node24 suite
+        run: |
+          npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+          npm test
+          python3 o34-artifact-receipt.test.py
+      - name: Reproduce exact paired P3 baseline
+        run: npm run bench:p3
+  independent-git-tree-getonly:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    defaults:
+      run:
+        working-directory: tools
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
+      GITHUB_REPOSITORY: Riflex91/boringstuff
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Require exact immutable predecessor Main without gameplay modifications
+        shell: bash
+        run: |
+          git -C .. fetch origin main --quiet
+          test "$(git -C .. rev-parse origin/main)" = bc43f2faf1f345e63d9bfe78b6bbaa59e5eaab0c
+          git -C .. diff --exit-code origin/main HEAD -- game
+      - name: Adversarial tests require all 82 Git blobs and reject altered game code
+        run: node o36-world-git-tree-equivalence.test.mjs
+      - name: "Authenticated GitHub GET: original World and exact Main Git trees"
+        run: node o36-world-git-tree-equivalence.mjs
+      - name: Code equivalence NEVER authorizes release or upload
+        shell: bash
+        run: |
+          echo '### Historic World O16 game tree compared byte-for-byte to Main' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Exact original World SHA differs from the exact current Main SHA.' >> "$GITHUB_STEP_SUMMARY"
+          echo '**HOLD_EXACT_PREDECESSOR_PAIR_MISSING:** valid code identity is not canonical exact-SHA World LIVE_100T_PASS.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'No Screeps API writes, code upload, respawn, merge, or branch activation.' >> "$GITHUB_STEP_SUMMARY"
