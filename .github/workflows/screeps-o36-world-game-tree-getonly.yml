@@ -54,7 +54,7 @@ jobs:
           git -C .. diff --exit-code origin/main HEAD -- game
       - name: Adversarial tests require all 82 Git blobs and reject altered game code
         run: node o36-world-git-tree-equivalence.test.mjs
-      - name: Authenticated GitHub GET: original World and exact Main Git trees
+      - name: "Authenticated GitHub GET: original World and exact Main Git trees"
         run: node o36-world-git-tree-equivalence.mjs
       - name: Code equivalence NEVER authorizes release or upload
         shell: bash
