@@ -1,0 +1,43 @@
+name: Screeps O52 authentic AST World guards and scope audit (OFFLINE)
+on:
+  push:
+    branches: [safety/o52-authentic-ast-guards-scope-20261017]
+permissions:
+  contents: read
+concurrency:
+  group: o52-offline-ast-guard-provenance
+  cancel-in-progress: false
+jobs:
+  node24-p3-no-write:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: tools
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Verify pinned Main and game file byte equivalence
+        shell: bash
+        run: |
+          git -C .. fetch origin main --quiet
+          test "$(git -C .. rev-parse origin/main)" = bc43f2faf1f345e63d9bfe78b6bbaa59e5eaab0c
+          git -C .. diff --exit-code origin/main HEAD -- game
+      - name: Full Node24 canonical O39-O52 safety tests
+        run: |
+          npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+          npm test
+      - name: Original exact baseline P3 benchmark
+        run: npm run bench:p3
+      - name: Record no-write and static audit scope
+        run: |
+          echo '### O52 AST provenance of legacy HOLD calls' >> "$GITHUB_STEP_SUMMARY"
+          echo 'First executable guard must be trusted named O45 import, exact per-file operation, and no parameter/hoisted shadow.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Only direct literal GET is skipped as read-only by the AST method analysis; aliases are flagged.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'No Screeps credentials, real World network activity, GitHub writer-ref changes, production upload, or Main merge.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Release HOLD_EXACT_PREDECESSOR_PAIR_MISSING.' >> "$GITHUB_STEP_SUMMARY"
