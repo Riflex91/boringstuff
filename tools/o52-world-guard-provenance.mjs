@@ -46,6 +46,26 @@ function hasLocalShadow(fn){
   });
   return shadow;
 }
+// O53: JS evaluates default initializers and destructuring *before*
+// entering the function body. A first-statement throw cannot protect them.
+// The only existing reviewed default is a zero-argument empty callback
+// factory (onPhase=()=>{}), whose creation does not invoke user code.
+function safePreBodyParameter(parameter) {
+  if(parameter?.type==='Identifier')return true;
+  if(parameter?.type!=='AssignmentPattern'||
+     parameter.left?.type!=='Identifier')return false;
+  const value=parameter.right;
+  return value?.type==='ArrowFunctionExpression'&&value.async===false&&
+    value.expression===false&&value.params?.length===0&&
+    value.body?.type==='BlockStatement'&&value.body.body?.length===0;
+}
+function safePreBodyParameters(fn,isMain) {
+  const parameters=fn?.params;
+  if(!Array.isArray(parameters))return false;
+  if(isMain&&parameters.length!==0)return false;
+  return parameters.every(safePreBodyParameter);
+}
+
 function actualGuard(statement,expected){
   if(statement?.type!=='ExpressionStatement')return false;
   const call=statement.expression;
@@ -87,6 +107,8 @@ export function validateWorldGuardProvenance(ast,filename,exportNames){
       violations.push('GUARD_WRONG_OPERATION_OR_ORDER_'+item.name);
     if(hasLocalShadow(fn))
       violations.push('GUARD_BINDING_SHADOWED_'+item.name);
+    if(!safePreBodyParameters(fn,item.name==='main'))
+      violations.push('GUARD_PREBODY_PARAMETER_EFFECT_OR_DESTRUCTURE_'+item.name);
   }
   return violations;
 }

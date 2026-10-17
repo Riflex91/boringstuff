@@ -5,6 +5,7 @@ import {
   LEGACY_WORLD_MUTATOR_EXPORTS,WRITE_PATH_CLASSES
 } from './o50-world-write-path-audit.mjs';
 import { validateWorldGuardProvenance } from './o52-world-guard-provenance.mjs';
+import {verifyPinnedWorldHoldImplementation} from './o53-pinned-world-hold.mjs';
 
 // O51 bounded independent AST layer over O50's known-pattern inventory.
 // Soundness LIMIT: AST syntax analysis and local const alias folding is not
@@ -191,6 +192,11 @@ export function inspectWorldAstSource(filename,source){
       allowHashBang:true,locations:true});
   }catch{fail('SYNTAX_'+filename.replace(/[^a-zA-Z0-9._-]/g,'_'));}
   const bindings=collectDeclarations(ast),findings=[],violations=[];
+  // O53: a genuine imported name is insufficient if the imported O45
+  // function itself is altered to return. Never auto-trust a new blob.
+  if(filename==='o45-world-mutation-entrypoint-hold.mjs'&&
+      !verifyPinnedWorldHoldImplementation(source).verified)
+    violations.push('O45_GUARD_IMPLEMENTATION_BLOB_CHANGED');
   const reviewed=WRITE_PATH_CLASSES[filename]||null;
   const exposed=LEGACY_WORLD_MUTATOR_EXPORTS[filename]||[];
   violations.push(...validateWorldGuardProvenance(ast,filename,exposed));
