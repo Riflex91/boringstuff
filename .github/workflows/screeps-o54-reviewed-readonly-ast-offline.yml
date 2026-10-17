@@ -1,0 +1,43 @@
+name: Screeps O54 exact AST World read-only transport contract (OFFLINE)
+on:
+  push:
+    branches: [safety/o54-reviewed-readonly-transport-ast-contract-20261017]
+permissions:
+  contents: read
+concurrency:
+  group: o54-offline-world-readonly-transport-ast
+  cancel-in-progress: false
+jobs:
+  node24-p3-readonly-transport-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: tools
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Pin original Main and byte identical game code
+        shell: bash
+        run: |
+          git -C .. fetch origin main --quiet
+          test "$(git -C .. rev-parse origin/main)" = bc43f2faf1f345e63d9bfe78b6bbaa59e5eaab0c
+          git -C .. diff --exit-code origin/main HEAD -- game
+      - name: Canonical Node24 O39 to O54 offline tests
+        run: |
+          npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+          npm test
+      - name: Exact original P3 baseline benchmark
+        run: npm run bench:p3
+      - name: Record denied production scope
+        run: |
+          echo '### O54 exact AST contracts for reviewed read-only transport calls' >> "$GITHUB_STEP_SUMMARY"
+          echo 'GitHub evidence GET and World scout subprocess are syntactically pinned to approved argument structures.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'No credentials or external Screeps API calls. Reflect and call/apply dynamic indirections are review-required.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'No real World writes, GitHub writer ref mutation, production activation or Main merge.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Release HOLD_EXACT_PREDECESSOR_PAIR_MISSING remains.' >> "$GITHUB_STEP_SUMMARY"
