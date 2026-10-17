@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { ScreepsHttpClient } from './screeps-client.mjs';
 import { DEFAULT_VERIFICATION_LOG_DIR, writeDeploymentReceipt } from './deployment-receipt.mjs';
 import { assertUniqueActiveCodeBranch, assertRestorablePreuploadCodeBackup } from './o39-code-upload-active-branch-policy.mjs';
+import { reconcileUncertainCodePostViaGet } from './o40-code-post-get-reconcile.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const parent = path.resolve(here, '..');
@@ -101,7 +102,16 @@ console.log('Backup written:    ' + backupPath);
 // retry this code POST: the API may already have committed the upload.
 // Active branch may change after initial preflight or backup capture.
 assertUniqueActiveCodeBranch(await api.userBranches(), branch);
-await api.userUploadCodeOnce(branch, modules);
+try {
+  await api.userUploadCodeOnce(branch, modules);
+} catch {
+  // The server might have applied the POST before the acknowledgement was
+  // lost. Inspect only via authenticated GET; even exact bytes do not replace
+  // the missing POST acknowledgement or a canonical 100-tick release witness.
+  const diagnostic = await reconcileUncertainCodePostViaGet(api, branch, modules);
+  console.error('CODE_POST_OUTCOME_UNCERTAIN ' + JSON.stringify(diagnostic));
+  throw new Error('CODE_POST_OUTCOME_UNCERTAIN_NO_RETRY_NO_RECEIPT');
+}
 console.log('Upload completed.');
 
 const after = await api._request('GET', '/api/user/code', { branch });
