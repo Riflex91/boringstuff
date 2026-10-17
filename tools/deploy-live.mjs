@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ScreepsHttpClient } from './screeps-client.mjs';
 import { DEFAULT_VERIFICATION_LOG_DIR, writeDeploymentReceipt } from './deployment-receipt.mjs';
+import { assertUniqueActiveCodeBranch, assertRestorablePreuploadCodeBackup } from './o39-code-upload-active-branch-policy.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const parent = path.resolve(here, '..');
@@ -61,22 +62,15 @@ console.log('Deployment ID:     ' + deploymentId);
 
 const api = await ScreepsHttpClient.fromConfig(serverName);
 
-let activeWorld = null;
-try {
-  const branches = await api.userBranches();
-  const list = Array.isArray(branches?.list) ? branches.list : [];
-  const info = list.find(entry => entry?.branch === branch);
-  if (typeof info?.activeWorld === 'boolean') activeWorld = info.activeWorld;
-  else if (typeof branches?.activeWorld === 'string') activeWorld = branches.activeWorld === branch;
-} catch (err) {
-  console.warn('Branch activity check skipped: ' + err.message);
-}
-
-if (activeWorld !== null) {
-  console.log('Branch activeWorld:' + (activeWorld ? ' true' : ' false'));
-}
+// Reject missing, ambiguous or wrong active code branches BEFORE backing up
+// or making the single permitted code POST. A prior CI preflight is insufficient
+// because account branch activation may change between CI steps.
+const branches = await api.userBranches();
+assertUniqueActiveCodeBranch(branches, branch);
+console.log('Branch activeWorld: true');
 
 const before = await api._request('GET', '/api/user/code', { branch });
+assertRestorablePreuploadCodeBackup(before, modules);
 const beforeVersion = extractVersion(before?.modules?.config);
 console.log('Server before:     ' + beforeVersion);
 
@@ -99,11 +93,15 @@ fs.writeFileSync(
     deploymentId,
     modules: before?.modules || {}
   }, null, 2),
-  'utf8'
+  { encoding: 'utf8', mode: 0o600, flag: 'wx' }
 );
 console.log('Backup written:    ' + backupPath);
 
-await api._request('POST', '/api/user/code', { branch, modules });
+// A missing HTTP acknowledgement is an UNKNOWN result. Never implicitly
+// retry this code POST: the API may already have committed the upload.
+// Active branch may change after initial preflight or backup capture.
+assertUniqueActiveCodeBranch(await api.userBranches(), branch);
+await api.userUploadCodeOnce(branch, modules);
 console.log('Upload completed.');
 
 const after = await api._request('GET', '/api/user/code', { branch });
@@ -132,13 +130,6 @@ const mismatches = Object.keys(modules).filter(name =>
 if (mismatches.length) {
   throw new Error('Verification failed: uploaded module content differs for: ' +
     mismatches.join(', '));
-}
-
-if (activeWorld === false) {
-  console.warn(
-    "WARNING: branch '" + branch +
-    "' is not activeWorld. Upload succeeded, but the world may execute another branch."
-  );
 }
 
 if (!String(after?.modules?.config || '').includes("DEPLOYMENT_ID: '" + deploymentId + "'")) {
