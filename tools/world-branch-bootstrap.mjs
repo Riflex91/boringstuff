@@ -1,3 +1,4 @@
+import { assertLegacyWorldMutationDisabled } from './o45-world-mutation-entrypoint-hold.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -151,6 +152,9 @@ function writeStageReceipt(folder,name,record) {
 }
 
 async function main() {
+  // O45: refuse World mutations even with old approval strings and secrets.
+  // No credentials, config file or network call may precede this HOLD.
+  assertLegacyWorldMutationDisabled('legacy-code-bootstrap');
   const temp=process.env.RUNNER_TEMP;
   if(!temp || process.env.WORLD_BOOTSTRAP_CONFIRM!=='STAGE_WORLD_CODE')
     throw new Error('World code staging requires explicit authorized workflow gate');
@@ -193,7 +197,10 @@ async function main() {
   }
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href)
-  main().catch(()=>{
-    console.error('World code bootstrap failed before protected World staging');
+  main().catch(err=>{
+    // Only expose the fixed safety HOLD; do not log raw API or credential errors.
+    console.error(String(err?.message || '').startsWith('O45_WORLD_MUTATION_HOLD_')
+      ? 'O45_WORLD_MUTATION_HOLD_NO_APPROVED_FENCED_EXECUTOR'
+      : 'World code bootstrap failed before protected World staging');
     process.exitCode=1;
   });

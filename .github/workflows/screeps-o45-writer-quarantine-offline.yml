@@ -1,0 +1,43 @@
+name: Screeps O45 World writer entrypoint quarantine + no unsafe ref delete (OFFLINE)
+on:
+  push:
+    branches: [safety/o45-world-writer-entrypoint-global-hold-no-delete-20261017]
+permissions:
+  contents: read
+concurrency:
+  group: o45-offline-world-writer-quarantine
+  cancel-in-progress: false
+jobs:
+  node24-p3-and-world-command-no-write:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: tools
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Verify pinned exact Main and game source byte identity
+        shell: bash
+        run: |
+          git -C .. fetch origin main --quiet
+          test "$(git -C .. rev-parse origin/main)" = bc43f2faf1f345e63d9bfe78b6bbaa59e5eaab0c
+          git -C .. diff --exit-code origin/main HEAD -- game
+      - name: All Node24 safety tests O39 through O45
+        run: |
+          npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+          npm test
+      - name: Exact P3 benchmark
+        run: npm run bench:p3
+      - name: Report no World runtime access
+        run: |
+          echo '### O45 World command quarantine (offline)' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Six legacy World writer entrypoints fail closed before config, login and mutation.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'CAS-less Git-ref DELETE is disabled even with a manual confirmation.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'No Screeps credentials, no real GitHub ref changes, no POST, no main merge.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'HOLD_EXACT_PREDECESSOR_PAIR_MISSING remains.' >> "$GITHUB_STEP_SUMMARY"

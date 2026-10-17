@@ -1,3 +1,4 @@
+import { assertLegacyWorldMutationDisabled } from './o45-world-mutation-entrypoint-hold.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -256,6 +257,9 @@ export async function placePinnedWorldSpawn(api,id) {
 }
 
 async function main() {
+  // O45: refuse World mutations even with old approval strings and secrets.
+  // No credentials, config file or network call may precede this HOLD.
+  assertLegacyWorldMutationDisabled('legacy-first-spawn');
   const required={
     WORLD_FIRST_SPAWN_CONFIRM:PLACEMENT_CONFIRM,
     WORLD_RCL8_RISK_CONFIRM:RIVAL_CONFIRM,
@@ -316,5 +320,10 @@ async function main() {
   }
 }
 if(process.argv[1]&&pathToFileURL(process.argv[1]).href===import.meta.url)
-  main().catch(()=>{console.error('World placement blocked before protected staging');
-    process.exitCode=1;});
+  main().catch(err=>{
+    // Keep credentials out of errors while showing the exact O45 block reason.
+    console.error(String(err?.message || '').startsWith('O45_WORLD_MUTATION_HOLD_')
+      ? 'O45_WORLD_MUTATION_HOLD_NO_APPROVED_FENCED_EXECUTOR'
+      : 'World placement blocked before protected staging');
+    process.exitCode=1;
+  });

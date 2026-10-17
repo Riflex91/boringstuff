@@ -1,3 +1,4 @@
+import { assertLegacyWorldMutationDisabled } from './o45-world-mutation-entrypoint-hold.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -62,6 +63,9 @@ export async function activateW37S79(api,approval,onPhase=()=>{}){
     activationApiCalls:1,placementAttempted:false};
 }
 async function main(){
+  // O45: refuse World mutations even with old approval strings and secrets.
+  // No credentials, config file or network call may precede this HOLD.
+  assertLegacyWorldMutationDisabled('legacy-spawn-activation');
   if(!process.env.RUNNER_TEMP||process.env.WORLD_W37S79_ACTIVATION_APPROVAL!==ACTIVATION_APPROVAL)
     throw new Error('EXPLICIT_APPROVAL_REQUIRED');
   const config=path.join(process.env.RUNNER_TEMP,'w37s79-activation-'+process.pid+'.json');
