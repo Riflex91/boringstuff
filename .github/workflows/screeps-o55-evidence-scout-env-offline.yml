@@ -1,0 +1,44 @@
+name: Screeps O55 GitHub evidence URL and World scout process-env isolation (OFFLINE)
+on:
+  push:
+    branches: [safety/o55-evidence-url-and-scout-env-isolation-20261017]
+permissions:
+  contents: read
+concurrency:
+  group: o55-world-evidence-scout-env-offline
+  cancel-in-progress: false
+jobs:
+  node24-p3-credential-safety:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: tools
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Pin Main and assert unchanged gameplay code
+        shell: bash
+        run: |
+          git -C .. fetch origin main --quiet
+          test "$(git -C .. rev-parse origin/main)" = bc43f2faf1f345e63d9bfe78b6bbaa59e5eaab0c
+          git -C .. diff --exit-code origin/main HEAD -- game
+      - name: Full canonical Node24 O39-O55 no-secret suite
+        run: |
+          npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+          npm test
+      - name: Original baseline P3 benchmarks
+        run: npm run bench:p3
+      - name: Record production HOLD
+        run: |
+          echo '### O55 evidence and child process egress boundary' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Bearer token evidence URLs pinned to exact GitHub API repo/run/job GET paths.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Redirect following denied. World scout child receives explicit three-variable environment only.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Offline test uses fake fetch and local Node child only; no real Screeps or GitHub evidence access.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'No World POST, activation, spawn, GitHub writer ref mutation, or Main merge.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'HOLD_EXACT_PREDECESSOR_PAIR_MISSING.' >> "$GITHUB_STEP_SUMMARY"
