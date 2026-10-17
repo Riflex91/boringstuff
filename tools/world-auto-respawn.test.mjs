@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {checkApprovedWorldHoldings,checkSameTickWorldLoss,
-  performApprovedWorldAutoRecovery} from './world-auto-respawn.mjs';
+  performApprovedWorldAutoRecovery,githubDurableRespawnAttemptLock} from './world-auto-respawn.mjs';
 
 const roomSet={shards:{shard0:['W37S79'],shard1:[],shard2:[],
  shard3:[],sim:[]},reservations:{shard0:[]}};
@@ -33,7 +33,7 @@ assert.equal(checkSameTickWorldLoss({data:JSON.stringify(wrong)},1004).verified,
 function mock({status='lost',statusAfter='empty',user='riflex91',
   holdings=roomSet,advanced=true,throwPost=false,rejectedPost=false,
   noHeartbeat=false}={}){
- const actions={respawnPosts:0,placements:0,worldChecks:0};
+ const actions={respawnPosts:0,placements:0,worldChecks:0,reservations:0};
  let clockCalls=0,lossReads=0;
  const api={
   defaultShard:'shard0',
@@ -73,6 +73,7 @@ function mock({status='lost',statusAfter='empty',user='riflex91',
  const deps={
   wait:async()=>{},
   now:()=>nowSeq.shift()??1421,
+  reserveAttempt:async()=>{actions.reservations++;return true},
   place:async(a,id,approval)=>{
    actions.placements++;
    assert.equal(id,'private-id');
@@ -126,4 +127,68 @@ assert.equal((await performApprovedWorldAutoRecovery(noReset.api,
  noReset.deps)).status,'RESPAWN_READBACK_UNVERIFIED_NO_RETRY');
 assert.equal(noReset.actions.respawnPosts,1);
 assert.equal(noReset.actions.placements,0);
+
+// A scheduled workflow is a different process. Without a durable marker,
+// zero destructive writes are allowed, even when all loss proofs pass.
+const noLock=mock();
+delete noLock.deps.reserveAttempt;
+const absentLock=await performApprovedWorldAutoRecovery(noLock.api,
+ noLock.deps);
+assert.equal(absentLock.status,'HOLD_DURABLE_ATTEMPT_LOCK_UNAVAILABLE');
+assert.equal(noLock.actions.respawnPosts,0);
+const alreadyLocked=mock();
+alreadyLocked.deps.reserveAttempt=async()=>{
+  alreadyLocked.actions.reservations++;return false;
+};
+const prevented=await performApprovedWorldAutoRecovery(alreadyLocked.api,
+ alreadyLocked.deps);
+assert.equal(prevented.status,
+ 'HOLD_RESPAWN_ATTEMPT_ALREADY_RECORDED_OR_UNVERIFIED');
+assert.equal(alreadyLocked.actions.respawnPosts,0);
+assert.equal(alreadyLocked.actions.reservations,1);
+const worldRecovered=mock();
+const originalStatus=worldRecovered.api.userWorldStatus;
+worldRecovered.api.userWorldStatus=async()=>{
+ const r=await originalStatus();
+ return worldRecovered.actions.reservations?{status:'normal'}:r;
+};
+const rescued=await performApprovedWorldAutoRecovery(worldRecovered.api,
+ worldRecovered.deps);
+assert.equal(rescued.status,'HOLD_FINAL_STATUS_NO_LONGER_LOST');
+assert.equal(worldRecovered.actions.respawnPosts,0);
+// Never expose the GitHub token and never POST without a complete history
+// check or while a recent auto-respawn attempt is already recorded.
+const ghEnv={GITHUB_REPOSITORY:'Riflex91/boringstuff',
+ GITHUB_REF:'refs/heads/main',GITHUB_TOKEN:'PRIVATE_GITHUB_TOKEN'};
+const calls=[];
+const fakeFetch=async(url,req)=>{
+ calls.push({method:req.method,url,body:req.body});
+ if(req.method==='GET')return {ok:true,json:async()=>[]};
+ return {status:201,json:async()=>({
+   id:123,body:JSON.parse(req.body).body})};
+};
+assert.equal(await githubDurableRespawnAttemptLock({
+ account:'riflex91',shard:'shard0',room:'W37S79'
+},ghEnv,fakeFetch),true);
+assert.deepEqual(calls.map(x=>x.method),['GET','POST']);
+assert.ok(!JSON.stringify(calls).includes('PRIVATE_GITHUB_TOKEN'));
+assert.equal(await githubDurableRespawnAttemptLock({
+ account:'other-player',shard:'shard0',room:'W37S79'
+},ghEnv,fakeFetch),false);
+assert.equal(calls.length,2,'wrong account never reaches network');
+const recentMarker=[{body:'WORLD_AUTO_RESPAWN_ATTEMPT_LOCK_V1',
+ created_at:new Date().toISOString()}];
+const blockedFetch=async(url,req)=>({
+ ok:true,json:async()=>recentMarker
+});
+assert.equal(await githubDurableRespawnAttemptLock({
+ account:'riflex91',shard:'shard0',room:'W37S79'
+},ghEnv,blockedFetch),false);
+let postAttempts=0;
+const failedHistory=async()=>{throw Error('private network failure')};
+assert.equal(await githubDurableRespawnAttemptLock({
+ account:'riflex91',shard:'shard0',room:'W37S79'
+},ghEnv,failedHistory),false);
+assert.equal(postAttempts,0);
+
 console.log('O23 executable auto-respawn exact-one-reset and protected placement offline regression PASS');
