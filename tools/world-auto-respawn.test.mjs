@@ -226,6 +226,9 @@ const ghEnv={GITHUB_REPOSITORY:'Riflex91/boringstuff',
 const calls=[];
 const fakeFetch=async(url,req)=>{
  calls.push({method:req.method,url,body:req.body});
+ if(req.method==='GET'&&url.endsWith('/issues/comments/123'))
+   return {ok:true,json:async()=>({id:123,
+     body:'WORLD_AUTO_RESPAWN_ATTEMPT_LOCK_V1\\nOperator-approved World auto-recovery intent; no Screeps mutation is implied by this entry.'})};
  if(req.method==='GET')return {ok:true,json:async()=>[]};
  return {status:201,json:async()=>({
    id:123,body:JSON.parse(req.body).body})};
@@ -233,12 +236,23 @@ const fakeFetch=async(url,req)=>{
 assert.equal(await githubDurableRespawnAttemptLock({
  account:'riflex91',shard:'shard0',room:'W37S79'
 },ghEnv,fakeFetch),true);
-assert.deepEqual(calls.map(x=>x.method),['GET','POST']);
+assert.deepEqual(calls.map(x=>x.method),['GET','POST','GET']);
 assert.ok(!JSON.stringify(calls).includes('PRIVATE_GITHUB_TOKEN'));
 assert.equal(await githubDurableRespawnAttemptLock({
  account:'other-player',shard:'shard0',room:'W37S79'
 },ghEnv,fakeFetch),false);
-assert.equal(calls.length,2,'wrong account never reaches network');
+assert.equal(calls.length,3,'wrong account never reaches network');
+const missingReadback=async(url,req)=>{
+ if(req.method==='POST')return {status:201,json:async()=>({
+   id:333,body:'WORLD_AUTO_RESPAWN_ATTEMPT_LOCK_V1'
+ })};
+ if(url.endsWith('/issues/comments/333'))
+   return {ok:false,status:404};
+ return {ok:true,json:async()=>[]};
+};
+assert.equal(await githubDurableRespawnAttemptLock({
+ account:'riflex91',shard:'shard0',room:'W37S79'
+},ghEnv,missingReadback),false,'missing lock readback must fail closed');
 const recentMarker=[{body:'WORLD_AUTO_RESPAWN_ATTEMPT_LOCK_V1',
  created_at:new Date().toISOString()}];
 const blockedFetch=async(url,req)=>({
