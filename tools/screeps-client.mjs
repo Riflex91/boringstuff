@@ -5,6 +5,7 @@ import https from 'node:https';
 import { EventEmitter } from 'node:events';
 import { fileURLToPath } from 'node:url';
 import { assertWorldHttpReadOnly } from './o46-world-http-write-policy.mjs';
+import { resolveSafeScreepsApiTarget } from './o48-safe-api-target.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -110,6 +111,9 @@ export class ScreepsHttpClient {
     // O46 network chokepoint: deny ALL World mutating HTTP methods before
     // authentication or socket creation, even via legacy raw _request.
     assertWorldHttpReadOnly(this.serverName, method, endpoint, this.server?.baseUrl);
+    // O48: reject absolute/encoded/traversing/foreign endpoints before any
+    // implicit sign-in POST, token handling or network activity.
+    resolveSafeScreepsApiTarget(this.server?.baseUrl,endpoint);
     if (!opts.skipAuth && !this.token) await this.auth();
 
     // O40: retries are safe by default ONLY for GET and authentication.
@@ -130,7 +134,9 @@ export class ScreepsHttpClient {
       // or between bounded GET retries. Recheck the exact URL input here.
       const configuredBaseUrl = this.server.baseUrl;
       assertWorldHttpReadOnly(this.serverName, method, endpoint, configuredBaseUrl);
-      const url = new URL(endpoint.replace(/^\//, ''), configuredBaseUrl);
+      // Resolve from the same pinned baseURL checked above. This rejects any
+      // cross-origin endpoint and unsafe base path on every retry as well.
+      const url = resolveSafeScreepsApiTarget(configuredBaseUrl,endpoint);
       if (method === 'GET') addSearchParams(url, params);
       const payload = method === 'GET' ? null : JSON.stringify(params || {});
       const transport = url.protocol === 'https:' ? https : http;

@@ -1,0 +1,42 @@
+name: Screeps O48 resolved API-target containment (OFFLINE)
+on:
+  push:
+    branches: [safety/o48-world-resolved-url-containment-20261017]
+permissions:
+  contents: read
+concurrency:
+  group: o48-world-resolved-api-url-offline
+  cancel-in-progress: false
+jobs:
+  node24-p3-api-target-firewall:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: tools
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Assert pinned Main and byte-identical gameplay modules
+        shell: bash
+        run: |
+          git -C .. fetch origin main --quiet
+          test "$(git -C .. rev-parse origin/main)" = bc43f2faf1f345e63d9bfe78b6bbaa59e5eaab0c
+          git -C .. diff --exit-code origin/main HEAD -- game
+      - name: Full Node24 O39 through O48 safety regression suite
+        run: |
+          npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+          npm test
+      - name: Exact P3 original baseline benchmarks
+        run: npm run bench:p3
+      - name: Confirm no live World writes
+        run: |
+          echo '### O48 URL containment: all test endpoints synthetic and local' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Absolute URLs, scheme injection, traversal, query and fragment endpoints fail closed before auth or any HTTP socket.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'No real Screeps credentials, no game POST, no GitHub writer-ref mutation, no branch activation or Main merge.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'HOLD_EXACT_PREDECESSOR_PAIR_MISSING unchanged.' >> "$GITHUB_STEP_SUMMARY"
