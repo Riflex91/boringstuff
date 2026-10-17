@@ -1,3 +1,4 @@
+import { assertLegacyWorldMutationDisabled } from './o45-world-mutation-entrypoint-hold.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -45,6 +46,9 @@ export async function restageInactiveWorldCode(api,modules,confirmation,onPhase=
     moduleCount:Object.keys(modules).length,spawnPlaced:false,activated:false};
 }
 async function main() {
+  // O45: refuse World mutations even with old approval strings and secrets.
+  // No credentials, config file or network call may precede this HOLD.
+  assertLegacyWorldMutationDisabled('legacy-inactive-restage');
   if(!process.env.RUNNER_TEMP)throw new Error('RUNNER_TEMP_REQUIRED');
   const config=path.join(process.env.RUNNER_TEMP,'w37s79-restage-'+process.pid+'.json');
   fs.writeFileSync(config,JSON.stringify(buildWorldConfig(process.env)),{mode:0o600,flag:'wx'});
