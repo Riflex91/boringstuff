@@ -84,14 +84,13 @@ const count=(r,method,path)=>r.calls.filter(c=>c.method===method&&c.path===path)
     transport:r.transport,held,operatorReleasePhrase:'RELEASE_WORLD_WRITER_LOCK'
   }),/EXPLICIT_REVIEW_REQUIRED/);
   assert.equal(count(r,'DELETE',P),0);
-  const release=await releaseWorldWriterFence({
+  // O45: even explicit operator approval cannot make a non-CAS DELETE safe.
+  await assert.rejects(()=>releaseWorldWriterFence({
     transport:r.transport,held,operatorReleasePhrase:'RELEASE_WORLD_WRITER_LOCK',
     mutationOutcomeResolved:true
-  });
-  assert.equal(release.released,true);
-  assert.equal(release.mayUploadWorldCode,false);
-  assert.equal(r.lock,null);
-  assert.equal(count(r,'DELETE',P),1);
+  }),/O44_WRITER_LOCK_HOLD_UNSAFE_NON_ATOMIC_REF_DELETE_DISABLED/);
+  assert.equal(r.lock,held.ownerTagSha);
+  assert.equal(count(r,'DELETE',P),0);
 }
 {
   const r=remote();
@@ -148,7 +147,7 @@ for(const opts of [{deleteStatus:429},{deleteStatus:503},{lostDeleteAck:true}]){
     transport:r.transport,held,operatorReleasePhrase:'RELEASE_WORLD_WRITER_LOCK',
     mutationOutcomeResolved:true
   }),/O44_WRITER_LOCK_HOLD_/);
-  assert.equal(count(r,'DELETE',P),1);
+  assert.equal(count(r,'DELETE',P),0);
 }
 for(const bad of [
   {...request(async()=>null),pinnedCommit:'bad'},
@@ -166,6 +165,8 @@ assert.throws(()=>createGithubWriterFenceTransport({
 const source=fs.readFileSync(new URL('./o44-world-writer-ref-fence.mjs',
   import.meta.url),'utf8');
 assert.match(source,/redirect:'error'/);
+assert.match(source,/UNSAFE_NON_ATOMIC_REF_DELETE_DISABLED/);
+assert.ok(!source.includes("send(transport,'DELETE'"));
 assert.ok(!source.includes('ScreepsHttpClient'));
 const deploy=fs.readFileSync(new URL('./deploy-live.mjs',import.meta.url),'utf8');
 assert.match(deploy,/O43_WORLD_CODE_UPLOAD_HOLD_NO_APPROVED_TWO_PHASE_EXECUTOR/);
