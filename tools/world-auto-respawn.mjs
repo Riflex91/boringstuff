@@ -14,6 +14,7 @@ const ROOM='W37S79',SHARD='shard0';
 const READ_LIMIT=2000;
 
 export function checkApprovedWorldHoldings(reply) {
+  if(reply?.ok===false)return {complete:false,scopeVerified:false};
   const shards=reply?.shards;
   if(!shards||typeof shards!=='object'||Array.isArray(shards))
     return {complete:false,scopeVerified:false};
