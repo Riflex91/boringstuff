@@ -131,6 +131,9 @@ async function readBackSpawn(api,id) {
  * has been independently verified. NEVER automatically retry a POST.
  */
 export async function activateVerifiedWorldSpawn(api,id,placement) {
+  // O49: imported World mutator remains quarantined even with an injected
+  // duck-typed API that bypasses ScreepsHttpClient's HTTP firewall.
+  assertLegacyWorldMutationDisabled('legacy-first-spawn');
   if(api?.defaultShard!==TARGET.shard || !id ||
      placement?.status!=='PASS' || placement?.spawnVerified!==true ||
      placement?.target?.shard!==TARGET.shard ||
@@ -200,6 +203,9 @@ export async function activateVerifiedWorldSpawn(api,id,placement) {
 }
 
 export async function placePinnedWorldSpawn(api,id) {
+  // O49: imported World mutator remains quarantined even with an injected
+  // duck-typed API that bypasses ScreepsHttpClient's HTTP firewall.
+  assertLegacyWorldMutationDisabled('legacy-first-spawn');
   if(api?.defaultShard!==TARGET.shard||!id)
     throw new Error('WORLD_EXACT_SHARD_OR_ID_REQUIRED');
   const initial=await inspectWorldLaunchDossier(api,WORLD_TARGET);
