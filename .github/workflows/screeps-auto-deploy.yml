@@ -89,6 +89,19 @@ jobs:
         if: steps.credentials.outputs.present == 'true'
         run: npm install --no-package-lock --ignore-scripts --no-audit --no-fund
 
+      # Main Node24/P3 alone is NOT the predecessor-Main dual-server
+      # LIVE_100T_PASS authorization required by the release policy.
+      # Until independently verifiable paired canonical receipts exist,
+      # this workflow must never send a Screeps game-code POST.
+      - name: Block Newbieland upload without paired canonical predecessor LIVE_100T_PASS
+        if: steps.credentials.outputs.present == 'true'
+        shell: bash
+        run: |
+          echo 'NEWBIELAND_AUTO_DEPLOY_RELEASE_HOLD: paired predecessor-Main canonical LIVE_100T_PASS evidence unavailable' >&2
+          echo '### Newbieland auto-upload blocked by release gate' >> "$GITHUB_STEP_SUMMARY"
+          echo 'No Screeps code upload, branch activation or gameplay change was attempted.' >> "$GITHUB_STEP_SUMMARY"
+          exit 1
+
       - name: Create short-lived HTTPS Screeps API config
         if: steps.credentials.outputs.present == 'true'
         run: node ci-deployment-credentials.mjs
