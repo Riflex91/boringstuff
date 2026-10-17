@@ -107,6 +107,8 @@ export function assessHistoricalRun({server,expectedMainSha=EXPECTED_MAIN_SHA,
     eligibleExactPredecessor:historical&&sameMain,
     originalReceiptArtifactMetadataVerified:!issues.includes('ORIGINAL_DEPLOYMENT_ARTIFACT_UNAVAILABLE'),
     originalReceiptFileContentsVerified:receiptVerified,
+    originalReceiptFailureReason:receiptVerified?null:
+      receiptEvidence?.reason||'ORIGINAL_RECEIPT_CONTENT_UNVERIFIED',
     independentCurrentRuntimeHealthyVerified:false,
     livePass:proof.valid?proof:null,
     issues:[...issues,...(!sameMain?['HISTORICAL_PASS_SHA_DIFFERS_FROM_EXACT_MAIN']:[])],
@@ -132,7 +134,8 @@ export function assessHistoricalPair(world,newbieland,expectedMainSha=EXPECTED_M
 
 const base='https://api.github.com/repos/'+OWNER+'/'+REPO;
 export function inspectOriginalReceiptArchive(bytes,{server,run,jobLog}){
-  const invalid={verified:false,server,runId:run?.id??null};
+  const invalid={verified:false,server,runId:run?.id??null,
+    reason:'ORIGINAL_RECEIPT_INPUT_UNVERIFIED'};
   if(!SERVERS[server]||!validId(run?.id)||
      typeof jobLog!=='string'||jobLog.length>24_000_000||
      !Buffer.isBuffer(bytes)||bytes.length>24_000_000)return invalid;
@@ -140,16 +143,18 @@ export function inspectOriginalReceiptArchive(bytes,{server,run,jobLog}){
   const rows=[...jobLog.matchAll(
     /^20\\d\\d-[^\\r\\n]{12,48}Z Deployment ID:\\s+([0-9]{17}-[0-9]{1,10})\\r?$/gm
   )];
-  if(rows.length!==1)return invalid;
+  if(rows.length!==1)return {...invalid,
+    reason:'ORIGINAL_DEPLOYMENT_ID_LOG_LINE_UNVERIFIED'};
   const idDigest=createHash('sha256').update(rows[0][1]).digest('hex');
   const command=spawnSync('python3',[
     fileURLToPath(new URL('./o34-artifact-receipt.py',import.meta.url)),
     server,branch
   ],{input:bytes,encoding:'utf8',maxBuffer:16384,timeout:10000});
-  if(command.status!==0||typeof command.stdout!=='string')return invalid;
+  if(command.status!==0||typeof command.stdout!=='string')return {...invalid,
+    reason:'ORIGINAL_RECEIPT_ZIP_EXTRACTOR_REJECTED'};
   let receipt;
   try{receipt=JSON.parse(command.stdout);}
-  catch{return invalid;}
+  catch{return {...invalid,reason:'ORIGINAL_RECEIPT_ZIP_JSON_UNVERIFIED'};}
   const created=Date.parse(receipt?.createdAt||'');
   const started=Date.parse(run?.created_at||'');
   const finished=Date.parse(run?.updated_at||'');
@@ -159,7 +164,8 @@ export function inspectOriginalReceiptArchive(bytes,{server,run,jobLog}){
     Number.isFinite(created)&&Number.isFinite(started)&&
     Number.isFinite(finished)&&
     created>=started-120000&&created<=finished+120000;
-  return {...invalid,verified:Boolean(verified)};
+  return {...invalid,verified:Boolean(verified),
+    reason:verified?null:'ORIGINAL_RECEIPT_LOG_TIME_OR_ID_MISMATCH'};
 }
 export async function inspectGithubHistoricalRun(server,runId,{
   token=process.env.GITHUB_TOKEN,read=githubGet,
@@ -181,13 +187,15 @@ export async function inspectGithubHistoricalRun(server,runId,{
   const found=Array.isArray(artifactData?.artifacts)?
     artifactData.artifacts.filter(a=>a?.name===artifactName&&
       a?.expired===false&&validId(a?.id)):[];
-  let receiptEvidence={verified:false,server,runId};
+  let receiptEvidence={verified:false,server,runId,
+    reason:'ORIGINAL_RECEIPT_ZIP_NOT_CHECKED'};
   if(found.length===1&&typeof jobLog==='string'){
     try{
       const archiveBytes=await read(
         base+'/actions/artifacts/'+found[0].id+'/zip',token,'binary');
       receiptEvidence=inspectArchive(archiveBytes,{server,run,jobLog});
-    }catch{/* absent/unreadable original artifact must HOLD */}
+    }catch{/* absent/unreadable original artifact must HOLD */
+      receiptEvidence.reason='ORIGINAL_RECEIPT_ZIP_DOWNLOAD_FAILED';}
   }
   return assessHistoricalRun({server,expectedRunId:runId,run,jobs,
     artifacts:artifactData?.artifacts,jobLog,receiptEvidence});
