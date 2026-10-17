@@ -30,7 +30,10 @@ export function assertReadOnlyScreepsWsCommand(serverName,httpBaseUrl,
     isOfficialWorldTarget(httpBaseUrl);
   if(!protectedTarget) return;
   if(typeof command!=='string' || command.length>512) reject();
-  if(typeof authToken==='string' && authToken.length>0 &&
+  // Never treat a multiline/whitespace token as a valid command payload.
+  // A malicious token with a newline must not smuggle a second WS command.
+  if(typeof authToken==='string' &&
+      /^[^\\s\\x00-\\x1f\\x7f]{1,500}$/.test(authToken) &&
       command==='auth '+authToken) return;
   if(/^subscribe user:[A-Za-z0-9_-]{1,80}\/(?:console|cpu)$/.test(command))
     return;
@@ -40,6 +43,9 @@ export function assertReadOnlyScreepsWsCommand(serverName,httpBaseUrl,
 export function protectScreepsSocketSend(ws,serverName,httpBaseUrl,authToken) {
   if(!ws || typeof ws.send!=='function') reject();
   if(serverName!=='world' && !isOfficialWorldTarget(httpBaseUrl)) return ws;
+  // Validate authentication material before the send interceptor is installed.
+  assertReadOnlyScreepsWsCommand(serverName,httpBaseUrl,
+    'auth '+authToken,authToken);
   // Lock method against accidental direct socket.ws.send(...) bypass.
   // Not a sandbox: independent WS implementations remain outside contract.
   const rawSend=ws.send.bind(ws);
