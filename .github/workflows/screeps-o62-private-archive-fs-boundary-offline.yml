@@ -1,0 +1,44 @@
+name: Screeps O62 private archive canonical path and original ZIP E2E safety (OFFLINE)
+on:
+  push:
+    branches: [safety/o62-private-archive-canonical-path-and-real-e2e-20261017]
+permissions:
+  contents: read
+concurrency:
+  group: o62-offline-private-archive-fs-boundary
+  cancel-in-progress: false
+jobs:
+  node24-p3-no-production-writes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: tools
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Assert original pinned Main and byte-exact gameplay modules
+        shell: bash
+        run: |
+          git -C .. fetch origin main --quiet
+          test "$(git -C .. rev-parse origin/main)" = bc43f2faf1f345e63d9bfe78b6bbaa59e5eaab0c
+          git -C .. diff --exit-code origin/main HEAD -- game
+      - name: Full canonical Node24 O39-O62 offline tests
+        run: |
+          npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+          npm test
+      - name: P3 exact original reproducibility
+        run: npm run bench:p3
+      - name: Report real custody and external evidence limits
+        run: |
+          echo '### O62 external canonical archive destination and optional genuine ZIP local E2E' >> "$GITHUB_STEP_SUMMARY"
+          echo 'The archiver checks canonical external path, POSIX private output parent and reads input ZIP through nofollow regular-file FD.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'No historical ZIPs, original game backups or operator keys are shipped into Actions CI.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'A separate opt-in local smoke can encrypt/decrypt the two already downloaded genuine O58 original ZIPs with an ephemeral test RSA key.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Neither local test nor green CI proves independent durable operator escrow or exact-Main World LIVE_100T_PASS.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'No Screeps writes, GitHub writer-ref changes, or Main merge. HOLD_EXACT_PREDECESSOR_PAIR_MISSING.' >> "$GITHUB_STEP_SUMMARY"

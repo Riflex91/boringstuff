@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {verifyPinnedOriginalArtifactZip} from './o58-original-artifact-integrity.mjs';
+import {assertPrivateArchiveParent,readPinnedArchiveInput} from './o62-private-archive-fs-boundary.mjs';
 import {
  ROADMAP_HISTORICAL_ARTIFACTS,sealPrivateRoadmapEvidence
 } from './o57-private-roadmap-evidence-vault.mjs';
@@ -22,27 +23,17 @@ function parse(argv){
  if(Object.keys(a).length!==4||argv.length!==8)fail();
  return a;
 }
-function readExistingFile(name,max){
- const stat=fs.lstatSync(name);
- if(!stat.isFile()||stat.isSymbolicLink()||
-    stat.size<4||stat.size>max)fail();
- const bytes=fs.readFileSync(name);
- if(!bytes.subarray(0,4).equals(Buffer.from([0x50,0x4b,0x03,0x04])))
-   fail(); // No decompression/execution of untrusted ZIP
- return bytes;
-}
+// O62: all input reads use the already-verified file descriptor; no
+// path-based read following a separate lstat(path) time-of-check.
+
 export function archivePinnedRoadmapOriginals(args){
  const inputs=parse(args);
- const dest=inputs['--output-parent'];
- const info=fs.lstatSync(dest);
- if(!info.isDirectory()||info.isSymbolicLink())fail();
- const repoRoot=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
- const relative=path.relative(repoRoot,dest);
- if(relative===''||(!relative.startsWith('..'+path.sep)&&relative!=='..'&&
-   !path.isAbsolute(relative)))fail(); // keep even encrypted archives out of git
+ // Resolve and validate the canonical destination BEFORE creating anything.
+ // Symlinked ancestors can otherwise route an "outside" path back into Git.
+ const dest=assertPrivateArchiveParent(inputs['--output-parent']);
  const pem=fs.readFileSync(inputs['--public-key'],'utf8');
- const world=readExistingFile(inputs['--world-zip'],32*1024*1024);
- const newb=readExistingFile(inputs['--newbieland-zip'],32*1024*1024);
+ const world=readPinnedArchiveInput(inputs['--world-zip'],32*1024*1024);
+ const newb=readPinnedArchiveInput(inputs['--newbieland-zip'],32*1024*1024);
  // O58: ZIP magic alone is not evidence provenance. Only the two exact
  // original downloaded Actions artifact byte streams may be labeled as
  // historical originals. This runs before creating the destination.
