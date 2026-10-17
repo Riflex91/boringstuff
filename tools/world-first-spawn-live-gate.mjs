@@ -1,5 +1,6 @@
 import {pathToFileURL} from 'node:url';
 import {assertGitHubEvidenceReadUrl} from './o55-readonly-network-boundaries.mjs';
+import {followOneSignedJobLogRedirect,readBoundedJobLog} from './o56-signed-job-log-download.mjs';
 
 export function verifyLiveRunEvidence(run,jobs,logs,expectedSha) {
  const failures=[];
@@ -27,15 +28,22 @@ export function verifyLiveRunEvidence(run,jobs,logs,expectedSha) {
 export async function githubGet(url,token,repository,runId,textMode=false){
  // O55: validate the final absolute URL before exposing GitHub token to
  // fetch. Never follow a 30x to a remote host with credentials.
- assertGitHubEvidenceReadUrl(url,repository,runId);
+ const {kind}=assertGitHubEvidenceReadUrl(url,repository,runId);
  const r=await fetch(url,{headers:{
    Accept:'application/vnd.github+json',
    Authorization:'Bearer '+token,
    'X-GitHub-Api-Version':'2022-11-28'
  },redirect:'manual'});
+ // Only an authenticated request to the exact GitHub job-log endpoint
+ // is allowed to initiate the uncredentialed signed-file second hop.
+ if(r.status===302){
+   if(kind!=='job-logs'||textMode!==true)
+     throw new Error('GITHUB_EVIDENCE_GET_FAILED_OR_REDIRECT_HOLD');
+   return followOneSignedJobLogRedirect(r);
+ }
  if(!r.ok || r.redirected || r.type==='opaqueredirect')
    throw new Error('GITHUB_EVIDENCE_GET_FAILED_OR_REDIRECT_HOLD');
- return textMode?r.text():r.json();
+ return textMode?readBoundedJobLog(r):r.json();
 }
 async function main(){
  const token=process.env.GITHUB_TOKEN;
