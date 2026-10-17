@@ -5,6 +5,7 @@ on:
     paths:
       - tools/world-next-runtime-diagnostics.mjs
       - tools/world-next-runtime-diagnostics.test.mjs
+      - tools/world-recovery-evidence.test.mjs
       - .github/workflows/screeps-world-o24-runtime-readonly.yml
   workflow_dispatch:
 permissions:
