@@ -1,0 +1,43 @@
+name: Screeps O56 tokenless bounded GitHub job-log second-hop (OFFLINE)
+on:
+  push:
+    branches: [safety/o56-bounded-tokenless-github-log-redirect-20261017]
+permissions:
+  contents: read
+concurrency:
+  group: o56-offline-signed-job-logs
+  cancel-in-progress: false
+jobs:
+  node24-p3-safe-job-log-download:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: tools
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Verify original pinned Main and exact gameplay file equality
+        shell: bash
+        run: |
+          git -C .. fetch origin main --quiet
+          test "$(git -C .. rev-parse origin/main)" = bc43f2faf1f345e63d9bfe78b6bbaa59e5eaab0c
+          git -C .. diff --exit-code origin/main HEAD -- game
+      - name: Complete Node24 canonical offline safety regression O39-O56
+        run: |
+          npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+          npm test
+      - name: Exact original P3 reproducibility
+        run: npm run bench:p3
+      - name: Report release HOLD
+        run: |
+          echo '### O56 bounded tokenless Actions logs download proof' >> "$GITHUB_STEP_SUMMARY"
+          echo 'GitHub authentication is used only against exact approved API paths; one signed redirect hop gets no Authorization.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'The signed target must use reviewed HTTPS CDN hosts, manual redirects and <=8 MiB UTF-8 body.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'All network IO in tests is fake fetch only; no live Screeps POST, spawn, Git ref mutation, or Main merge.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'HOLD_EXACT_PREDECESSOR_PAIR_MISSING.' >> "$GITHUB_STEP_SUMMARY"
