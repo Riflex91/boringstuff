@@ -22,3 +22,20 @@ export function assertUniqueActiveCodeBranch(branches, requestedBranch) {
     throw new Error('CODE_UPLOAD_HOLD_EXACT_ACTIVE_BRANCH_NOT_VERIFIED');
   return Object.freeze({ verified: true, requestedBranch });
 }
+
+export function assertRestorablePreuploadCodeBackup(previousReply, expectedModules) {
+  const prior=previousReply?.modules;
+  if (!prior || typeof prior !== 'object' || Array.isArray(prior) ||
+      !expectedModules || typeof expectedModules !== 'object' ||
+      Array.isArray(expectedModules))
+    throw new Error('CODE_UPLOAD_HOLD_ROLLBACK_BACKUP_UNVERIFIED');
+  const beforeNames=Object.keys(prior).sort();
+  const expectedNames=Object.keys(expectedModules).sort();
+  if (beforeNames.length!==82 || expectedNames.length!==82 ||
+      beforeNames.some((name,i)=>name!==expectedNames[i]) ||
+      beforeNames.some(name=>typeof prior[name]!=='string' ||
+        prior[name].length<1 || prior[name].length>2_000_000))
+    throw new Error('CODE_UPLOAD_HOLD_ROLLBACK_BACKUP_UNVERIFIED');
+  // Do not leak original game source, IDs or credentials to job logs.
+  return Object.freeze({complete:true,moduleCount:82});
+}
