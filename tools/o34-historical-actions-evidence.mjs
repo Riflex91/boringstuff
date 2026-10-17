@@ -133,6 +133,15 @@ export function assessHistoricalPair(world,newbieland,expectedMainSha=EXPECTED_M
 }
 
 const base='https://api.github.com/repos/'+OWNER+'/'+REPO;
+export function originalDeploymentLogDigest(jobLog) {
+  if(typeof jobLog!=='string'||jobLog.length>24_000_000)return null;
+  const rows=[...jobLog.matchAll(
+    /^20\d\d-[^\r\n]{12,48}Z Deployment ID:\s+([0-9]{17}-[0-9]{1,10})\r?$/gm
+  )];
+  if(rows.length!==1)return null;
+  return createHash('sha256').update(rows[0][1]).digest('hex');
+}
+
 export function inspectOriginalReceiptArchive(bytes,{server,run,jobLog}){
   const invalid={verified:false,server,runId:run?.id??null,
     reason:'ORIGINAL_RECEIPT_INPUT_UNVERIFIED'};
@@ -140,12 +149,9 @@ export function inspectOriginalReceiptArchive(bytes,{server,run,jobLog}){
      typeof jobLog!=='string'||jobLog.length>24_000_000||
      !Buffer.isBuffer(bytes)||bytes.length>24_000_000)return invalid;
   const branch=server==='world'?'chatgpt-w37s79-stage':'chatgpt';
-  const rows=[...jobLog.matchAll(
-    /^20\d\d-[^\r\n]{12,48}Z Deployment ID:\s+([0-9]{17}-[0-9]{1,10})\r?$/gm
-  )];
-  if(rows.length!==1)return {...invalid,
+  const idDigest=originalDeploymentLogDigest(jobLog);
+  if(!idDigest)return {...invalid,
     reason:'ORIGINAL_DEPLOYMENT_ID_LOG_LINE_UNVERIFIED'};
-  const idDigest=createHash('sha256').update(rows[0][1]).digest('hex');
   const command=spawnSync('python3',[
     fileURLToPath(new URL('./o34-artifact-receipt.py',import.meta.url)),
     server,branch
