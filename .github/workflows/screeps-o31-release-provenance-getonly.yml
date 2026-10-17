@@ -1,0 +1,101 @@
+name: Screeps O31 isolated no-write release provenance audit
+on:
+  push:
+    branches: [diagnostics/o31-postdeploy-readonly-provenance-audit-20261017]
+permissions:
+  contents: read
+concurrency:
+  group: o31-release-provenance-getonly
+  cancel-in-progress: false
+jobs:
+  canonical-offline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: tools
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Verify pinned Main and unchanged O16 game sources
+        shell: bash
+        run: |
+          git -C .. fetch origin main --quiet
+          test "$(git -C .. rev-parse origin/main)" = 'bc43f2faf1f345e63d9bfe78b6bbaa59e5eaab0c'
+          git -C .. diff --exit-code origin/main HEAD -- game
+      - name: Exact-head full Node24 and game syntax checks
+        run: |
+          npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+          npm test
+      - name: Exact-head paired P3 benchmark
+        run: npm run bench:p3
+  world-get-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    defaults:
+      run:
+        working-directory: tools
+    env:
+      SCREEPS_SERVER: world
+      SCREEPS_ROOM: W37S79
+      SCREEPS_TOKEN_WORLD: ${{ secrets.SCREEPS_TOKEN_WORLD }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Verify pinned Main and unchanged O16 game sources
+        shell: bash
+        run: |
+          git -C .. fetch origin main --quiet
+          test "$(git -C .. rev-parse origin/main)" = 'bc43f2faf1f345e63d9bfe78b6bbaa59e5eaab0c'
+          git -C .. diff --exit-code origin/main HEAD -- game
+      - name: Verify O31 no-false-pass audit offline
+        run: node o31-postdeploy-readonly-audit.test.mjs
+      - name: Observe retained World post-deployment evidence without mutation
+        run: node o31-postdeploy-readonly-audit.mjs world
+  newbieland-get-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    defaults:
+      run:
+        working-directory: tools
+    env:
+      SCREEPS_SERVER: newbieland
+      SCREEPS_ROOM: E8N1
+      SCREEPS_TOKEN_NEWBIELAND: ${{ secrets.SCREEPS_TOKEN_NEWBIELAND }}
+      SCREEPS_USERNAME_NEWBIELAND: Riflex91
+      SCREEPS_PASSWORD_NEWBIELAND: ${{ secrets.SCREEPS_PASSWORD_NEWBIELAND }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Verify pinned Main and unchanged O16 game sources
+        shell: bash
+        run: |
+          git -C .. fetch origin main --quiet
+          test "$(git -C .. rev-parse origin/main)" = 'bc43f2faf1f345e63d9bfe78b6bbaa59e5eaab0c'
+          git -C .. diff --exit-code origin/main HEAD -- game
+      - name: Verify O31 no-false-pass audit offline
+        run: node o31-postdeploy-readonly-audit.test.mjs
+      - name: Create temporary Newbieland API config path
+        working-directory: .
+        run: echo "SCREEPS_CONFIG=$RUNNER_TEMP/o31-newbieland-getonly.json" >> "$GITHUB_ENV"
+      - name: Configure read-only Newbieland authentication
+        run: node ci-deployment-credentials.mjs
+      - name: Observe retained Newbieland post-deployment evidence without mutation
+        run: node o31-postdeploy-readonly-audit.mjs newbieland
+      - name: Remove temporary credential file
+        if: always()
+        working-directory: .
+        run: rm -f "$SCREEPS_CONFIG"
