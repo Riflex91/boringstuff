@@ -1,0 +1,45 @@
+name: Screeps O63 private archive permissions and secret buffer hygiene (OFFLINE)
+on:
+  push:
+    branches: [safety/o63-private-archive-permissions-and-secret-zeroization-20261017]
+permissions:
+  contents: read
+concurrency:
+  group: o63-private-archive-owner-only
+  cancel-in-progress: false
+jobs:
+  node24-p3-archive-private-security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: tools
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Pin original Main and require byte-identical gameplay
+        shell: bash
+        run: |
+          git -C .. fetch origin main --quiet
+          test "$(git -C .. rev-parse origin/main)" = bc43f2faf1f345e63d9bfe78b6bbaa59e5eaab0c
+          git -C .. diff --exit-code origin/main HEAD -- game
+      - name: Full Node24 O39-O63 secretless regression
+        run: |
+          npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+          npm test
+      - name: Original exact P3 baseline
+        run: npm run bench:p3
+      - name: Record private custody and release boundaries
+        run: |
+          echo '### O63 archive confidentiality and key-buffer cleanup' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Archive parent and files are owner-only under POSIX. External operator-controlled durable backup remains unverified.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'On Windows ACLs are not attested by POSIX checks; review storage permissions separately.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Best-effort AES secret and rejected plaintext memory zeroization added; tests never use real operator secrets.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Original ZIPs and temporary real-source crypto smoke are not shipped into CI.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'No World POST, spawn/respawn/reset, GitHub writer ref mutation or Main merge.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'HOLD_EXACT_PREDECESSOR_PAIR_MISSING.' >> "$GITHUB_STEP_SUMMARY"

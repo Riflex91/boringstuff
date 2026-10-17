@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import {assertPrivateArchiveDirectory,assertPrivateArchiveFiles}
+ from './o63-private-vault-file-policy.mjs';
 
 // O57 private EVIDENCE vault. NOT a production escrow receipt, NOT a
 // GitHub upload and NEVER a source of release authorization. A real backup
@@ -40,8 +42,10 @@ function publicKey(pem){
 function privateDir(directory){
  if(typeof directory!=='string'||!path.isAbsolute(directory)||
    fs.existsSync(directory))die('DIRECTORY_ALREADY_EXISTS_OR_RELATIVE');
- // Exclusive directory. No archive payload may be written to a repository
- // working directory by a default path; caller must provide location.
+ // O63: a direct library caller cannot bypass O62's CLI path gate.
+ // The parent must be a private, current-UID, non-Git directory.
+ try{assertPrivateArchiveDirectory(path.dirname(directory));}
+ catch{die('PRIVATE_PARENT');}
  fs.mkdirSync(directory,{recursive:false,mode:0o700});
  if(process.platform!=='win32')fs.chmodSync(directory,0o700);
  return directory;
@@ -67,14 +71,22 @@ export function sealPrivateRoadmapEvidence({
  const enc=crypto.createCipheriv('aes-256-gcm',key,iv);
  enc.setAAD(aad);
  const body=Buffer.concat([enc.update(zipBytes),enc.final()]);
+ let wrappedKey;
+ try{
+   wrappedKey=crypto.publicEncrypt({
+     key:recipient,padding:crypto.constants.RSA_PKCS1_OAEP_PADDING,
+     oaepHash:'sha256'},key).toString('base64');
+ }finally{
+   // O63: the temporary AES content-encryption key must not linger in
+   // caller-visible JS memory after producing its recipient-only wrap.
+   key.fill(0);
+ }
  const manifest={
    format:'O57_PRIVATE_EVIDENCE_V1',source:ctx,fingerprint,
    plaintextSha256,plaintextBytes:zipBytes.length,
    ciphertextSha256:sha(body),ciphertextBytes:body.length,
    iv:iv.toString('hex'),tag:enc.getAuthTag().toString('hex'),
-   wrappedKey:crypto.publicEncrypt({
-     key:recipient,padding:crypto.constants.RSA_PKCS1_OAEP_PADDING,
-     oaepHash:'sha256'},key).toString('base64'),
+   wrappedKey,
    originalReceiptAuthenticated:false,
    durableRemoteStorageVerified:false,
    releaseAuthorized:false
@@ -98,6 +110,8 @@ export function inspectPrivateRoadmapArchive({directory,context}){
  if(typeof directory!=='string'||!path.isAbsolute(directory))die('DIRECTORY');
  const stat=fs.lstatSync(directory);
  if(!stat.isDirectory()||stat.isSymbolicLink())die('DIRECTORY');
+ try{assertPrivateArchiveFiles(directory);}
+ catch{die('PRIVATE_FILE_POLICY');}
  if(JSON.stringify(fs.readdirSync(directory).sort())!==
    JSON.stringify(['archive-manifest.json','archive.enc']))die('INVENTORY');
  let manifest;
@@ -138,9 +152,18 @@ export function restorePrivateRoadmapEvidenceOffline({
    })));
    dec.setAuthTag(Buffer.from(manifest.tag,'hex'));
    plain=Buffer.concat([dec.update(payload),dec.final()]);
- }catch{die('RECOVERY_KEY_OR_AUTH_TAG');}
- if(plain.length!==manifest.plaintextBytes||sha(plain)!==manifest.plaintextSha256)
+ }catch{
+   if(plain)plain.fill(0);
+   die('RECOVERY_KEY_OR_AUTH_TAG');
+ }finally{
+   // O63: never leave the RSA-unwrapped AES secret resident after an
+   // authenticated restore, a wrong key, or a malformed GCM tag.
+   if(secret)secret.fill(0);
+ }
+ if(plain.length!==manifest.plaintextBytes||sha(plain)!==manifest.plaintextSha256){
+   plain.fill(0);
    die('RESTORED_BYTES');
+ }
  return {zipBytes:plain,sha256:sha(plain),
    releaseAuthorized:false,remoteStored:false,originalReceiptAuthenticated:false};
 }
