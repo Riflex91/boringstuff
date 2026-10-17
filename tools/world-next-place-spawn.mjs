@@ -1,3 +1,4 @@
+import { assertLegacyWorldMutationDisabled } from './o45-world-mutation-entrypoint-hold.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -51,6 +52,9 @@ export async function placeW37S79Only(api,id,approval,onPhase=()=>{}){
     activationAttempted:false,deploymentAttempted:false};
 }
 async function main(){
+  // O45: refuse World mutations even with old approval strings and secrets.
+  // No credentials, config file or network call may precede this HOLD.
+  assertLegacyWorldMutationDisabled('legacy-spawn-placement');
   if(!process.env.RUNNER_TEMP||process.env.WORLD_W37S79_PLACEMENT_APPROVAL!==PLACEMENT_APPROVAL)
     throw new Error('EXPLICIT_APPROVAL_REQUIRED');
   const config=path.join(process.env.RUNNER_TEMP,'w37s79-placement-'+process.pid+'.json');
