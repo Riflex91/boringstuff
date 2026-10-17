@@ -44,6 +44,10 @@ export function assessWorldRespawnReadiness(evidence, policy = WORLD_RECOVERY_PO
     blockers.push('ENGINE_SPAWN_ABSENCE_NOT_VERIFIED');
   if (evidence?.sameTickEngineCreepCount !== 0)
     blockers.push('ENGINE_CREEP_ABSENCE_NOT_VERIFIED');
+  // /api/user/world-status=lost only establishes spawn loss. A room-scoped
+  // GET and user/rooms ownership list cannot exclude remote creeps on other shards.
+  if (evidence?.globalAllShardCreepAbsenceVerified !== true)
+    blockers.push('GLOBAL_OWNED_CREEP_ABSENCE_NOT_VERIFIED');
   if (evidence?.otherRecoverableFootholdAbsentVerified !== true)
     blockers.push('RECOVERABLE_FOOTHOLD_NOT_RULED_OUT');
   if (evidence?.accountResetScopeVerified !== true)
