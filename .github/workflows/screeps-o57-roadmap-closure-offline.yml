@@ -1,0 +1,46 @@
+name: Screeps O57 roadmap closure offline safety, evidence vault and release HOLD
+on:
+  push:
+    branches: [safety/o57-roadmap-closure-offline-20261017]
+permissions:
+  contents: read
+concurrency:
+  group: o57-offline-release-readiness
+  cancel-in-progress: false
+jobs:
+  node24-roadmap-and-p3:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: tools
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Pinned original Main and byte-exact game files
+        shell: bash
+        run: |
+          git -C .. fetch origin main --quiet
+          test "$(git -C .. rev-parse origin/main)" = bc43f2faf1f345e63d9bfe78b6bbaa59e5eaab0c
+          git -C .. diff --exit-code origin/main HEAD -- game
+      - name: Canonical Node24 offline suite O39 through O57
+        run: |
+          npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+          npm test
+      - name: Exact original P3 four-fold reproducibility
+        run: npm run bench:p3
+      - name: Record explicit unfulfilled production prerequisites
+        shell: bash
+        run: |
+          echo '### O57 roadmap evidence, writer-review and release HOLD' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Original historical artifact ZIPs are NOT downloaded or archived by this workflow.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Offline cryptographic RSA evidence tests use generated synthetic fixture keys, never operator secrets.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Do not interpret an offline local vault or supplied green fields as externally authenticated release approval.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'A correct exact pinned Main World canonical LIVE_100T_PASS and human-licensed safe executor are still absent.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'No real Screeps POST, spawn, respawn, GitHub writer ref mutation, Main merge or deployment.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Release HOLD_EXACT_PREDECESSOR_PAIR_MISSING.' >> "$GITHUB_STEP_SUMMARY"
