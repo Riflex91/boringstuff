@@ -69,7 +69,12 @@ function decodeResponseBody(text) {
 export class ScreepsHttpClient {
   constructor(serverName, server, options = {}) {
     this.defaultShard = options.shard ?? null;
-    this.serverName = serverName;
+    // O46: bind the transport identity at construction. Without this, a
+    // caller could turn a guarded World instance into a nominal "offline"
+    // instance merely by assigning client.serverName = 'offline'.
+    Object.defineProperty(this, 'serverName', {
+      value:serverName, enumerable:true, writable:false, configurable:false
+    });
     this.server = server;
     this.token = server.token || null;
     this._me = null;
