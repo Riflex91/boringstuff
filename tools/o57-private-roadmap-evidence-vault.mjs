@@ -71,14 +71,22 @@ export function sealPrivateRoadmapEvidence({
  const enc=crypto.createCipheriv('aes-256-gcm',key,iv);
  enc.setAAD(aad);
  const body=Buffer.concat([enc.update(zipBytes),enc.final()]);
+ let wrappedKey;
+ try{
+   wrappedKey=crypto.publicEncrypt({
+     key:recipient,padding:crypto.constants.RSA_PKCS1_OAEP_PADDING,
+     oaepHash:'sha256'},key).toString('base64');
+ }finally{
+   // O63: the temporary AES content-encryption key must not linger in
+   // caller-visible JS memory after producing its recipient-only wrap.
+   key.fill(0);
+ }
  const manifest={
    format:'O57_PRIVATE_EVIDENCE_V1',source:ctx,fingerprint,
    plaintextSha256,plaintextBytes:zipBytes.length,
    ciphertextSha256:sha(body),ciphertextBytes:body.length,
    iv:iv.toString('hex'),tag:enc.getAuthTag().toString('hex'),
-   wrappedKey:crypto.publicEncrypt({
-     key:recipient,padding:crypto.constants.RSA_PKCS1_OAEP_PADDING,
-     oaepHash:'sha256'},key).toString('base64'),
+   wrappedKey,
    originalReceiptAuthenticated:false,
    durableRemoteStorageVerified:false,
    releaseAuthorized:false
@@ -144,9 +152,18 @@ export function restorePrivateRoadmapEvidenceOffline({
    })));
    dec.setAuthTag(Buffer.from(manifest.tag,'hex'));
    plain=Buffer.concat([dec.update(payload),dec.final()]);
- }catch{die('RECOVERY_KEY_OR_AUTH_TAG');}
- if(plain.length!==manifest.plaintextBytes||sha(plain)!==manifest.plaintextSha256)
+ }catch{
+   if(plain)plain.fill(0);
+   die('RECOVERY_KEY_OR_AUTH_TAG');
+ }finally{
+   // O63: never leave the RSA-unwrapped AES secret resident after an
+   // authenticated restore, a wrong key, or a malformed GCM tag.
+   if(secret)secret.fill(0);
+ }
+ if(plain.length!==manifest.plaintextBytes||sha(plain)!==manifest.plaintextSha256){
+   plain.fill(0);
    die('RESTORED_BYTES');
+ }
  return {zipBytes:plain,sha256:sha(plain),
    releaseAuthorized:false,remoteStored:false,originalReceiptAuthenticated:false};
 }
