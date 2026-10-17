@@ -18,7 +18,7 @@ const line='2026-10-16T04:16:49.1086284Z LIVE_100T_PASS '+
 // comparison uses SHA-256 only; IDs must never appear in emitted audit JSON.
 const uploaded='20261016040545315-1234';
 const originalLine='2026-10-16T04:05:45.3150310Z Deployment ID:     '+
-  uploaded+'\\n';
+  uploaded+'\n';
 assert.match(originalDeploymentLogDigest(originalLine),/^[a-f0-9]{64}$/);
 assert.equal(originalDeploymentLogDigest(originalLine),
   crypto.createHash('sha256').update(uploaded).digest('hex'));
