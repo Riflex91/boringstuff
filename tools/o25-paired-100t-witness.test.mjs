@@ -100,7 +100,7 @@ assert.equal(badRun.apiMutationsAttempted,0);
 // deploy-live.mjs legitimately inserts exactly one deployment ID into
 // config.js. The changed line is trusted only when Memory.bot confirms it.
 const canonicalConfig="module.exports = {\n  VERSION: 'O16',\n};\n";
-const injectedId='20261017123456-101';
+const injectedId='20261017123456789-101';
 const publishedConfig=canonicalConfig.replace('module.exports = {\n',
   "module.exports = {\n  DEPLOYMENT_ID: '"+injectedId+"',\n");
 const installedModules={...code,config:publishedConfig};
@@ -119,7 +119,7 @@ assert.equal(normalized.codeFingerprint.injectedConfigDeploymentIdVerified,true)
 assert.deepEqual(normalized.codeFingerprint.differingKnownModules,['config']);
 assert.ok(!JSON.stringify(normalized).includes(injectedId));
 const wrongMemory={...injectedRaw,memory:{data:JSON.stringify({
- ...injectedMemory,deploymentId:'20261017123456-102'
+ ...injectedMemory,deploymentId:'20261017123456789-102'
 })}};
 const mismatch=assessReadOnlyPulse(wrongMemory,{
  ...config,expected:installedExpected
