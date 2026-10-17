@@ -5,15 +5,15 @@ import {ScreepsHttpClient} from './screeps-client.mjs';
 import {inspectWorldRecoveryEvidence} from './world-recovery-evidence.mjs';
 import {buildWorldConfig} from './world-deployment-profile.mjs';
 import {WORLD_NEXT_TARGET_CANDIDATE as target} from './world-next-target-candidate.mjs';
-import {STAGING_BRANCH} from './world-next-staged-readiness.mjs';
+const ACTIVE_WORLD_BRANCH='chatgpt'; // post-respawn bootstrap pinned to exact O16 Main
 export function assessWorldRuntime({me,branches,status,room,memory}){
   const failures=[],warnings=[];
   const id=me?._id||me?.id;
   if(!id)failures.push('AUTH_UNVERIFIED');
   const list=Array.isArray(branches?.list)?branches.list:[];
   const active=list.filter(b=>b?.activeWorld===true);
-  if(active.length!==1||active[0]?.branch!==STAGING_BRANCH)failures.push('EXPECTED_BRANCH_NOT_ACTIVE');
-  if(status?.status==='empty'||typeof status?.status!=='string')failures.push('WORLD_STATUS_INVALID');
+  if(active.length!==1||active[0]?.branch!==ACTIVE_WORLD_BRANCH)failures.push('EXPECTED_WORLD_MAIN_BRANCH_NOT_ACTIVE');
+  if(status?.status!=='normal')failures.push('WORLD_STATUS_NOT_NORMAL');
   if(!Array.isArray(room?.objects))failures.push('ROOM_OBJECTS_UNAVAILABLE');
   const objects=Array.isArray(room?.objects)?room.objects:[];
   const spawn=objects.find(o=>(o?.type==='spawn'||o?.structureType==='spawn')&&
@@ -21,15 +21,17 @@ export function assessWorldRuntime({me,branches,status,room,memory}){
     String(o.user||'')===String(id));
   if(!spawn)failures.push('OWNED_PINNED_SPAWN_MISSING');
   const creeps=objects.filter(o=>o?.type==='creep'&&String(o.user||'')===String(id));
+  if(!creeps.length)failures.push('OWNED_WORKFORCE_MISSING');
   const controller=objects.find(o=>o?.type==='controller');
   if(!controller)warnings.push('CONTROLLER_NOT_OBSERVED');
-  if(!creeps.length)warnings.push('NO_OWNED_CREEPS_OBSERVED');
+  
   const energy=Number(spawn?.energy);
   const capacity=Number(spawn?.energyCapacity);
   const recoveryEvidence=inspectWorldRecoveryEvidence(memory);
   if(recoveryEvidence.availability==='UNKNOWN')
     warnings.push('RECOVERY_MEMORY_UNVERIFIED');
   const result={ok:failures.length===0,failures,warnings,mode:'GET_ONLY',
+    operationalReady:failures.length===0, expectedActiveWorldBranch:ACTIVE_WORLD_BRANCH,
     target:{shard:target.shard,room:target.room,x:target.x,y:target.y},
     activeBranch:active.length===1?active[0].branch:null,
     worldStatus:status?.status??null,spawnVerified:Boolean(spawn),
