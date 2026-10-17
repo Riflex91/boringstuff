@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
-import {assessRetainedReleaseEvidence,runReadOnlyReleaseAudit}
+import {assessRetainedReleaseEvidence,assessJournalRetention,runReadOnlyReleaseAudit}
   from './o31-postdeploy-readonly-audit.mjs';
 
 const TARGET_ROOM=process.env.SCREEPS_ROOM||'E8N1';
@@ -40,6 +40,51 @@ assert.equal(good.fatalFreeContinuousCoverageVerified,false);
 assert.equal(good.releaseAuthorized,false);
 assert.equal(good.apiMutationsAttempted,0);
 assert.ok(good.blockers.includes('INDEPENDENT_SAME_RUN_DEPLOYMENT_RECEIPT_UNAVAILABLE'));
+
+// O32 retention diagnostics distinguish positive pruning evidence from
+// an uncertain cause. They never convert a missing marker into success.
+const retainedInfo=assessJournalRetention(memory(bot));
+assert.equal(retainedInfo.status,'DEPLOYMENT_MARKER_RETAINED');
+assert.equal(retainedInfo.deploymentMarkerRetained,true);
+assert.equal(retainedInfo.oldestRetainedTick,1000);
+assert.equal(retainedInfo.oldestRetainedEventTick,1000);
+assert.equal(retainedInfo.retainedSnapshotCount,1);
+const withoutMarker={...bot,telemetryJournal:{
+  ...bot.telemetryJournal,
+  events:[{c:'BOT_HEARTBEAT',t:1205,x:{creeps:2,rooms:1}}],
+  snapshots:[{...bot.telemetryJournal.snapshots[0],t:1200}],
+  droppedThroughSeq:987,nextSeq:1005
+}};
+const oldHistory=assessRetainedReleaseEvidence(memory(withoutMarker),goodPulse);
+assert.equal(oldHistory.result,'HOLD');
+assert.equal(oldHistory.retainedWindowReason,'MISSING_DEPLOYMENT_MARKER');
+assert.equal(oldHistory.journalRetention.status,
+  'ALL_RETAINED_RECORDS_NEWER_THAN_DEPLOYMENT');
+assert.equal(oldHistory.journalRetention.journalDroppedThroughSeq,987);
+assert.equal(oldHistory.journalRetention.olderThanDeploymentTick,true);
+assert.equal(oldHistory.canonicalLive100tPass,false);
+const partialHistory={...bot,telemetryJournal:{
+ ...bot.telemetryJournal,
+ events:[{c:'BOT_HEARTBEAT',t:1000}],
+ droppedThroughSeq:123,nextSeq:400
+}};
+assert.equal(assessJournalRetention(memory(partialHistory)).status,
+  'MARKER_MISSING_WITH_PRIOR_PRUNING');
+const unexplained={...partialHistory,telemetryJournal:{
+ ...partialHistory.telemetryJournal,droppedThroughSeq:0
+}};
+assert.equal(assessJournalRetention(memory(unexplained)).status,
+  'MARKER_MISSING_RETENTION_UNEXPLAINED');
+assert.equal(assessJournalRetention(null).status,
+  'JOURNAL_PROVENANCE_UNVERIFIED');
+assert.equal(assessJournalRetention(memory({...bot,telemetryJournal:{
+ ...bot.telemetryJournal,events:[{t:-12}]
+}})).status,'JOURNAL_PROVENANCE_UNVERIFIED');
+for(const evidence of [retainedInfo,oldHistory.journalRetention,
+  assessJournalRetention(memory(partialHistory))]){
+  assert.ok(!JSON.stringify(evidence).includes(secretId));
+  assert.ok(!JSON.stringify(evidence).includes(secretUser));
+}
 
 const fails=[
   {...bot,deploymentId:'OTHER_ID'},
