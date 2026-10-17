@@ -39,6 +39,7 @@ jobs:
         run: |
           echo "SCREEPS_CONFIG=$RUNNER_TEMP/screeps-newbieland.json" >> "$GITHUB_ENV"
           echo "SCREEPS_LOG_DIR=$RUNNER_TEMP/screeps-verification" >> "$GITHUB_ENV"
+          echo "SCREEPS_BACKUP_DIR=$RUNNER_TEMP/screeps-newbieland-backups" >> "$GITHUB_ENV"
 
       - name: Determine whether deployment credentials are configured
         id: credentials
@@ -111,7 +112,7 @@ jobs:
         with:
           name: screeps-deployment-evidence-${{ github.event.workflow_run.head_sha }}
           path: |
-            logs/deploy-backup-*.json
+            ${{ runner.temp }}/screeps-newbieland-backups/deploy-backup-*.json
             ${{ runner.temp }}/screeps-verification/deployment-receipt-*.json
           if-no-files-found: warn
           retention-days: 14

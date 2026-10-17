@@ -127,13 +127,16 @@ const source=fs.readFileSync(
 const branchGuard=source.indexOf('assertUniqueActiveCodeBranch(branches, branch)');
 const before=source.indexOf("const before = await api._request('GET', '/api/user/code'");
 const verifiedBackup=source.indexOf('assertRestorablePreuploadCodeBackup(before, modules)');
-const backup=source.indexOf('Backup written:');
+const backup=source.indexOf('Backup written and byte-verified:');
 const lastMile=source.indexOf('assertUniqueActiveCodeBranch(await api.userBranches(), branch)');
 const upload=source.indexOf('await api.userUploadCodeOnce(branch, modules)');
 assert.ok(branchGuard>0&&before>branchGuard&&
   verifiedBackup>before&&backup>verifiedBackup&&
   lastMile>backup&&upload>lastMile);
-assert.ok(source.includes("{ encoding: 'utf8', mode: 0o600, flag: 'wx' }"));
+assert.ok(source.includes('const backup = writeDurableCodeBackup({'));
+const verifiedOnDisk=source.indexOf('verifyDurableCodeBackup({');
+assert.ok(verifiedOnDisk>lastMile&&verifiedOnDisk<upload,
+  'The on-disk private backup must be reverified immediately before code POST');
 assert.equal((source.match(/await api\.userUploadCodeOnce\(branch, modules\)/g)||[]).length,1);
 assert.ok(!/api\._request\('POST', '\/api\/user\/code'/.test(source));
 assert.ok(source.includes("const receipt = writeDeploymentReceipt"));

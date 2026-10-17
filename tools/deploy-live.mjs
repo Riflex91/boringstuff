@@ -5,6 +5,7 @@ import { ScreepsHttpClient } from './screeps-client.mjs';
 import { DEFAULT_VERIFICATION_LOG_DIR, writeDeploymentReceipt } from './deployment-receipt.mjs';
 import { assertUniqueActiveCodeBranch, assertRestorablePreuploadCodeBackup } from './o39-code-upload-active-branch-policy.mjs';
 import { reconcileUncertainCodePostViaGet } from './o40-code-post-get-reconcile.mjs';
+import { writeDurableCodeBackup, verifyDurableCodeBackup } from './o41-durable-code-backup.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const parent = path.resolve(here, '..');
@@ -78,30 +79,27 @@ console.log('Server before:     ' + beforeVersion);
 const packageRoot = runtimeDir.endsWith(path.sep + 'game')
   ? path.dirname(runtimeDir)
   : runtimeDir;
-const logsDir = path.join(packageRoot, 'logs');
-fs.mkdirSync(logsDir, { recursive: true });
-const backupPath = path.join(
-  logsDir,
-  'deploy-backup-' + new Date().toISOString().replace(/[:.]/g, '-') + '.json'
-);
-fs.writeFileSync(
-  backupPath,
-  JSON.stringify({
-    capturedAt: new Date().toISOString(),
-    server: serverName,
-    branch,
-    version: beforeVersion,
-    deploymentId,
-    modules: before?.modules || {}
-  }, null, 2),
-  { encoding: 'utf8', mode: 0o600, flag: 'wx' }
-);
-console.log('Backup written:    ' + backupPath);
+const backupDirectory = process.env.SCREEPS_BACKUP_DIR ||
+  (process.env.GITHUB_ACTIONS === 'true'
+    ? null : path.join(packageRoot, 'logs'));
+// GitHub production uploads MUST explicitly define a private RUNNER_TEMP
+// backup location. A local interactive deployment retains its private logs/.
+const backup = writeDurableCodeBackup({
+  directory: backupDirectory, server: serverName, branch,
+  version: beforeVersion, deploymentId,
+  previousReply: before, expectedModules: modules
+});
+console.log('Backup written and byte-verified: ' + backup.file);
 
 // A missing HTTP acknowledgement is an UNKNOWN result. Never implicitly
 // retry this code POST: the API may already have committed the upload.
 // Active branch may change after initial preflight or backup capture.
 assertUniqueActiveCodeBranch(await api.userBranches(), branch);
+verifyDurableCodeBackup({
+  file: backup.file, sha256: backup.sha256,
+  server: serverName, branch, deploymentId,
+  expectedPriorModules: before.modules
+});
 try {
   await api.userUploadCodeOnce(branch, modules);
 } catch {

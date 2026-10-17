@@ -43,6 +43,7 @@ jobs:
         run: |
           echo "SCREEPS_CONFIG=$RUNNER_TEMP/screeps-world-deploy.json" >> "$GITHUB_ENV"
           echo "SCREEPS_LOG_DIR=$RUNNER_TEMP/screeps-world-verification" >> "$GITHUB_ENV"
+          echo "SCREEPS_BACKUP_DIR=$RUNNER_TEMP/screeps-world-backups" >> "$GITHUB_ENV"
       - uses: actions/checkout@v4
         with:
           ref: main
@@ -81,7 +82,7 @@ jobs:
         with:
           name: screeps-world-deployment-${{ github.sha }}
           path: |
-            tools/logs/deploy-backup-*.json
+            ${{ runner.temp }}/screeps-world-backups/deploy-backup-*.json
             ${{ runner.temp }}/screeps-world-verification/deployment-receipt-*.json
           if-no-files-found: warn
           retention-days: 14

@@ -1,0 +1,42 @@
+name: Screeps O41 private backup durability and artifact alignment (OFFLINE)
+on:
+  push:
+    branches: [safety/o41-durable-preupload-backup-attestation-20261017]
+permissions:
+  contents: read
+concurrency:
+  group: o41-offline-backup-regression
+  cancel-in-progress: false
+jobs:
+  node24-p3-and-backup-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: tools
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Pin predecessor Main and assert game modules byte-identical
+        shell: bash
+        run: |
+          git -C .. fetch origin main --quiet
+          test "$(git -C .. rev-parse origin/main)" = bc43f2faf1f345e63d9bfe78b6bbaa59e5eaab0c
+          git -C .. diff --exit-code origin/main HEAD -- game
+      - name: Full Node24 regression suite with private disk backup probes
+        run: |
+          npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+          npm test
+      - name: P3 benchmark exact baseline equality
+        run: npm run bench:p3
+      - name: Save offline no-production statement
+        run: |
+          echo '### O41 offline safety development' >> "$GITHUB_STEP_SUMMARY"
+          echo 'No Screeps API tokens, game-code POST, respawn, branch activation or merge.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Private backups are fsynced and verified on disk before an eligible upload. Remote archive depends on separate GitHub upload-artifact completion.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Main dual-server predecessor proof remains HOLD.' >> "$GITHUB_STEP_SUMMARY"
