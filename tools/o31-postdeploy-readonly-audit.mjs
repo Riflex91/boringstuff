@@ -16,6 +16,60 @@ export const READONLY_TARGETS=Object.freeze({
   newbieland:Object.freeze({room:'E8N1',shard:null,branch:'chatgpt'})
 });
 
+// O32: bounded provenance diagnostics. A truncated journal explains why a
+// one-time marker MAY be unavailable; it never proves a missing marker existed,
+// recovers lost events, or grants a release. No IDs or source payloads escape.
+export function assessJournalRetention(memoryReply) {
+  const bot=parseBotMemory(memoryReply);
+  const journal=bot?.telemetryJournal;
+  const unknown={status:'JOURNAL_PROVENANCE_UNVERIFIED',
+    deploymentMarkerRetained:false,oldestRetainedTick:null,
+    newestRetainedTick:null,oldestRetainedEventTick:null,
+    oldestRetainedSnapshotTick:null,journalDroppedThroughSeq:null,
+    journalNextSeq:null,retainedEventCount:null,
+    retainedSnapshotCount:null,olderThanDeploymentTick:null};
+  if(!bot||!journal||!Array.isArray(journal.events)||
+     !Array.isArray(journal.snapshots)||
+     journal.events.length>1500||journal.snapshots.length>512)
+    return unknown;
+  const safeTick=n=>Number.isSafeInteger(n)&&n>=0&&n<=2_000_000_000;
+  const safeSeq=n=>Number.isSafeInteger(n)&&n>=0&&n<=2_000_000_000;
+  const events=journal.events,snapshots=journal.snapshots;
+  // Mixed or future timestamps do not establish a valid retention window.
+  if([...events,...snapshots].some(e=>!safeTick(e?.t)))
+    return unknown;
+  const ticks=[...events,...snapshots].map(e=>e.t);
+  const oldest=ticks.length?Math.min(...ticks):null;
+  const newest=ticks.length?Math.max(...ticks):null;
+  const oldestEvents=events.length?Math.min(...events.map(e=>e.t)):null;
+  const oldestSnapshots=snapshots.length?
+    Math.min(...snapshots.map(e=>e.t)):null;
+  const deploymentTick=bot.deploymentTick;
+  const retained=typeof bot.deploymentId==='string'&&
+    safeTick(deploymentTick)&&events.some(e=>
+      e?.c==='DEPLOYMENT_MARKER'&&e.t===deploymentTick&&
+      e.x?.deploymentId===bot.deploymentId);
+  const dropped=safeSeq(journal.droppedThroughSeq)?
+    journal.droppedThroughSeq:null;
+  const next=safeSeq(journal.nextSeq)&&journal.nextSeq>=1?
+    journal.nextSeq:null;
+  const older=oldest!==null&&safeTick(deploymentTick)?
+    oldest>deploymentTick:null;
+  let status='MARKER_MISSING_RETENTION_UNEXPLAINED';
+  if(retained)status='DEPLOYMENT_MARKER_RETAINED';
+  else if(older===true)status='ALL_RETAINED_RECORDS_NEWER_THAN_DEPLOYMENT';
+  else if(dropped!==null&&dropped>0)
+    status='MARKER_MISSING_WITH_PRIOR_PRUNING';
+  return {status,deploymentMarkerRetained:retained,
+    oldestRetainedTick:oldest,newestRetainedTick:newest,
+    oldestRetainedEventTick:oldestEvents,
+    oldestRetainedSnapshotTick:oldestSnapshots,
+    journalDroppedThroughSeq:dropped,journalNextSeq:next,
+    retainedEventCount:events.length,
+    retainedSnapshotCount:snapshots.length,
+    olderThanDeploymentTick:older};
+}
+
 export function assessRetainedReleaseEvidence(memoryReply,pulse) {
   const bot=parseBotMemory(memoryReply);
   let inspection=null;
@@ -31,6 +85,7 @@ export function assessRetainedReleaseEvidence(memoryReply,pulse) {
     result:pulse?.ok===true&&good?'RETAINED_POSTDEPLOY_100T_SAMPLED':'HOLD',
     pulseVerified:pulse?.ok===true,
     exactMainCodeVerified:pulse?.exactMainCodeVerified===true,
+    journalRetention:assessJournalRetention(memoryReply),
     retainedWindowStatus:['PASS','WAIT','FAIL'].includes(inspection?.status)?
       inspection.status:'UNVERIFIED',
     retainedWindowReason:typeof inspection?.reason==='string'?
