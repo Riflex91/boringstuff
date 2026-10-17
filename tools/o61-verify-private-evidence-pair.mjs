@@ -61,8 +61,8 @@ function readPair(directory){
   if(!hex64(m.fingerprint)||
      !/^[a-f0-9]{24}$/.test(m.iv||'')||
      typeof m.wrappedKey!=='string'||m.wrappedKey.length>2048||
-     !hex64(m.plaintextSha256)||m.plaintextBytes!==
-       ORIGINAL_ARTIFACT_LENGTH[server])refuse();
+     !hex64(m.plaintextSha256)||m.plaintextBytes<1||
+     m.plaintextBytes>32*1024*1024)refuse();
   results[server]={directory:sub,manifest:m};
  }
  const w=results.world.manifest,n=results.newbieland.manifest;
@@ -119,6 +119,10 @@ export function verifyPrivateEvidencePairOffline({
   if(fingerprint!==pair.world.manifest.fingerprint)refuse();
   const check={};
   for(const server of ['world','newbieland']){
+   // Pair-envelope metadata alone cannot attest an original GitHub ZIP.
+   // Production recovery additionally requires exact original byte pins.
+   if(pair[server].manifest.plaintextBytes!==ORIGINAL_ARTIFACT_LENGTH[server]||
+      pair[server].manifest.plaintextSha256!==ORIGINAL_ARTIFACT_SHA256[server])refuse();
    const restored=restorePrivateRoadmapEvidenceOffline({
     directory:pair[server].directory,context:context(server),
     recipientPrivateKeyPem:keyBytes
