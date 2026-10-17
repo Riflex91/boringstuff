@@ -208,6 +208,40 @@ export function inspectWorldAstSource(filename,source){
     if(entry.length!==1||!isGuard(firstExecutableStatement(entry[0]?.fn)))
       violations.push('MAIN_FIRST_EXECUTABLE_HOLD_MISSING');
   }
+  if(filename==='initial-spawn-planner.mjs'){
+    const entry=fns.filter(x=>x.fn.id?.name==='main');
+    const body=entry[0]?.fn?.body?.body||[];
+    const gate=body.findIndex(x=>x.type==='ExpressionStatement'&&
+      x.expression?.type==='CallExpression'&&
+      x.expression.callee?.name==='assertWorldPlannerReadOnly'&&
+      x.expression.arguments[0]?.name==='args');
+    if(entry.length!==1||gate<0||gate>2||
+       bindings.imports.get('assertWorldPlannerReadOnly')!==
+          './o51-world-planner-readonly-gate.mjs')
+      violations.push('SCOUT_CHILD_PLANNER_WORLD_PLACE_HOLD_MISSING');
+    else{
+      const gatedAt=body[gate].start;
+      nodes(ast,node=>{
+        if(node.type==='CallExpression'&&
+           ['fromConfig','gamePlaceSpawn','userSetActiveBranch'].includes(
+             memberCall(node.callee,bindings.consts).member)&&
+           node.start<gatedAt)
+          violations.push('WORLD_PLANNER_GUARD_NOT_BEFORE_NETWORK');
+      });
+    }
+  }
+  if(filename==='world-scout.mjs'){
+    let safeArg=null,spawn=null;
+    nodes(ast,node=>{
+      if(node.type==='CallExpression'&&node.callee?.name==='assertWorldScoutRoomArguments'&&
+         node.arguments[0]?.name==='selected')safeArg=node;
+      if(node.type==='CallExpression'&&node.callee?.name==='spawnSync')spawn=node;
+    });
+    if(bindings.imports.get('assertWorldScoutRoomArguments')!==
+         './o51-world-planner-readonly-gate.mjs'||
+       !safeArg||!spawn||safeArg.start>=spawn.start)
+      violations.push('SCOUT_SUBPROCESS_ARGV_GUARD_MISSING');
+  }
   let reviewedReadonlyCalls=0;
   nodes(ast,node=>{
     const kind=candidateKind(node,bindings);
@@ -222,8 +256,12 @@ export function inspectWorldAstSource(filename,source){
   });
   if(REVIEWED_READONLY_TRANSPORTS[filename]&&reviewedReadonlyCalls!==1)
     violations.push('EXPECTED_REVIEWED_READONLY_TRANSPORT_NOT_UNIQUE');
-  if(filename==='initial-spawn-planner.mjs'&&findings.length)
-    violations.push('SCOUT_CHILD_PLANNER_POTENTIAL_MUTATION');
+  // Deliberately dual-use Newbieland spawn planner. O51 checks that the
+  // World --place gate runs before credential initialization; new alternate
+  // transports or dynamic mutators still require explicit review.
+  if(filename==='initial-spawn-planner.mjs'&&
+      findings.some(f=>f.kind!=='MUTATING_CLIENT_WRAPPER'))
+    violations.push('SCOUT_CHILD_PLANNER_UNREVIEWED_TRANSPORT');
   // The known guarded sources are deliberately exempt from a simple
   // presence-of-write classification, NOT exempt from their AST HOLD proof.
   // A new world-*.mjs transport or dynamic call cannot silently expand the
