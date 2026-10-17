@@ -1,0 +1,44 @@
+name: Screeps O61 private original evidence pair recovery (OFFLINE)
+on:
+  push:
+    branches: [safety/o61-offline-private-evidence-pair-recovery-20261017]
+permissions:
+  contents: read
+concurrency:
+  group: o61-offline-private-evidence-recovery
+  cancel-in-progress: false
+jobs:
+  node24-p3-no-production-writes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: tools
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Pinned original Main and byte-exact gameplay code
+        shell: bash
+        run: |
+          git -C .. fetch origin main --quiet
+          test "$(git -C .. rev-parse origin/main)" = bc43f2faf1f345e63d9bfe78b6bbaa59e5eaab0c
+          git -C .. diff --exit-code origin/main HEAD -- game
+      - name: Canonical Node24 O39 to O61 secretless suite
+        run: |
+          npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+          npm test
+      - name: Original P3 exact result reproducibility
+        run: npm run bench:p3
+      - name: Record private archive custody and release limits
+        run: |
+          echo '### O61 two-original encrypted private evidence recovery' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Offline tests generate short-lived synthetic RSA fixture keys, never use operator recovery keys.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'The operator-selected private archive must be verified outside the git checkout against pinned O58 original ZIP SHA256 values.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'CI does not ship original ZIPs, key material, log content, Screeps credentials or production HTTP clients.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Neither a local recovery check nor a green P3 run proves independent durable custody or an exact-Main World LIVE_100T_PASS.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'No live Screeps mutation, GitHub writer-ref change or Main merge. HOLD_EXACT_PREDECESSOR_PAIR_MISSING.' >> "$GITHUB_STEP_SUMMARY"
