@@ -81,6 +81,13 @@ try {
     fs.symlinkSync(destination, linkDir);
     assert.throws(() => write({ modules: previous }, linkDir),
       /CODE_UPLOAD_HOLD_DURABLE_BACKUP_UNVERIFIED/);
+    // A symlinked ANCESTOR must fail *before* mkdir creates anything outside
+    // the expected runner-private tree.
+    const escapeLink = path.join(root, 'outside-link');
+    fs.symlinkSync(os.tmpdir(), escapeLink);
+    assert.throws(() => write({ modules: previous },
+      path.join(escapeLink, 'forbidden-nested-dir')),
+      /CODE_UPLOAD_HOLD_DURABLE_BACKUP_UNVERIFIED/);
     fs.chmodSync(another.file, 0o644);
     assert.throws(() => verifyDurableCodeBackup({
       file: another.file, sha256: another.sha256, server, branch,
