@@ -1,0 +1,39 @@
+name: Screeps O25 Newbieland exact active-code fingerprint (GET only)
+on:
+  push:
+    branches: [diagnostics/o25-paired-live-100tick-readonly-20261017]
+    paths:
+      - .github/workflows/screeps-o25-newb-code-drift-getonly.yml
+permissions:
+  contents: read
+jobs:
+  fingerprint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    defaults:
+      run:
+        working-directory: tools
+    env:
+      SCREEPS_TOKEN_NEWBIELAND: ${{ secrets.SCREEPS_TOKEN_NEWBIELAND }}
+      SCREEPS_USERNAME_NEWBIELAND: Riflex91
+      SCREEPS_PASSWORD_NEWBIELAND: ${{ secrets.SCREEPS_PASSWORD_NEWBIELAND }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Verify O25 GET-only fingerprint
+        run: node o25-paired-100t-witness.test.mjs
+      - name: Prepare ephemeral Newbieland credentials
+        working-directory: .
+        run: echo "SCREEPS_CONFIG=$RUNNER_TEMP/o25-newb-code-fingerprint.json" >> "$GITHUB_ENV"
+      - name: Configure credential source without printing secrets
+        run: node ci-deployment-credentials.mjs
+      - name: Observe module fingerprint and fail closed before any wait (GET only)
+        run: node o25-paired-100t-witness.mjs newbieland
+      - name: Erase ephemeral credentials
+        if: always()
+        working-directory: .
+        run: rm -f "$SCREEPS_CONFIG"
