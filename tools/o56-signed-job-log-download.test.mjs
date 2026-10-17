@@ -133,6 +133,20 @@ try{
     assert.equal(requests.length,2);
     assert.equal(Object.hasOwn(requests[1].opts.headers,'Authorization'),false);
   }
+  // A network exception can embed the signed capability URL in its
+  // message/cause. Exposed failures must contain only a fixed HOLD.
+  requests.length=0;
+  globalThis.fetch=async(url,opts)=>{
+    requests.push({url,opts});
+    if(requests.length===1)return redirect(azure);
+    throw new TypeError('socket failed at '+azure+' with sig=PRIVATE');
+  };
+  await assert.rejects(()=>githubGet(logApi,token,repo,run,true),
+    error=>error.message===O56_LOG_REDIRECT_HOLD &&
+      !error.message.includes('sig=')&&!error.message.includes(azure));
+  assert.equal(requests.length,2);
+  assert.equal(Object.hasOwn(requests[1].opts.headers,'Authorization'),false);
+
   for(const status of [301,303,307,308]){
     requests.length=0;
     globalThis.fetch=async(url,opts)=>{
