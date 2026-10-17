@@ -45,6 +45,7 @@ jobs:
         run: |
           echo "SCREEPS_CONFIG=$RUNNER_TEMP/w37s79-auto-deploy.json" >> "$GITHUB_ENV"
           echo "SCREEPS_LOG_DIR=$RUNNER_TEMP/w37s79-auto-deploy-evidence" >> "$GITHUB_ENV"
+          echo "SCREEPS_BACKUP_DIR=$RUNNER_TEMP/screeps-world-backups" >> "$GITHUB_ENV"
       - name: Verify pinned owned spawn and active branch (GET only)
         run: node world-next-auto-deploy-guard.mjs
       - name: Verify exact active branch and backup access
@@ -62,7 +63,7 @@ jobs:
         with:
           name: screeps-w37s79-auto-deploy-${{ github.event.workflow_run.head_sha }}
           path: |
-            logs/deploy-backup-*.json
+            ${{ runner.temp }}/screeps-world-backups/deploy-backup-*.json
             ${{ runner.temp }}/w37s79-auto-deploy-evidence/deployment-receipt-*.json
             ${{ runner.temp }}/w37s79-auto-deploy-evidence/consumer-supply-world-report.json
           if-no-files-found: warn
