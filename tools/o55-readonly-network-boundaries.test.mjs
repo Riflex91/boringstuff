@@ -63,8 +63,12 @@ const token='SYNTHETIC_NON_SECRET_TEST_TOKEN';
 try{
   globalThis.fetch=async(u,opts)=>{
     requests.push({u,opts});
-    return {ok:true,redirected:false,type:'basic',
-      json:async()=>({ok:1}),text:async()=>'synthetic-log'};
+    return {ok:true,status:200,redirected:false,type:'basic',
+      json:async()=>({ok:1}),
+      body:new ReadableStream({start(controller){
+        controller.enqueue(new TextEncoder().encode('synthetic-log'));
+        controller.close();
+      }})};
   };
   for(const [i,url] of valid.entries()){
     const response=await githubGet(url,token,repo,run,i===2);
