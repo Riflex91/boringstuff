@@ -257,6 +257,29 @@ export class ScreepsHttpClient {
     return this._request('GET', '/api/user/branches');
   }
 
+  userUploadCodeOnce(branch, modules) {
+    // A code upload can commit even if HTTP times out, 429/5xx is returned,
+    // or the response body is lost. One invocation gets ONE POST attempt.
+    // Refuse malformed or partial O16 payloads before touching the network.
+    if (typeof branch !== 'string' ||
+        !/^[a-zA-Z0-9_-]{1,80}$/.test(branch) ||
+        !modules || typeof modules !== 'object' || Array.isArray(modules) ||
+        Object.keys(modules).length !== 82 ||
+        typeof modules.main !== 'string' || !modules.main ||
+        typeof modules.config !== 'string' || !modules.config ||
+        Object.entries(modules).some(([name, source]) =>
+          !/^[a-zA-Z0-9._-]{1,100}$/.test(name) ||
+          typeof source !== 'string' || source.length < 1 ||
+          source.length > 2_000_000)) {
+      throw new Error('EXACT_82_MODULE_CODE_UPLOAD_PAYLOAD_REQUIRED');
+    }
+    // Strict transport fail-closed even for socket drop, 401, 429, 5xx.
+    // There is deliberately no local retry/rollback/upload on uncertainty;
+    // an operator must inspect the live branch with independent GETs.
+    return this._request('POST', '/api/user/code', { branch, modules },
+      { max429Retries: 0, max5xxRetries: 0, retryAuth: false });
+  }
+
   userSetActiveBranch(branch, activeName = 'activeWorld') {
     // An activation may have succeeded even if the HTTP result is uncertain.
     // Require independent GET-only recovery rather than a hidden second POST.
