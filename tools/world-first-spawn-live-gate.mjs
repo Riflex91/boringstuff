@@ -1,4 +1,5 @@
 import {pathToFileURL} from 'node:url';
+import {assertGitHubEvidenceReadUrl} from './o55-readonly-network-boundaries.mjs';
 
 export function verifyLiveRunEvidence(run,jobs,logs,expectedSha) {
  const failures=[];
@@ -23,13 +24,17 @@ export function verifyLiveRunEvidence(run,jobs,logs,expectedSha) {
      .filter(n=>Number.isInteger(n)&&n>=100)[0]||null};
 }
 
-async function githubGet(url,token,textMode=false){
+export async function githubGet(url,token,repository,runId,textMode=false){
+ // O55: validate the final absolute URL before exposing GitHub token to
+ // fetch. Never follow a 30x to a remote host with credentials.
+ assertGitHubEvidenceReadUrl(url,repository,runId);
  const r=await fetch(url,{headers:{
    Accept:'application/vnd.github+json',
    Authorization:'Bearer '+token,
    'X-GitHub-Api-Version':'2022-11-28'
- }});
- if(!r.ok)throw new Error('GITHUB_EVIDENCE_GET_FAILED');
+ },redirect:'manual'});
+ if(!r.ok || r.redirected || r.type==='opaqueredirect')
+   throw new Error('GITHUB_EVIDENCE_GET_FAILED_OR_REDIRECT_HOLD');
  return textMode?r.text():r.json();
 }
 async function main(){
@@ -42,14 +47,14 @@ async function main(){
     !/^[-\w]+\/[-\w.]+$/.test(repository||''))
    throw new Error('WORLD_LIVE_GATE_INPUT_INVALID');
  const root='https://api.github.com/repos/'+repository;
- const run=await githubGet(root+'/actions/runs/'+id,token);
- const jobSet=await githubGet(root+'/actions/runs/'+id+'/jobs?per_page=100',token);
+ const run=await githubGet(root+'/actions/runs/'+id,token,repository,id);
+ const jobSet=await githubGet(root+'/actions/runs/'+id+'/jobs?per_page=100',token,repository,id);
  const jobs=Array.isArray(jobSet?.jobs)?jobSet.jobs:[];
  const candidates=jobs.filter(j=>j.status==='completed'&&j.conclusion==='success');
  let output={ok:false,failures:['REAL_100_TICK_EVIDENCE_MISSING']};
  for(const job of candidates) {
    let logs;
-   try {logs=await githubGet(root+'/actions/jobs/'+job.id+'/logs',token,true);}
+   try {logs=await githubGet(root+'/actions/jobs/'+job.id+'/logs',token,repository,id,true);}
    catch {continue;}
    output=verifyLiveRunEvidence(run,jobs,logs,sha);
    if(output.ok)break;

@@ -5,6 +5,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { ScreepsHttpClient } from './screeps-client.mjs';
 import { assertWorldScoutRoomArguments } from './o51-world-planner-readonly-gate.mjs';
+import { buildWorldScoutChildEnv } from './o55-readonly-network-boundaries.mjs';
 import { buildWorldConfig } from './world-deployment-profile.mjs';
 import { inspectWorld } from './world-readonly-preflight.mjs';
 import { summarizeRoom } from './spawn-planner-core.mjs';
@@ -106,9 +107,10 @@ async function main() {
         const logDir = path.join(output,shard);
         fs.mkdirSync(logDir,{recursive:true});
         const fd = fs.openSync(path.join(logDir,'planner.log'),'w',0o600);
-        const env = {...process.env,SCREEPS_CONFIG:configFile,SCREEPS_LOG_DIR:logDir};
-        delete env.SCREEPS_TOKEN_WORLD;
-        delete env.SCREEPS_TOKEN_NEWBIELAND;
+        // O55: do not forward NODE_OPTIONS, NODE_PATH, preload hooks,
+        // credentials or unreviewed CI environment into the planner.
+        // The child receives only an explicit three-key allowlist.
+        const env = buildWorldScoutChildEnv(process.env,configFile,logDir);
         // O51: remote room names must never be treated as CLI flags
         // such as --place in the dual-use planner.
         assertWorldScoutRoomArguments(selected);

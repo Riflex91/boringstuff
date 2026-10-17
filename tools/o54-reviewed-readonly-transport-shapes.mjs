@@ -9,7 +9,7 @@ const fetchGet=String.raw`fetch(url,{headers:{
   Accept:'application/vnd.github+json',
   Authorization:'Bearer '+token,
   'X-GitHub-Api-Version':'2022-11-28'
-}})`;
+},redirect:'manual'})`;
 const scoutChild=String.raw`spawnSync(process.execPath,[
   'initial-spawn-planner.mjs','--server','world',
   '--shard',shard,'--deep-top','5','--top-rooms','5',

@@ -40,7 +40,7 @@ const alteredFetch=[
   githubGet.replace("fetch(url,","fetch(new URL('https://screeps.com/api/user/code'),"),
   githubGet.replace("fetch(url,","fetch.call(null,url,"),
   githubGet.replace("fetch(url,","fetch(url,{method:'POST'},"),
-  githubGet.replace("}})","}}, {method:'POST'})"),
+  githubGet.replace("redirect:'manual'","redirect:'follow'"),
   githubGet.replace("fetch(url,","Reflect.apply(fetch,null,[url,")
 ];
 for(const [i,call] of alteredFetch.entries()){
