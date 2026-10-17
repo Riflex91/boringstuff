@@ -31,6 +31,8 @@ export function buildPublicHistoricalAttestation({world,newbieland,
     const integrity=r?.originalArtifactIntegrity;
     if(r?.historicalCanonicalPass!==true||
        r.runId!==HISTORICAL_RUNS[server]||
+       r.sourceHeadSha!==(server==='newbieland'?
+         EXPECTED_MAIN_SHA:'3f14590592d30dded0b6f61ab0e301e475ed6bf3')||
        r.predecessorMainSha!==EXPECTED_MAIN_SHA||
        r.exactMainSha!==(server==='newbieland')||
        r.eligibleExactPredecessor!==(server==='newbieland')||
