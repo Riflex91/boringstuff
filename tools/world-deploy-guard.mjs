@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { pathToFileURL, fileURLToPath } from 'node:url';
+import { assertUniqueActiveCodeBranch, assertRestorablePreuploadCodeBackup }
+  from './o39-code-upload-active-branch-policy.mjs';
 import { ScreepsHttpClient } from './screeps-client.mjs';
 import { buildWorldConfig } from './world-deployment-profile.mjs';
 import { summarizeRoom } from './spawn-planner-core.mjs';
@@ -54,6 +56,15 @@ async function execute() {
     api.authMe(),api.userWorldStatus(),api.userBranches(),api.gameRoomObjects(room,shard),
     api.gameRoomStatus(room,shard),api._request('GET','/api/user/code',{branch:'chatgpt'})
   ]);
+  // A readable JSON object is not a rollback. Require the uniquely active
+  // requested World branch and all 82 restorable source modules by name.
+  const gameDir=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..','game');
+  const files=fs.readdirSync(gameDir).filter(file=>file.endsWith('.js'));
+  const expected=Object.fromEntries(files.map(file=>[
+    file.slice(0,-3),fs.readFileSync(path.join(gameDir,file),'utf8')
+  ]));
+  assertUniqueActiveCodeBranch(branches,'chatgpt');
+  assertRestorablePreuploadCodeBackup(code,expected);
   const decision=assessWorldDeployment({account,world,branches,roomObjects,status,code,room,shard});
   console.log('WORLD_DEPLOY_GATE '+JSON.stringify(decision));
   if (!decision.ok) throw new Error('World deployment is blocked by read-only preflight');
