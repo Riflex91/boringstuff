@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import http from 'node:http';
 import { ScreepsHttpClient } from './screeps-client.mjs';
-import { assertUniqueActiveCodeBranch }
+import { assertUniqueActiveCodeBranch, assertRestorablePreuploadCodeBackup }
   from './o39-code-upload-active-branch-policy.mjs';
 
 // No remote Screeps calls: all HTTP scenarios use an ephemeral loopback server.
@@ -34,6 +34,21 @@ const modules={
 };
 for(let i=0;i<80;i++)modules['module'+i]='module.exports = '+i+';';
 assert.equal(Object.keys(modules).length,82);
+assert.deepEqual(assertRestorablePreuploadCodeBackup({modules},modules),
+  {complete:true,moduleCount:82});
+for(const bad of [
+ null,{}, {modules:{}},
+ {modules:{...modules,main:null}},
+ {modules:{...modules,config:''}},
+ {modules:{...modules,other:'unexpected'}},
+ {modules:{...modules,main:42}},
+ {modules:{...modules,config:'x'.repeat(2_000_001)}},
+ {modules:Object.fromEntries(Object.entries(modules).filter(([k])=>k!=='main'))},
+ {modules:[...Object.values(modules)]}
+])assert.throws(
+ ()=>assertRestorablePreuploadCodeBackup(bad,modules),
+ /CODE_UPLOAD_HOLD_ROLLBACK_BACKUP_UNVERIFIED/
+);
 const fakeClient=new ScreepsHttpClient('local',{
  baseUrl:'http://127.0.0.1:9/',token:'test',email:'example',password:'example'
 });
@@ -111,9 +126,14 @@ const source=fs.readFileSync(
 );
 const branchGuard=source.indexOf('assertUniqueActiveCodeBranch(branches, branch)');
 const before=source.indexOf("const before = await api._request('GET', '/api/user/code'");
+const verifiedBackup=source.indexOf('assertRestorablePreuploadCodeBackup(before, modules)');
 const backup=source.indexOf('Backup written:');
+const lastMile=source.indexOf('assertUniqueActiveCodeBranch(await api.userBranches(), branch)');
 const upload=source.indexOf('await api.userUploadCodeOnce(branch, modules)');
-assert.ok(branchGuard>0&&before>branchGuard&&backup>before&&upload>backup);
+assert.ok(branchGuard>0&&before>branchGuard&&
+  verifiedBackup>before&&backup>verifiedBackup&&
+  lastMile>backup&&upload>lastMile);
+assert.ok(source.includes("{ encoding: 'utf8', mode: 0o600, flag: 'wx' }"));
 assert.equal((source.match(/await api\.userUploadCodeOnce\(branch, modules\)/g)||[]).length,1);
 assert.ok(!/api\._request\('POST', '\/api\/user\/code'/.test(source));
 assert.ok(source.includes("const receipt = writeDeploymentReceipt"));
