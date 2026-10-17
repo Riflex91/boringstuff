@@ -1,0 +1,36 @@
+name: Screeps World user-approved automatic respawn recovery
+on:
+  schedule:
+    - cron: '23 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+concurrency:
+  group: screeps-world-chatgpt
+  cancel-in-progress: false
+jobs:
+  recover-only-if-verified-lost:
+    if: github.repository == 'Riflex91/boringstuff' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: tools
+    env:
+      SCREEPS_TOKEN_WORLD: ${{ secrets.SCREEPS_TOKEN_WORLD }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Validate exact-no-retry future World recovery contracts (offline)
+        run: |
+          node --check world-auto-respawn.mjs
+          node world-respawn-recovery-policy.test.mjs
+          node world-auto-respawn.test.mjs
+      - name: Read World account; if and ONLY if independently verified lost, reserve GitHub lock then perform one respawn
+        run: node world-auto-respawn.mjs
