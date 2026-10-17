@@ -140,5 +140,5 @@ try{
  assert.throws(()=>writeReadOnlyDossier(file,actual),/EEXIST/);
  assert.throws(()=>writeReadOnlyDossier(path.join(tmp,'unsafe.json'),{
   ...actual,mayUploadWorldCode:true}),/MUTATING_OR_UNVERIFIED_DOSSIER_REFUSED/);
-}finally{fs.rmSync(tmp,{force:true});}
+}finally{fs.rmSync(tmp,{recursive:true,force:true});}
 console.log('O38 exact-Main CI + 2 genuine receipts + World evidence; explicit approval remains HOLD: PASS');
