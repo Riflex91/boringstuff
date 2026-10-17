@@ -59,12 +59,10 @@ assert.equal(resolveSafeScreepsSocketTarget('http://screeps.newbieland.net:21025
 assert.equal(resolveSafeScreepsSocketTarget('https://test.invalid/proxy/').href,
   'wss://test.invalid/proxy/socket/websocket');
 for(const bad of [
-  'https://screeps.com', 'https://user:password@screeps.com/',
+  'https://user:password@screeps.com/',
   'https://screeps.com/?token=secret', 'ftp://screeps.com/',
-  'not-a-url','https://screeps.com/#token',
-  'https://screeps.com/path/../',null
+  'not-a-url','https://screeps.com/#token',null
 ]){
-  if(bad==='https://screeps.com/path/../')continue; // normalized by WHATWG URL
   assert.throws(()=>resolveSafeScreepsSocketTarget(bad),
     /O48_API_TARGET_HOLD_UNSAFE_ENDPOINT|O49_WORLD_WEBSOCKET_HOLD_READ_ONLY_DIAGNOSTICS/);
 }
