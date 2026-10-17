@@ -1,0 +1,72 @@
+name: Screeps O37 World exact-Main no-write release proof preflight
+on:
+  push:
+    branches: [diagnostics/o37-world-proof-acquisition-no-write-preflight-20261017]
+permissions:
+  contents: read
+concurrency:
+  group: o37-world-exact-main-no-write
+  cancel-in-progress: false
+jobs:
+  exact-head-node24-p3:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: tools
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Exact-feature-head complete Node24 game tests
+        run: |
+          npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+          npm test
+          python3 o34-artifact-receipt.test.py
+      - name: Exact-feature-head paired P3 CPU benchmark
+        run: npm run bench:p3
+  world-predeploy-getonly:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    defaults:
+      run:
+        working-directory: tools
+    env:
+      SCREEPS_SERVER: world
+      SCREEPS_BRANCH: chatgpt
+      SCREEPS_SHARD: shard0
+      SCREEPS_ROOM: W37S79
+      SCREEPS_TOKEN_WORLD: ${{ secrets.SCREEPS_TOKEN_WORLD }}
+      GITHUB_TOKEN: ${{ github.token }}
+      GITHUB_REPOSITORY: Riflex91/boringstuff
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Require exact pinned Main SHA and completely unchanged World game modules
+        shell: bash
+        run: |
+          git -C .. fetch origin main --quiet
+          test "$(git -C .. rev-parse origin/main)" = bc43f2faf1f345e63d9bfe78b6bbaa59e5eaab0c
+          git -C .. diff --exit-code origin/main HEAD -- game
+      - name: Verify all World preflight fail-closed scenarios offline
+        run: node o37-world-proof-acquisition-preflight.test.mjs
+      - name: Independently prove original World game Git tree equals exact Main
+        run: node o36-world-git-tree-equivalence.mjs
+      - name: GET-only current World account, ownership, 82 active game modules and game tick
+        run: node o37-world-proof-acquisition-preflight.mjs
+      - name: Explicit exact World deployment provenance release HOLD
+        shell: bash
+        run: |
+          echo '### World O16 current-health and code-byte preflight only' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Healthy original gameplay and identical Git code are not an original same-run exact Main SHA World LIVE_100T_PASS.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'A fresh same-SHA receipt requires explicit operator approval for any controlled production change; this workflow cannot upload.' >> "$GITHUB_STEP_SUMMARY"
+          echo '**RELEASE HOLD: NO UPLOAD, NO RESPAWN, NO MERGE, NO BRANCH ACTIVATION.**' >> "$GITHUB_STEP_SUMMARY"
