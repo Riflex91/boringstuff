@@ -1,0 +1,60 @@
+name: Screeps O42 encrypted remote escrow artifact round-trip (OFFLINE)
+on:
+  push:
+    branches: [safety/o42-remote-prepost-escrow-offline-20261017]
+permissions:
+  contents: read
+concurrency:
+  group: o42-offline-encrypted-escrow
+  cancel-in-progress: false
+jobs:
+  exact-head-node24-p3-remote-escrow:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: tools
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Verify exact pinned predecessor Main and no gameplay changes
+        shell: bash
+        run: |
+          git -C .. fetch origin main --quiet
+          test "$(git -C .. rev-parse origin/main)" = bc43f2faf1f345e63d9bfe78b6bbaa59e5eaab0c
+          git -C .. diff --exit-code origin/main HEAD -- game
+      - name: Full Node24 safety regression suite
+        run: |
+          npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+          npm test
+      - name: P3 original baseline paired benchmarks
+        run: npm run bench:p3
+      - name: Generate SYNTHETIC encrypted rollback escrow files (offline)
+        run: node o42-escrow-offline-ci.mjs prepare
+      - name: Upload encrypted synthetic archive before any write (no game API)
+        uses: actions/upload-artifact@v4
+        with:
+          name: o42-encrypted-fixture-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/o42-encrypted-backup/backup.enc
+            ${{ runner.temp }}/o42-encrypted-backup/escrow-envelope.json
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 1
+      - name: Re-download real GitHub-hosted artifact into isolated directory
+        uses: actions/download-artifact@v4
+        with:
+          name: o42-encrypted-fixture-${{ github.run_id }}
+          path: ${{ runner.temp }}/o42-remote-download
+      - name: Authenticate remotely retrieved ciphertext and all 82 synthetic modules
+        run: node o42-escrow-offline-ci.mjs verify
+      - name: Reaffirm release HOLD and no Screeps credentials
+        run: |
+          echo 'No actual game code POST, branch mutation, respawn or reset.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'An offline artifact round-trip is NOT enforcement in production deploy-live.mjs.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'HOLD_EXACT_PREDECESSOR_PAIR_MISSING remains in force.' >> "$GITHUB_STEP_SUMMARY"
