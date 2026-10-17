@@ -88,6 +88,22 @@ for(const disallowed of [
 }
 // Guard must use actual host as in O47: a mislabeled client pointed at
 // official World cannot write arbitrary WebSocket commands.
+for(const invalidToken of [
+  'token\nconsole malicious', 'contains spaces', 'token\r\n',
+  'token\u0000danger', ''
+]){
+  const tokenValue=invalidToken.includes('\\n')?invalidToken.replace('\\n','\n')
+    :invalidToken.includes('\\r')?invalidToken.replace('\\r','\r')
+    :invalidToken.includes('\\u0000')?invalidToken.replace('\\u0000','\u0000')
+    :invalidToken;
+  assert.throws(()=>assertReadOnlyScreepsWsCommand(
+    'world',world,'auth '+tokenValue,tokenValue),
+    new RegExp(WORLD_WS_MUTATION_HOLD));
+  assert.throws(()=>protectScreepsSocketSend(
+    {send(){}},'world',world,tokenValue),
+    new RegExp(WORLD_WS_MUTATION_HOLD));
+}
+
 const sent=[];
 const ws={send(value){sent.push(value);return 1;}};
 protectScreepsSocketSend(ws,'newbieland',world,token);
@@ -109,4 +125,6 @@ assert.deepEqual(separate,['subscribe user:someone/custom'],
 const source=fs.readFileSync(path.join(root,'tools','screeps-client.mjs'),'utf8');
 assert.ok(source.includes('resolveSafeScreepsSocketTarget(configuredBaseUrl)'));
 assert.ok(source.includes('protectScreepsSocketSend(ws,this.http.serverName'));
+assert.ok(!source.includes('WebSocket authentication failed: ${msg}'),
+  'Never include raw WebSocket auth response frames in errors');
 console.log('O49 exported World writer unconditional HOLD + World WebSocket readonly guard: PASS');
