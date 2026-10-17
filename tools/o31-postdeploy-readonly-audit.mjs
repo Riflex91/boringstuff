@@ -92,6 +92,11 @@ async function main(){
   if(!Object.hasOwn(READONLY_TARGETS,server)||
      !process.env.RUNNER_TEMP)throw Error('EXPLICIT_READONLY_TARGET_AND_TEMP_REQUIRED');
   const conf={...READONLY_TARGETS[server],server};
+  // The canonical retained-memory inspector selects its room when imported.
+  // Reject misconfigured CLI invocations rather than auditing the wrong room.
+  if(process.env.SCREEPS_SERVER!==server||
+     process.env.SCREEPS_ROOM!==conf.room)
+    throw Error('EXACT_CANONICAL_RELEASE_ROOM_REQUIRED');
   const file=path.join(process.env.RUNNER_TEMP,
     'o31-'+server+'-'+process.pid+'.json');
   if(server==='world')fs.writeFileSync(file,
