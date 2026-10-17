@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import {checkApprovedWorldHoldings,checkSameTickWorldLoss,
   performApprovedWorldAutoRecovery,githubDurableRespawnAttemptLock,
   validateGlobalCreepCensus} from './world-auto-respawn.mjs';
@@ -268,4 +269,9 @@ assert.equal(await githubDurableRespawnAttemptLock({
 },ghEnv,failedHistory),false);
 assert.equal(postAttempts,0);
 
+// Operational readiness is distinct from placement readback: never
+// mark the scheduled job green on an empty account or only placed Spawn1.
+const executor=fs.readFileSync(new URL('./world-auto-respawn.mjs',import.meta.url),'utf8');
+assert.ok(executor.includes("if(r.status!=='NO_ACTION_WORLD_NORMAL')process.exitCode=2;"));
+assert.ok(!executor.includes("'HOLD_WORLD_NOT_LOST'].includes(r.status)"));
 console.log('O23 executable auto-respawn exact-one-reset and protected placement offline regression PASS');
