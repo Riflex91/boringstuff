@@ -9,6 +9,7 @@ const ready={
   worldAccountIdentityVerified:true,
   allShardAndSimHoldingsEnumerated:true,
   sameTickEngineSpawnCount:0,sameTickEngineCreepCount:0,
+  globalAllShardCreepAbsenceVerified:true,
   otherRecoverableFootholdAbsentVerified:true,
   accountResetScopeVerified:true,
   documentedRespawnTransportVerified:true,
@@ -24,6 +25,7 @@ for(const [key,value,code] of [
  ['allShardAndSimHoldingsEnumerated',false,'FOOTHOLD_ENUMERATION_INCOMPLETE'],
  ['sameTickEngineSpawnCount',1,'ENGINE_SPAWN_ABSENCE_NOT_VERIFIED'],
  ['sameTickEngineCreepCount',1,'ENGINE_CREEP_ABSENCE_NOT_VERIFIED'],
+ ['globalAllShardCreepAbsenceVerified',false,'GLOBAL_OWNED_CREEP_ABSENCE_NOT_VERIFIED'],
  ['otherRecoverableFootholdAbsentVerified',false,'RECOVERABLE_FOOTHOLD_NOT_RULED_OUT'],
  ['accountResetScopeVerified',false,'RESET_SCOPE_UNVERIFIED'],
  ['documentedRespawnTransportVerified',false,'RESPAWN_TRANSPORT_NOT_VERIFIED'],
@@ -59,4 +61,7 @@ const hold=assessWorldRespawnReadiness(actualKnown);
 assert.equal(hold.verdict,'HOLD');
 assert.ok(hold.blockers.includes('RESPAWN_TRANSPORT_NOT_VERIFIED'));
 assert.ok(hold.blockers.includes('RECOVERABLE_FOOTHOLD_NOT_RULED_OUT'));
+assert.ok(hold.blockers.includes('GLOBAL_OWNED_CREEP_ABSENCE_NOT_VERIFIED'));
+assert.ok(assessWorldRespawnReadiness({...ready,globalAllShardCreepAbsenceVerified:undefined})
+  .blockers.includes('GLOBAL_OWNED_CREEP_ABSENCE_NOT_VERIFIED'));
 console.log('O23 approved World auto-respawn fail-closed policy PASS');
