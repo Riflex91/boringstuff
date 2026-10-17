@@ -10,7 +10,8 @@ import {
 
 // Only synthetic module content and local filesystem tests. Never the live
 // account/game/ backup or a Screeps credential.
-const root=fs.mkdtempSync(path.join(os.tmpdir(),'screeps-o42-escrow-'));
+const root=fs.mkdtempSync(path.join(process.env.RUNNER_TEMP || os.tmpdir(),
+  'screeps-o42-escrow-'));
 const destination=path.join(root,'private'),local=path.join(root,'encrypted'),
   remote=path.join(root,'downloaded');
 const context={
