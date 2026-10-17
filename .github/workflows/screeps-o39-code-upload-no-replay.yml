@@ -1,0 +1,43 @@
+name: Screeps O39 at-most-once code upload transport regression (OFFLINE)
+on:
+  push:
+    branches: [safety/o39-world-code-post-exactly-once-20261017]
+permissions:
+  contents: read
+concurrency:
+  group: o39-code-upload-at-most-once
+  cancel-in-progress: false
+jobs:
+  exact-head-node24-p3-and-local-http:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: tools
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Pin predecessor Main; do not change any in-game modules
+        shell: bash
+        run: |
+          git -C .. fetch origin main --quiet
+          test "$(git -C .. rev-parse origin/main)" = bc43f2faf1f345e63d9bfe78b6bbaa59e5eaab0c
+          git -C .. diff --exit-code origin/main HEAD -- game
+      - name: Full Node24 suite with local HTTP POST replay regressions
+        run: |
+          npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+          npm test
+      - name: P3 paired baseline equality
+        run: npm run bench:p3
+      - name: Confirm this workflow made no Screeps production changes
+        shell: bash
+        run: |
+          echo '### O39 code upload transport replay safeguard' >> "$GITHUB_STEP_SUMMARY"
+          echo 'One POST maximum per deploy invocation: failures require GET-only reconciliation and explicit operator decision.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'All HTTP tests used localhost. This workflow has no Screeps credentials or production upload step.' >> "$GITHUB_STEP_SUMMARY"
+          echo '**NO GAME WRITES, NO MERGE, NO RELEASE-GATE EXCEPTION.**' >> "$GITHUB_STEP_SUMMARY"
