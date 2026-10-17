@@ -22,6 +22,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24.21.0'
+      - name: Verify pinned Main and unchanged O16 game sources
+        shell: bash
+        run: |
+          git -C .. fetch origin main --quiet
+          test "$(git -C .. rev-parse origin/main)" = 'bc43f2faf1f345e63d9bfe78b6bbaa59e5eaab0c'
+          git -C .. diff --exit-code origin/main HEAD -- game
       - name: Exact-head full Node24 and game syntax checks
         run: |
           npm install --no-package-lock --ignore-scripts --no-audit --no-fund
@@ -45,6 +51,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24.21.0'
+      - name: Verify pinned Main and unchanged O16 game sources
+        shell: bash
+        run: |
+          git -C .. fetch origin main --quiet
+          test "$(git -C .. rev-parse origin/main)" = 'bc43f2faf1f345e63d9bfe78b6bbaa59e5eaab0c'
+          git -C .. diff --exit-code origin/main HEAD -- game
       - name: Verify O31 no-false-pass audit offline
         run: node o31-postdeploy-readonly-audit.test.mjs
       - name: Observe retained World post-deployment evidence without mutation
@@ -68,6 +80,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24.21.0'
+      - name: Verify pinned Main and unchanged O16 game sources
+        shell: bash
+        run: |
+          git -C .. fetch origin main --quiet
+          test "$(git -C .. rev-parse origin/main)" = 'bc43f2faf1f345e63d9bfe78b6bbaa59e5eaab0c'
+          git -C .. diff --exit-code origin/main HEAD -- game
       - name: Verify O31 no-false-pass audit offline
         run: node o31-postdeploy-readonly-audit.test.mjs
       - name: Create temporary Newbieland API config path
