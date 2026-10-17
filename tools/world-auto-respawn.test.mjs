@@ -36,17 +36,27 @@ function mock({status='lost',statusAfter='empty',user='riflex91',
   holdings=roomSet,advanced=true,throwPost=false,rejectedPost=false,
   noHeartbeat=false,spawnGhost=false,creepGhost=false,
   spawnAfterReserve=false,roomObjectsRejected=false,
-  finalRoomObjectsRejected=false}={}){
+  finalRoomObjectsRejected=false,holdingsAfterReserve=null,
+  userAfterReserve=null,finalAccountId=null,lastStatusNormal=false}={}){
  const actions={respawnPosts:0,placements:0,worldChecks:0,reservations:0};
  let clockCalls=0,lossReads=0;
  const api={
   defaultShard:'shard0',
-  async authMe(){return {_id:'private-id',username:user}},
+  async authMe(){return {
+    _id:actions.reservations&&finalAccountId?finalAccountId:'private-id',
+    username:actions.reservations&&userAfterReserve?userAfterReserve:user
+  }},
   async userWorldStatus(){
    actions.worldChecks++;
-   return {status:actions.respawnPosts?statusAfter:status};
+   return {status:actions.respawnPosts?statusAfter:
+     lastStatusNormal&&actions.reservations&&actions.worldChecks>=6?
+       'normal':status};
   },
-  async userRooms(id){assert.equal(id,'private-id');return holdings},
+  async userRooms(id){
+   assert.equal(id,'private-id');
+   return actions.reservations&&holdingsAfterReserve?
+     holdingsAfterReserve:holdings;
+  },
   async userMemory(){
    lossReads++;
    if(noHeartbeat)return {data:'{}'};
@@ -112,7 +122,12 @@ for(const opts of [
   shards:{shard0:['W37S79','W37S80'],shard1:[],shard2:[],shard3:[]}}},
  {noHeartbeat:true},{advanced:false},
  {spawnGhost:true},{creepGhost:true},{spawnAfterReserve:true},
- {roomObjectsRejected:true},{finalRoomObjectsRejected:true}
+ {roomObjectsRejected:true},{finalRoomObjectsRejected:true},
+ {holdingsAfterReserve:{shards:{
+   shard0:['W37S79'],shard1:['E4N1'],shard2:[],shard3:[],sim:[]}}},
+ {userAfterReserve:'another-user'},
+ {finalAccountId:'another-private-id'},
+ {lastStatusNormal:true}
  ]){
   const m=mock(opts);
   if(opts.user==='another-user'){
@@ -123,6 +138,12 @@ for(const opts of [
     assert.ok(r.status.startsWith('HOLD'),r.status);
     if(opts.spawnAfterReserve||opts.finalRoomObjectsRejected)
       assert.equal(r.status,'HOLD_FINAL_OWNED_ASSETS_OR_ROOM_GET_UNVERIFIED');
+    if(opts.holdingsAfterReserve)
+      assert.equal(r.status,'HOLD_FINAL_RECOVERABLE_HOLDINGS_OR_SCOPE_UNVERIFIED');
+    if(opts.userAfterReserve||opts.finalAccountId)
+      assert.equal(r.status,'HOLD_FINAL_ACCOUNT_IDENTITY_MISMATCH');
+    if(opts.lastStatusNormal)
+      assert.equal(r.status,'HOLD_LAST_WORLD_STATUS_NO_LONGER_LOST');
   }
   assert.equal(m.actions.respawnPosts,0);
   assert.equal(m.actions.placements,0);
