@@ -71,7 +71,8 @@ async function readLossEvidence(api,accountId) {
   const holdings=checkApprovedWorldHoldings(rooms);
   const tick=clock?.time;
   const engine=checkSameTickWorldLoss(memory,tick);
-  const roomList=Array.isArray(roomObjects?.objects)?roomObjects.objects:null;
+  const roomList=roomObjects?.ok!==false&&Array.isArray(roomObjects?.objects)?
+    roomObjects.objects:null;
   const ownCreeps=roomList?.filter(o=>o?.type==='creep'&&
     String(o?.user||'')===accountId).length;
   // A surviving owned spawn from any authenticated GET is positive
@@ -166,7 +167,7 @@ export async function performApprovedWorldAutoRecovery(api,{
     return {status:'HOLD_FINAL_STATUS_NO_LONGER_LOST',
       respawnPosts:0,placementPosts:0};
   const finalObjects=finalRoomObjects?.objects;
-  if(!Array.isArray(finalObjects)||finalObjects.some(o=>
+  if(finalRoomObjects?.ok===false||!Array.isArray(finalObjects)||finalObjects.some(o=>
     String(o?.user||'')===String(id)&&
     (o?.type==='creep'||o?.type==='spawn'||
       o?.structureType==='spawn')))
