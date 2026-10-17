@@ -33,7 +33,7 @@ export function assertReadOnlyScreepsWsCommand(serverName,httpBaseUrl,
   // Never treat a multiline/whitespace token as a valid command payload.
   // A malicious token with a newline must not smuggle a second WS command.
   if(typeof authToken==='string' &&
-      /^[^\\s\\x00-\\x1f\\x7f]{1,500}$/.test(authToken) &&
+      /^[^\s\x00-\x1f\x7f]{1,500}$/.test(authToken) &&
       command==='auth '+authToken) return;
   if(/^subscribe user:[A-Za-z0-9_-]{1,80}\/(?:console|cpu)$/.test(command))
     return;
