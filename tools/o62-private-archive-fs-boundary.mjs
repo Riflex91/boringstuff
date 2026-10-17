@@ -41,7 +41,8 @@ export function readPinnedArchiveInput(source,maxBytes) {
  let resolved,fd;
  try{
   resolved=fs.realpathSync.native(source);
-  if(insideRepo(resolved))deny();
+  const leaf=fs.lstatSync(source);
+  if(leaf.isSymbolicLink()||insideRepo(resolved))deny();
   // O_NOFOLLOW rejects final-component symlinks; we read and fstat the
   // SAME open descriptor instead of lstat(path) then re-opening a path.
   const flags=fs.constants.O_RDONLY|(fs.constants.O_NOFOLLOW||0);
