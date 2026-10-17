@@ -62,6 +62,13 @@ console.log('Runtime modules:   ' + files.length);
 console.log('Local version:     ' + expectedVersion);
 console.log('Deployment ID:     ' + deploymentId);
 
+// O43 development HOLD: the old single-step World deployment path does not
+// have a remotely recoverable *pre-POST* escrow. Refuse it before login,
+// backup or any possible game write. A boolean environment override is NOT
+// sufficient proof, and this change is NOT a World deployment approval.
+if (serverName === 'world')
+  throw new Error('O43_WORLD_CODE_UPLOAD_HOLD_NO_APPROVED_TWO_PHASE_EXECUTOR');
+
 const api = await ScreepsHttpClient.fromConfig(serverName);
 
 // Reject missing, ambiguous or wrong active code branches BEFORE backing up
