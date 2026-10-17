@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import {assertPrivateArchiveDirectory,assertPrivateArchiveFiles}
+ from './o63-private-vault-file-policy.mjs';
 
 // O57 private EVIDENCE vault. NOT a production escrow receipt, NOT a
 // GitHub upload and NEVER a source of release authorization. A real backup
@@ -40,8 +42,10 @@ function publicKey(pem){
 function privateDir(directory){
  if(typeof directory!=='string'||!path.isAbsolute(directory)||
    fs.existsSync(directory))die('DIRECTORY_ALREADY_EXISTS_OR_RELATIVE');
- // Exclusive directory. No archive payload may be written to a repository
- // working directory by a default path; caller must provide location.
+ // O63: a direct library caller cannot bypass O62's CLI path gate.
+ // The parent must be a private, current-UID, non-Git directory.
+ try{assertPrivateArchiveDirectory(path.dirname(directory));}
+ catch{die('PRIVATE_PARENT');}
  fs.mkdirSync(directory,{recursive:false,mode:0o700});
  if(process.platform!=='win32')fs.chmodSync(directory,0o700);
  return directory;
@@ -98,6 +102,8 @@ export function inspectPrivateRoadmapArchive({directory,context}){
  if(typeof directory!=='string'||!path.isAbsolute(directory))die('DIRECTORY');
  const stat=fs.lstatSync(directory);
  if(!stat.isDirectory()||stat.isSymbolicLink())die('DIRECTORY');
+ try{assertPrivateArchiveFiles(directory);}
+ catch{die('PRIVATE_FILE_POLICY');}
  if(JSON.stringify(fs.readdirSync(directory).sort())!==
    JSON.stringify(['archive-manifest.json','archive.enc']))die('INVENTORY');
  let manifest;
