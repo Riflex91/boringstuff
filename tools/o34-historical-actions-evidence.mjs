@@ -195,16 +195,29 @@ export async function inspectGithubHistoricalRun(server,runId,{
       a?.expired===false&&validId(a?.id)):[];
   let receiptEvidence={verified:false,server,runId,
     reason:'ORIGINAL_RECEIPT_ZIP_NOT_CHECKED'};
+  let originalArtifactSha256=null;
   if(found.length===1&&typeof jobLog==='string'){
     try{
       const archiveBytes=await read(
         base+'/actions/artifacts/'+found[0].id+'/zip',token,'binary');
       receiptEvidence=inspectArchive(archiveBytes,{server,run,jobLog});
+      if(receiptEvidence?.verified===true&&Buffer.isBuffer(archiveBytes))
+        originalArtifactSha256=createHash('sha256')
+          .update(archiveBytes).digest('hex');
     }catch{/* absent/unreadable original artifact must HOLD */
       receiptEvidence.reason='ORIGINAL_RECEIPT_ZIP_DOWNLOAD_FAILED';}
   }
-  return assessHistoricalRun({server,expectedRunId:runId,run,jobs,
+  const verdict=assessHistoricalRun({server,expectedRunId:runId,run,jobs,
     artifacts:artifactData?.artifacts,jobLog,receiptEvidence});
+  // O35: hashes are of the actual ORIGINAL API-delivered bytes, never
+  // of re-created receipts. Retain neither archive contents nor IDs.
+  const originalArtifactIntegrity=verdict.historicalCanonicalPass&&
+    originalArtifactSha256&&found.length===1&&
+    typeof jobLog==='string'&&typeof found[0]?.expires_at==='string'?
+    {artifactId:found[0].id,archiveSha256:originalArtifactSha256,
+      originalJobLogSha256:createHash('sha256').update(jobLog).digest('hex'),
+      artifactExpiresAt:found[0].expires_at}:null;
+  return {...verdict,originalArtifactIntegrity};
 }
 
 export async function githubGet(url,token,type){
