@@ -29,6 +29,9 @@ export function assessActivationState({approval,branches,objects,me,code,status,
     exactStagedCode:exact.exactInactiveCode};
 }
 export async function activateW37S79(api,approval,onPhase=()=>{}){
+  // O49: imported World mutator remains quarantined even with an injected
+  // duck-typed API that bypasses ScreepsHttpClient's HTTP firewall.
+  assertLegacyWorldMutationDisabled('legacy-spawn-activation');
   if(api?.defaultShard!==target.shard)throw new Error('EXACT_SHARD_REQUIRED');
   const game=path.join(path.dirname(fileURLToPath(import.meta.url)),'..','game');
   const expected=Object.fromEntries(fs.readdirSync(game).filter(n=>n.endsWith('.js')).sort().map(n=>
