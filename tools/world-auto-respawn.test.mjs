@@ -16,7 +16,7 @@ for(const extra of [
  {shards:{shard0:['W37S79']}}
  ])assert.equal(checkApprovedWorldHoldings(extra).scopeVerified,false);
 
-const mem=t=>({data:JSON.stringify({telemetryJournal:{
+const mem=t=>({data:JSON.stringify({deploymentId:'test-world-main',telemetryJournal:{
  snapshots:[{c:'STATUS_SNAPSHOT',t,x:{
   rooms:{W37S79:{health:{status:'CRITICAL',reasons:['SPAWN_MISSING']}}},
   totalCreeps:0}}],
