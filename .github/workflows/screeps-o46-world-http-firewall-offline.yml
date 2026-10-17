@@ -1,0 +1,43 @@
+name: Screeps O46 World HTTP mutation firewall imported writer regression (OFFLINE)
+on:
+  push:
+    branches: [safety/o46-world-http-write-firewall-20261017]
+permissions:
+  contents: read
+concurrency:
+  group: o46-offline-world-http-firewall
+  cancel-in-progress: false
+jobs:
+  node24-p3-world-http-mutation-prohibition:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: tools
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Pin main and confirm game blob equality
+        shell: bash
+        run: |
+          git -C .. fetch origin main --quiet
+          test "$(git -C .. rev-parse origin/main)" = bc43f2faf1f345e63d9bfe78b6bbaa59e5eaab0c
+          git -C .. diff --exit-code origin/main HEAD -- game
+      - name: All canonical Node24 tests O39 through O46
+        run: |
+          npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+          npm test
+      - name: Exact P3 baseline benchmarks
+        run: npm run bench:p3
+      - name: Reaffirm immutable no-production authorization
+        run: |
+          echo '### O46 World HTTP write firewall' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Mutating World HTTP requests fail before auth/socket; only auth signin and GET allowed.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'All World routing, stages and mock transports use synthetic loopback data.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'No World game code POST, spawn, reset, branch activation, real GitHub lock or merge.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'HOLD_EXACT_PREDECESSOR_PAIR_MISSING remains.' >> "$GITHUB_STEP_SUMMARY"

@@ -3,6 +3,8 @@ import http from 'node:http';
 import {once} from 'node:events';
 import {ScreepsHttpClient} from './screeps-client.mjs';
 
+// O46: transport retry regression intentionally uses a NON-World fixture name.
+// World production POSTs are now blocked before reaching this transport.
 // Local loopback HTTP fixture: ensure a *single on-wire POST* in all
 // ambiguous/retryable failure cases, not merely one wrapper method call.
 async function scenario(route,kind,invoker) {
@@ -39,7 +41,7 @@ async function scenario(route,kind,invoker) {
   server.listen(0,'127.0.0.1');
   await once(server,'listening');
   const address=server.address();
-  const client=new ScreepsHttpClient('world',{
+  const client=new ScreepsHttpClient('offline-transport-fixture',{
     baseUrl:'http://127.0.0.1:'+address.port+'/',
     token:'token',
     email:'test@example.test',password:'in-memory-credentials'
