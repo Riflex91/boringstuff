@@ -103,8 +103,16 @@ export class ScreepsHttpClient {
   async _request(method, endpoint, params = {}, opts = {}) {
     if (!opts.skipAuth && !this.token) await this.auth();
 
-    const max429Retries = Number.isInteger(opts.max429Retries) ? opts.max429Retries : 5;
-    const max5xxRetries = Number.isInteger(opts.max5xxRetries) ? opts.max5xxRetries : 2;
+    // O40: retries are safe by default ONLY for GET and authentication.
+    // All game/account mutations, including raw legacy _request('POST', ...),
+    // MUST NOT be replayed on a lost reply, 401, 429 or 5xx. Caller-provided
+    // retry counts cannot override this transport-level safety property.
+    const retrySafe = method === 'GET' ||
+      (method === 'POST' && endpoint === '/api/auth/signin');
+    const max429Retries = retrySafe
+      ? (Number.isInteger(opts.max429Retries) ? opts.max429Retries : 5) : 0;
+    const max5xxRetries = retrySafe
+      ? (Number.isInteger(opts.max5xxRetries) ? opts.max5xxRetries : 2) : 0;
     let retry429 = 0;
     let retry5xx = 0;
 
@@ -156,7 +164,7 @@ export class ScreepsHttpClient {
       if (headerToken) this.token = Array.isArray(headerToken) ? headerToken[0] : headerToken;
       const data = decodeResponseBody(response.text);
 
-      if (response.statusCode === 401 && !opts.skipAuth && opts.retryAuth !== false && this.server.email && this.server.password) {
+      if (response.statusCode === 401 && retrySafe && !opts.skipAuth && opts.retryAuth !== false && this.server.email && this.server.password) {
         this.token = null;
         await this.auth();
         return this._request(method, endpoint, params, { ...opts, retryAuth: false });
