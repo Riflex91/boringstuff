@@ -64,4 +64,4 @@ for(const scenario of [{},{missingSpawn:true},{codeChanged:true},
   assert.equal(f.calls.length,0,'No injected World API operation');
   assert.equal(f.count(),0,'No activation');
 }
-console.log('World exact Spawn1 post-placement activation guards: PASS');
+console.log('O49 World post-spawn activation export quarantine: PASS');
