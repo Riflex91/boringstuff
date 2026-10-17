@@ -320,5 +320,10 @@ async function main() {
   }
 }
 if(process.argv[1]&&pathToFileURL(process.argv[1]).href===import.meta.url)
-  main().catch(()=>{console.error('World placement blocked before protected staging');
-    process.exitCode=1;});
+  main().catch(err=>{
+    // Keep credentials out of errors while showing the exact O45 block reason.
+    console.error(String(err?.message || '').startsWith('O45_WORLD_MUTATION_HOLD_')
+      ? 'O45_WORLD_MUTATION_HOLD_NO_APPROVED_FENCED_EXECUTOR'
+      : 'World placement blocked before protected staging');
+    process.exitCode=1;
+  });
