@@ -20,7 +20,7 @@ for(const patch of [
 {code:{modules:{}}}])
  assert.equal(assessAutoDeployGate({...base,...patch}).ok,false);
 const wf=fs.readFileSync(new URL('../.github/workflows/screeps-world-next-auto-deploy.yml',import.meta.url),'utf8');
-assert.match(wf,/SCREEPS_BRANCH: chatgpt\\n/);
+assert.ok(wf.includes('SCREEPS_BRANCH: chatgpt'));
 assert.doesNotMatch(wf,/chatgpt-w37s79-stage/);
 const hold=wf.indexOf('Block auto-upload until verified paired predecessor LIVE_100T_PASS');
 const upload=wf.indexOf('Upload exact tested game modules');
