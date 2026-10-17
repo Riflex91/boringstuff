@@ -55,9 +55,12 @@ function readPrivateFile(file) {
   return fs.readFileSync(file);
 }
 function readEnvelope(dir) {
-  if (!path.isAbsolute(dir) || !fs.lstatSync(dir).isDirectory() ||
-      fs.lstatSync(dir).isSymbolicLink())
+  if (typeof dir !== 'string' || !path.isAbsolute(dir))
     fail('ARCHIVE_DIRECTORY');
+  let stat;
+  try { stat=fs.lstatSync(dir); }
+  catch { fail('ARCHIVE_DIRECTORY'); }
+  if (!stat.isDirectory() || stat.isSymbolicLink()) fail('ARCHIVE_DIRECTORY');
   const files=fs.readdirSync(dir).sort();
   if (files.length!==2 || files[0]!=='backup.enc' ||
       files[1]!=='escrow-envelope.json') fail('ARCHIVE_INVENTORY');
