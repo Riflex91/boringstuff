@@ -1,0 +1,44 @@
+name: Screeps O59 original historical live job evidence crosscheck (OFFLINE)
+on:
+  push:
+    branches: [safety/o59-original-live-job-witness-crosscheck-20261017]
+permissions:
+  contents: read
+concurrency:
+  group: o59-historical-job-evidence-offline
+  cancel-in-progress: false
+jobs:
+  node24-p3-historical-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: tools
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Assert pinned original Main and byte-identical game modules
+        shell: bash
+        run: |
+          git -C .. fetch origin main --quiet
+          test "$(git -C .. rev-parse origin/main)" = bc43f2faf1f345e63d9bfe78b6bbaa59e5eaab0c
+          git -C .. diff --exit-code origin/main HEAD -- game
+      - name: Complete Node24 O39-O59 offline regressions
+        run: |
+          npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+          npm test
+      - name: Original P3 reproducibility
+        run: npm run bench:p3
+      - name: Record authentic source limits
+        run: |
+          echo '### O59 two historical original GitHub live job witnesses' >> "$GITHUB_STEP_SUMMARY"
+          echo 'The historical World run was 166 ticks on a DIFFERENT Git SHA; Newbieland was 131 ticks on pinned Main.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Authenticated actual GitHub logs were independently inspected during O59; CI uses reconstructed synthetic logs only.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'No original logs/ZIPs or token in repository. A matching historical witness must not authorize a current Main World release.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'No Screeps writes, World branch activation, spawn/respawn, GitHub writer ref mutation or Main merge.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Release HOLD_EXACT_PREDECESSOR_PAIR_MISSING.' >> "$GITHUB_STEP_SUMMARY"
