@@ -93,4 +93,4 @@ for(const scenario of [{},{occupied:true},{otherEnemy:true},
   assert.equal(f.calls.length,0);
   assert.equal(f.placed(),false);
 }
-console.log('World pinned first spawn isolated full offline flow: PASS');
+console.log('O49 World pinned first spawn export quarantine + offline fixture: PASS');
