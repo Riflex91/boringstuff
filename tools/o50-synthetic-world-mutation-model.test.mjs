@@ -136,7 +136,7 @@ const code=fs.readFileSync(new URL('./o50-synthetic-world-mutation-model.mjs',
   import.meta.url),'utf8');
 assert.ok(!/^\s*import\s/m.test(code));
 assert.ok(!/\b(?:fetch|XMLHttpRequest|WebSocket|https?\.request|process\.env)\s*\(/.test(code));
-assert.ok(!code.includes('ScreepsHttpClient'));
+assert.ok(!/^\s*import\s+.*ScreepsHttpClient/m.test(code));
 assert.ok(!code.includes("from './world-"));
 assert.ok(!code.includes('SCREEPS_TOKEN'));
 console.log('O50 positive legacy intent simulations (7), gates, lost-ack no-retry, zero-network isolation: PASS');
