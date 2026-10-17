@@ -25,3 +25,24 @@ jobs:
           npm test
       - name: Exact P3 paired benchmark
         run: npm run bench:p3
+  world-runtime-get-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: tools
+    env:
+      SCREEPS_TOKEN_WORLD: ${{ secrets.SCREEPS_TOKEN_WORLD }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Validate offline World GET-only contract
+        run: |
+          node world-next-runtime-diagnostics.test.mjs
+          node world-recovery-evidence.test.mjs
+      - name: Independently observe current World recovery (GET-only, no uploads)
+        run: node world-next-runtime-diagnostics.mjs
