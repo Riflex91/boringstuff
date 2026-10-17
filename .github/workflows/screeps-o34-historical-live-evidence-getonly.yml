@@ -1,0 +1,58 @@
+name: Screeps O34 original Actions LIVE_100T provenance (GET only)
+on:
+  push:
+    branches: [diagnostics/o34-historical-canonical-actions-provenance-20261017]
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: o34-historical-actions-getonly
+  cancel-in-progress: false
+jobs:
+  canonical-offline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: tools
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Canonical full Node24 test suite
+        run: |
+          npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+          npm test
+      - name: Exact P3 paired benchmark
+        run: npm run bench:p3
+  original-github-evidence-getonly:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: tools
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
+      GITHUB_REPOSITORY: Riflex91/boringstuff
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Verify exact immutable predecessor Main before provenance inspection
+        shell: bash
+        run: |
+          git -C .. fetch origin main --quiet
+          test "$(git -C .. rev-parse origin/main)" = bc43f2faf1f345e63d9bfe78b6bbaa59e5eaab0c
+          git -C .. diff --exit-code origin/main HEAD -- game
+      - name: Offline adversarial exact-SHA 100-tick evidence tests
+        run: node o34-historical-actions-evidence.test.mjs
+      - name: Verify original Github Actions run, job, logs and artifact metadata via GET
+        run: node o34-historical-actions-evidence.mjs
