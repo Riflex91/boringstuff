@@ -126,6 +126,8 @@ function candidateKind(node,bindings){
   if(member==='fetch'&&(object==='globalThis'||object===''))
     return 'FETCH_TRANSPORT';
   if(member==='fetch'&&imports.get(member))return 'FETCH_TRANSPORT';
+  if(imports.has(member)&&NET_MODULES.has(imports.get(member)))
+    return 'ALTERNATE_NETWORK_TRANSPORT';
   if(['eval','Function'].includes(member))return 'DYNAMIC_JS_EVALUATION';
   if(node.type==='NewExpression'&&['WebSocket','XMLHttpRequest'].includes(member))
     return 'ALTERNATE_SOCKET_OR_XHR';
