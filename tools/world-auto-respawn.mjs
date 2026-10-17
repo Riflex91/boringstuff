@@ -29,28 +29,35 @@ export function validateGlobalCreepCensus(evidence,accountId) {
 }
 
 export function checkApprovedWorldHoldings(reply) {
-  if(reply?.ok===false)return {complete:false,scopeVerified:false};
+  const unknown={complete:false,scopeVerified:false};
+  if(reply?.ok===false)return unknown;
   const shards=reply?.shards;
-  if(!shards||typeof shards!=='object'||Array.isArray(shards))
-    return {complete:false,scopeVerified:false};
-  const all=Object.keys(shards);
-  if(!['shard0','shard1','shard2','shard3'].every(x=>
-    Array.isArray(shards[x])&&shards[x].length<=30))
-    return {complete:false,scopeVerified:false};
-  if(!all.every(x=>Array.isArray(shards[x])&&
-     shards[x].length<=30))return {complete:false,scopeVerified:false};
-  const rooms=all.flatMap(k=>shards[k].map(name=>[k,name]));
-  // The user approved rebuilding THIS colony, not deleting arbitrary
-  // additional recoverable bases on other shards. Do not reset otherwise.
-  const scopeVerified=rooms.length===1&&
-    rooms[0][0]===SHARD&&rooms[0][1]===ROOM;
-  const reservations=reply.reservations;
-  const reservationsEmpty=reservations===undefined||
-    (reservations&&typeof reservations==='object'&&
-      !Array.isArray(reservations)&&Object.values(reservations).every(v=>
-        Array.isArray(v)&&v.length===0));
-  return {complete:reservationsEmpty===true,
-    scopeVerified:scopeVerified&&reservationsEmpty===true};
+  const reservations=reply?.reservations;
+  // Unknown/missing room and reservation groups are NOT evidence of
+  // zero recoverable holdings. Explicitly require all four World shards
+  // plus the Screeps simulation grouping for BOTH collections.
+  if(!shards||typeof shards!=='object'||Array.isArray(shards)||
+     !reservations||typeof reservations!=='object'||
+     Array.isArray(reservations))return unknown;
+  const required=[...WORLD_SHARDS,'sim'];
+  const validGroup=(x)=>Array.isArray(x)&&x.length<=30&&
+    x.every(n=>typeof n==='string'&&n.length>=1&&n.length<=20);
+  const full=(groups)=>required.every(k=>
+    Object.hasOwn(groups,k)&&validGroup(groups[k]))&&
+    Object.keys(groups).length<=15&&
+    Object.values(groups).every(validGroup);
+  if(!full(shards)||!full(reservations))return unknown;
+  const rooms=Object.entries(shards).flatMap(([shard,names])=>
+    names.map(name=>[shard,name]));
+  const keys=rooms.map(([shard,name])=>shard+':'+name);
+  if(new Set(keys).size!==keys.length)return unknown;
+  if(Object.values(reservations).some(names=>names.length!==0))
+    return unknown;
+  // Additional explicit empty groupings are permitted; populated unknown
+  // groups cannot be silently ignored.
+  const scopeVerified=rooms.length===1&&rooms[0][0]===SHARD&&
+    rooms[0][1]===ROOM;
+  return {complete:true,scopeVerified};
 }
 export function checkSameTickWorldLoss(memoryReply,currentTick) {
   const unknown={verified:false,snapshotTick:null,
