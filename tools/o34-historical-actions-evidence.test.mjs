@@ -61,7 +61,8 @@ const sample=(server)=>{
     }))}],
   artifacts:[{id:id+222,name:c.artifact,
     expired:false,size_in_bytes:200000}],
-  jobLog:line
+  jobLog:line,
+  receiptEvidence:{verified:true,server,runId:id}
  };
 };
 const n=assessHistoricalRun(sample('newbieland'));
@@ -77,7 +78,7 @@ assert.equal(assessHistoricalPair(w,n).newbielandExactMainHistoricalPass,true);
 assert.equal(assessHistoricalPair(w,n).worldExactMainHistoricalPass,false);
 assert.equal(assessHistoricalPair(w,n).releaseAuthorized,false);
 assert.equal(n.originalReceiptArtifactMetadataVerified,true);
-assert.equal(n.originalReceiptFileContentsVerified,false);
+assert.equal(n.originalReceiptFileContentsVerified,true);
 assert.equal(n.independentCurrentRuntimeHealthyVerified,false);
 assert.equal(n.apiMutationsAttempted,0);
 assert.equal(w.apiMutationsAttempted,0);
@@ -110,6 +111,16 @@ for(const kind of ['newbieland','world']){
  assert.equal(assessHistoricalRun(wrongID).historicalCanonicalPass,false);
 }
 assert.equal(assessHistoricalRun({server:'world'}).historicalCanonicalPass,false);
+const absentReceipt={...sample('newbieland'),receiptEvidence:{
+  verified:false,server:'newbieland',runId:HISTORICAL_RUNS.newbieland
+}};
+assert.equal(assessHistoricalRun(absentReceipt).historicalCanonicalPass,false);
+assert.ok(assessHistoricalRun(absentReceipt).issues.includes(
+  'ORIGINAL_RECEIPT_CONTENT_NOT_VERIFIED'));
+const swappedReceipt={...sample('newbieland'),receiptEvidence:{
+  verified:true,server:'world',runId:HISTORICAL_RUNS.newbieland
+}};
+assert.equal(assessHistoricalRun(swappedReceipt).historicalCanonicalPass,false);
 
 const history=[];
 const mockRead=async(url,_token,type)=>{
@@ -117,14 +128,24 @@ const mockRead=async(url,_token,type)=>{
  history.push({url,type});
  const data=sample(url.includes('/38848802082')?'newbieland':'world');
  if(url.includes('/actions/jobs/'))return line;
+ if(url.includes('/actions/artifacts/'))return Buffer.from('synthetic');
  if(url.endsWith('/jobs?per_page=100'))return {jobs:data.jobs};
  if(url.endsWith('/artifacts?per_page=100'))return {artifacts:data.artifacts};
  return data.run;
 };
 const actualN=await inspectGithubHistoricalRun('newbieland',
- HISTORICAL_RUNS.newbieland,{token:'REDACTED_TEST_TOKEN',read:mockRead});
+ HISTORICAL_RUNS.newbieland,{token:'REDACTED_TEST_TOKEN',read:mockRead,
+   inspectArchive:(_bytes,{server,run})=>({
+     verified:true,server,runId:run.id
+   })});
 assert.equal(actualN.eligibleExactPredecessor,true);
-assert.deepEqual(history.map(x=>x.type).sort(),['json','json','json','text'].sort());
-assert.equal(history.length,4);
+assert.deepEqual(history.map(x=>x.type).sort(),
+  ['json','json','json','text','binary'].sort());
+assert.equal(history.length,5);
 assert.ok(!JSON.stringify(actualN).includes('REDACTED_TEST_TOKEN'));
+const noReceipt=await inspectGithubHistoricalRun('newbieland',
+ HISTORICAL_RUNS.newbieland,{token:'REDACTED_TEST_TOKEN',read:mockRead,
+   inspectArchive:()=>({verified:false})});
+assert.equal(noReceipt.historicalCanonicalPass,false);
+assert.equal(noReceipt.eligibleExactPredecessor,false);
 console.log('O34 audited GitHub canonical historical PASS provenance and exact Main HOLD: PASS');
