@@ -48,6 +48,42 @@ contains("import {exec as command} from 'node:child_process';"+
   "command('node other-tool.mjs');",'ALTERNATE_NETWORK_TRANSPORT');
 contains("const sock={send(){}};ws.send('console something')",'SOCKET_SEND');
 
+// Reviewed read-only transports are an explicit AST-shape allowlist, not a
+// blanket file-name exemption. A fetch POST or changed local child argv must
+// become a new, independently reviewable violation.
+const githubGetReadOnly=
+  "async function githubGet(url){return fetch(url,{headers:{Accept:'application/json'}});}";
+assert.deepEqual(inspectWorldAstSource(
+  'world-first-spawn-live-gate.mjs',githubGetReadOnly).violations,[]);
+assert.ok(inspectWorldAstSource('world-first-spawn-live-gate.mjs',
+  "async function githubGet(url){return fetch(url,{headers:{},method:'POST'});}"
+).violations.some(x=>x.startsWith('READONLY_TRANSPORT_CHANGED_OR_ADDED_')));
+const scoutBase=
+  "import {spawnSync} from 'node:child_process';"+
+  "import {assertWorldScoutRoomArguments} from './o51-world-planner-readonly-gate.mjs';"+
+  "const selected=['W37S79'];assertWorldScoutRoomArguments(selected);";
+const scoutCall=(server)=>
+  "spawnSync(process.execPath,['initial-spawn-planner.mjs','--server','"+
+    server+"',...selected]);";
+assert.deepEqual(inspectWorldAstSource('world-scout.mjs',
+  scoutBase+scoutCall('world')).violations,[]);
+assert.ok(inspectWorldAstSource('world-scout.mjs',
+  scoutBase+scoutCall('newbieland')).violations.some(x=>
+    x.startsWith('READONLY_TRANSPORT_CHANGED_OR_ADDED_')));
+assert.ok(inspectWorldAstSource('world-scout.mjs',
+  scoutBase.replace('assertWorldScoutRoomArguments(selected);','')+
+    scoutCall('world')).violations.some(x=>
+      x.includes('SCOUT_SUBPROCESS_ARGV_GUARD_MISSING')));
+const guardedPlanner=
+  "import {assertWorldPlannerReadOnly} from './o51-world-planner-readonly-gate.mjs';"+
+  "async function main(){let args;try{args={};}catch(e){}"+
+  "assertWorldPlannerReadOnly(args);await api.gamePlaceSpawn('W37S79',1,1,'Spawn1');}";
+assert.deepEqual(inspectWorldAstSource('initial-spawn-planner.mjs',
+  guardedPlanner).violations,[]);
+assert.ok(inspectWorldAstSource('initial-spawn-planner.mjs',
+  guardedPlanner.replace('assertWorldPlannerReadOnly(args);','')
+).violations.includes('SCOUT_CHILD_PLANNER_WORLD_PLACE_HOLD_MISSING'));
+
 // O50's textual substring test can mistake a guard in a comment for a
 // first-statement guard. The O51 AST proof rejects it.
 const exportSource=(body,firstMain)=>
