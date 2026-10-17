@@ -322,7 +322,7 @@ const realRoom={objects:[
 ]};
 const results=assessWorldRuntime({
   me:{_id:'me'},
-  branches:{list:[{branch:'chatgpt-w37s79-stage',activeWorld:true}]},
+  branches:{list:[{branch:'chatgpt',activeWorld:true}]},
   status:{status:'normal'},room:realRoom,memory:wrapped
 });
 assert.equal(results.ok,true);
@@ -332,7 +332,7 @@ let writes=0,reads=0,pathUsed=null,shardUsed=null;
 const api={
   defaultShard:'shard0',
   authMe:async()=>({_id:'me'}),
-  userBranches:async()=>({list:[{branch:'chatgpt-w37s79-stage',
+  userBranches:async()=>({list:[{branch:'chatgpt',
     activeWorld:true}]}),
   userWorldStatus:async()=>({status:'normal'}),
   gameRoomObjects:async()=>realRoom,

@@ -1,0 +1,37 @@
+name: Screeps O24 recovered World runtime (GET only)
+on:
+  push:
+    branches: [observability/o24-world-postrespawn-branch-live-gate-20261017]
+    paths:
+      - tools/world-next-runtime-diagnostics.mjs
+      - tools/world-next-runtime-diagnostics.test.mjs
+      - tools/world-recovery-evidence.test.mjs
+      - .github/workflows/screeps-world-o24-runtime-readonly.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: screeps-o24-world-postrespawn-readonly
+  cancel-in-progress: false
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: tools
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Verify new operational gate and historical recovery evidence (offline)
+        run: |
+          node world-next-runtime-diagnostics.test.mjs
+          node world-recovery-evidence.test.mjs
+      - name: Authenticated W37S79 operational state (GET only)
+        env:
+          SCREEPS_TOKEN_WORLD: ${{ secrets.SCREEPS_TOKEN_WORLD }}
+        run: node world-next-runtime-diagnostics.mjs
