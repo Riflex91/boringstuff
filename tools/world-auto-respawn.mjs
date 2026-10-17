@@ -71,12 +71,18 @@ async function readLossEvidence(api,accountId) {
   const holdings=checkApprovedWorldHoldings(rooms);
   const tick=clock?.time;
   const engine=checkSameTickWorldLoss(memory,tick);
-  const ownCreeps=Array.isArray(roomObjects?.objects)?
-    roomObjects.objects.filter(o=>o?.type==='creep'&&
-      String(o?.user||'')===accountId).length:null;
+  const roomList=Array.isArray(roomObjects?.objects)?roomObjects.objects:null;
+  const ownCreeps=roomList?.filter(o=>o?.type==='creep'&&
+    String(o?.user||'')===accountId).length;
+  // A surviving owned spawn from any authenticated GET is positive
+  // recoverability evidence. Never erase it as a presumed stale ghost.
+  const ownSpawns=roomList?.filter(o=>
+    (o?.type==='spawn'||o?.structureType==='spawn')&&
+    String(o?.user||'')===accountId).length;
   return {status:world?.status??null,holdings,engine,
     currentGameTick:Number.isSafeInteger(tick)?tick:null,
-    noOwnedRoomObjectCreeps:ownCreeps===0};
+    noOwnedRoomObjectCreeps:ownCreeps===0,
+    noOwnedRoomObjectSpawns:ownSpawns===0};
 }
 export async function performApprovedWorldAutoRecovery(api,{
   wait=ms=>pause(ms),now=()=>Math.floor(Date.now()/1000),
@@ -97,7 +103,8 @@ export async function performApprovedWorldAutoRecovery(api,{
   const start=now();
   const first=await readLossEvidence(api,id);
   if(first.status!=='lost'||!first.holdings.scopeVerified||
-     !first.engine.verified||!first.noOwnedRoomObjectCreeps)
+     !first.engine.verified||!first.noOwnedRoomObjectCreeps||
+     !first.noOwnedRoomObjectSpawns)
     return {status:'HOLD_RECOVERABILITY_UNVERIFIED',
       respawnPosts:0,placementPosts:0};
   // Two independent real game-loop status snapshots MUST be separated
@@ -120,7 +127,7 @@ export async function performApprovedWorldAutoRecovery(api,{
     sameTickEngineCreepCount:distinct?second.engine.engineCreepCount:null,
     otherRecoverableFootholdAbsentVerified:distinct&&
       first.holdings.scopeVerified&&second.holdings.scopeVerified&&
-      second.noOwnedRoomObjectCreeps,
+      second.noOwnedRoomObjectCreeps&&second.noOwnedRoomObjectSpawns,
     accountResetScopeVerified:first.holdings.scopeVerified&&
       second.holdings.scopeVerified,
     documentedRespawnTransportVerified:true,
@@ -148,12 +155,22 @@ export async function performApprovedWorldAutoRecovery(api,{
       respawnPosts:0,placementPosts:0};
   // The durable reservation itself takes time. Check official World account
   // state once more; never POST if it recovered while the lock was recorded.
-  let finalStatus;
-  try{finalStatus=await api.userWorldStatus();}
-  catch{return {status:'HOLD_FINAL_STATUS_GET_UNVERIFIED',
+  let finalStatus,finalRoomObjects;
+  try{
+    [finalStatus,finalRoomObjects]=await Promise.all([
+      api.userWorldStatus(),api.gameRoomObjects(ROOM,SHARD)
+    ]);
+  }catch{return {status:'HOLD_FINAL_STATUS_GET_UNVERIFIED',
     respawnPosts:0,placementPosts:0};}
   if(finalStatus?.ok===false||finalStatus?.status!=='lost')
     return {status:'HOLD_FINAL_STATUS_NO_LONGER_LOST',
+      respawnPosts:0,placementPosts:0};
+  const finalObjects=finalRoomObjects?.objects;
+  if(!Array.isArray(finalObjects)||finalObjects.some(o=>
+    String(o?.user||'')===String(id)&&
+    (o?.type==='creep'||o?.type==='spawn'||
+      o?.structureType==='spawn')))
+    return {status:'HOLD_FINAL_OWNED_ASSETS_OR_ROOM_GET_UNVERIFIED',
       respawnPosts:0,placementPosts:0};
   // Verified in the maintained screepers/node-screeps-api library:
   // userRespawn(): POST /api/user/respawn with no payload.
@@ -185,7 +202,8 @@ export async function performApprovedWorldAutoRecovery(api,{
     if(placement?.status!=='PASS'||placement.spawnVerified!==true)
       throw Error('PLACEMENT_NOT_VERIFIED');
     return {status:'RESPAWN_AND_SPAWN1_VERIFIED',
-      respawnPosts:1,placementPosts:placement.placementApiCalls};
+      respawnPosts:1,placementPosts:placement.placementApiCalls,
+      runtimeOperationalVerified:false,codeUploadAttempted:false};
   }catch{
     return {status:'RESPAWN_VERIFIED_EMPTY_PLACEMENT_HOLD',
       respawnPosts:1,placementPosts:null};
