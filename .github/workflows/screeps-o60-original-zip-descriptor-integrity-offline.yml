@@ -1,0 +1,44 @@
+name: Screeps O60 signed ZIP descriptor and exact original archive layout (OFFLINE)
+on:
+  push:
+    branches: [safety/o60-original-zip-descriptor-layout-integrity-20261017]
+permissions:
+  contents: read
+concurrency:
+  group: o60-offline-original-archive-layout
+  cancel-in-progress: false
+jobs:
+  node24-p3-no-production-writes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: tools
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Verify unchanged original Main and gameplay modules
+        shell: bash
+        run: |
+          git -C .. fetch origin main --quiet
+          test "$(git -C .. rev-parse origin/main)" = bc43f2faf1f345e63d9bfe78b6bbaa59e5eaab0c
+          git -C .. diff --exit-code origin/main HEAD -- game
+      - name: Complete canonical Node24 O39-O60 offline regression
+        run: |
+          npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+          npm test
+      - name: Original exact P3 baseline benchmark
+        run: npm run bench:p3
+      - name: Document immutable release HOLD and source custody limits
+        run: |
+          echo '### O60 original Actions ZIP signed-descriptor and layout validation' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Strictly verify CRC, compressed/decompressed lengths, signed data descriptor, and gap-free local ZIP records.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Both original GitHub ZIP archives were inspected independently outside CI; CI uses only synthetic ZIP data.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'No real Screeps upload/spawn/respawn/reset, no writer ref mutation and no merge to Main.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Historical source custody is NOT independent durable operator storage.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'HOLD_EXACT_PREDECESSOR_PAIR_MISSING.' >> "$GITHUB_STEP_SUMMARY"
