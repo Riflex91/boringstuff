@@ -22,7 +22,7 @@ const contains=(code,kind,filename='world-new-writer.mjs')=>{
 // containing a fake POST must not create spurious network sinks.
 for(const source of [
   "// api._request('POST','/api/user/code');\nexport const read=1;",
-  'const example="api._request(\\'POST\\',\\'/api/user/code\\')";',
+  "const example='api._request(\"POST\",\"/api/user/code\")';",
   "const data='https.request';\nconst get=api._request('GET','/api/user/code');"
 ]){
   const result=inspectWorldAstSource('world-docs.mjs',source);
