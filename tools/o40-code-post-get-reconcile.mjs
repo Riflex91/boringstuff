@@ -24,10 +24,15 @@ export async function reconcileUncertainCodePostViaGet(api, branch, expectedModu
   }
   try {
     const opts = { retryAuth: false };
-    const [branches, readback] = await Promise.all([
+    // Drain both initiated reads before returning, even if one fails.
+    // This prevents an orphaned GET from outliving the diagnostic decision.
+    const inspected = await Promise.allSettled([
       api._request('GET', '/api/user/branches', {}, opts),
       api._request('GET', '/api/user/code', { branch }, opts)
     ]);
+    if (inspected.some(result => result.status !== 'fulfilled'))
+      return hold('GET_UNAVAILABLE_OUTCOME_UNKNOWN');
+    const [branches, readback] = inspected.map(result => result.value);
     try {
       assertUniqueActiveCodeBranch(branches, branch);
     } catch {
