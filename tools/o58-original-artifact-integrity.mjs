@@ -36,6 +36,9 @@ export function inspectBoundedZipArchive(bytes){
  check(count>=1&&count<=8&&count===read16(bytes,end+8)&&
   start!==0xffffffff&&length!==0xffffffff&&start+length===end);
  let cursor=start,total=0;
+ // O60: the ZIP must contain only the claimed local records followed
+ // immediately by its central directory. No shadow/prefix/hidden bytes.
+ let expectedLocalOffset=0;
  const names=new Set(),entries=[];
  for(let index=0;index<count;index++){
   check(read32(bytes,cursor)===0x02014b50);
@@ -53,7 +56,7 @@ export function inspectBoundedZipArchive(bytes){
    !name.startsWith('/')&&!name.endsWith('/')&&!name.includes('//')&&
    name.split('/').every(s=>s!=='.'&&s!=='..'));
   names.add(name);cursor+=46+nameLen;
-  check(read32(bytes,local)===0x04034b50&&
+  check(local===expectedLocalOffset&&read32(bytes,local)===0x04034b50&&
    read16(bytes,local+6)===flags&&read16(bytes,local+8)===method);
   const localNameLen=read16(bytes,local+26);
   const localExtra=read16(bytes,local+28);
@@ -72,6 +75,19 @@ export function inspectBoundedZipArchive(bytes){
    check(read32(bytes,local+14)===crc&&read32(bytes,local+18)===packed&&
     read32(bytes,local+22)===unpacked);
   }
+  // The Actions original ZIPs use 16-byte signed data descriptors.
+  // Previous O58 accepted corrupt descriptors or payload gaps, while
+  // validating the decompressed stream against the central directory.
+  const compressedEnd=dataStart+packed;
+  if(flags&8){
+   check(compressedEnd+16<=start&&
+    read32(bytes,compressedEnd)===0x08074b50&&
+    read32(bytes,compressedEnd+4)===crc&&
+    read32(bytes,compressedEnd+8)===packed&&
+    read32(bytes,compressedEnd+12)===unpacked);
+   expectedLocalOffset=compressedEnd+16;
+  }else expectedLocalOffset=compressedEnd;
+  check(expectedLocalOffset<=start);
   let content;
   try{content=inflateRawSync(bytes.subarray(dataStart,dataStart+packed),
     {maxOutputLength:entryMax});}catch{hold();}
@@ -79,7 +95,7 @@ export function inspectBoundedZipArchive(bytes){
   total+=content.length;check(total<=3*1024*1024);
   entries.push(Object.freeze({name,bytes:content,length:content.length,sha256:sha(content)}));
  }
- check(cursor===end);
+ check(cursor===end&&expectedLocalOffset===start);
  return Object.freeze({sha256:sha(bytes),size:bytes.length,
   entries:Object.freeze(entries),entryCount:entries.length});
 }
