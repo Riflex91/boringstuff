@@ -35,6 +35,16 @@ assert.equal(first.ok,true);
 assert.equal(later.ok,true);
 assert.equal(first.canonicalLive100tPass,false);
 assert.equal(first.exactMainCodeVerified,true);
+assert.deepEqual(first.codeFingerprint,{
+ expectedModuleCount:82,actualModuleCount:82,
+ missingExpectedCount:0,unexpectedCount:0,mismatchingExpectedCount:0,
+ differingKnownModules:[]
+});
+const differing=assessReadOnlyPulse(raw(1005,{alternateCode:true}),config);
+assert.equal(differing.ok,false);
+assert.equal(differing.codeFingerprint.mismatchingExpectedCount,1);
+assert.deepEqual(differing.codeFingerprint.differingKnownModules,['m1']);
+assert.ok(!JSON.stringify(differing).includes('CHANGED'));
 assert.equal(first.snapshotTick,1000);
 assert.equal(first.heartbeatTick,1004);
 assert.ok(!JSON.stringify(first).includes('private-deployment-a'));
