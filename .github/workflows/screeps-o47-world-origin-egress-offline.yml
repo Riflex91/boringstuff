@@ -1,0 +1,43 @@
+name: Screeps O47 official World origin and URL TOCTOU firewall (OFFLINE)
+on:
+  push:
+    branches: [safety/o47-world-origin-egress-firewall-20261017]
+permissions:
+  contents: read
+concurrency:
+  group: o47-world-origin-offline-regression
+  cancel-in-progress: false
+jobs:
+  node24-p3-official-world-egress:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: tools
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Pin Main and assert gameplay source byte-identical
+        shell: bash
+        run: |
+          git -C .. fetch origin main --quiet
+          test "$(git -C .. rev-parse origin/main)" = bc43f2faf1f345e63d9bfe78b6bbaa59e5eaab0c
+          git -C .. diff --exit-code origin/main HEAD -- game
+      - name: Full Node24 safety regression O39-O47 including URL-switch and masked World labels
+        run: |
+          npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+          npm test
+      - name: Exact original P3 benchmark equality
+        run: npm run bench:p3
+      - name: Confirm World production HOLD and no external writes
+        run: |
+          echo '### O47 World-origin egress regression' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Official screeps.com targets remain GET-only even under other client labels and mutated baseUrl.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Localhost synthetic fixtures only, no Screeps secrets or external World calls.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'No live World POST, spawn, branch activation, GitHub writer-ref mutation or merge.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'HOLD_EXACT_PREDECESSOR_PAIR_MISSING.' >> "$GITHUB_STEP_SUMMARY"
