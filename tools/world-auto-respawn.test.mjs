@@ -35,7 +35,8 @@ assert.equal(checkSameTickWorldLoss({data:JSON.stringify(wrong)},1004).verified,
 function mock({status='lost',statusAfter='empty',user='riflex91',
   holdings=roomSet,advanced=true,throwPost=false,rejectedPost=false,
   noHeartbeat=false,spawnGhost=false,creepGhost=false,
-  spawnAfterReserve=false}={}){
+  spawnAfterReserve=false,roomObjectsRejected=false,
+  finalRoomObjectsRejected=false}={}){
  const actions={respawnPosts:0,placements:0,worldChecks:0,reservations:0};
  let clockCalls=0,lossReads=0;
  const api={
@@ -51,7 +52,10 @@ function mock({status='lost',statusAfter='empty',user='riflex91',
    if(noHeartbeat)return {data:'{}'};
    return mem(advanced&&lossReads>1?1100:1000);
   },
-  async gameRoomObjects(){return {objects:[
+  async gameRoomObjects(){
+   if(roomObjectsRejected||(finalRoomObjectsRejected&&actions.reservations>0))
+     return {ok:false,objects:[]};
+   return {objects:[
    {type:'controller',user:'private-id'},
    ...((spawnGhost||(spawnAfterReserve&&actions.reservations>0))?
      [{type:'spawn',user:'private-id'}]:[]),
@@ -107,7 +111,8 @@ for(const opts of [
  {user:'another-user'},{status:'empty'},{holdings:{
   shards:{shard0:['W37S79','W37S80'],shard1:[],shard2:[],shard3:[]}}},
  {noHeartbeat:true},{advanced:false},
- {spawnGhost:true},{creepGhost:true},{spawnAfterReserve:true}
+ {spawnGhost:true},{creepGhost:true},{spawnAfterReserve:true},
+ {roomObjectsRejected:true},{finalRoomObjectsRejected:true}
  ]){
   const m=mock(opts);
   if(opts.user==='another-user'){
@@ -116,7 +121,7 @@ for(const opts of [
   }else{
     const r=await performApprovedWorldAutoRecovery(m.api,m.deps);
     assert.ok(r.status.startsWith('HOLD'),r.status);
-    if(opts.spawnAfterReserve)
+    if(opts.spawnAfterReserve||opts.finalRoomObjectsRejected)
       assert.equal(r.status,'HOLD_FINAL_OWNED_ASSETS_OR_ROOM_GET_UNVERIFIED');
   }
   assert.equal(m.actions.respawnPosts,0);
