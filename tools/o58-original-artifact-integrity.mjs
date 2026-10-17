@@ -60,6 +60,18 @@ export function inspectBoundedZipArchive(bytes){
   const dataStart=local+30+localNameLen+localExtra;
   check(localNameLen===nameLen&&localExtra===0&&dataStart+packed<=start&&
    utf8(bytes.subarray(local+30,local+30+localNameLen))===name);
+  // The local and central headers must describe the same entry. Data-
+  // descriptor archives keep the 3 size/checksum fields zero in local
+  // header; non-descriptor entries must carry the central values.
+  check(read16(bytes,local+10)===read16(bytes,cursor-(46+nameLen)+12)&&
+   read16(bytes,local+12)===read16(bytes,cursor-(46+nameLen)+14));
+  if(flags&8){
+   check(read32(bytes,local+14)===0&&read32(bytes,local+18)===0&&
+    read32(bytes,local+22)===0);
+  }else{
+   check(read32(bytes,local+14)===crc&&read32(bytes,local+18)===packed&&
+    read32(bytes,local+22)===unpacked);
+  }
   let content;
   try{content=inflateRawSync(bytes.subarray(dataStart,dataStart+packed),
     {maxOutputLength:entryMax});}catch{hold();}
