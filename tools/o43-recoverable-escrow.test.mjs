@@ -9,6 +9,8 @@ import {
 import {
   prepareTwoPhaseWorldEscrow, verifyTwoPhaseWorldPrePostGate
 } from './o43-two-phase-world-gate.mjs';
+import { inspectWorldEscrowUnderWriterFence }
+  from './o44-world-readonly-fenced-inspection.mjs';
 
 // Every byte below is synthetic. No Screeps service is contacted.
 const root=fs.mkdtempSync(path.join(process.env.RUNNER_TEMP||os.tmpdir(),
@@ -91,6 +93,32 @@ try {
   assert.equal(decision.releaseAuthorized,false);
   assert.equal(decision.mayWriteDeploymentReceipt,false);
   assert.equal(calls.length,8);
+  // O44 insists on the same GitHub fixed-ref owner both before and after
+  // the World and remote-escrow GET-only verification.
+  const writerLock={
+    scope:'world',ref:'refs/tags/locks/screeps-world-code-writer',
+    ownerTagSha:'d'.repeat(40),ownerRunId:'999999',lockHeld:true
+  };
+  let lockGets=0;
+  const writerTransport=async ({method,path})=>{
+    assert.equal(method,'GET');
+    assert.equal(path,'/git/ref/tags/locks/screeps-world-code-writer');
+    lockGets++;
+    return {status:200,data:{ref:writerLock.ref,object:{
+      type:'tag',sha:lockGets===999?'f'.repeat(40):writerLock.ownerTagSha}}};
+  };
+  const fenced=await inspectWorldEscrowUnderWriterFence({
+    ...args,writerLock,writerTransport
+  });
+  assert.equal(fenced.mayUploadWorldCode,false);
+  assert.equal(fenced.releaseAuthorized,false);
+  assert.equal(fenced.status,'O44_LOCK_AND_REMOTE_ESCROW_VERIFIED_READ_ONLY');
+  assert.equal(lockGets,2);
+  assert.equal(calls.length,12);
+  lockGets=998;
+  await assert.rejects(()=>inspectWorldEscrowUnderWriterFence({
+    ...args,writerLock,writerTransport
+  }),/O44_WRITER_LOCK_HOLD_OWNERSHIP_LOST/);
   // Simulate losing the ephemeral runner key: ONLY the offline operator's
   // private RSA key restores the encrypted backup directly from the artifact.
   const recovered=restoreBackupWithOfflinePrivateKey({
