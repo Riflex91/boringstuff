@@ -315,9 +315,19 @@ export async function githubDurableRespawnAttemptLock({
       if(created?.status!==201)return false;
       try{
         const recorded=await created.json();
-        return Number.isSafeInteger(recorded?.id)&&
-          typeof recorded?.body==='string'&&
-          recorded.body.includes(INTENT_MARKER);
+        if(!Number.isSafeInteger(recorded?.id)||
+           typeof recorded?.body!=='string'||
+           !recorded.body.includes(INTENT_MARKER))return false;
+        // A successful POST response is not itself a durable readback.
+        // Verify the same comment independently before any destructive write.
+        const check=await fetcher(
+          'https://api.github.com/repos/Riflex91/boringstuff/issues/comments/'+recorded.id,
+          {method:'GET',headers});
+        if(!check?.ok)return false;
+        const persisted=await check.json();
+        return persisted?.id===recorded.id &&
+          persisted?.body===recorded.body &&
+          persisted.body.includes(INTENT_MARKER);
       }catch{return false;}
     }
   }
