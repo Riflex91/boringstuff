@@ -1,0 +1,43 @@
+name: Screeps O49 imported World mutators and WebSocket read-only proof (OFFLINE)
+on:
+  push:
+    branches: [safety/o49-imported-world-mutator-ws-readonly-20261017]
+permissions:
+  contents: read
+concurrency:
+  group: o49-world-import-ws-offline
+  cancel-in-progress: false
+jobs:
+  node24-p3-no-world-mutation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: tools
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Enforce pinned main and byte-identical game modules
+        shell: bash
+        run: |
+          git -C .. fetch origin main --quiet
+          test "$(git -C .. rev-parse origin/main)" = bc43f2faf1f345e63d9bfe78b6bbaa59e5eaab0c
+          git -C .. diff --exit-code origin/main HEAD -- game
+      - name: Canonical Node24 suite O39 through O49
+        run: |
+          npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+          npm test
+      - name: Exact P3 reproducibility
+        run: npm run bench:p3
+      - name: State deliberate no-write limits
+        run: |
+          echo '### O49 World imports + WebSocket read-only' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Seven previously mutating exported helpers are hard-HOLD before any caller API read.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Only World auth and user console/CPU subscription commands pass the cooperative WS send guard.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'No real Screeps or GitHub ref mutations; no tokens, production POSTs, activation or merge.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'HOLD_EXACT_PREDECESSOR_PAIR_MISSING remains.' >> "$GITHUB_STEP_SUMMARY"

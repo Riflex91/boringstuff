@@ -20,6 +20,9 @@ export function assessRestageGate(branches,status,code,confirmed) {
   return {ok:failures.length===0,failures,mode:'INACTIVE_BRANCH_RESTAGE_ONLY'};
 }
 export async function restageInactiveWorldCode(api,modules,confirmation,onPhase=()=>{}) {
+  // O49: imported World mutator remains quarantined even with an injected
+  // duck-typed API that bypasses ScreepsHttpClient's HTTP firewall.
+  assertLegacyWorldMutationDisabled('legacy-inactive-restage');
   if(api?.defaultShard!=='shard0')throw new Error('EXACT_SHARD_REQUIRED');
   if(!modules||Object.keys(modules).length<8||typeof modules.main!=='string'||
      typeof modules.config!=='string')throw new Error('INVALID_LOCAL_MODULE_SET');

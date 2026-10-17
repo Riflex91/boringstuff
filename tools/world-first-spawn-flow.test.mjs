@@ -83,29 +83,14 @@ function fakeWorld({occupied=false,otherEnemy=false,failedPost=false,
   };
   return {api,calls,placed:()=>placed};
 }
-{
- const f=fakeWorld();
- const done=await placePinnedWorldSpawn(f.api,'me');
- assert.equal(done.status,'PASS');
- assert.equal(done.spawnVerified,true);
- assert.equal(done.worldCodeActivated,false);
- assert.equal(done.activeBranch,'default');
- assert.equal(done.placementApiCalls,1);
- assert.equal(f.placed(),true);
- assert.equal(f.calls.filter(c=>c==='POST_PLACE_SPAWN').length,1);
- await assert.rejects(()=>placePinnedWorldSpawn(f.api,'me'));
- assert.equal(f.calls.filter(c=>c==='POST_PLACE_SPAWN').length,1);
+// O49: even an injected fake API that reports perfect readiness must not
+// perform a spawn placement from the old exported mutator.
+for(const scenario of [{},{occupied:true},{otherEnemy:true},
+  {badName:true},{failedPost:true}]){
+  const f=fakeWorld(scenario);
+  await assert.rejects(()=>placePinnedWorldSpawn(f.api,'me'),
+    /O45_WORLD_MUTATION_HOLD_NO_APPROVED_FENCED_EXECUTOR/);
+  assert.equal(f.calls.length,0);
+  assert.equal(f.placed(),false);
 }
-for (const cfg of [{occupied:true},{otherEnemy:true},{badName:true}]) {
- const f=fakeWorld(cfg);
- await assert.rejects(()=>placePinnedWorldSpawn(f.api,'me'));
- assert.equal(f.calls.includes('POST_PLACE_SPAWN'),false);
- assert.equal(f.placed(),false);
-}
-{
- const f=fakeWorld({failedPost:true});
- await assert.rejects(()=>placePinnedWorldSpawn(f.api,'me'),
-   /WORLD_PLACEMENT_RESULT_UNCERTAIN/);
- assert.equal(f.calls.filter(c=>c==='POST_PLACE_SPAWN').length,1);
-}
-console.log('World pinned first spawn isolated full offline flow: PASS');
+console.log('O49 World pinned first spawn export quarantine + offline fixture: PASS');

@@ -74,8 +74,9 @@ try{
   assert.throws(()=>assertWorldHttpReadOnly('world','post','/api/user/code'),
     /O46_WORLD_HTTP_MUTATION_HOLD_NO_APPROVED_FENCED_EXECUTOR/);
 
-  // Raw entrypoint import can no longer make actual World HTTP writes.
-  // Bootstrap safely reaches GET-only preflight but stops at clone-branch.
+  // O49 adds a stronger guard on imported legacy World mutators:
+  // these now abort before even a GET. Direct raw _request POST checks above
+  // continue to exercise the independent O46 HTTP firewall.
   const source={
     main:'module.exports.loop = () => {};',
     config:"module.exports={VERSION:'synthetic'};",
@@ -84,20 +85,15 @@ try{
   const api=fixtureWorld();
   const prior=hits.length;
   await assert.rejects(()=>stageInactiveWorldCode(api,source),
-    /O46_WORLD_HTTP_MUTATION_HOLD_NO_APPROVED_FENCED_EXECUTOR/);
-  assert.ok(hits.length>prior,'World staging must first complete GET-only checks');
-  assert.equal(hits.slice(prior).every(x=>x.method==='GET'),true,
-    'Imported World staging must never POST to real World client');
+    /O45_WORLD_MUTATION_HOLD_NO_APPROVED_FENCED_EXECUTOR/);
+  assert.equal(hits.length,prior,'Exported World staging aborts before all HTTP');
 
-  // A second imported mutating helper reaches its own guarded POST but
-  // cannot evade the shared transport firewall.
   state.mode='chatgpt';
   const second=hits.length;
   await assert.rejects(()=>stageSeparateInactiveCode(fixtureWorld(),
     source,'STAGE_SEPARATE_INACTIVE_CODE'),
-    /O46_WORLD_HTTP_MUTATION_HOLD_NO_APPROVED_FENCED_EXECUTOR/);
-  assert.ok(hits.length>second);
-  assert.ok(hits.slice(second).every(x=>x.method==='GET'));
+    /O45_WORLD_MUTATION_HOLD_NO_APPROVED_FENCED_EXECUTOR/);
+  assert.equal(hits.length,second,'Second imported World staging aborts before HTTP');
 
   // World identity must not be reassignable to defeat a check that trusts
   // the mutable client property.

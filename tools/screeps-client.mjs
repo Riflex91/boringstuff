@@ -6,6 +6,7 @@ import { EventEmitter } from 'node:events';
 import { fileURLToPath } from 'node:url';
 import { assertWorldHttpReadOnly } from './o46-world-http-write-policy.mjs';
 import { resolveSafeScreepsApiTarget } from './o48-safe-api-target.mjs';
+import { resolveSafeScreepsSocketTarget, protectScreepsSocketSend } from './o49-world-websocket-readonly.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -343,12 +344,17 @@ export class ScreepsSocketClient extends EventEmitter {
   async connect() {
     this._manualClose = false;
     if (!this.http.token) await this.http.auth();
-    const wsUrl = new URL('socket/websocket', this.http.server.baseUrl.replace(/^http/, 'ws'));
+    // O49: reject malformed/retargeted socket origins before connecting,
+    // then pin read-only commands on the actual World-targeted socket.
+    const configuredBaseUrl = this.http.server.baseUrl;
+    const wsUrl = resolveSafeScreepsSocketTarget(configuredBaseUrl);
     const { default: WebSocket } = await import('ws');
 
     return new Promise((resolve, reject) => {
       let settled = false;
       const ws = new WebSocket(wsUrl);
+      protectScreepsSocketSend(ws,this.http.serverName,configuredBaseUrl,
+        this.http.token);
       this.ws = ws;
 
       const failBeforeAuth = err => {
@@ -400,7 +406,7 @@ export class ScreepsSocketClient extends EventEmitter {
                 resolve();
               }
             } else {
-              const err = new Error(`WebSocket authentication failed: ${msg}`);
+              const err = new Error('WebSocket authentication rejected (details redacted)');
               this.emit(ScreepsSocketClient.AUTH, { data: { status, token } });
               failBeforeAuth(err);
             }
