@@ -24,7 +24,8 @@ function publicKey(pem) {
   try {
     const key=crypto.createPublicKey(pem);
     if (key.asymmetricKeyType !== 'rsa' ||
-        key.asymmetricKeyDetails?.modulusLength < 3072) fail('RSA_KEY_TOO_WEAK');
+        !Number.isInteger(key.asymmetricKeyDetails?.modulusLength) ||
+        key.asymmetricKeyDetails.modulusLength < 3072) fail('RSA_KEY_TOO_WEAK');
     return key;
   } catch { fail('RSA_PUBLIC_KEY'); }
 }
@@ -39,11 +40,18 @@ function assertRecipient(publicKeyPem, fingerprint) {
     fail('PINNED_RECIPIENT_MISMATCH');
   return key;
 }
+function readArtifactFile(file) {
+  const stat=fs.lstatSync(file);
+  if (!stat.isFile() || stat.isSymbolicLink()) fail('UNSAFE_ARTIFACT_FILE');
+  // GitHub download-artifact normalizes downloaded file modes to 0644.
+  // The archive is encrypted public data; its integrity is authenticated.
+  return fs.readFileSync(file);
+}
 function readPrivateFile(file) {
   const stat=fs.lstatSync(file);
   if (!stat.isFile() || stat.isSymbolicLink() ||
       (process.platform !== 'win32' && (stat.mode & 0o077)!==0))
-    fail('UNSAFE_FILE');
+    fail('UNSAFE_PRIVATE_BACKUP');
   return fs.readFileSync(file);
 }
 function readEnvelope(dir) {
@@ -53,8 +61,8 @@ function readEnvelope(dir) {
   const files=fs.readdirSync(dir).sort();
   if (files.length!==2 || files[0]!=='backup.enc' ||
       files[1]!=='escrow-envelope.json') fail('ARCHIVE_INVENTORY');
-  const body=readPrivateFile(path.join(dir,'backup.enc'));
-  const raw=readPrivateFile(path.join(dir,'escrow-envelope.json'));
+  const body=readArtifactFile(path.join(dir,'backup.enc'));
+  const raw=readArtifactFile(path.join(dir,'escrow-envelope.json'));
   let envelope;
   try { envelope=JSON.parse(raw.toString('utf8')); }
   catch { fail('ENVELOPE_JSON'); }
