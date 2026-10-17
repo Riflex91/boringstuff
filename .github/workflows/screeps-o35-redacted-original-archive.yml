@@ -1,0 +1,76 @@
+name: Screeps O35 redacted original receipt archival (GET only, no release)
+on:
+  push:
+    branches: [diagnostics/o35-redacted-original-receipt-archive-20261017]
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: o35-redacted-original-receipts
+  cancel-in-progress: false
+jobs:
+  exact-head-node24-p3:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: tools
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Full exact-head Node24, original proof, archival safeguards
+        run: |
+          npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+          npm test
+          python3 o34-artifact-receipt.test.py
+      - name: Paired exact P3 CPU benchmark
+        run: npm run bench:p3
+  preserve-only-no-live-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    defaults:
+      run:
+        working-directory: tools
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
+      GITHUB_REPOSITORY: Riflex91/boringstuff
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Verify unchanged exact predecessor Main O16
+        shell: bash
+        run: |
+          git -C .. fetch origin main --quiet
+          test "$(git -C .. rev-parse origin/main)" = bc43f2faf1f345e63d9bfe78b6bbaa59e5eaab0c
+          git -C .. diff --exit-code origin/main HEAD -- game
+      - name: Strict archived ZIP and attestation regression tests
+        run: |
+          python3 o34-artifact-receipt.test.py
+          node o34-historical-actions-evidence.test.mjs
+          node o35-redacted-original-attestation.test.mjs
+      - name: GET original ZIPs and logs and write redacted digest-only HOLD attestation
+        run: node o35-redacted-original-attestation.mjs
+      - name: Preserve ONLY public-safe redacted hash attestation for 90 days
+        uses: actions/upload-artifact@v4
+        with:
+          name: o35-redacted-original-provenance-${{ github.sha }}
+          path: ${{ runner.temp }}/o35-redacted-github-evidence.json
+          if-no-files-found: error
+          retention-days: 90
+      - name: Explain nonrelease artifact and strict predecessor HOLD
+        shell: bash
+        run: |
+          echo '### Original GitHub historical receipt evidence preserved (redacted hashes only)' >> "$GITHUB_STEP_SUMMARY"
+          echo 'The artifact contains no source code, backup modules, credentials, deployment IDs, or raw receipt contents.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Newbieland original PASS is exact current Main; World original PASS belongs to an earlier SHA.' >> "$GITHUB_STEP_SUMMARY"
+          echo '**HOLD_EXACT_PREDECESSOR_PAIR_MISSING — NO RELEASE, NO MERGE, NO GAME WRITES.**' >> "$GITHUB_STEP_SUMMARY"
