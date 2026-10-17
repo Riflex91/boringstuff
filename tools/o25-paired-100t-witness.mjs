@@ -60,7 +60,7 @@ export function assessReadOnlyPulse(raw,{room,branch,expected}){
   // currently retained Memory.bot.deploymentId and removal must reproduce
   // the exact checked-out Main config bytes. No other normalization allowed.
   const serverConfig=typeof modules?.config==='string'?modules.config:null;
-  const deployedLine=/^  DEPLOYMENT_ID: '([0-9]{14}-[0-9]{1,10})',\\r?\\n/gm;
+  const deployedLine=/^  DEPLOYMENT_ID: '([0-9]{14}-[0-9]{1,10})',\r?\n/gm;
   const deploymentMarkers=serverConfig?
     [...serverConfig.matchAll(deployedLine)]:[];
   const knownDeploymentLineVerified=Boolean(
