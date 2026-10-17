@@ -24,7 +24,7 @@ export function verifyLiveRunEvidence(run,jobs,logs,expectedSha) {
      .filter(n=>Number.isInteger(n)&&n>=100)[0]||null};
 }
 
-async function githubGet(url,token,repository,runId,textMode=false){
+export async function githubGet(url,token,repository,runId,textMode=false){
  // O55: validate the final absolute URL before exposing GitHub token to
  // fetch. Never follow a 30x to a remote host with credentials.
  assertGitHubEvidenceReadUrl(url,repository,runId);
