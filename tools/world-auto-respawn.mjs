@@ -79,7 +79,7 @@ async function readLossEvidence(api,accountId) {
 }
 export async function performApprovedWorldAutoRecovery(api,{
   wait=ms=>pause(ms),now=()=>Math.floor(Date.now()/1000),
-  waitForLossMs=420000,place=placeW37S79Only
+  waitForLossMs=420000,place=placeW37S79Only,reserveAttempt=null
 }={}){
   if(api?.defaultShard!==SHARD)throw Error('WORLD_SHARD_NOT_VERIFIED');
   const me=await api.authMe();
@@ -129,6 +129,31 @@ export async function performApprovedWorldAutoRecovery(api,{
   if(verdict.verdict!=='ELIGIBLE_FOR_SEPARATELY_VERIFIED_EXECUTOR')
     return {status:'HOLD_RESPAWN_GATE',blockers:verdict.blockers,
       respawnPosts:0,placementPosts:0};
+  // A single process can prevent transport retries, but a scheduled
+  // workflow may be started again after a lost acknowledgement. Require an
+  // external, durable one-way attempt marker BEFORE a potentially committed
+  // respawn. If that marker cannot be independently verified, do not reset.
+  if(typeof reserveAttempt!=='function')
+    return {status:'HOLD_DURABLE_ATTEMPT_LOCK_UNAVAILABLE',
+      respawnPosts:0,placementPosts:0};
+  let reserved=false;
+  try {
+    reserved=await reserveAttempt({
+      account:EXPECTED_USERNAME,shard:SHARD,room:ROOM,
+      gameTick:second.currentGameTick});
+  } catch {/* account safety first; no reset without durable marker */ }
+  if(reserved!==true)
+    return {status:'HOLD_RESPAWN_ATTEMPT_ALREADY_RECORDED_OR_UNVERIFIED',
+      respawnPosts:0,placementPosts:0};
+  // The durable reservation itself takes time. Check official World account
+  // state once more; never POST if it recovered while the lock was recorded.
+  let finalStatus;
+  try{finalStatus=await api.userWorldStatus();}
+  catch{return {status:'HOLD_FINAL_STATUS_GET_UNVERIFIED',
+    respawnPosts:0,placementPosts:0};}
+  if(finalStatus?.ok===false||finalStatus?.status!=='lost')
+    return {status:'HOLD_FINAL_STATUS_NO_LONGER_LOST',
+      respawnPosts:0,placementPosts:0};
   // Verified in the maintained screepers/node-screeps-api library:
   // userRespawn(): POST /api/user/respawn with no payload.
   // Exactly one request. NO retries on network uncertainty or any HTTP error.
@@ -165,6 +190,63 @@ export async function performApprovedWorldAutoRecovery(api,{
       respawnPosts:1,placementPosts:null};
   }
 }
+// Never print the GitHub token, issue response, or any credentials. Record
+// the intent in the existing World recovery incident BEFORE invoking the
+// destructive Screeps POST. The workflow serializes this across invocations.
+// A recent marker blocks a new automatic reset for seven days, including
+// when an earlier POST timed out after the server may have committed it.
+const INTENT_MARKER='WORLD_AUTO_RESPAWN_ATTEMPT_LOCK_V1';
+const COOLDOWN_SECONDS=7*24*60*60;
+export async function githubDurableRespawnAttemptLock({
+  account,shard,room
+}={},env=process.env,fetcher=fetch){
+  if(account!=='riflex91'||shard!=='shard0'||room!=='W37S79'||
+     env.GITHUB_REPOSITORY!=='Riflex91/boringstuff'||
+     env.GITHUB_REF!=='refs/heads/main'||
+     typeof env.GITHUB_TOKEN!=='string'||!env.GITHUB_TOKEN)
+    return false;
+  const base='https://api.github.com/repos/Riflex91/boringstuff/issues/367/comments';
+  const headers={Authorization:'Bearer '+env.GITHUB_TOKEN,
+    Accept:'application/vnd.github+json',
+    'X-GitHub-Api-Version':'2022-11-28'};
+  const now=Math.floor(Date.now()/1000);
+  // Validate a complete paged comment history, not just last 100.
+  // If too many records to check exhaustively, HOLD rather than retry.
+  for(let page=1;page<=25;page++){
+    let result;
+    try {result=await fetcher(base+'?per_page=100&page='+page,{
+      method:'GET',headers
+    });} catch{return false;}
+    if(!result?.ok)return false;
+    let items;
+    try{items=await result.json();}catch{return false;}
+    if(!Array.isArray(items)||items.length>100)return false;
+    if(items.some(item=>{
+      if(typeof item?.body!=='string'||!item.body.includes(INTENT_MARKER))
+        return false;
+      const age=(Date.parse(item.created_at||'')/1000);
+      return !Number.isFinite(age)||now-age<COOLDOWN_SECONDS;
+    }))return false;
+    if(items.length<100){
+      const body=INTENT_MARKER+'\\nOperator-approved World auto-recovery'
+        +' intent; no Screeps mutation is implied by this entry.';
+      let created;
+      try{created=await fetcher(base,{method:'POST',headers:{
+        ...headers,'Content-Type':'application/json'
+      },body:JSON.stringify({body})});}
+      catch{return false;}
+      if(created?.status!==201)return false;
+      try{
+        const recorded=await created.json();
+        return Number.isSafeInteger(recorded?.id)&&
+          typeof recorded?.body==='string'&&
+          recorded.body.includes(INTENT_MARKER);
+      }catch{return false;}
+    }
+  }
+  return false;
+}
+
 async function main(){
   if(!process.env.RUNNER_TEMP)throw Error('RUNNER_TEMP_REQUIRED');
   const config=path.join(process.env.RUNNER_TEMP,
@@ -173,7 +255,9 @@ async function main(){
     {mode:0o600,flag:'wx'});
   try{
     const api=await ScreepsHttpClient.fromConfig('world',{file:config,shard:SHARD});
-    const r=await performApprovedWorldAutoRecovery(api);
+    const r=await performApprovedWorldAutoRecovery(api,{
+      reserveAttempt:githubDurableRespawnAttemptLock
+    });
     console.log('WORLD_AUTO_RESPAWN '+JSON.stringify(r));
     if(!['NO_ACTION_WORLD_NORMAL','RESPAWN_AND_SPAWN1_VERIFIED',
       'HOLD_WORLD_NOT_LOST'].includes(r.status))process.exitCode=2;
