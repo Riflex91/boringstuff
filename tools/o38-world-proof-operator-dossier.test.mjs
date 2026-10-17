@@ -104,7 +104,7 @@ const wrong=[
  {...params,worldOriginal:{...worldOriginal,sourceHeadSha:PREDECESSOR_MAIN}},
  {...params,worldOriginal:{...worldOriginal,livePass:{
   ...worldOriginal.livePass,observedTicks:99
- }}
+ }}}
 ];
 for(const [i,bad] of wrong.entries()){
  const got=assessWorldEvidenceBootstrapDossier(bad);
