@@ -2,6 +2,9 @@
 // GET-only against GitHub's own run/jobs/log/artifact records. No Screeps API,
 // code upload, respawn, branch switch, GitHub issue mutation or fake receipt.
 // A historical PASS on another SHA is NOT the exact predecessor-Main gate.
+import {spawnSync} from 'node:child_process';
+import {createHash} from 'node:crypto';
+import {fileURLToPath} from 'node:url';
 const OWNER='Riflex91',REPO='boringstuff';
 export const EXPECTED_MAIN_SHA='bc43f2faf1f345e63d9bfe78b6bbaa59e5eaab0c';
 export const HISTORICAL_RUNS=Object.freeze({
@@ -53,7 +56,7 @@ export function extractOriginalLivePass(log){
 }
 
 export function assessHistoricalRun({server,expectedMainSha=EXPECTED_MAIN_SHA,
-  expectedRunId,run,jobs,artifacts,jobLog}={}){
+  expectedRunId,run,jobs,artifacts,jobLog,receiptEvidence}={}){
   const issues=[];
   const policy=SERVERS[server];
   if(!policy||!isSha(expectedMainSha)||!validId(expectedRunId))
@@ -89,6 +92,10 @@ export function assessHistoricalRun({server,expectedMainSha=EXPECTED_MAIN_SHA,
     a?.name===artifactName&&a?.expired===false&&validId(a?.id)&&
     Number.isSafeInteger(a?.size_in_bytes)&&a.size_in_bytes>0).length!==1)
     issues.push('ORIGINAL_DEPLOYMENT_ARTIFACT_UNAVAILABLE');
+  const receiptVerified=receiptEvidence?.verified===true&&
+    receiptEvidence?.server===server&&
+    receiptEvidence?.runId===expectedRunId;
+  if(!receiptVerified)issues.push('ORIGINAL_RECEIPT_CONTENT_NOT_VERIFIED');
   const sameMain=run?.head_sha===expectedMainSha;
   const historical=issues.length===0;
   return {
@@ -99,7 +106,7 @@ export function assessHistoricalRun({server,expectedMainSha=EXPECTED_MAIN_SHA,
     exactMainSha:Boolean(sameMain),
     eligibleExactPredecessor:historical&&sameMain,
     originalReceiptArtifactMetadataVerified:!issues.includes('ORIGINAL_DEPLOYMENT_ARTIFACT_UNAVAILABLE'),
-    originalReceiptFileContentsVerified:false,
+    originalReceiptFileContentsVerified:receiptVerified,
     independentCurrentRuntimeHealthyVerified:false,
     livePass:proof.valid?proof:null,
     issues:[...issues,...(!sameMain?['HISTORICAL_PASS_SHA_DIFFERS_FROM_EXACT_MAIN']:[])],
@@ -124,8 +131,39 @@ export function assessHistoricalPair(world,newbieland,expectedMainSha=EXPECTED_M
 }
 
 const base='https://api.github.com/repos/'+OWNER+'/'+REPO;
+export function inspectOriginalReceiptArchive(bytes,{server,run,jobLog}){
+  const invalid={verified:false,server,runId:run?.id??null};
+  if(!SERVERS[server]||!validId(run?.id)||
+     typeof jobLog!=='string'||jobLog.length>24_000_000||
+     !Buffer.isBuffer(bytes)||bytes.length>24_000_000)return invalid;
+  const branch=server==='world'?'chatgpt-w37s79-stage':'chatgpt';
+  const rows=[...jobLog.matchAll(
+    /^20\\d\\d-[^\\r\\n]{12,48}Z Deployment ID:\\s+([0-9]{17}-[0-9]{1,10})\\r?$/gm
+  )];
+  if(rows.length!==1)return invalid;
+  const idDigest=createHash('sha256').update(rows[0][1]).digest('hex');
+  const command=spawnSync('python3',[
+    fileURLToPath(new URL('./o34-artifact-receipt.py',import.meta.url)),
+    server,branch
+  ],{input:bytes,encoding:'utf8',maxBuffer:16384,timeout:10000});
+  if(command.status!==0||typeof command.stdout!=='string')return invalid;
+  let receipt;
+  try{receipt=JSON.parse(command.stdout);}
+  catch{return invalid;}
+  const created=Date.parse(receipt?.createdAt||'');
+  const started=Date.parse(run?.created_at||'');
+  const finished=Date.parse(run?.updated_at||'');
+  const verified=receipt?.server===server&&receipt?.branch===branch&&
+    receipt?.idDigest===idDigest&&
+    typeof receipt?.version==='string'&&receipt.version.length>=1&&
+    Number.isFinite(created)&&Number.isFinite(started)&&
+    Number.isFinite(finished)&&
+    created>=started-120000&&created<=finished+120000;
+  return {...invalid,verified:Boolean(verified)};
+}
 export async function inspectGithubHistoricalRun(server,runId,{
-  token=process.env.GITHUB_TOKEN,read=githubGet
+  token=process.env.GITHUB_TOKEN,read=githubGet,
+  inspectArchive=inspectOriginalReceiptArchive
 }={}){
   if(!SERVERS[server]||!validId(runId))throw Error('EXACT_TRUSTED_SERVER_RUN_REQUIRED');
   const uri='/actions/runs/'+runId;
@@ -139,8 +177,20 @@ export async function inspectGithubHistoricalRun(server,runId,{
   const job=Array.isArray(jobs)&&jobs.length===1?jobs[0]:null;
   const jobLog=validId(job?.id)?
     await read(base+'/actions/jobs/'+job.id+'/logs',token,'text'):null;
+  const artifactName=SERVERS[server].artifact+(run?.head_sha||'');
+  const found=Array.isArray(artifactData?.artifacts)?
+    artifactData.artifacts.filter(a=>a?.name===artifactName&&
+      a?.expired===false&&validId(a?.id)):[];
+  let receiptEvidence={verified:false,server,runId};
+  if(found.length===1&&typeof jobLog==='string'){
+    try{
+      const archiveBytes=await read(
+        base+'/actions/artifacts/'+found[0].id+'/zip',token,'binary');
+      receiptEvidence=inspectArchive(archiveBytes,{server,run,jobLog});
+    }catch{/* absent/unreadable original artifact must HOLD */}
+  }
   return assessHistoricalRun({server,expectedRunId:runId,run,jobs,
-    artifacts:artifactData?.artifacts,jobLog});
+    artifacts:artifactData?.artifacts,jobLog,receiptEvidence});
 }
 
 export async function githubGet(url,token,type){
@@ -157,6 +207,11 @@ export async function githubGet(url,token,type){
   if(!reply.ok)throw Error('GITHUB_READ_NOT_VERIFIED_'+reply.status);
   const declared=Number(reply.headers.get('content-length')||0);
   if(declared>24_000_000)throw Error('GITHUB_REPLY_UNBOUNDED');
+  if(type==='binary'){
+    const bytes=Buffer.from(await reply.arrayBuffer());
+    if(bytes.length>24_000_000)throw Error('GITHUB_REPLY_UNBOUNDED');
+    return bytes;
+  }
   const raw=await reply.text();
   if(raw.length>24_000_000)throw Error('GITHUB_REPLY_UNBOUNDED');
   if(type==='text')return raw;
