@@ -47,6 +47,22 @@ export function inspectBoundedZipArchive(bytes){
   const unpacked=read32(bytes,cursor+24),nameLen=read16(bytes,cursor+28);
   const extra=read16(bytes,cursor+30),comment=read16(bytes,cursor+32);
   const disk=read16(bytes,cursor+34),local=read32(bytes,cursor+42);
+  // O64: a valid payload/CRC is not enough if the ZIP central metadata
+  // claims the member is a symlink, directory, device or executable.
+  const creatorOS=bytes[cursor+5],internalAttrs=read16(bytes,cursor+36);
+  const externalAttrs=read32(bytes,cursor+38);
+  if(creatorOS===3){
+   // The only supported POSIX regular files are user-private 0600
+   // and standard non-executable 0644; reject suid, symlink and dirs.
+   const mode=externalAttrs>>>16;
+   check((mode===0x81a4||mode===0x8180)&&
+    (externalAttrs&0xffff)===0x20&&internalAttrs===0);
+  }else{
+   // DOS/Windows fixture metadata: zero or standard archive bit only.
+   // Unknown file-origin systems require explicit review.
+   check(creatorOS===0&&internalAttrs===0&&
+    (externalAttrs===0||externalAttrs===0x20));
+  }
   check((flags&1)===0&&(flags&~0x808)===0&&method===8&&
    packed>0&&packed<=32*1024*1024&&unpacked>0&&unpacked<=entryMax&&
    nameLen>0&&nameLen<=180&&extra===0&&comment===0&&disk===0&&
@@ -93,7 +109,8 @@ export function inspectBoundedZipArchive(bytes){
     {maxOutputLength:entryMax});}catch{hold();}
   check(content.length===unpacked&&crc32(content)===crc);
   total+=content.length;check(total<=3*1024*1024);
-  entries.push(Object.freeze({name,bytes:content,length:content.length,sha256:sha(content)}));
+  entries.push(Object.freeze({name,bytes:content,length:content.length,sha256:sha(content),
+   creatorOS,externalAttrs,internalAttrs}));
  }
  check(cursor===end&&expectedLocalOffset===start);
  return Object.freeze({sha256:sha(bytes),size:bytes.length,
@@ -117,7 +134,9 @@ export function verifyPinnedOriginalArtifactZip(bytes,server){
   Buffer.isBuffer(bytes)&&bytes.length===ORIGINAL_ARTIFACT_LENGTH[server]&&
   sha(bytes)===ORIGINAL_ARTIFACT_SHA256[server]);
  const zip=inspectBoundedZipArchive(bytes),wanted=paths[server];
- check(zip.entryCount===wanted.length&&zip.entries.every((e,i)=>e.name===wanted[i]));
+ check(zip.entryCount===wanted.length&&zip.entries.every((e,i)=>
+   e.name===wanted[i]&&e.creatorOS===3&&
+   e.externalAttrs===0x81a40020&&e.internalAttrs===0));
  const backup=json(zip.entries[0]),receipt=json(zip.entries.at(-1));
  const branch=server==='world'?'chatgpt-w37s79-stage':'chatgpt';
  check(backup?.server===server&&receipt?.server===server&&
