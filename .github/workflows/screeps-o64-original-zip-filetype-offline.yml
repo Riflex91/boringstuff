@@ -1,0 +1,43 @@
+name: Screeps O64 original ZIP Unix regular-file metadata (OFFLINE)
+on:
+  push:
+    branches: [safety/o64-original-zip-filetype-and-mode-audit-20261018]
+permissions:
+  contents: read
+concurrency:
+  group: o64-offline-historical-zip-filemode
+  cancel-in-progress: false
+jobs:
+  node24-p3-original-zip-metadata:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: tools
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Pinned original Main, unchanged gameplay
+        shell: bash
+        run: |
+          git -C .. fetch origin main --quiet
+          test "$(git -C .. rev-parse origin/main)" = bc43f2faf1f345e63d9bfe78b6bbaa59e5eaab0c
+          git -C .. diff --exit-code origin/main HEAD -- game
+      - name: Canonical complete Node24 O39 through O64 offline tests
+        run: |
+          npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+          npm test
+      - name: Original P3 exact reproducibility
+        run: npm run bench:p3
+      - name: Release HOLD and no-secret accounting
+        run: |
+          echo '### O64 historical original ZIP Unix file type/mode verification' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Reject symlinks, directories, executable devices, unreviewed external file attributes and unknown ZIP-origin OS.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'CI runs only synthetic ZIP fixtures. Original historical artifact bytes were inspected locally, not uploaded to GitHub.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'No external owner-controlled durable custody, original exact-Main World LIVE_100T_PASS, live World POST or Main merge.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'HOLD_EXACT_PREDECESSOR_PAIR_MISSING.' >> "$GITHUB_STEP_SUMMARY"
