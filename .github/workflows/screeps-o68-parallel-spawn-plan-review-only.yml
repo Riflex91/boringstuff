@@ -1,0 +1,54 @@
+name: Screeps O68 coordinated parallel-spawn planner (SHADOW REVIEW ONLY)
+on:
+  push:
+    branches: [feature/o68-coordinated-parallel-spawn-plan-20261020]
+permissions:
+  contents: read
+concurrency:
+  group: o68-parallel-spawn-plan-review
+  cancel-in-progress: false
+jobs:
+  node24-gameplay-p3-offline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: tools
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Check original Main and precisely bounded gameplay delta
+        shell: bash
+        run: |
+          git -C .. fetch origin main --quiet
+          test "$(git -C .. rev-parse origin/main)" = bc43f2faf1f345e63d9bfe78b6bbaa59e5eaab0c
+          actual="$(git -C .. diff --name-only origin/main HEAD -- game | sort)"
+          expected="$(printf '%s\n' game/main.js game/room.manager.js game/room.state.js game/spawn.job.stall.shadow.js game/spawn.fleet.telemetry.js game/spawn.manager.js game/spawn.parallel.plan.js | sort)"
+          test "$actual" = "$expected"
+          git -C .. diff --quiet 9a2e964c5f35cdf0b3b89e555113e3f729c10507 HEAD -- game/spawn.manager.js
+          git -C .. diff --quiet origin/main HEAD -- game/body.builder.js
+          git -C .. diff --quiet origin/main HEAD -- game/config.js
+          git -C .. diff --quiet origin/main HEAD -- game/defense.regional.live.js
+          if grep -E '(\.spawnCreep[[:space:]]*\(|\.cancel[[:space:]]*\(|\.renewCreep[[:space:]]*\(|\.createConstructionSite[[:space:]]*\()' ../game/spawn.parallel.plan.js; then
+            echo 'O68 planner must not create gameplay actions' >&2
+            exit 1
+          fi
+      - name: Full canonical Node24 O65-O68 gameplay regressions
+        run: |
+          node --check ../game/spawn.parallel.plan.js
+          npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+          npm test
+      - name: Original P3 4-mode reproducibility benchmark
+        run: npm run bench:p3
+      - name: No live deploy or authorization
+        run: |
+          echo '### O68 multi-spawn deterministic shadow planner review only' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Plans multiple independent roles and reserves room energy once, without executing game intents.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Accounts for observed live roles, prespawn horizon and existing in-flight spawn jobs.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Shadow only. Legacy spawnOne stays the only executor; no new spawnCreep, cancel, API POST or Main merge.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'No original exact-Main World LIVE_100T_PASS. HOLD_EXACT_PREDECESSOR_PAIR_MISSING.' >> "$GITHUB_STEP_SUMMARY"
