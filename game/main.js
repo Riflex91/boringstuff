@@ -303,6 +303,8 @@ function statusSnapshot(roomStates, tickCpu) {
       // O68: role/energy reservations are a SHADOW preview, never live intents.
       spawnParallel: state.spawnParallelShadow ? state.spawnParallelShadow.summary : null,
       spawnParallelExecution: state.spawnParallelExecution || null,
+      defenseSiege: state.defenseSiege || null,
+      defenseTowerAction: state.defenseTowerAction || null,
       spawnParallelReconciliation: spawnParallelReconcile.summary(state.room.name, Memory),
       spawnRemainingTime: state.spawn && state.spawn.spawning ? state.spawn.spawning.remainingTime : 0,
       economy: state.economyMetrics || null,
