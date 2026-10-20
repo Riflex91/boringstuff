@@ -163,28 +163,30 @@ function shadowCpuHeadroom(detailName, game, memoryRoot) {
 // unrelated towers, construction, CPU stages or remote mission logic.
 // A throwing productive executor must not trigger a legacy retry.
 function dispatchSpawn(state, game, memory) {
+  let legacyNeeded = false;
   if (config.ENABLE_PARALLEL_SPAWN_EXECUTION !== true) {
     state.spawnParallelExecution = {status:'DISABLED', reason:'RELEASE_GATE_OFF'};
-    spawnManager.spawnOne(state);
-    return state.spawnParallelExecution;
-  }
-  const proposal = state.spawnParallelShadow;
-  if (proposal && proposal.status === 'DEFERRED') {
-    state.spawnParallelExecution = {status:'DEFERRED', reason:'CPU_SHADOW_DEFERRED'};
-    spawnManager.spawnOne(state);
-  } else if (proposal && Array.isArray(proposal.intents) &&
-             proposal.intents.length) {
-    try {
-      state.spawnParallelExecution = spawnParallelExecutor.execute(state, proposal, game, memory);
-    } catch (_) {
-      // A spawn intent could have been accepted before an exception.
-      // Never attempt a second productive executor inside the same room tick.
-      state.spawnParallelExecution = {status:'HOLD', reason:'EXECUTOR_EXCEPTION'};
-    }
+    legacyNeeded = true;
   } else {
-    state.spawnParallelExecution = {status:'HOLD', reason:
-      proposal ? (proposal.reason || 'NO_PREPARED_INTENTS') : 'NO_PLAN'};
+    const proposal = state.spawnParallelShadow;
+    if (proposal && proposal.status === 'DEFERRED') {
+      // Preserve the proven single-spawn survival path under CPU deferral.
+      state.spawnParallelExecution = {status:'DEFERRED', reason:'CPU_SHADOW_DEFERRED'};
+      legacyNeeded = true;
+    } else if (proposal && Array.isArray(proposal.intents) &&
+               proposal.intents.length) {
+      try {
+        state.spawnParallelExecution = spawnParallelExecutor.execute(state, proposal, game, memory);
+      } catch (_) {
+        // An intent may have been accepted before an exception. Never retry.
+        state.spawnParallelExecution = {status:'HOLD', reason:'EXECUTOR_EXCEPTION'};
+      }
+    } else {
+      state.spawnParallelExecution = {status:'HOLD', reason:
+        proposal ? (proposal.reason || 'NO_PREPARED_INTENTS') : 'NO_PLAN'};
+    }
   }
+  if (legacyNeeded) spawnManager.spawnOne(state);
   return state.spawnParallelExecution;
 }
 
