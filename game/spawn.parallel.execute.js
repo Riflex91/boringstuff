@@ -4,6 +4,7 @@
 // Config defaults OFF. Do not activate without an approved runtime release.
 const MAX_SPAWNS = 3;
 const planner = require('spawn.parallel.plan');
+const reconcile = require('spawn.parallel.reconcile');
 // Room-object identity is stable inside one Screeps tick. Keep the guard in
 // module memory, not persistent Memory; ambiguous writes must not be retried.
 const tickAttemptedByRoom = new WeakMap();
@@ -140,6 +141,15 @@ function inspect(state, proposal, game, memory) {
   return {intents,available};
 }
 
+function receipt(memory, game, room, intent, status) {
+  try {
+    return reconcile.receipt(memory, game, room, {
+      spawnName:intent.spawn.name,spawnId:intent.spawn.id,
+      creepName:intent.name,role:intent.role,status
+    }) === true;
+  } catch (_) { return false; }
+}
+
 function execute(state, proposal, game, memory) {
   // The second gate deliberately rechecks the release flag at call time.
   const config = require('config');
@@ -183,6 +193,12 @@ function execute(state, proposal, game, memory) {
       return report('PARTIAL_HOLD','PRE_INTENT_STATE_CHANGED',
         accepted,attempted,spent);
     }
+    // Persist a bounded private receipt BEFORE a possible game mutation.
+    // Following global resets, the next tick can still inspect the actual
+    // spawning job; Memory alone must never count as success.
+    if (!receipt(memory,game,room,i,'SUBMITTED'))
+      return report('PARTIAL_HOLD','RECEIPT_STORE_UNAVAILABLE',
+        accepted,attempted,spent);
     attempted++;
     let rc;
     try {
@@ -190,17 +206,26 @@ function execute(state, proposal, game, memory) {
         memory:dryMemory(i,room,game.time)
       });
     } catch (_) {
+      receipt(memory,game,room,i,'UNCERTAIN');
       return report('PARTIAL_HOLD','SPAWN_INTENT_EXCEPTION',
         accepted,attempted,spent);
     }
     // An ambiguous return is NEVER retried in this tick.
-    if (rc !== OK) return report('PARTIAL_HOLD',
-      rc === ERR_NOT_ENOUGH_ENERGY ? 'LIVE_ENERGY_CONFLICT' :
-      rc === ERR_BUSY ? 'LIVE_SPAWN_BUSY' : 'LIVE_SPAWN_REJECTED',
-      accepted,attempted,spent);
+    if (rc !== OK) {
+      receipt(memory,game,room,i,
+        rc === ERR_NOT_ENOUGH_ENERGY || rc === ERR_BUSY
+          ? 'REJECTED' : 'UNCERTAIN');
+      return report('PARTIAL_HOLD',
+        rc === ERR_NOT_ENOUGH_ENERGY ? 'LIVE_ENERGY_CONFLICT' :
+        rc === ERR_BUSY ? 'LIVE_SPAWN_BUSY' : 'LIVE_SPAWN_REJECTED',
+        accepted,attempted,spent);
+    }
     remaining -= i.cost;
     accepted++;
     spent += i.cost;
+    if (!receipt(memory,game,room,i,'ACCEPTED'))
+      return report('PARTIAL_HOLD','RECEIPT_ACK_FAILED',
+        accepted,attempted,spent);
   }
   return report('EXECUTED',null,accepted,attempted,spent);
 }
