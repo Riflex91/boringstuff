@@ -23,7 +23,7 @@ const planner=require('../game/spawn.parallel.plan.js');
 const executor=require('../game/spawn.parallel.execute.js');
 assert.equal(config.ENABLE_PARALLEL_SPAWN_EXECUTION,false,
   'O69 must not be release-enabled in a Draft branch');
-function fixture({rejectDry=null,rejectLive=null}={}){
+function fixture({rejectDry=null,rejectLive=null,onDryRun=null}={}){
  const calls=[];
  const room={name:'E8N1',controller:{my:true,level:3},energyAvailable:800};
  function spawn(name){
@@ -32,7 +32,10 @@ function fixture({rejectDry=null,rejectLive=null}={}){
    spawnCreep(parts,creepName,opts){
     calls.push({name,creepName,role:opts.memory.role,dryRun:!!opts.dryRun,
       cost:parts.reduce((n,p)=>n+BODYPART_COST[p],0)});
-    if(opts.dryRun) return name===rejectDry?ERR_BUSY:OK;
+    if(opts.dryRun) {
+      if (onDryRun) onDryRun(room);
+      return name===rejectDry?ERR_BUSY:OK;
+    }
     if(name===rejectLive) return ERR_BUSY;
     Memory.creeps[creepName]={...opts.memory};
     this.spawning={name:creepName};
@@ -90,6 +93,11 @@ try{
   assert.equal(new Set(f.calls.map(c=>c.creepName)).size,2);
   assert.equal(f.state.room.energyAvailable,800-out.spentEnergy);
   assert.equal(Object.keys(f.memory.creeps).length,2);
+  const callCount=f.calls.length;
+  const again=executor.execute(f.state,f.proposal,f.game,f.memory);
+  assert.equal(again.reason,'DUPLICATE_EXECUTION_TICK',
+    'no second wave in the same real room and game tick');
+  assert.equal(f.calls.length,callCount);
  }
  {
   const f=fixture({rejectDry:'Spawn2'});
@@ -109,6 +117,11 @@ try{
   assert.equal(f.calls.filter(c=>!c.dryRun).length,2,
     'ambiguous/failed call is not retried');
   assert.equal(Object.keys(f.memory.creeps).length,1);
+  const callCount=f.calls.length;
+  assert.equal(executor.execute(f.state,f.proposal,f.game,f.memory).reason,
+    'DUPLICATE_EXECUTION_TICK',
+    'even an ambiguous partial result must never be replayed');
+  assert.equal(f.calls.length,callCount);
  }
  {
   const f=fixture();
@@ -136,6 +149,39 @@ try{
   f.proposal.intents[1].spawnName=f.proposal.intents[0].spawnName;
   assert.equal(executor.execute(f.state,f.proposal,f.game,f.memory).reason,
     'STALE_OR_DUPLICATE_INTENT');
+  assert.equal(f.calls.length,0);
+ }
+ {
+  const f=fixture();
+  // All bodies/costs/spawns still validate, but a forged role order must not.
+  f.proposal.intents[0].role='hauler';
+  assert.equal(executor.execute(f.state,f.proposal,f.game,f.memory).reason,
+    'PLAN_DRIFT');
+  assert.equal(f.calls.length,0);
+ }
+ {
+  const f=fixture();
+  // A newly arrived hauler invalidates the earlier missing-hauler demand.
+  f.state.creeps.push({name:'new-carrier',memory:{role:'hauler'},
+    ticksToLive:1000});
+  f.state.byRole.hauler=1;
+  assert.equal(executor.execute(f.state,f.proposal,f.game,f.memory).reason,
+    'PLAN_DRIFT');
+  assert.equal(f.calls.length,0);
+ }
+ {
+  const f=fixture({onDryRun:room=>{room.energyAvailable=700;}});
+  assert.equal(executor.execute(f.state,f.proposal,f.game,f.memory).reason,
+    'INVALID_RELEASE_SNAPSHOT',
+    'side effects during dryRuns must prevent productive submission');
+  assert.equal(f.calls.filter(c=>!c.dryRun).length,0);
+ }
+ {
+  const f=fixture();
+  // Even if total reserved energy still fits, stale snapshots are rejected.
+  f.state.room.energyAvailable=750;
+  assert.equal(executor.execute(f.state,f.proposal,f.game,f.memory).reason,
+    'INVALID_RELEASE_SNAPSHOT');
   assert.equal(f.calls.length,0);
  }
  {
@@ -171,4 +217,4 @@ assert.match(rm,/state\.spawnParallelExecution = spawnParallelExecutor\.execute/
 assert.match(main,/spawnParallelExecution:\s*state\.spawnParallelExecution/);
 const configSource=fs.readFileSync(new URL('../game/config.js',import.meta.url),'utf8');
 assert.match(configSource,/ENABLE_PARALLEL_SPAWN_EXECUTION:\s*false/);
-console.log('O69 release-gated parallel executor: default-off, preflight/dry-run, bounded actual intents, no replay PASS');
+console.log('O69 release-gated parallel executor: default-off, fresh priority replan, preflight/dry-run, at-most-once and no partial replay PASS');
