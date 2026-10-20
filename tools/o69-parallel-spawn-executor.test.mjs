@@ -21,6 +21,7 @@ Object.assign(global,{
 const config=require('../game/config.js');
 const planner=require('../game/spawn.parallel.plan.js');
 const executor=require('../game/spawn.parallel.execute.js');
+const reconcile=require('../game/spawn.parallel.reconcile.js');
 assert.equal(config.ENABLE_PARALLEL_SPAWN_EXECUTION,false,
   'O69 must not be release-enabled in a Draft branch');
 function fixture({rejectDry=null,rejectLive=null,onDryRun=null}={}){
@@ -48,7 +49,7 @@ function fixture({rejectDry=null,rejectLive=null,onDryRun=null}={}){
  const spawns=[spawn('Spawn2'),spawn('Spawn1')];
  const game={time:5000,creeps:{},rooms:{E8N1:room},spawns:Object.fromEntries(
    spawns.map(s=>[s.name,s]))};
- const memory={creeps:{}};
+ const memory={creeps:{},bot:{}};
  global.Memory=memory;
  const state={
   room,rcl:3,spawns,spawn:spawns[0],
@@ -94,11 +95,20 @@ try{
   assert.equal(new Set(f.calls.map(c=>c.creepName)).size,2);
   assert.equal(f.state.room.energyAvailable,800-out.spentEnergy);
   assert.equal(Object.keys(f.memory.creeps).length,2);
+  assert.deepEqual(f.memory.bot.spawnParallelReconcile.rooms.E8N1.intents
+    .map(x=>x.status),['ACCEPTED','ACCEPTED']);
   const callCount=f.calls.length;
   const again=executor.execute(f.state,f.proposal,f.game,f.memory);
   assert.equal(again.reason,'DUPLICATE_EXECUTION_TICK',
     'no second wave in the same real room and game tick');
   assert.equal(f.calls.length,callCount);
+  f.game.time++;
+  assert.equal(reconcile.observe(f.game,f.memory).status,'OBSERVED');
+  assert.deepEqual(
+    [reconcile.summary('E8N1',f.memory).status,
+      reconcile.summary('E8N1',f.memory).observedJobs],
+    ['VERIFIED',2],
+    'a prior OK only becomes a verified job after a real next tick');
  }
  {
   const f=fixture({rejectDry:'Spawn2'});
@@ -118,6 +128,8 @@ try{
   assert.equal(f.calls.filter(c=>!c.dryRun).length,2,
     'ambiguous/failed call is not retried');
   assert.equal(Object.keys(f.memory.creeps).length,1);
+  assert.deepEqual(f.memory.bot.spawnParallelReconcile.rooms.E8N1.intents
+    .map(x=>x.status),['ACCEPTED','REJECTED']);
   const callCount=f.calls.length;
   assert.equal(executor.execute(f.state,f.proposal,f.game,f.memory).reason,
     'DUPLICATE_EXECUTION_TICK',
