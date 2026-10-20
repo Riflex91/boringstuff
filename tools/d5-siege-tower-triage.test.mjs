@@ -130,6 +130,10 @@ const adjacent=enemy('breacher',11,['attack','move']);
  assert.equal(summary.rangedParts,1);
  assert.equal(summary.dismantleParts,1);
  assert.equal(summary.boostedParts,1);
+ const moveBoost=siege.threatSummary([enemy('x',11,[
+  {type:'attack',hits:100},{type:'move',hits:100,boost:'XZHO2'}])]);
+ assert.equal(moveBoost.boostedParts,0,
+  'a boosted noncombat part is not boosted offensive pressure');
  assert.ok(!JSON.stringify(summary).includes('attack') ||
   !JSON.stringify(summary).includes('our-spawn'));
  assert.equal(siege.threatSummary(Array.from({length:41},()=>enemy('x',11,['attack']))).status,'CAP_EXCEEDED');
