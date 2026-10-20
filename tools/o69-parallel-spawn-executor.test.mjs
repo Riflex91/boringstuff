@@ -22,8 +22,8 @@ const config=require('../game/config.js');
 const planner=require('../game/spawn.parallel.plan.js');
 const executor=require('../game/spawn.parallel.execute.js');
 const reconcile=require('../game/spawn.parallel.reconcile.js');
-assert.equal(config.ENABLE_PARALLEL_SPAWN_EXECUTION,false,
-  'O69 must not be release-enabled in a Draft branch');
+assert.equal(config.ENABLE_PARALLEL_SPAWN_EXECUTION,true,
+  'Operator-approved live trial must explicitly enable O69');
 function fixture({rejectDry=null,rejectLive=null,onDryRun=null}={}){
  const calls=[];
  const room={name:'E8N1',controller:{my:true,level:3},energyAvailable:800,
@@ -72,6 +72,7 @@ function fixture({rejectDry=null,rejectLive=null,onDryRun=null}={}){
  assert.deepEqual(proposal.intents.map(i=>i.role),['defender','hauler']);
  return {state,game,memory,calls,proposal,spawns};
 }
+config.ENABLE_PARALLEL_SPAWN_EXECUTION=false;
 {
  const f=fixture();
  const out=executor.execute(f.state,f.proposal,f.game,f.memory);
@@ -244,7 +245,7 @@ try{
   assert.equal(f.calls.length,0);
  }
 } finally {
- config.ENABLE_PARALLEL_SPAWN_EXECUTION=false;
+ config.ENABLE_PARALLEL_SPAWN_EXECUTION=true;
 }
 const rm=fs.readFileSync(new URL('../game/room.manager.js',import.meta.url),'utf8');
 const main=fs.readFileSync(new URL('../game/main.js',import.meta.url),'utf8');
@@ -255,5 +256,5 @@ assert.match(rm,/config\.ENABLE_PARALLEL_SPAWN_EXECUTION !== true/,
 assert.match(rm,/state\.spawnParallelExecution = spawnParallelExecutor\.execute/);
 assert.match(main,/spawnParallelExecution:\s*state\.spawnParallelExecution/);
 const configSource=fs.readFileSync(new URL('../game/config.js',import.meta.url),'utf8');
-assert.match(configSource,/ENABLE_PARALLEL_SPAWN_EXECUTION:\s*false/);
+assert.match(configSource,/ENABLE_PARALLEL_SPAWN_EXECUTION:\s*true/);
 console.log('O69 release-gated parallel executor: default-off, fresh priority replan, preflight/dry-run, at-most-once and no partial replay PASS');
