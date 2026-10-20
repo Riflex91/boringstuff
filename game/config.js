@@ -75,6 +75,8 @@ module.exports = {
   // Conservative safety defaults. Turn on only after reviewing logs.
   // D1 survival: use the bounded core-loss guard, never lone scouts.
   AUTO_SAFE_MODE: true,
+  // O69: strictly OFF until separately approved release and genuine runtime proof.
+  ENABLE_PARALLEL_SPAWN_EXECUTION: false,
   // D2: one safe preexisting defender across directly adjacent own rooms.
   AUTO_REGIONAL_DEFENSE_SUPPORT: true,
   // R2: allow one bounded neighboring-colony spare labor rescue.
