@@ -52,6 +52,8 @@ function standingGarrison(state) {
 function desired(state) {
   const constructionHeavy = state.sites.length > 5;
   const damaged = state.structures.some(s => s.hits !== undefined && s.hits < s.hitsMax * 0.6 && s.structureType !== STRUCTURE_WALL && s.structureType !== STRUCTURE_RAMPART);
+  const shieldSiege = state.rcl >= 4 && !state.emergency &&
+    workPriority.hasCriticalCoreShieldThreat(state.structures,state.hostileCreeps);
   const defendersNeeded = Math.max(defenderDemand(state.hostileCreeps),
     standingGarrison(state));
   const baseHarvesters = Math.max(1, state.sources.length);
@@ -109,7 +111,7 @@ function desired(state) {
     hauler: desiredHaulers,
     worker: baseWorkers,
     builder: state.sites.length ? Math.min(config.MAX_BUILDERS, constructionHeavy ? 2 : 1) : 0,
-    repairer: damaged && state.rcl >= 2 ? 1 : 0,
+    repairer: (damaged || shieldSiege) && state.rcl >= 2 ? 1 : 0,
     upgrader: desiredUpgraders,
     defender: defendersNeeded,
     scout: state.rcl >= config.SCOUTS_AFTER_RCL ? 1 : 0
