@@ -66,8 +66,8 @@ function core(type,id,x,y,hits=1000){
  return {id,structureType:type,my:true,hits,hitsMax:100000,
   pos:{x,y}};
 }
-const primary=core('spawn','sp',10,10);
-const towerCore=core('tower','tw',11,10);
+const primary=core('spawn','sp',10,10,100000);
+const towerCore=core('tower','tw',11,10,100000);
 const ramp1=core('rampart','r-sp',10,10,15000);
 const ramp2=core('rampart','r-tw',11,10,6000);
 const remote=core('rampart','r-exit',2,2,1000);
