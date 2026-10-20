@@ -1,0 +1,38 @@
+name: Screeps D7 siege ammunition logistics (REVIEW ONLY)
+on:
+  push:
+    branches: [feature/d7-siege-tower-ammo-logistics-20261020]
+permissions:
+  contents: read
+jobs:
+  node24-and-p3-no-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: tools
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Verify exact parent Main, only logistics runtime changed
+        shell: bash
+        run: |
+          git -C .. fetch origin main --quiet
+          test "$(git -C .. rev-parse origin/main)" = 36a90b47535e0d5c1e82416448c38c3f5880dbf4
+          actual="$(git -C .. diff --name-only origin/main HEAD -- game | sort)"
+          test "$actual" = "game/energy.js"
+          grep -Eq 'AUTO_SAFE_MODE:[[:space:]]*true' ../game/config.js
+          grep -Eq 'ENABLE_PARALLEL_SPAWN_EXECUTION:[[:space:]]*true' ../game/config.js
+      - name: Canonical Node 24 tests
+        run: |
+          npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+          npm test
+      - name: Original P3 benchmark
+        run: npm run bench:p3
+      - name: No Screeps deployment
+        run: echo 'D7 review CI has no Screeps credentials or upload authority.'
