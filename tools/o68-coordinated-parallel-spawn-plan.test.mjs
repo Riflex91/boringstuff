@@ -142,6 +142,18 @@ function invariant(plan, energy) {
   assert.equal(result.intents.some(x=>x.role==='defender'),false);
 }
 {
+  // With no productive workforce, two essential 200-energy recovery bodies
+  // must be able to share one room energy budget without an upgrader leapfrog.
+  const f=fixture({withHostile:false,energy:500});
+  f.state.emergency=true;
+  f.state.creeps=[];
+  f.state.byRole={};
+  const result=execute(f);
+  invariant(result,500);
+  assert.deepEqual(result.intents.map(x=>x.role),['harvester','worker']);
+  assert.equal(result.summary.reservedEnergy,400);
+}
+{
   const f=fixture({inactive:true});
   assert.equal(execute(f).status,'NO_IDLE');
 }
