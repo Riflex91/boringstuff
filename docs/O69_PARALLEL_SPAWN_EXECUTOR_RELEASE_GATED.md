@@ -16,6 +16,16 @@ Raumenergie und die exakt gleiche reservierte Gesamtsumme.
 Alle Spawn-Intents brauchen unterschiedliche Slots, eindeutige
 Spawnnamen und konfliktfreie neue Creep-Namen.
 
+Vor dem ersten echten Spawn-Intent berechnet der Executor zusätzlich
+**einen frischen vollständigen O68-Plan**. Jede abweichende Rollenpriorität,
+Spawn-Zuordnung, Körperzusammensetzung oder Energiereservierung führt zu
+`PLAN_DRIFT` ohne produktiven Call. Der aktuelle Raum-Energiestand muss
+exakt dem vorbereiteten Snapshot entsprechen. Nach den Dry-Runs wird die
+Momentaufnahme erneut validiert. Eine Tick-lokale, im Prozess gehaltene
+Raum-Sperre verhindert eine zweite produktive Ausführungsserie im gleichen
+Spiel-Tick – auch wenn die erste Serie teilweise angenommen oder unklar
+beantwortet wurde.
+
 Vor dem ersten echten Spawn-Intent muss bei **jedem** reservierten
 Kandidaten das offizielle `spawnCreep(...,{dryRun:true})` erfolgreich
 sein. Erst danach werden höchstens drei produktive Anfragen
