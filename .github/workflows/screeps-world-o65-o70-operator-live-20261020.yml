@@ -45,6 +45,14 @@ jobs:
         with:
           node-version: '24.21.0'
       - name: Full exact-Main tests and original P3 benchmark
+        # Canonical existing CI fixtures target Newbieland. Keep the
+        # fixture environment distinct from the real World deploy steps.
+        env:
+          SCREEPS_SERVER: newbieland
+          SCREEPS_BRANCH: chatgpt
+          SCREEPS_ROOM: E8N1
+          SCREEPS_SHARD: ''
+          WORLD_DEPLOY_APPROVAL: ''
         run: |
           npm install --no-package-lock --ignore-scripts --no-audit --no-fund
           npm test
