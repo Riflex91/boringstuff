@@ -110,7 +110,8 @@ function roomInspect(state){
       typeof EVENT_HEAL==='undefined'||
       typeof EVENT_REPAIR==='undefined')return null;
   for(const e of events) {
-    if(!e||!e.data||typeof e.data!=='object')continue;
+    if(!e||typeof e.objectId!=='string'||!e.objectId||
+       !e.data||typeof e.data!=='object')continue;
     const d=e.data;
     if(e.event===EVENT_ATTACK) {
       if(!safeNumber(d.damage))continue;
