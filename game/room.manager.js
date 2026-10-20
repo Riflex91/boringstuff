@@ -31,6 +31,8 @@ function status(state) {
     creeps: state.byRole,
     sites: state.sites.length,
     hostiles: state.hostileCreeps.length,
+    defenseSiege: state.defenseSiege || null,
+    defenseTowerAction: state.defenseTowerAction || null,
     economyModel: state.economyModel,
     health: state.health,
     efficiency: state.efficiency,
