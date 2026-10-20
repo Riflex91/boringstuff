@@ -158,6 +158,36 @@ function shadowCpuHeadroom(detailName, game, memoryRoot) {
   return game.cpu.getUsed() + estimated + reserve <= game.cpu.limit;
 }
 
+// O69: isolate the ONE spawn-dispatch authority so OFF/DEFERRED,
+// productive and uncertain paths can be exercised without running
+// unrelated towers, construction, CPU stages or remote mission logic.
+// A throwing productive executor must not trigger a legacy retry.
+function dispatchSpawn(state, game, memory) {
+  if (config.ENABLE_PARALLEL_SPAWN_EXECUTION !== true) {
+    state.spawnParallelExecution = {status:'DISABLED', reason:'RELEASE_GATE_OFF'};
+    spawnManager.spawnOne(state);
+    return state.spawnParallelExecution;
+  }
+  const proposal = state.spawnParallelShadow;
+  if (proposal && proposal.status === 'DEFERRED') {
+    state.spawnParallelExecution = {status:'DEFERRED', reason:'CPU_SHADOW_DEFERRED'};
+    spawnManager.spawnOne(state);
+  } else if (proposal && Array.isArray(proposal.intents) &&
+             proposal.intents.length) {
+    try {
+      state.spawnParallelExecution = spawnParallelExecutor.execute(state, proposal, game, memory);
+    } catch (_) {
+      // A spawn intent could have been accepted before an exception.
+      // Never attempt a second productive executor inside the same room tick.
+      state.spawnParallelExecution = {status:'HOLD', reason:'EXECUTOR_EXCEPTION'};
+    }
+  } else {
+    state.spawnParallelExecution = {status:'HOLD', reason:
+      proposal ? (proposal.reason || 'NO_PREPARED_INTENTS') : 'NO_PLAN'};
+  }
+  return state.spawnParallelExecution;
+}
+
 function run(room, lowCpu) {
   const state = profiler.detailSection('room.state', function() {
     return stateBuilder.get(room);
@@ -300,23 +330,7 @@ function run(room, lowCpu) {
     towerManager.run(state);
     maybeSafeMode(state);
     maybeWarnUpgraderStall(state);
-    let useLegacySpawn = config.ENABLE_PARALLEL_SPAWN_EXECUTION !== true;
-    if (config.ENABLE_PARALLEL_SPAWN_EXECUTION === true) {
-      const proposal = state.spawnParallelShadow;
-      if (proposal && proposal.status === 'DEFERRED') {
-        // Preserve the proven single-spawn survival path under low CPU.
-        state.spawnParallelExecution = {status:'DEFERRED', reason:'CPU_SHADOW_DEFERRED'};
-        useLegacySpawn = true;
-      } else if (proposal && proposal.intents && proposal.intents.length) {
-        state.spawnParallelExecution = spawnParallelExecutor.execute(state, proposal, Game, Memory);
-      } else {
-        state.spawnParallelExecution = {status:'HOLD', reason:
-          proposal ? (proposal.reason || 'NO_PREPARED_INTENTS') : 'NO_PLAN'};
-      }
-    } else {
-      state.spawnParallelExecution = {status:'DISABLED', reason:'RELEASE_GATE_OFF'};
-    }
-    if (useLegacySpawn) spawnManager.spawnOne(state);
+    dispatchSpawn(state, Game, Memory);
   });
 
   if (!lowCpu && Game.time % config.PLANNER_INTERVAL === 0) {
@@ -333,4 +347,4 @@ function run(room, lowCpu) {
   return state;
 }
 
-module.exports = { run, _test: { status, shadowCpuHeadroom, safeModeDecision, maybeSafeMode } };
+module.exports = { run, _test: { status, shadowCpuHeadroom, safeModeDecision, maybeSafeMode, dispatchSpawn } };
