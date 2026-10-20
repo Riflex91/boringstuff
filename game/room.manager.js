@@ -136,6 +136,7 @@ function maybeWarnUpgraderStall(state) {
 const SHADOW_STAGE_FALLBACK_CPU = Object.freeze({
   'room.capacity-spawn': 2.5,
   'room.spawn-parallel-plan': 1.0,
+  'room.spawn-parallel-execute': 2.0,
   'room.assignment': 2.5,
   'room.logistics-match': 1.0
 });
@@ -175,7 +176,15 @@ function dispatchSpawn(state, game, memory) {
       legacyNeeded = true;
     } else if (proposal && Array.isArray(proposal.intents) &&
                proposal.intents.length) {
-      try {
+      // Plan headroom was measured BEFORE later evidence/stats stages.
+      // A fresh read is mandatory before any additional CPU-heavy replay,
+      // dryRun sequence or productive multi-spawn intents.
+      if (!game || !game.cpu || typeof game.cpu.getUsed !== 'function' ||
+          !Number.isFinite(game.cpu.limit) ||
+          !shadowCpuHeadroom('room.spawn-parallel-execute', game, memory)) {
+        state.spawnParallelExecution = {status:'DEFERRED', reason:'CPU_EXECUTOR_HEADROOM'};
+        legacyNeeded = true;
+      } else try {
         state.spawnParallelExecution = spawnParallelExecutor.execute(state, proposal, game, memory);
       } catch (_) {
         // An intent may have been accepted before an exception. Never retry.
