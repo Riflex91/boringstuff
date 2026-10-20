@@ -1,0 +1,35 @@
+name: Screeps D6 World post-timeout 100-tick witness (GET ONLY)
+on:
+  push:
+    branches: [audit/d6-world-post-timeout-20261020]
+permissions:
+  contents: read
+jobs:
+  read-only-d6-world-witness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    defaults:
+      run:
+        working-directory: tools
+    env:
+      SCREEPS_SERVER: world
+      SCREEPS_BRANCH: chatgpt
+      SCREEPS_ROOM: W37S79
+      SCREEPS_SHARD: shard0
+      SCREEPS_TOKEN_WORLD: ${{ secrets.SCREEPS_TOKEN_WORLD }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Verify evidence script from exact D6 Main
+        run: |
+          node --check d6-world-post-timeout-audit.mjs
+          git rev-parse HEAD
+      - name: GET-only owned core and exact D6 deployment 100-tick witness
+        run: node d6-world-post-timeout-audit.mjs
+      - name: No live code mutation
+        if: always()
+        run: echo 'D6 GET-only audit. No deployment, no Creep game intents, no changed branch or credentials.'
