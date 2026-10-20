@@ -141,6 +141,23 @@ function fixture(tick=100) {
  }),false,'global room receipt count must be bounded');
 }
 {
+ // No prototype pollution, private names or forged telemetry leaks.
+ const f=fixture();
+ assert.equal(reconcile.receipt(f.memory,f.game,'__proto__',{
+   spawnName:'x',spawnId:'y',creepName:'z',role:'worker',status:'SUBMITTED'
+ }),false);
+ assert.equal(Object.getPrototypeOf(f.memory.bot),Object.prototype);
+ f.write('har-E8N1-100-0');
+ f.write('har-E8N1-100-0','ACCEPTED');
+ f.game.time++;
+ reconcile.observe(f.game,f.memory);
+ f.memory.bot.spawnParallelReconcile.last[room].creepName='PRIVATE_CREEP';
+ f.memory.bot.spawnParallelReconcile.last[room].spawnName='PRIVATE_SPAWN';
+ const safe=JSON.stringify(reconcile.summary(room,f.memory));
+ assert.equal(safe.includes('PRIVATE_'),false,
+   'telemetry must whitelist only aggregate fields');
+}
+{
  // Evaluate the actual production cleanup implementation, without
  // executing the main loop or any game API action.
  const source=fs.readFileSync(new URL('../game/main.js',import.meta.url),'utf8');
