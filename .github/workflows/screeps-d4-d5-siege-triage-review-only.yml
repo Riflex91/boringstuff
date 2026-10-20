@@ -1,0 +1,43 @@
+name: Screeps D4-D5 siege Tower triage review (NO DEPLOY)
+on:
+  push:
+    branches: [feature/d4-d5-siege-tower-triage-20261020]
+permissions:
+  contents: read
+jobs:
+  exact-head-no-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: tools
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Exact Main predecessor and bounded D4/D5 game delta
+        shell: bash
+        run: |
+          git -C .. fetch origin main --quiet
+          test "$(git -C .. rev-parse origin/main)" = 7d78eea001695ced187f75777ff576670dac1201
+          actual="$(git -C .. diff --name-only origin/main HEAD -- game | sort)"
+          expected="$(printf '%s\n' game/defense.siege.triage.js game/tower.manager.js game/room.manager.js game/main.js | sort)"
+          test "$actual" = "$expected"
+          grep -Eq 'AUTO_SAFE_MODE:[[:space:]]*true' ../game/config.js
+          grep -Eq 'ENABLE_PARALLEL_SPAWN_EXECUTION:[[:space:]]*true' ../game/config.js
+          if grep -E '(\.spawnCreep[[:space:]]*\(|\.cancel[[:space:]]*\(|\.createConstructionSite[[:space:]]*\(|\.attack[[:space:]]*\(|\.heal[[:space:]]*\()' ../game/defense.siege.triage.js; then
+            echo 'Read-only D4/D5 policy helper must never issue an intent' >&2
+            exit 1
+          fi
+      - name: Canonical Node24 regression tests
+        run: |
+          npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+          npm test
+      - name: Original P3 four-mode benchmark
+        run: npm run bench:p3
+      - name: No live side effects
+        run: echo 'D4/D5 review-only, no credentials and no Screeps deployment actions.'
