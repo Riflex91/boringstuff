@@ -51,6 +51,9 @@ const repair=(actor,target,amount)=>({
  assert.equal(got.incomingOwnedHitEvents,2);
  assert.equal(got.settledOwnedDamage,200);
  assert.equal(got.ticksWithArmedHostiles,1);
+ assert.equal(got._coreStructures,2);
+ assert.equal(got._coveredCoreStructures,1);
+ assert.equal(got._minCoreShieldHits,1000);
  assert.equal(JSON.stringify(got).includes('enemy'),false);
  const result=d8.observe([f.state],f.world,f.mem);
  assert.equal(result.observedRooms,1);
@@ -60,6 +63,10 @@ const repair=(actor,target,amount)=>({
  assert.equal(summary.current.observedTicks,1);
  assert.equal(summary.current.firstSettledEventTick,199);
  assert.equal(summary.current.settledTowerDamage,400);
+ assert.equal(summary.current.minimumObservedCoreShieldHits,1000);
+ assert.equal(summary.current.latestCoreStructures,2);
+ assert.equal(summary.current.latestUncoveredCoreStructures,1);
+ assert.equal(summary.current.coreShieldSamples,1);
  assert.equal(summary.current.authority,'SHADOW_EVIDENCE');
  assert.equal(summary.current.actionAuthority,'NONE');
  assert.equal(JSON.stringify(summary).includes('s1'),false);
@@ -81,6 +88,8 @@ const repair=(actor,target,amount)=>({
  assert.equal(done.completed[0].summary.firstSettledEventTick,199);
  assert.equal(done.completed[0].summary.lastSettledEventTick,298);
  assert.equal(done.completed[0].summary.settledTowerDamage,400);
+ assert.equal(done.completed[0].summary.minimumObservedCoreShieldHits,1000);
+ assert.equal(done.completed[0].summary.coreShieldSamples,100);
  assert.equal(d8.summary('E8N1',f.mem).lastCompletedWindow.observedTicks,100);
  const mem=JSON.parse(JSON.stringify(f.mem));
  f.world.time=300;
@@ -122,6 +131,8 @@ const repair=(actor,target,amount)=>({
  f.state.structures.splice(2,1); // Rampart destroyed/not visible
  f.events.push(repair('c1','r1',100));
  const x=d8._test.roomInspect(f.state);
+ assert.equal(x._coveredCoreStructures,0,
+  'the physically missing shield is not counted as protection');
  assert.equal(x.coreShieldRepairEvents,0,
   'destroyed or not visible shield cannot authenticate actual repaired hits');
  assert.equal(x.towerAttackEvents,1);
