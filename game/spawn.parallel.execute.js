@@ -7,6 +7,23 @@ const planner = require('spawn.parallel.plan');
 // Room-object identity is stable inside one Screeps tick. Keep the guard in
 // module memory, not persistent Memory; ambiguous writes must not be retried.
 const tickAttemptedByRoom = new WeakMap();
+const tickAttemptedByGame = new WeakMap();
+
+function alreadyAttempted(room, game) {
+  const byGame = tickAttemptedByGame.get(game);
+  return tickAttemptedByRoom.get(room) === game.time ||
+    !!(byGame && byGame.tick === game.time &&
+      byGame.rooms.has(room.name));
+}
+function markAttempt(room, game) {
+  tickAttemptedByRoom.set(room, game.time);
+  let byGame = tickAttemptedByGame.get(game);
+  if (!byGame || byGame.tick !== game.time) {
+    byGame = {tick:game.time, rooms:new Set()};
+    tickAttemptedByGame.set(game, byGame);
+  }
+  byGame.rooms.add(room.name);
+}
 const ROLES = new Set([
   'defender','harvester','worker','hauler',
   'repairer','builder','upgrader','scout'
@@ -41,6 +58,7 @@ function inspect(state, proposal, game, memory) {
   if (!state || !state.room || !state.room.controller ||
       state.room.controller.my !== true ||
       !state.room.name || !game || !Number.isSafeInteger(game.time) ||
+      !game.rooms || game.rooms[state.room.name] !== state.room ||
       !game.spawns || !game.creeps || !memory || !memory.creeps ||
       !proposal || proposal.authority !== 'SHADOW' ||
       proposal.actionAuthority !== 'NONE' ||
@@ -51,6 +69,8 @@ function inspect(state, proposal, game, memory) {
       !Number.isSafeInteger(state.energyAvailable) ||
       !Number.isSafeInteger(state.room.energyAvailable) ||
       !Number.isSafeInteger(state.energyCapacityAvailable) ||
+      !Number.isSafeInteger(state.room.energyCapacityAvailable) ||
+      state.room.energyCapacityAvailable !== state.energyCapacityAvailable ||
       state.energyAvailable < 0 ||
       state.energyAvailable > state.energyCapacityAvailable ||
       state.room.energyAvailable < 0 ||
@@ -61,8 +81,8 @@ function inspect(state, proposal, game, memory) {
 
   const byName = new Map();
   for (const spawn of state.spawns) {
-    if (!spawn || !spawn.name || !spawn.id || !spawn.room ||
-        spawn.room.name !== state.room.name || spawn.my !== true ||
+    if (!spawn || !spawn.name || !spawn.id ||
+        spawn.room !== state.room || spawn.my !== true ||
         byName.has(spawn.name)) return {error:'INVALID_FLEET'};
     byName.set(spawn.name, spawn);
   }
@@ -126,7 +146,7 @@ function execute(state, proposal, game, memory) {
   if (config.ENABLE_PARALLEL_SPAWN_EXECUTION !== true)
     return reject('PARALLEL_EXECUTION_DISABLED');
   if (state && state.room && game && Number.isSafeInteger(game.time) &&
-      tickAttemptedByRoom.get(state.room) === game.time)
+      alreadyAttempted(state.room, game))
     return reject('DUPLICATE_EXECUTION_TICK');
   const checked = inspect(state, proposal, game, memory);
   if (checked.error) return reject(checked.error);
@@ -149,9 +169,9 @@ function execute(state, proposal, game, memory) {
   // immediately before submitting ANY productive intent.
   const refreshed = inspect(state, proposal, game, memory);
   if (refreshed.error) return reject(refreshed.error);
-  if (tickAttemptedByRoom.get(state.room) === game.time)
+  if (alreadyAttempted(state.room, game))
     return reject('DUPLICATE_EXECUTION_TICK');
-  tickAttemptedByRoom.set(state.room, game.time);
+  markAttempt(state.room, game);
 
   let remaining=refreshed.available;
   let accepted=0, attempted=0, spent=0;
