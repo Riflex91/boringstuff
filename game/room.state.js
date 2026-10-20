@@ -6,6 +6,9 @@ function get(room) {
   const sites = room.find(FIND_MY_CONSTRUCTION_SITES);
   const structures = room.find(FIND_STRUCTURES);
   const sources = room.find(FIND_SOURCES);
+  // Keep all owned spawns available to the legacy spawn manager. The
+  // original primary spawn remains unchanged for recovery/health callers.
+  const ownedSpawns = room.find(FIND_MY_SPAWNS);
   const energyStored = structures.reduce((sum, s) => {
     if (!s.store) return sum;
     return sum + (s.store[RESOURCE_ENERGY] || 0);
@@ -27,7 +30,8 @@ function get(room) {
     energyAvailable: room.energyAvailable,
     energyCapacityAvailable: room.energyCapacityAvailable,
     emergency: creeps.filter(c => c.getActiveBodyparts(WORK) > 0 && c.getActiveBodyparts(CARRY) > 0).length === 0,
-    spawn: room.find(FIND_MY_SPAWNS)[0],
+    spawn: ownedSpawns[0],
+    spawns: ownedSpawns,
     towers: room.find(FIND_MY_STRUCTURES, { filter: s => s.structureType === STRUCTURE_TOWER })
   };
 }
