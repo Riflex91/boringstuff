@@ -161,10 +161,11 @@ try{
  }
  {
   const f=fixture();
-  // A newly arrived hauler invalidates the earlier missing-hauler demand.
-  f.state.creeps.push({name:'new-carrier',memory:{role:'hauler'},
+  // Two newly arrived haulers satisfy the demand reserved by the old plan.
+  f.state.creeps.push({name:'new-carrier-a',memory:{role:'hauler'},
+    ticksToLive:1000},{name:'new-carrier-b',memory:{role:'hauler'},
     ticksToLive:1000});
-  f.state.byRole.hauler=1;
+  f.state.byRole.hauler=2;
   assert.equal(executor.execute(f.state,f.proposal,f.game,f.memory).reason,
     'PLAN_DRIFT');
   assert.equal(f.calls.length,0);
