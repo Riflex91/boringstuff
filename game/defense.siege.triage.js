@@ -48,11 +48,12 @@ function threatSummary(hostiles) {
     let armed=false;
     for(const p of enemy.body) {
       if(!p || !(p.hits>0))continue;
-      if(active(p,'attack')){attackParts++;armed=true;}
-      else if(active(p,'ranged_attack')){rangedParts++;armed=true;}
-      else if(active(p,'heal')){healingParts++;armed=true;}
-      else if(active(p,'work')){dismantleParts++;armed=true;}
-      if(armed && p.boost)boostedParts++;
+      let combat=false;
+      if(active(p,'attack')){attackParts++;combat=true;}
+      else if(active(p,'ranged_attack')){rangedParts++;combat=true;}
+      else if(active(p,'heal')){healingParts++;combat=true;}
+      else if(active(p,'work')){dismantleParts++;combat=true;}
+      if(combat){armed=true;if(p.boost)boostedParts++;}
     }
     if(armed)activeCount++;
   }
