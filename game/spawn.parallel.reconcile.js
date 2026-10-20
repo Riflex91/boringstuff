@@ -17,6 +17,9 @@ function validName(value) {
 function validTick(value) {
   return Number.isSafeInteger(value) && value > 0;
 }
+function validRoom(value) {
+  return validName(value) && /^[EW][0-9]{1,3}[NS][0-9]{1,3}$/.test(value);
+}
 function own(obj, key) {
   return Object.prototype.hasOwnProperty.call(obj, key);
 }
@@ -32,7 +35,7 @@ function validRoot(root) {
 }
 function receipt(memory, game, room, item) {
   if (!memory || !memory.bot || !validTick(game && game.time) ||
-      !validName(room) || !item || !validName(item.spawnName) ||
+      !validRoom(room) || !item || !validName(item.spawnName) ||
       !validName(item.spawnId) || !validName(item.creepName) ||
       !validName(item.role) || !VALID_STATES.has(item.status)) return false;
   let root = memory.bot.spawnParallelReconcile;
@@ -121,7 +124,7 @@ function observe(game, memory) {
   const results={};
   for (const room of Object.keys(root.rooms).sort()) {
     const entry=root.rooms[room];
-    if (!validName(room) || !entry || !validTick(entry.tick) ||
+    if (!validRoom(room) || !entry || !validTick(entry.tick) ||
         !Array.isArray(entry.intents) || entry.intents.length > MAX_INTENTS)
       return {status:'HOLD',reason:'MALFORMED_RECEIPT',authority:'SHADOW_EVIDENCE'};
     if (entry.tick >= game.time) continue;
@@ -134,7 +137,8 @@ function observe(game, memory) {
   for (const room of Object.keys(results)) {
     if (Object.keys(root.last).length >= MAX_ROOMS && !own(root.last,room)) {
       const eldest=Object.keys(root.last).sort(
-        (a,b)=>(root.last[a].tick || 0)-(root.last[b].tick || 0))[0];
+        (a,b)=>((root.last[a] && root.last[a].tick) || 0)-
+          ((root.last[b] && root.last[b].tick) || 0))[0];
       delete root.last[eldest];
     }
     root.last[room]=results[room];
@@ -143,13 +147,31 @@ function observe(game, memory) {
   return {status:'OBSERVED',authority:'SHADOW_EVIDENCE',
     reconciledRooms:Object.keys(results).length};
 }
+function unobserved() {
+  return {authority:'SHADOW_EVIDENCE',actionAuthority:'NONE',
+    status:'UNOBSERVED'};
+}
 function summary(room, memory) {
   const root=memory && memory.bot && memory.bot.spawnParallelReconcile;
-  if (!validRoot(root) || !validName(room) || !own(root.last,room))
-    return {authority:'SHADOW_EVIDENCE',actionAuthority:'NONE',
-      status:'UNOBSERVED'};
+  if (!validRoot(root) || !validRoom(room) || !own(root.last,room))
+    return unobserved();
   const x=root.last[room];
-  return x && x.authority==='SHADOW_EVIDENCE'
-    ? {...x} : {authority:'SHADOW_EVIDENCE',actionAuthority:'NONE',status:'UNOBSERVED'};
+  // Private Memory is NOT a telemetry schema. Expose only explicitly
+  // allowed aggregate fields, never spread a possibly malformed object.
+  if (!x || x.authority !== 'SHADOW_EVIDENCE' ||
+      !['VERIFIED','UNVERIFIED','REJECTED_ONLY','GAP_UNKNOWN'].includes(x.status) ||
+      !validTick(x.tick) || !validTick(x.predecessorTick))
+    return unobserved();
+  const fields=['observedJobs','observedCreeps','notObserved','unknown',
+    'rejected','total'];
+  if (fields.some(k=>!Number.isSafeInteger(x[k]) || x[k]<0 ||
+    x[k]>MAX_INTENTS)) return unobserved();
+  return {
+    authority:'SHADOW_EVIDENCE',actionAuthority:'NONE',
+    status:x.status,tick:x.tick,predecessorTick:x.predecessorTick,
+    observedJobs:x.observedJobs,observedCreeps:x.observedCreeps,
+    notObserved:x.notObserved,unknown:x.unknown,
+    rejected:x.rejected,total:x.total
+  };
 }
 module.exports={receipt,observe,summary,MODEL_VERSION,MAX_ROOMS,MAX_INTENTS};
