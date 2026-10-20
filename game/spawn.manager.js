@@ -25,10 +25,35 @@ function defenderDemand(hostiles) {
   return pressure > 0 ? Math.min(3, Math.max(1, Math.ceil(pressure / 4))) : 0;
 }
 
+// D3: a colony that first requests a defender AFTER hostile entry may lose
+// its only Spawn before construction finishes. Keep an affordable local
+// garrison only after the energy-production chain has been verified live.
+// Critical mining/logistics and an emergency always outrank peacetime troops.
+function standingGarrison(state) {
+  if (!state || state.emergency || !state.room?.controller?.my ||
+      !Number.isSafeInteger(state.rcl) || state.rcl < 4 ||
+      !Number.isFinite(state.energyStored) || state.energyStored < 3000 ||
+      !Number.isFinite(state.energyCapacityAvailable) ||
+      state.energyCapacityAvailable < 550 ||
+      !Array.isArray(state.sources) ||
+      !state.byRole ||
+      (state.byRole.harvester || 0) < Math.max(1,state.sources.length) ||
+      (state.byRole.hauler || 0) < 1 ||
+      (state.byRole.worker || 0) < 1) return 0;
+  const towers = Array.isArray(state.towers) ?
+    state.towers.filter(s=>s?.my===true).length : 0;
+  // Two units require both redundant defensive towers and a deep economic
+  // buffer; single-Spawn RCL4/5 colonies keep only one affordable sentry.
+  return state.rcl >= 6 && towers >= 2 &&
+    state.energyStored >= 10000 &&
+    (state.byRole.hauler || 0) >= 2 ? 2 : 1;
+}
+
 function desired(state) {
   const constructionHeavy = state.sites.length > 5;
   const damaged = state.structures.some(s => s.hits !== undefined && s.hits < s.hitsMax * 0.6 && s.structureType !== STRUCTURE_WALL && s.structureType !== STRUCTURE_RAMPART);
-  const defendersNeeded = defenderDemand(state.hostileCreeps);
+  const defendersNeeded = Math.max(defenderDemand(state.hostileCreeps),
+    standingGarrison(state));
   const baseHarvesters = Math.max(1, state.sources.length);
   let desiredHarvesters = baseHarvesters;
 
