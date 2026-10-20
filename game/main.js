@@ -40,6 +40,7 @@ const combatAggressionEvidence = require('combat.aggression.evidence');
 const combatCounterattackShadow = require('combat.counterattack.shadow');
 const combatCounterattackLaunch = require('combat.counterattack.launch');
 const regionalDefenseLive = require('defense.regional.live');
+const spawnJobStallShadow = require('spawn.job.stall.shadow');
 
 function bootstrapMemory() {
   if (!Memory.bot) Memory.bot = { version: config.VERSION, born: Game.time };
@@ -293,6 +294,7 @@ function statusSnapshot(roomStates, tickCpu) {
       constructionSites: state.sites.length,
       hostiles: state.hostileCreeps.length,
       spawnBusy: !!(state.spawn && state.spawn.spawning),
+      spawnJobStall: spawnJobStallShadow.summary(state.room.name, Memory),
       spawnRemainingTime: state.spawn && state.spawn.spawning ? state.spawn.spawning.remainingTime : 0,
       economy: state.economyMetrics || null,
       economyModel: state.economyModel || null,
@@ -458,6 +460,11 @@ module.exports.loop = function() {
         }
       });
     }, schedulerContext);
+
+    // O65: inspect only actual Game.spawns timers and consecutive game ticks.
+    // No Spawn.cancel, forced spawn, memory-creep deletion, or HTTP writes.
+    try { spawnJobStallShadow.observe(Game, Memory, logger); }
+    catch (_) { /* telemetry failure cannot affect colony survival */ }
 
     // D2 executable neighbor aid uses one existing spare fighter and keeps
     // a verified home garrison. No enemy-owned or neutral transit rooms.
