@@ -1,0 +1,40 @@
+name: Screeps D3 core defense hardening (review only)
+on:
+  push:
+    branches: [feature/d3-core-defense-first-ramparts-20261020]
+permissions:
+  contents: read
+jobs:
+  d3-full-ci-offline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: tools
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Validate exact base and bounded gameplay diff
+        shell: bash
+        run: |
+          git -C .. fetch origin main --quiet
+          test "$(git -C .. rev-parse origin/main)" = c063d812d9e0fa2baaba5a972f4ef6a5c923233c
+          actual="$(git -C .. diff --name-only origin/main HEAD -- game | sort)"
+          expected="$(printf '%s\n' game/room.manager.js game/tower.manager.js game/room.planner.js game/spawn.manager.js | sort)"
+          test "$actual" = "$expected"
+          grep -Eq 'AUTO_SAFE_MODE:[[:space:]]*true' ../game/config.js
+          grep -Eq 'ENABLE_PARALLEL_SPAWN_EXECUTION:[[:space:]]*true' ../game/config.js
+      - name: Install clean Node24 dependencies
+        run: npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+      - name: Full canonical gameplay and defense tests
+        run: npm test
+      - name: Original P3 four-mode benchmark
+        run: npm run bench:p3
+      - name: No live deploy from feature branch
+        run: |
+          echo 'D3 review pass does not deploy or merge. Release only through independent main CI and guarded Newbieland/World auto-deploy.' >> "$GITHUB_STEP_SUMMARY"
