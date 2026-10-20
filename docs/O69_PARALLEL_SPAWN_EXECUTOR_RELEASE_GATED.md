@@ -24,7 +24,11 @@ exakt dem vorbereiteten Snapshot entsprechen. Nach den Dry-Runs wird die
 Momentaufnahme erneut validiert. Eine Tick-lokale, im Prozess gehaltene
 Raum-Sperre verhindert eine zweite produktive Ausführungsserie im gleichen
 Spiel-Tick – auch wenn die erste Serie teilweise angenommen oder unklar
-beantwortet wurde.
+beantwortet wurde. Die Sperre prüft sowohl die echte Raumobjekt-Identität
+als auch den `Game`-weiten Raumnamen für diesen Tick. Zusätzlich müssen
+`state.room` exakt `Game.rooms[roomName]` und alle eingeplanten
+Spawn-Objekte exakt diesem Raumobjekt zugeordnet sein; auch eine geänderte
+Raum-Energiekapazität ist ein harter HOLD.
 
 Vor dem ersten echten Spawn-Intent muss bei **jedem** reservierten
 Kandidaten das offizielle `spawnCreep(...,{dryRun:true})` erfolgreich
