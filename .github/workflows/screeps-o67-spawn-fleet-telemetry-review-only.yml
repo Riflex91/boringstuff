@@ -1,0 +1,52 @@
+name: Screeps O67 spawn-fleet telemetry (GAMEPLAY REVIEW ONLY)
+on:
+  push:
+    branches: [feature/o67-spawn-fleet-telemetry-20261020]
+permissions:
+  contents: read
+concurrency:
+  group: o67-spawn-fleet-telemetry-review
+  cancel-in-progress: false
+jobs:
+  node24-gameplay-p3-offline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: tools
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Check original Main and precisely bounded gameplay delta
+        shell: bash
+        run: |
+          git -C .. fetch origin main --quiet
+          test "$(git -C .. rev-parse origin/main)" = bc43f2faf1f345e63d9bfe78b6bbaa59e5eaab0c
+          actual="$(git -C .. diff --name-only origin/main HEAD -- game | sort)"
+          expected="$(printf '%s\n' game/main.js game/room.state.js game/spawn.job.stall.shadow.js game/spawn.fleet.telemetry.js game/spawn.manager.js | sort)"
+          test "$actual" = "$expected"
+          git -C .. diff --quiet origin/main HEAD -- game/body.builder.js
+          git -C .. diff --quiet origin/main HEAD -- game/config.js
+          git -C .. diff --quiet origin/main HEAD -- game/defense.regional.live.js
+          if grep -E '(\.spawnCreep[[:space:]]*\(|\.cancel[[:space:]]*\(|\.renewCreep[[:space:]]*\(|\.createConstructionSite[[:space:]]*\()' ../game/spawn.fleet.telemetry.js; then
+            echo 'O67 telemetry must not create gameplay actions' >&2
+            exit 1
+          fi
+      - name: Full canonical Node24 O65-O67 gameplay regressions
+        run: |
+          npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+          npm test
+      - name: Original P3 4-mode reproducibility benchmark
+        run: npm run bench:p3
+      - name: No live deploy or authorization
+        run: |
+          echo '### O67 multi-spawn fleet telemetry review only' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Distinguishes primary-busy legacy from total/busy/free/inactive/unknown room fleet counts.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'A stall claim requires original O65 evidence matching this real game tick, spawn ID and job.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Purely passive status reporting; no new spawnCreep, cancel, World upload, API POST or Main merge.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'No original exact-Main World LIVE_100T_PASS. HOLD_EXACT_PREDECESSOR_PAIR_MISSING.' >> "$GITHUB_STEP_SUMMARY"
