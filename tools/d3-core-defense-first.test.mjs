@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
+import {createRequire} from 'node:module';
+const nodeRequire=createRequire(import.meta.url);
 
 const read=name=>fs.readFileSync(new URL('../game/'+name,import.meta.url),'utf8');
 const roomSource=read('room.manager.js');
@@ -89,7 +91,9 @@ const tctx={module:{exports:{}},
  STRUCTURE_STORAGE:'storage',STRUCTURE_RAMPART:'rampart',
  STRUCTURE_WALL:'wall',RESOURCE_ENERGY:'energy',
  FIND_MY_CREEPS:'my_creeps',
- require(name){if(name==='logger')return{warn:()=>{}};throw Error(name);}};
+ require(name){if(name==='logger')return{warn:()=>{}};
+   if(name==='defense.siege.triage')return nodeRequire('../game/defense.siege.triage.js');
+   throw Error(name);}};
 vm.runInNewContext(towerSource,tctx,{filename:'tower.manager.js'});
 const towers=tctx.module.exports;
 function core(type,id,x,y,hits=1000){
