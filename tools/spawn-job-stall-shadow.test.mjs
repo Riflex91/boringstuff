@@ -145,7 +145,12 @@ const manager=fs.readFileSync(new URL('../game/spawn.manager.js',import.meta.url
 assert.match(main,/require\('spawn\.job\.stall\.shadow'\)/);
 assert.match(main,/spawnJobStallShadow\.observe\(Game, Memory, logger\)/);
 assert.match(main,/spawnJobStall:\s*spawnJobStallShadow\.summary\(state\.room\.name, Memory\)/);
-assert.match(manager,/if \(!spawn \|\| spawn\.spawning\) return false/);
+assert.match(manager,/const spawn = selectIdleSpawn\(state\);/,
+ 'O66 still uses exactly one eligible idle in-room spawn');
+assert.match(manager,/if \(!spawn\) return false/,
+ 'if all owned spawns are busy, no spawn request is issued');
+assert.match(manager,/spawn\.spawning \|\|/,
+ 'busy jobs remain ineligible without forced cancellation');
 assert.match(manager,/if \(countRole\(state\.room, 'defender'\) < want\.defender\)/);
 for(const forbidden of [
  /(?:spawn|spawning)\.cancel\s*\(/,
