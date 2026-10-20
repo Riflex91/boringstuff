@@ -41,6 +41,7 @@ const combatCounterattackShadow = require('combat.counterattack.shadow');
 const combatCounterattackLaunch = require('combat.counterattack.launch');
 const regionalDefenseLive = require('defense.regional.live');
 const spawnJobStallShadow = require('spawn.job.stall.shadow');
+const spawnFleetTelemetry = require('spawn.fleet.telemetry');
 
 function bootstrapMemory() {
   if (!Memory.bot) Memory.bot = { version: config.VERSION, born: Game.time };
@@ -295,6 +296,9 @@ function statusSnapshot(roomStates, tickCpu) {
       hostiles: state.hostileCreeps.length,
       spawnBusy: !!(state.spawn && state.spawn.spawning),
       spawnJobStall: spawnJobStallShadow.summary(state.room.name, Memory),
+      // O67: authoritative same-room capacity counts; spawnBusy remains
+      // the legacy primary-spawn field for backward-compatible consumers.
+      spawnFleet: spawnFleetTelemetry.summary(state, Memory, Game),
       spawnRemainingTime: state.spawn && state.spawn.spawning ? state.spawn.spawning.remainingTime : 0,
       economy: state.economyMetrics || null,
       economyModel: state.economyModel || null,
