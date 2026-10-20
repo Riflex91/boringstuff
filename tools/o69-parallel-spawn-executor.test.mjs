@@ -25,7 +25,8 @@ assert.equal(config.ENABLE_PARALLEL_SPAWN_EXECUTION,false,
   'O69 must not be release-enabled in a Draft branch');
 function fixture({rejectDry=null,rejectLive=null,onDryRun=null}={}){
  const calls=[];
- const room={name:'E8N1',controller:{my:true,level:3},energyAvailable:800};
+ const room={name:'E8N1',controller:{my:true,level:3},energyAvailable:800,
+  energyCapacityAvailable:800};
  function spawn(name){
   return {
    name,id:'id-'+name,my:true,room,spawning:null,isActive(){return true;},
@@ -45,7 +46,7 @@ function fixture({rejectDry=null,rejectLive=null,onDryRun=null}={}){
   };
  }
  const spawns=[spawn('Spawn2'),spawn('Spawn1')];
- const game={time:5000,creeps:{},spawns:Object.fromEntries(
+ const game={time:5000,creeps:{},rooms:{E8N1:room},spawns:Object.fromEntries(
    spawns.map(s=>[s.name,s]))};
  const memory={creeps:{}};
  global.Memory=memory;
@@ -197,6 +198,30 @@ try{
   f.game.spawns.Spawn1={...f.spawns[1]};
   assert.equal(executor.execute(f.state,f.proposal,f.game,f.memory).reason,
     'STALE_SPAWN');
+  assert.equal(f.calls.length,0);
+ }
+ {
+  const f=fixture();
+  f.state.room={...f.state.room};
+  assert.equal(executor.execute(f.state,f.proposal,f.game,f.memory).reason,
+    'INVALID_RELEASE_SNAPSHOT',
+    'a room clone is not the canonical Game.rooms object');
+  assert.equal(f.calls.length,0);
+ }
+ {
+  const f=fixture();
+  f.spawns[0].room={...f.state.room};
+  assert.equal(executor.execute(f.state,f.proposal,f.game,f.memory).reason,
+    'INVALID_FLEET',
+    'a same-name replacement Spawn room must not gain authority');
+  assert.equal(f.calls.length,0);
+ }
+ {
+  const f=fixture();
+  f.state.room.energyCapacityAvailable=750;
+  assert.equal(executor.execute(f.state,f.proposal,f.game,f.memory).reason,
+    'INVALID_RELEASE_SNAPSHOT',
+    'capacity changes invalidate a prepared body-cost plan');
   assert.equal(f.calls.length,0);
  }
  {
