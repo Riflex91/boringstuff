@@ -299,6 +299,8 @@ function statusSnapshot(roomStates, tickCpu) {
       // O67: authoritative same-room capacity counts; spawnBusy remains
       // the legacy primary-spawn field for backward-compatible consumers.
       spawnFleet: spawnFleetTelemetry.summary(state, Memory, Game),
+      // O68: role/energy reservations are a SHADOW preview, never live intents.
+      spawnParallel: state.spawnParallelShadow ? state.spawnParallelShadow.summary : null,
       spawnRemainingTime: state.spawn && state.spawn.spawning ? state.spawn.spawning.remainingTime : 0,
       economy: state.economyMetrics || null,
       economyModel: state.economyModel || null,
