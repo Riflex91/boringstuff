@@ -6,6 +6,8 @@ permissions:
   contents: read
 jobs:
   one-shot-get-defense:
+    # Prevent repeated authenticated probes from any subsequent branch push.
+    if: ${{ github.sha == 'd1414f253a02bb433bc67de4df8e010bb1736676' }}
     runs-on: ubuntu-latest
     timeout-minutes: 8
     defaults:
