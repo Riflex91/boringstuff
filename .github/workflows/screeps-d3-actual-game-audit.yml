@@ -1,0 +1,33 @@
+name: Screeps D3 real gameplay defense audit (GET ONLY)
+on:
+  push:
+    branches: [audit/d3-defense-live-observation-20261020]
+permissions:
+  contents: read
+jobs:
+  one-shot-get-defense:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    defaults:
+      run:
+        working-directory: tools
+    env:
+      SCREEPS_USERNAME_NEWBIELAND: Riflex91
+      SCREEPS_TOKEN_NEWBIELAND: ${{ secrets.SCREEPS_TOKEN_NEWBIELAND }}
+      SCREEPS_PASSWORD_NEWBIELAND: ${{ secrets.SCREEPS_PASSWORD_NEWBIELAND }}
+      SCREEPS_TOKEN_WORLD: ${{ secrets.SCREEPS_TOKEN_WORLD }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Install needed API dependencies without scripts
+        run: npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+      - name: Read actual game defensive assets without issuing intents
+        run: node d3-defense-actual-game-audit.mjs
+      - name: Confirm no server mutation authority
+        run: |
+          echo 'D3 authentic World and Newbieland game objects and bot telemetry, GET only.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'No gameplay writes, activation, new Spawn, construction placement or code upload.' >> "$GITHUB_STEP_SUMMARY"
