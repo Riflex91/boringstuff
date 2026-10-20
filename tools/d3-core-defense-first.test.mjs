@@ -162,14 +162,17 @@ const building=[primary,towerCore,core('storage','stor',12,10)];
 const room={
  name:'E8N1',controller:{my:true,level:6},
  getTerrain(){return {get(){return 0;}};},
- find(kind){return kind==='my-sites' ? sites : [];},
+ find(kind,options){
+  const rows=kind==='my-sites' ? sites : [];
+  return typeof options?.filter==='function' ? rows.filter(options.filter) : rows;
+ },
  lookForAt(kind,x,y){
   if(kind==='structures')return building.filter(s=>s.pos.x===x&&s.pos.y===y);
   if(kind==='sites')return sites.filter(s=>s.x===x&&s.y===y);
   throw Error(kind);
  },
  createConstructionSite(x,y,type){
-  placed.push({x,y,type});sites.push({x,y,type});
+  placed.push({x,y,type});sites.push({x,y,type,structureType:type});
   return 0;
  }
 };
