@@ -1,0 +1,34 @@
+name: Screeps O65-O70 actual live Spawn behavior audit (GET ONLY, ONE SHOT)
+on:
+  push:
+    branches: [release/world-chatgpt-o65-o70-20261020]
+permissions:
+  contents: read
+jobs:
+  read-only-spawn-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    defaults:
+      run:
+        working-directory: tools
+    env:
+      SCREEPS_USERNAME_NEWBIELAND: Riflex91
+      SCREEPS_TOKEN_NEWBIELAND: ${{ secrets.SCREEPS_TOKEN_NEWBIELAND }}
+      SCREEPS_PASSWORD_NEWBIELAND: ${{ secrets.SCREEPS_PASSWORD_NEWBIELAND }}
+      SCREEPS_TOKEN_WORLD: ${{ secrets.SCREEPS_TOKEN_WORLD }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Install locked runtime dependencies without scripts
+        run: npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+      - name: Query and sanitize actual Newbieland and World Spawn Memory (GET only)
+        run: node spawn-live-one-shot-audit.mjs
+      - name: State evidence limitations
+        run: |
+          echo '### Current Screeps runtime evidence, GET only' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Logs carry only aggregate role/Spawn counts and O69/O70 status, never tokens or Creep/Spawn identities.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'One sampled tick does not prove a sustained parallel Spawn throughput improvement.' >> "$GITHUB_STEP_SUMMARY"
