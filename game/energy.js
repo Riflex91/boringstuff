@@ -268,6 +268,38 @@ function needsCombatTowerRefill(structure) {
     Number.isFinite(energy) && energy >= 0 && energy < cap * 0.5;
 }
 
+// D7: keep a larger *loaded Tower ammunition reserve* in an actual
+// observed armed siege, without spending the energy necessary to spawn
+// defender/harvester replacements. Below 50% remains the D1 emergency.
+function towerBelowSiegeReserve(structure) {
+  if(!structure || structure.structureType!==STRUCTURE_TOWER ||
+     !structure.store || typeof structure.store.getCapacity!=='function')
+    return false;
+  const cap=Number(structure.store.getCapacity(RESOURCE_ENERGY));
+  const amount=Number(structure.store[RESOURCE_ENERGY]);
+  return Number.isFinite(cap) && cap>0 &&
+    Number.isFinite(amount) && amount>=0 && amount < cap*0.8;
+}
+function safeProactiveTowerRefill(room) {
+  if(!room || !Number.isFinite(room.energyAvailable) ||
+     !Number.isFinite(room.energyCapacityAvailable) ||
+     room.energyCapacityAvailable<=0)return false;
+  return room.energyAvailable>=Math.max(300,
+    room.energyCapacityAvailable*0.8);
+}
+function siegeTowerReserveDeficit(room) {
+  if(!armedHostilePresent(room))return false;
+  if(typeof FIND_MY_STRUCTURES==='undefined')return true;
+  let structures;
+  try {structures=room.find(FIND_MY_STRUCTURES);}
+  catch (_) {return true;}
+  if(!Array.isArray(structures) || structures.length>400)return true;
+  return structures.some(s=>s?.structureType===STRUCTURE_TOWER &&
+    (!s.store || typeof s.store.getCapacity!=='function' ||
+     !Number.isFinite(Number(s.store.getCapacity(RESOURCE_ENERGY))) ||
+     towerBelowSiegeReserve(s)));
+}
+
 function deliveryTargets(creep) {
   const targets = creep.room.find(FIND_MY_STRUCTURES, {
     filter: s => (s.structureType === STRUCTURE_SPAWN || s.structureType === STRUCTURE_EXTENSION || s.structureType === STRUCTURE_TOWER) && freeEnergyCapacity(s) > 0
@@ -275,6 +307,8 @@ function deliveryTargets(creep) {
   const combatPressure = armedHostilePresent(creep.room);
   const priority = s => s.structureType === STRUCTURE_SPAWN ? 0 :
     combatPressure && needsCombatTowerRefill(s) ? 1 :
+    combatPressure && safeProactiveTowerRefill(creep.room) &&
+      towerBelowSiegeReserve(s) ? 1 :
     s.structureType === STRUCTURE_EXTENSION ? 2 : 3;
   targets.sort((a, b) =>
     priority(a) - priority(b) ||
@@ -413,6 +447,11 @@ function selectConsumerRescueHauler(room, haulers, ready, critical) {
 }
 
 function selectConsumerGuardHaulers(room) {
+  // When Towers are under the 80% reserve during an actual armed siege,
+  // all ready carriers serve Spawn/extension/Tower logistics. No optional
+  // consumer guards may siphon loaded carriers from defense ammunition.
+  // Once reserve recovers, historical critical-consumer rescue resumes.
+  if (siegeTowerReserveDeficit(room)) return [];
   // Preserve at least one live hauler for hard infrastructure. With two
   // haulers this remains the historical single starvation guard. A third
   // hauler may unlock a second guard only when multiple critical consumers
