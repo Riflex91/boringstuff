@@ -300,7 +300,23 @@ function run(room, lowCpu) {
     towerManager.run(state);
     maybeSafeMode(state);
     maybeWarnUpgraderStall(state);
-    spawnManager.spawnOne(state);
+    if (config.ENABLE_PARALLEL_SPAWN_EXECUTION === true) {
+      const proposal = state.spawnParallelShadow;
+      if (proposal && proposal.status === 'DEFERRED') {
+        // Preserve proven single-spawn survival in a CPU-constrained tick.
+        state.spawnParallelExecution = {status:'DEFERRED', reason:'CPU_SHADOW_DEFERRED'};
+        spawnManager.spawnOne(state);
+      } else if (proposal && proposal.intents && proposal.intents.length) {
+        state.spawnParallelExecution = spawnParallelExecutor.execute(state, proposal, Game, Memory);
+      } else {
+        // Do not speculate when a non-deferred planner refused input.
+        state.spawnParallelExecution = {status:'HOLD', reason:
+          proposal ? (proposal.reason || 'NO_PREPARED_INTENTS') : 'NO_PLAN'};
+      }
+    } else {
+      state.spawnParallelExecution = {status:'DISABLED', reason:'RELEASE_GATE_OFF'};
+      spawnManager.spawnOne(state);
+    }
   });
 
   if (!lowCpu && Game.time % config.PLANNER_INTERVAL === 0) {
