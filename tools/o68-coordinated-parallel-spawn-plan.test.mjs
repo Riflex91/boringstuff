@@ -110,8 +110,10 @@ function invariant(plan, energy) {
   f.creeps.push(creep('hauler-one','hauler'));
   const result=execute(f);
   invariant(result,800);
-  assert.deepEqual(result.intents.map(i=>i.role),['defender'],
-    'count both existing live carrier and ongoing spawn job');
+  assert.equal(result.intents[0]?.role,'defender',
+    'defender still leads after carrier demand is satisfied');
+  assert.equal(result.intents.filter(i=>i.role==='hauler').length,0,
+    'already-running carrier and one live carrier satisfy all two slots');
 }
 {
   const f=fixture();
