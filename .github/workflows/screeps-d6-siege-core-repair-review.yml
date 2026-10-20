@@ -1,0 +1,38 @@
+name: Screeps D6 core Rampart siege repair (REVIEW ONLY)
+on:
+  push:
+    branches: [feature/d6-siege-core-rampart-repair-20261020]
+permissions:
+  contents: read
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: tools
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Exact D5 parent and limited game delta
+        shell: bash
+        run: |
+          git -C .. fetch origin main --quiet
+          test "$(git -C .. rev-parse origin/main)" = 596dddfe805d4866c293b2b5d13fcd6a37a57371
+          actual="$(git -C .. diff --name-only origin/main HEAD -- game | sort)"
+          expected="$(printf '%s\n' game/work.priority.js game/role.worker.js game/spawn.manager.js | sort)"
+          test "$actual" = "$expected"
+          grep -Eq 'AUTO_SAFE_MODE:[[:space:]]*true' ../game/config.js
+      - name: Full Node24 canonical tests
+        run: |
+          npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+          npm test
+      - name: Original P3 benchmark
+        run: npm run bench:p3
+      - name: Review only; no live writes
+        run: echo 'This workflow cannot deploy to Screeps.'
