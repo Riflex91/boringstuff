@@ -48,13 +48,24 @@ action on a CPU-constrained tick.
    standing garrison, but actually armed hostiles still trigger
    existing capped live defender demand of up to three.
    No attack on nonhostile neighbors or unverified target selection.
+5. As soon as an owned colony reaches **RCL7** (the first level
+   allowing a second Spawn), the existing room planner attempts
+   **at most one** legal duplicate-capacity Spawn construction site,
+   3–5 tiles from the observed original Spawn. Preconditions:
+   12000+ genuinely stored energy, no active hostiles, no room
+   survival emergency, owned controller, available controller
+   Spawn quota, available site slots, verified walkable/nonoccupied
+   destination. Any already pending Spawn site counts toward the
+   quota. No attempt to create a second Spawn at RCL5/6, and no
+   speculative World Spawn placement or resetting an existing Spawn.
 
 ## Tests and limits
 
 `tools/d3-core-defense-first.test.mjs` checks exact ordering,
 Safe-Mode/Tower failure isolation, active enemy vs harmless scout,
 critical-core shield imminent-loss trigger, peace-time reserve-safe
-Tower rampart repairs and bounded verified rampart placement.
+Tower rampart repairs, bounded verified rampart placement and legal
+RCL7+ second-Spawn site creation.
 
 `tools/d3-standing-defense.test.mjs` proves peacetime reserves,
 a RCL6 defensive pair, economic failure holds, and active raid scale-up.
