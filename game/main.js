@@ -37,6 +37,7 @@ const defenseRegistryPreview = require('defense.registry.preview');
 const regionalDefenseShadow = require('defense.reinforcement.shadow');
 const defenseTransitEvidence = require('defense.transit.evidence');
 const combatAggressionEvidence = require('combat.aggression.evidence');
+const combatSettlementEvidence = require('defense.combat.settlement');
 const combatCounterattackShadow = require('combat.counterattack.shadow');
 const combatCounterattackLaunch = require('combat.counterattack.launch');
 const regionalDefenseLive = require('defense.regional.live');
@@ -305,6 +306,7 @@ function statusSnapshot(roomStates, tickCpu) {
       spawnParallelExecution: state.spawnParallelExecution || null,
       defenseSiege: state.defenseSiege || null,
       defenseTowerAction: state.defenseTowerAction || null,
+      defenseCombatSettlement: combatSettlementEvidence.summary(state.room.name, Memory),
       spawnParallelReconciliation: spawnParallelReconcile.summary(state.room.name, Memory),
       spawnRemainingTime: state.spawn && state.spawn.spawning ? state.spawn.spawning.remainingTime : 0,
       economy: state.economyMetrics || null,
@@ -488,6 +490,25 @@ module.exports.loop = function() {
         }
       });
     }, schedulerContext);
+
+    // D8: Room.getEventLog() contains the PREVIOUS game tick's settled
+    // actions, not intents from this tick. This optional read-only stage
+    // is lower priority than immediate Safe Mode, Towers and Creeps;
+    // CPU headroom gating creates explicit gaps in contiguous evidence.
+    if (!lowCpu && !criticalCpu && roomStates.length>0 &&
+        roomStates.length<=3 && Game.time>1 &&
+        Number.isFinite(Game.cpu?.limit) &&
+        Game.cpu.limit-Game.cpu.getUsed()>config.SHADOW_CPU_RESERVE+3) {
+      try {
+        const result=combatSettlementEvidence.observe(roomStates,Game,Memory);
+        for(const item of result.completed||[]) {
+          logger.info('D8_SETTLED_COMBAT_WINDOW',
+            'Authentic previous-tick Tower/owned-core settlement lower bounds',
+            {room:item.room,evidence:item.summary},
+            {force:true,persist:true,dedupeTicks:0});
+        }
+      } catch (_) { /* optional observation never suppresses core defense */ }
+    }
 
     // O65: inspect only actual Game.spawns timers and consecutive game ticks.
     // No Spawn.cancel, forced spawn, memory-creep deletion, or HTTP writes.
