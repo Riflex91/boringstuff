@@ -6,6 +6,8 @@ permissions:
   contents: read
 jobs:
   read-only-spawn-audit:
+    # Bound the one-shot audit to its previously executed exact commit.
+    if: ${{ github.sha == '83379f6db1dab475f27ae5e9fde4bb4fbf61ebfb' }}
     runs-on: ubuntu-latest
     timeout-minutes: 8
     defaults:
