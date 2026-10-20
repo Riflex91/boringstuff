@@ -147,6 +147,8 @@ const pctx={module:{exports:{}},
  STRUCTURE_STORAGE:'storage',STRUCTURE_RAMPART:'rampart',
  STRUCTURE_WALL:'wall',
  LOOK_STRUCTURES:'structures',LOOK_CONSTRUCTION_SITES:'sites',
+ FIND_MY_CONSTRUCTION_SITES:'my-sites',TERRAIN_MASK_WALL:1,
+ CONTROLLER_STRUCTURES:{spawn:{7:2,8:3}},
  OK:0,ERR_FULL:-8,ERR_INVALID_TARGET:-7,ERR_RCL_NOT_ENOUGH:-14,
  require(name){
   if(name==='config')return{};
@@ -159,6 +161,8 @@ const sites=[], placed=[];
 const building=[primary,towerCore,core('storage','stor',12,10)];
 const room={
  name:'E8N1',controller:{my:true,level:6},
+ getTerrain(){return {get(){return 0;}};},
+ find(kind){return kind==='my-sites' ? sites : [];},
  lookForAt(kind,x,y){
   if(kind==='structures')return building.filter(s=>s.pos.x===x&&s.pos.y===y);
   if(kind==='sites')return sites.filter(s=>s.x===x&&s.y===y);
@@ -187,6 +191,30 @@ assert.equal(fortify({...base,rcl:3},{remaining:10}),0);
 assert.equal(fortify({...base,room:{...room,controller:{my:false}}},
  {remaining:10}),0);
 assert.equal(fortify(base,{remaining:0}),0);
+// RCL7: production redundancy must come from genuine controller quota,
+// available stored energy, an owned anchor, and a vacant >=3-tile site.
+const secondary=pctx.module.exports._test.secondarySpawnSite;
+const grown={...base,rcl:7,energyStored:15000,spawn:primary,
+ spawns:[primary]};
+room.controller.level=7;
+let extra={remaining:3};
+assert.equal(secondary(grown,extra),true,
+ 'RCL7 stockpiled colony should construct the second allowed Spawn');
+assert.equal(extra.remaining,2);
+const site=placed.at(-1);
+assert.equal(site.type,'spawn');
+assert.ok(Math.max(Math.abs(site.x-primary.pos.x),
+ Math.abs(site.y-primary.pos.y))>=3,
+ 'do not block primary Spawn immediate exits');
+assert.equal(secondary(grown,{remaining:3}),false,
+ 'a pending second Spawn site consumes its controller quota');
+for(const invalid of [
+ {...grown,rcl:6}, {...grown,energyStored:5000},
+ {...grown,emergency:true},
+ {...grown,hostileCreeps:[active]},
+ {...grown,room:{...room,controller:{my:false}}}
+])assert.equal(secondary(invalid,{remaining:3}),false,
+ 'a recovery or unstable colony must not create redundant Spawn sites');
 assert.match(planSource,/changed \+= fortifyCore\(state,budget\)/,
  'fortification must be integrated before optional road stage');
 const where=planSource.indexOf('changed += fortifyCore(state,budget)');
