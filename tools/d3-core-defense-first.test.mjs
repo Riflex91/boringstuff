@@ -8,6 +8,7 @@ const calls=[], warnings=[];
 const roomCtx={
  module:{exports:{}},
  STRUCTURE_SPAWN:'spawn',STRUCTURE_STORAGE:'storage',STRUCTURE_TOWER:'tower',
+ STRUCTURE_RAMPART:'rampart',
  require(name){
   if(name==='config')return {AUTO_SAFE_MODE:true};
   if(name==='logger')return {warn:(...x)=>warnings.push(x)};
@@ -52,6 +53,35 @@ calls.length=0;
 immediateDefense(state);
 assert.deepEqual(calls,['TOWER_ATTACK'],
  'far-away melee must not consume scarce Safe Mode');
+
+// Safe Mode is proactive when the ONLY shield covering the Spawn is
+// observed near destruction under ACTUAL adjacent attacker pressure.
+const shield={id:'owned-shield',my:true,structureType:'rampart',
+  hits:180,hitsMax:100000,pos:{x:10,y:10}};
+state.structures[0].hits=1000;
+state.structures=[state.structures[0],shield];
+state.hostileCreeps=[{pos:{getRangeTo(){return 1;}},
+ body:[{type:'attack',hits:100}]}];
+assert.equal(roomCtx.module.exports._test.safeModeDecision(state).reason,
+ 'CORE_RAMPART_BREACH_IMMINENT');
+shield.hits=10000;
+assert.equal(roomCtx.module.exports._test.safeModeDecision(state),null,
+ 'healthy shield must not consume Safe Mode prematurely');
+shield.hits=180;
+state.hostileCreeps=[{pos:{getRangeTo(){return 1;}},
+ body:[{type:'attack',hits:0},{type:'move',hits:100}]}];
+assert.equal(roomCtx.module.exports._test.safeModeDecision(state),null,
+ 'inactive attacker never triggers core rampart breach');
+state.hostileCreeps=[{pos:{getRangeTo(){return 4;}},
+ body:[{type:'attack',hits:100}]}];
+assert.equal(roomCtx.module.exports._test.safeModeDecision(state),null,
+ 'distant melee cannot damage shield this tick');
+state.hostileCreeps=[{pos:{getRangeTo(){return 1;}},
+ body:[{type:'attack',hits:100}]}];
+shield.pos={x:29,y:29};
+assert.equal(roomCtx.module.exports._test.safeModeDecision(state),null,
+ 'remote ramparts cannot trigger expensive Safe Mode');
+shield.pos={x:10,y:10};
 
 const towerSource=read('tower.manager.js');
 const tctx={module:{exports:{}},
