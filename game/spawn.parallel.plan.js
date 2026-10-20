@@ -202,10 +202,9 @@ function plan(state, game, memory) {
     // deterministically rather than letting the first large body consume all.
     const slotsLeft = scanned.idle.length - intents.length;
     const divisor = Math.max(1, Math.min(slotsLeft, outstanding));
-    const budget = state.emergency
-      ? remaining
-      : Math.min(state.energyCapacityAvailable,
-          Math.max(300, Math.floor(remaining / divisor)));
+    const minimumBodyBudget = state.emergency ? 200 : 300;
+    const budget = Math.min(state.energyCapacityAvailable,
+      Math.max(minimumBodyBudget, Math.floor(remaining / divisor)));
     let parts;
     try { parts = bodyFor(role, budget, state); }
     catch (_) { return hold('BODY_BUILD_EXCEPTION'); }
