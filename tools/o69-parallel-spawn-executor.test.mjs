@@ -127,7 +127,7 @@ try{
   const f=fixture();
   f.state.room.energyAvailable=500;
   const out=executor.execute(f.state,f.proposal,f.game,f.memory);
-  assert.equal(out.reason,'STALE_ENERGY_RESERVATION');
+  assert.equal(out.reason,'INVALID_RELEASE_SNAPSHOT');
   assert.equal(f.calls.length,0);
  }
  {
