@@ -126,7 +126,11 @@ function run(state) {
     return;
   }
 
-  const hurt = state.room.find(FIND_MY_CREEPS, { filter: c => c.hits < c.hitsMax })[0];
+  // Reuse the single authoritative room.state creep snapshot where available.
+  // Avoid an additional Room.find that can disagree with siege triage.
+  const hurt = Array.isArray(state.creeps)
+    ? state.creeps.find(c=>c && c.hits<c.hitsMax)
+    : state.room.find(FIND_MY_CREEPS, { filter: c => c.hits < c.hitsMax })[0];
   if (hurt) {
     state.towers.forEach(t => t.heal(hurt));
     result('HEAL_PEACE',0,state.towers.length);
