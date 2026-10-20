@@ -1,0 +1,56 @@
+# D6 – Critical core Rampart repairs under actual siege
+
+Review-only development from Main 596dddfe805d4866c293b2b5d13fcd6a37a57371.
+
+## Objective
+
+Tower attacks and rescues during battle override Tower repairs. Ordinary
+workers can meanwhile spend time repairing roads, distant walls or
+building low-priority structures. A damaged Rampart directly over a
+Spawn, Tower or Storage requires a separate targeted repair priority.
+
+## Behavior
+
+The new bounded work-priority predicate checks only existing owned
+Ramparts physically on owned Spawn/Tower/Storage tiles. Actual in-range
+enemy ATTACK, WORK and RANGED_ATTACK parts produce a conservative
+per-tick damage estimate (x4 upper bound when boost metadata is
+present). Unknown, inactive, distant, scouting and non-owned targets
+are not accepted. A shield is urgent only below 30,000 hits or below
+12 estimated ticks of incoming damage. Highest breach urgency wins.
+
+Funded workers, builders and repairers attempt an urgent shield repair
+after an existing emergency Spawn/Tower repair but before optional
+building or maintenance. If out of range, move only toward repair range
+3, within the same room, respecting the existing civilian evacuation
+handler. The legacy survival/hauler refill branch remains ahead of this
+stage. The live defender and harvester prioritization remain unchanged.
+
+One additional repairer is requested under verified RCL4+ siege
+pressure without overriding the existing workforce emergency hold.
+The actual legacy Spawn dispatcher now also promotes this ONE
+siege repairer ahead of optional upgrader or builder growth, but ONLY
+after the minimum source-matched harvester, single worker and at least
+one transport hauler are present. Under an emergency, no peacetime
+repairer is requested; real hostile defender demand remains first.
+An unarmed scout, unowned shield or unwitnessed threat never grants
+siege-repairer priority.
+
+No second Tower combat caller, Safe Mode changes, external raiding
+or speculative construction placement are introduced.
+
+## Evidence and release status
+
+Canonical Node24 regression tests cover target ownership, weapon
+reach, boost, safe range, no enemy/no threat, worker energy, peacetime
+and existing role demand. Exact-base secretless CI also runs the
+original P3 four-mode benchmark.
+
+The D4/D5 predecessor Main 596dddfe805d4866c293b2b5d13fcd6a37a57371
+has passed independent 100-real-tick verification on BOTH Newbieland
+(Actions 39495952018) and World W37S79 (Actions 39495951928).
+D6 is therefore eligible for an independently checked Main release,
+subject to exact-head canonical + P3 and review/merge requirements.
+Do not count mock repairs as real Rampart durability gains. A new
+Main deployment still needs its own 100-real-tick verifications; even
+an authenticated successful repair cannot guarantee every siege win.

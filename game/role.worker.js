@@ -166,6 +166,38 @@ function emergencyRepair(creep) {
   return rc === OK || rc === ERR_NOT_IN_RANGE;
 }
 
+// D6: only verified enemy damage to an owned Spawn/Tower/Storage shield
+// displaces discretionary construction. Evacuation still executes before
+// this role and prevents a worker from being ordered into immediate danger.
+function repairCoreShield(creep) {
+  if(!creep?.room?.controller?.my || creep.room.controller.safeMode ||
+     !creep.pos || !creep.store ||
+     (creep.store[RESOURCE_ENERGY]||0)<=0 ||
+     typeof creep.room.find!=='function' ||
+     typeof FIND_HOSTILE_CREEPS==='undefined')return false;
+  let structures,hostiles;
+  try {
+    hostiles=creep.room.find(FIND_HOSTILE_CREEPS);
+    if(!Array.isArray(hostiles) || !hostiles.length)return false;
+    structures=creep.room.find(FIND_STRUCTURES);
+  }catch(_){return false;}
+  const targets=workPriority.criticalCoreShieldTargets(structures,hostiles);
+  if(!targets.length ||
+     typeof creep.pos.findClosestByPath!=='function')return false;
+  const target=creep.pos.findClosestByPath(targets,{
+    maxOps:config.PATH_MAX_OPS
+  });
+  if(!target)return false;
+  let rc;
+  try{rc=creep.repair(target);}catch(_){return false;}
+  if(rc===ERR_NOT_IN_RANGE) {
+    // Stand at working range, not directly on the tile exposed to attackers.
+    creep.moveTo(target,{range:3,reusePath:3,maxRooms:1,
+      maxOps:config.PATH_MAX_OPS});
+  }
+  return rc===OK || rc===ERR_NOT_IN_RANGE;
+}
+
 function repair(creep) {
   const rcl = creep.room.controller ? creep.room.controller.level : 1;
   const wallCap = Math.max(10000, rcl * config.REPAIR_WALL_TARGET_RCL_MULTIPLIER);
@@ -228,6 +260,7 @@ function run(creep) {
   // repair critically damaged owned spawns/towers/storage before construction
   // or routine maintenance. Upgraders retain their controller assignment.
   if (emergencyRepair(creep)) return;
+  if (repairCoreShield(creep)) return;
 
   if (role === 'builder') {
     if (build(creep)) return;
@@ -247,4 +280,4 @@ function run(creep) {
   upgrade(creep);
 }
 
-module.exports = { run, _test: { acquireWorkEnergy, needsEnergy, liveHaulerCount, shouldAssistInfrastructure, emergencyRepair, economicConstructionSite, preferredConstructionSite } };
+module.exports = { run, _test: { acquireWorkEnergy, needsEnergy, liveHaulerCount, shouldAssistInfrastructure, emergencyRepair, repairCoreShield, economicConstructionSite, preferredConstructionSite } };

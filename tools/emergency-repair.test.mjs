@@ -243,4 +243,69 @@ function spawnFixture() {
   assert.equal(spawnManager.spawnOne(fixture.state), false,
     'emergency bootstrap does not spawn an optional repairer');
 }
+// D6: verified active core-shield damage should be treated as urgent
+// infrastructure repair AFTER essential workforce; a normal deficit in
+// upgrade/build demand cannot delay the sole belaguered Rampart repairer.
+function siegedFixture() {
+  const f=spawnFixture();
+  f.state.rcl=6;
+  f.state.room.controller={my:true,level:6};
+  f.state.energyStored=5000;
+  f.state.energyAvailable=1050;
+  f.state.energyCapacityAvailable=1050;
+  const original=f.state.structures[0];
+  original.hits=original.hitsMax;original.my=true;
+  original.pos={x:12,y:12};
+  f.state.structures=[
+    original,
+    {id:'coreRampart',my:true,structureType:STRUCTURE_RAMPART,
+      pos:{x:12,y:12},hits:1200,hitsMax:1000000}
+  ];
+  f.state.hostileCreeps=[{
+    id:'armed-dismantler',
+    pos:{getRangeTo(){return 1;}},
+    body:[{type:'work',hits:100},{type:'move',hits:100}]
+  }];
+  f.creeps.push({memory:{role:'defender'},ticksToLive:700});
+  return f;
+}
+{
+  const f=siegedFixture();
+  assert.equal(spawnManager.desired(f.state).repairer,1);
+  assert.equal(spawnManager.spawnOne(f.state),true);
+  assert.equal(f.spawned().options.memory.role,'repairer',
+    'live core-shield breach must outrank absent optional upgrader');
+}
+{
+  const f=siegedFixture();
+  f.creeps.splice(2,1); // remove critical hauler
+  assert.equal(spawnManager.spawnOne(f.state),true);
+  assert.equal(f.spawned().options.memory.role,'hauler',
+    'siege repairer must not preempt the last logistics carrier');
+}
+{
+  const f=siegedFixture();
+  f.creeps.splice(1,1); // remove the last worker
+  assert.equal(spawnManager.spawnOne(f.state),true);
+  assert.equal(f.spawned().options.memory.role,'worker',
+    'siege repairer must not preempt last productive worker');
+}
+{
+  const f=siegedFixture();
+  f.creeps.splice(0,1); // remove the source miner
+  assert.equal(spawnManager.spawnOne(f.state),true);
+  assert.equal(f.spawned().options.memory.role,'harvester',
+    'siege repairer must not preempt sole source miner');
+}
+{
+  const f=siegedFixture();
+  f.state.hostileCreeps=[{body:[{type:'move',hits:100}],
+    pos:{getRangeTo(){return 1;}}}];
+  assert.equal(spawnManager.desired(f.state).repairer,0,
+    'harmless visitor cannot create a dedicated siege repairer');
+  assert.equal(spawnManager.spawnOne(f.state),true);
+  assert.notEqual(f.spawned().options.memory.role,'repairer',
+    'peacetime upgrade remains ahead of nonexistent siege defense');
+}
+
 console.log('active infrastructure repair triage and spawn dispatch PASS');
