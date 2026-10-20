@@ -3,6 +3,7 @@
 const stateBuilder = require('room.state');
 const spawnManager = require('spawn.manager');
 const spawnParallelPlan = require('spawn.parallel.plan');
+const spawnParallelExecutor = require('spawn.parallel.execute');
 const towerManager = require('tower.manager');
 const planner = require('room.planner');
 const economyMetrics = require('economy.metrics');
