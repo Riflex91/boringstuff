@@ -53,6 +53,7 @@ function desired(state) {
   const constructionHeavy = state.sites.length > 5;
   const damaged = state.structures.some(s => s.hits !== undefined && s.hits < s.hitsMax * 0.6 && s.structureType !== STRUCTURE_WALL && s.structureType !== STRUCTURE_RAMPART);
   const shieldSiege = state.rcl >= 4 && !state.emergency &&
+    typeof workPriority.hasCriticalCoreShieldThreat === 'function' &&
     workPriority.hasCriticalCoreShieldThreat(state.structures,state.hostileCreeps);
   const defendersNeeded = Math.max(defenderDemand(state.hostileCreeps),
     standingGarrison(state));
