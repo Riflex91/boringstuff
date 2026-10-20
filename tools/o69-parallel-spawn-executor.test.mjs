@@ -238,7 +238,8 @@ const rm=fs.readFileSync(new URL('../game/room.manager.js',import.meta.url),'utf
 const main=fs.readFileSync(new URL('../game/main.js',import.meta.url),'utf8');
 assert.equal((rm.match(/spawnManager\.spawnOne\(state\)/g)||[]).length,1,
  'one legacy fallback invocation; never parallel with O69');
-assert.match(rm,/config\.ENABLE_PARALLEL_SPAWN_EXECUTION === true/);
+assert.match(rm,/config\.ENABLE_PARALLEL_SPAWN_EXECUTION !== true/,
+  'the dispatch gate must require explicit release enablement');
 assert.match(rm,/state\.spawnParallelExecution = spawnParallelExecutor\.execute/);
 assert.match(main,/spawnParallelExecution:\s*state\.spawnParallelExecution/);
 const configSource=fs.readFileSync(new URL('../game/config.js',import.meta.url),'utf8');
