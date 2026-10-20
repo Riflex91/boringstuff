@@ -1,12 +1,16 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
+import {createRequire} from 'node:module';
+const nodeRequire=createRequire(import.meta.url);
 
 const source = fs.readFileSync(new URL('../game/tower.manager.js', import.meta.url), 'utf8');
 const context = {
   module: { exports: {} },
   require(name) {
     if (name === 'logger') return { warn() {} };
+    if (name === 'defense.siege.triage')
+      return nodeRequire('../game/defense.siege.triage.js');
     throw new Error('Unexpected dependency: ' + name);
   },
   STRUCTURE_SPAWN: 'spawn',
