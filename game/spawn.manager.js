@@ -433,4 +433,4 @@ function spawnOne(state) {
   return false;
 }
 
-module.exports = { desired, spawnOne, _test: { countRole, baseUpgraderTarget, productivePrespawnHorizon, countRoleAvailable, countRoleForDesired, productivePrespawnShortfall, defenderDemand, selectIdleSpawn } };
+module.exports = { desired, spawnOne, _test: { countRole, baseUpgraderTarget, productivePrespawnHorizon, countRoleAvailable, countRoleForDesired, productivePrespawnShortfall, defenderDemand, standingGarrison, selectIdleSpawn } };
