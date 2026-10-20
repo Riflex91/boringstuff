@@ -98,6 +98,38 @@ function safeModeDecision(state) {
     if (nextTickDamage > 0 && nextTickDamage * 3 >= structure.hits)
       return { reason: 'PREDICTED_CORE_LOSS', structure };
   }
+  // A healthy Spawn beneath a nearly breached defensive Rampart may lose
+  // thousands of hits in the first UNPROTECTED tick. Existing core-health
+  // checks cannot see this risk while damage is absorbed by the shield.
+  // Trigger only for an ACTUAL OWNED rampart over an ACTUAL OWNED critical
+  // asset and ACTIVE hostile damage in weapon range. Never trigger for
+  // a remote wall, old damage or a harmless passing scout.
+  if (typeof STRUCTURE_RAMPART !== 'undefined') {
+    const ramps=(state.structures || []).filter(s=>
+      s && s.my===true && s.structureType===STRUCTURE_RAMPART &&
+      s.pos && Number.isFinite(s.hits) && s.hits>0);
+    for(const ramp of ramps) {
+      if(!core.some(s=>s.pos.x===ramp.pos.x && s.pos.y===ramp.pos.y))
+        continue;
+      let perTick=0;
+      for(const hostile of hostiles) {
+        if(!hostile?.pos || typeof hostile.pos.getRangeTo!=='function' ||
+           !Array.isArray(hostile.body))continue;
+        const d=hostile.pos.getRangeTo(ramp);
+        if(!Number.isSafeInteger(d) || d<0)continue;
+        for(const part of hostile.body) {
+          if(!part || !(part.hits>0))continue;
+          let base=0;
+          if(d<=1 && part.type==='attack')base=30;
+          else if(d<=1 && part.type==='work')base=50;
+          else if(d<=3 && part.type==='ranged_attack')base=10;
+          if(base)perTick+=base*(part.boost?4:1);
+        }
+      }
+      if(perTick>0 && ramp.hits<=perTick*8)
+        return {reason:'CORE_RAMPART_BREACH_IMMINENT',structure:ramp};
+    }
+  }
   return null;
 }
 
