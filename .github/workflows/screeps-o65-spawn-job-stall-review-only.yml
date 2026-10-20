@@ -1,0 +1,51 @@
+name: Screeps O65 passive spawn stall witness (GAMEPLAY REVIEW ONLY)
+on:
+  push:
+    branches: [feature/o65-spawn-job-stall-shadow-20261020]
+permissions:
+  contents: read
+concurrency:
+  group: o65-spawn-stall-offline
+  cancel-in-progress: false
+jobs:
+  node24-gameplay-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: tools
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Require pinned original Main and strictly reviewed gameplay delta
+        shell: bash
+        run: |
+          git -C .. fetch origin main --quiet
+          test "$(git -C .. rev-parse origin/main)" = bc43f2faf1f345e63d9bfe78b6bbaa59e5eaab0c
+          actual="$(git -C .. diff --name-only origin/main HEAD -- game | sort)"
+          expected="$(printf '%s\n' game/main.js game/spawn.job.stall.shadow.js | sort)"
+          test "$actual" = "$expected"
+          git -C .. diff --quiet origin/main HEAD -- game/spawn.manager.js
+          if grep -E '(\.cancel[[:space:]]*\(|\.spawnCreep[[:space:]]*\(|\.createConstructionSite[[:space:]]*\()' ../game/spawn.job.stall.shadow.js; then
+            echo 'Read-only observer may not contain game mutation calls' >&2
+            exit 1
+          fi
+      - name: Complete canonical Node24 gameplay regressions
+        run: |
+          npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+          npm test
+      - name: P3 baseline reproducibility
+        run: npm run bench:p3
+      - name: Explicitly preserve production release hold
+        run: |
+          echo '### O65 passive actual-game-tick Spawn job watchdog' >> "$GITHUB_STEP_SUMMARY"
+          echo 'This branch intentionally changes game/main.js and adds one READ-ONLY game module, but never deploys them.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Long-lived same-job detection requires 151 consecutive in-game tick observations and valid timer values.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Detection only reports an anomaly; no cancel, force spawn, HTTP POST, branch activation, ref mutation or merge.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Historical E8N1 incident is NOT retrospectively diagnosed by synthetic tests.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'HOLD_EXACT_PREDECESSOR_PAIR_MISSING until approved original live evidence and review.' >> "$GITHUB_STEP_SUMMARY"

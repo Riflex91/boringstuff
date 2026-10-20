@@ -40,6 +40,9 @@ const combatAggressionEvidence = require('combat.aggression.evidence');
 const combatCounterattackShadow = require('combat.counterattack.shadow');
 const combatCounterattackLaunch = require('combat.counterattack.launch');
 const regionalDefenseLive = require('defense.regional.live');
+const spawnJobStallShadow = require('spawn.job.stall.shadow');
+const spawnFleetTelemetry = require('spawn.fleet.telemetry');
+const spawnParallelReconcile = require('spawn.parallel.reconcile');
 
 function bootstrapMemory() {
   if (!Memory.bot) Memory.bot = { version: config.VERSION, born: Game.time };
@@ -293,6 +296,14 @@ function statusSnapshot(roomStates, tickCpu) {
       constructionSites: state.sites.length,
       hostiles: state.hostileCreeps.length,
       spawnBusy: !!(state.spawn && state.spawn.spawning),
+      spawnJobStall: spawnJobStallShadow.summary(state.room.name, Memory),
+      // O67: authoritative same-room capacity counts; spawnBusy remains
+      // the legacy primary-spawn field for backward-compatible consumers.
+      spawnFleet: spawnFleetTelemetry.summary(state, Memory, Game),
+      // O68: role/energy reservations are a SHADOW preview, never live intents.
+      spawnParallel: state.spawnParallelShadow ? state.spawnParallelShadow.summary : null,
+      spawnParallelExecution: state.spawnParallelExecution || null,
+      spawnParallelReconciliation: spawnParallelReconcile.summary(state.room.name, Memory),
       spawnRemainingTime: state.spawn && state.spawn.spawning ? state.spawn.spawning.remainingTime : 0,
       economy: state.economyMetrics || null,
       economyModel: state.economyModel || null,
@@ -366,8 +377,20 @@ function currentSectionTotal(names) {
 }
 
 function cleanupMemory() {
+  // Live spawning jobs are NOT yet exposed by Game.creeps. Discarding their
+  // Memory.creeps records would erase role/home identity during the spawn
+  // and make O68's authenticated running-job census fail closed.
+  const activeSpawnJobs = new Set();
+  for (const spawn of Object.values(Game.spawns || {})) {
+    if (spawn && spawn.my === true && spawn.spawning &&
+        typeof spawn.spawning.name === 'string' &&
+        spawn.spawning.name.length > 0 &&
+        spawn.spawning.name.length <= 128)
+      activeSpawnJobs.add(spawn.spawning.name);
+  }
   for (const name in Memory.creeps) {
-    if (!Game.creeps[name]) delete Memory.creeps[name];
+    if (!Game.creeps[name] && !activeSpawnJobs.has(name))
+      delete Memory.creeps[name];
   }
   if (Memory.intel && Game.time % 1000 === 0) {
     for (const room in Memory.intel) if (Game.time - Memory.intel[room].tick > 20000) delete Memory.intel[room];
@@ -378,6 +401,11 @@ module.exports.loop = function() {
   const tickStart = Game.cpu.getUsed();
   try {
     measureMainDetail('main.bootstrap', bootstrapMemory);
+    // O70: inspect pending prior-tick O69 receipts BEFORE any game writer,
+    // cleanup or room planning. Actual Game.spawns evidence is required;
+    // ledger entries and OK return codes alone are never a live witness.
+    try { spawnParallelReconcile.observe(Game, Memory); }
+    catch (_) { /* telemetry failure must not stop colony survival */ }
     // Preserve real counterattack retreat even if future releases disable
     // autonomous raid launches. Never interrupt the home economy on error.
     if(['ATTACKING','RETREAT'].includes(
@@ -458,6 +486,11 @@ module.exports.loop = function() {
         }
       });
     }, schedulerContext);
+
+    // O65: inspect only actual Game.spawns timers and consecutive game ticks.
+    // No Spawn.cancel, forced spawn, memory-creep deletion, or HTTP writes.
+    try { spawnJobStallShadow.observe(Game, Memory, logger); }
+    catch (_) { /* telemetry failure cannot affect colony survival */ }
 
     // D2 executable neighbor aid uses one existing spare fighter and keeps
     // a verified home garrison. No enemy-owned or neutral transit rooms.

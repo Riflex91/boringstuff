@@ -1,0 +1,55 @@
+name: Screeps O65-O70 Newbieland release candidate (ACTIVE, OFFLINE PREMERGE)
+on:
+  push:
+    branches:
+      - release/o65-o70-parallel-live-newbieland-20261020
+permissions:
+  contents: read
+concurrency:
+  group: screeps-o65-o70-live-trial-release-check
+  cancel-in-progress: false
+jobs:
+  exact-release-premerge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: tools
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Exact Main, bounded game delta and deliberate feature release
+        shell: bash
+        run: |
+          git -C .. fetch origin main --quiet
+          test "$(git -C .. rev-parse origin/main)" = bc43f2faf1f345e63d9bfe78b6bbaa59e5eaab0c
+          actual="$(git -C .. diff --name-only origin/main HEAD -- game | sort)"
+          expected="$(printf '%s\n' game/config.js game/main.js game/room.manager.js game/room.state.js game/spawn.job.stall.shadow.js game/spawn.fleet.telemetry.js game/spawn.manager.js game/spawn.parallel.plan.js game/spawn.parallel.execute.js game/spawn.parallel.reconcile.js | sort)"
+          test "$actual" = "$expected"
+          grep -Eq 'ENABLE_PARALLEL_SPAWN_EXECUTION:[[:space:]]*true' ../game/config.js
+          grep -Eq 'AUTO_SAFE_MODE:[[:space:]]*true' ../game/config.js
+          git -C .. diff --quiet origin/main HEAD -- game/body.builder.js game/defense.regional.live.js
+          git -C .. diff --quiet 9a2e964c5f35cdf0b3b89e555113e3f729c10507 HEAD -- game/spawn.manager.js
+          git -C .. diff --quiet c773ce6d95ebce3223d93cb543e250ded938d367 HEAD -- game/spawn.parallel.plan.js
+          if grep -E '(\.spawnCreep[[:space:]]*\(|\.cancel[[:space:]]*\(|\.renewCreep[[:space:]]*\(|\.createConstructionSite[[:space:]]*\()' ../game/spawn.parallel.plan.js ../game/spawn.parallel.reconcile.js; then
+            echo 'Read-only planners/reconcilers cannot issue game intents' >&2
+            exit 1
+          fi
+      - name: Full canonical Node 24 regression suite
+        run: |
+          npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+          npm test
+      - name: Original P3 four-mode benchmark
+        run: npm run bench:p3
+      - name: Release handoff explicit
+        run: |
+          echo '### Operator-approved Newbieland live trial premerge tests' >> "$GITHUB_STEP_SUMMARY"
+          echo 'O65-O70 bundled; O69 parallel spawn gate explicitly TRUE; bounded and CPU-protected.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'This workflow has no Screeps credentials or upload action.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Merge to main triggers the separate existing Newbieland CI > guarded upload > 100-tick verifier.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'World is a distinct manually gated workflow; this is NOT a World deployment.' >> "$GITHUB_STEP_SUMMARY"

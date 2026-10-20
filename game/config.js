@@ -75,6 +75,10 @@ module.exports = {
   // Conservative safety defaults. Turn on only after reviewing logs.
   // D1 survival: use the bounded core-loss guard, never lone scouts.
   AUTO_SAFE_MODE: true,
+  // O69/O70: operator-authorized Newbieland live trial (2026-10-20).
+  // Bounded by multi-Spawn dryRuns, CPU/fleet/energy checks and O70 receipts.
+  // Rollback: restore this flag to false and redeploy last verified main.
+  ENABLE_PARALLEL_SPAWN_EXECUTION: true,
   // D2: one safe preexisting defender across directly adjacent own rooms.
   AUTO_REGIONAL_DEFENSE_SUPPORT: true,
   // R2: allow one bounded neighboring-colony spare labor rescue.

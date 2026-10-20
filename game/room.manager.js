@@ -2,6 +2,8 @@
 
 const stateBuilder = require('room.state');
 const spawnManager = require('spawn.manager');
+const spawnParallelPlan = require('spawn.parallel.plan');
+const spawnParallelExecutor = require('spawn.parallel.execute');
 const towerManager = require('tower.manager');
 const planner = require('room.planner');
 const economyMetrics = require('economy.metrics');
@@ -36,6 +38,8 @@ function status(state) {
     logisticsRequests: state.requestShadow ? state.requestShadow.logisticsGraph : null,
     scoutingFrontier: state.requestShadow ? state.requestShadow.scoutingFrontier : null,
     capacitySpawn: state.capacitySpawnShadow ? state.capacitySpawnShadow.summary : null,
+    spawnParallel: state.spawnParallelShadow ? state.spawnParallelShadow.summary : null,
+    spawnParallelExecution: state.spawnParallelExecution || null,
     assignments: state.assignmentShadow ? state.assignmentShadow.summary : null,
     logisticsMatching: state.logisticsMatchingShadow ? state.logisticsMatchingShadow.summary : null,
     logisticsMatchingEvidence: state.logisticsMatchingEvidence ? (state.logisticsMatchingEvidence.lastWindow || state.logisticsMatchingEvidence.current) : null,
@@ -131,6 +135,8 @@ function maybeWarnUpgraderStall(state) {
 
 const SHADOW_STAGE_FALLBACK_CPU = Object.freeze({
   'room.capacity-spawn': 2.5,
+  'room.spawn-parallel-plan': 1.0,
+  'room.spawn-parallel-execute': 2.0,
   'room.assignment': 2.5,
   'room.logistics-match': 1.0
 });
@@ -151,6 +157,46 @@ function shadowCpuHeadroom(detailName, game, memoryRoot) {
     : 0;
   const estimated = Math.max(fallback, historical * 1.15);
   return game.cpu.getUsed() + estimated + reserve <= game.cpu.limit;
+}
+
+// O69: isolate the ONE spawn-dispatch authority so OFF/DEFERRED,
+// productive and uncertain paths can be exercised without running
+// unrelated towers, construction, CPU stages or remote mission logic.
+// A throwing productive executor must not trigger a legacy retry.
+function dispatchSpawn(state, game, memory) {
+  let legacyNeeded = false;
+  if (config.ENABLE_PARALLEL_SPAWN_EXECUTION !== true) {
+    state.spawnParallelExecution = {status:'DISABLED', reason:'RELEASE_GATE_OFF'};
+    legacyNeeded = true;
+  } else {
+    const proposal = state.spawnParallelShadow;
+    if (proposal && proposal.status === 'DEFERRED') {
+      // Preserve the proven single-spawn survival path under CPU deferral.
+      state.spawnParallelExecution = {status:'DEFERRED', reason:'CPU_SHADOW_DEFERRED'};
+      legacyNeeded = true;
+    } else if (proposal && Array.isArray(proposal.intents) &&
+               proposal.intents.length) {
+      // Plan headroom was measured BEFORE later evidence/stats stages.
+      // A fresh read is mandatory before any additional CPU-heavy replay,
+      // dryRun sequence or productive multi-spawn intents.
+      if (!game || !game.cpu || typeof game.cpu.getUsed !== 'function' ||
+          !Number.isFinite(game.cpu.limit) ||
+          !shadowCpuHeadroom('room.spawn-parallel-execute', game, memory)) {
+        state.spawnParallelExecution = {status:'DEFERRED', reason:'CPU_EXECUTOR_HEADROOM'};
+        legacyNeeded = true;
+      } else try {
+        state.spawnParallelExecution = spawnParallelExecutor.execute(state, proposal, game, memory);
+      } catch (_) {
+        // An intent may have been accepted before an exception. Never retry.
+        state.spawnParallelExecution = {status:'HOLD', reason:'EXECUTOR_EXCEPTION'};
+      }
+    } else {
+      state.spawnParallelExecution = {status:'HOLD', reason:
+        proposal ? (proposal.reason || 'NO_PREPARED_INTENTS') : 'NO_PLAN'};
+    }
+  }
+  if (legacyNeeded) spawnManager.spawnOne(state);
+  return state.spawnParallelExecution;
 }
 
 function run(room, lowCpu) {
@@ -207,6 +253,15 @@ function run(room, lowCpu) {
       : capacitySpawnShadow.deferredSnapshot(shadowDeferReason);
     snapshot.summary.legacyDesired = spawnManager.desired(state);
     return snapshot;
+  });
+
+  // O68 is a bounded, CPU-gated simulation. The live executor below remains
+  // the original single spawnOne call, with no new game mutation authority.
+  state.spawnParallelShadow = profiler.detailSection('room.spawn-parallel-plan', function() {
+    if (!canRunShadowStage('room.spawn-parallel-plan'))
+      return spawnParallelPlan.deferred(shadowDeferReason);
+    try { return spawnParallelPlan.plan(state, Game, Memory); }
+    catch (_) { return spawnParallelPlan.deferred('PLAN_EXCEPTION'); }
   });
 
   state.assignmentShadow = profiler.detailSection('room.assignment', function() {
@@ -286,7 +341,7 @@ function run(room, lowCpu) {
     towerManager.run(state);
     maybeSafeMode(state);
     maybeWarnUpgraderStall(state);
-    spawnManager.spawnOne(state);
+    dispatchSpawn(state, Game, Memory);
   });
 
   if (!lowCpu && Game.time % config.PLANNER_INTERVAL === 0) {
@@ -303,4 +358,4 @@ function run(room, lowCpu) {
   return state;
 }
 
-module.exports = { run, _test: { status, shadowCpuHeadroom, safeModeDecision, maybeSafeMode } };
+module.exports = { run, _test: { status, shadowCpuHeadroom, safeModeDecision, maybeSafeMode, dispatchSpawn } };

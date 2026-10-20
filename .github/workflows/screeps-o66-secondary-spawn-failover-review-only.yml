@@ -1,0 +1,52 @@
+name: Screeps O66 owned secondary Spawn failover (GAMEPLAY REVIEW ONLY)
+on:
+  push:
+    branches: [feature/o66-idle-secondary-spawn-failover-20261020]
+permissions:
+  contents: read
+concurrency:
+  group: o66-spawn-failover-review
+  cancel-in-progress: false
+jobs:
+  node24-full-gameplay-p3:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: tools
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Verify unchanged original Main and precisely bounded O66 gameplay changes
+        shell: bash
+        run: |
+          git -C .. fetch origin main --quiet
+          test "$(git -C .. rev-parse origin/main)" = bc43f2faf1f345e63d9bfe78b6bbaa59e5eaab0c
+          actual="$(git -C .. diff --name-only origin/main HEAD -- game | sort)"
+          expected="$(printf '%s\n' game/main.js game/room.state.js game/spawn.job.stall.shadow.js game/spawn.manager.js | sort)"
+          test "$actual" = "$expected"
+          git -C .. diff --quiet origin/main HEAD -- game/body.builder.js
+          git -C .. diff --quiet origin/main HEAD -- game/config.js
+          git -C .. diff --quiet origin/main HEAD -- game/defense.regional.live.js
+          if grep -E '(\.cancel[[:space:]]*\(|\.renewCreep[[:space:]]*\()' ../game/spawn.manager.js; then
+            echo 'No spawn cancel/renew authority from an idle-secondary failover' >&2
+            exit 1
+          fi
+      - name: Full canonical Node24 gameplay and release regressions
+        run: |
+          npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+          npm test
+      - name: Original P3 benchmark
+        run: npm run bench:p3
+      - name: Explicit no-live-release outcome
+        run: |
+          echo '### O66 second owned idle Spawn failover (unmerged gameplay candidate)' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Uses one idle in-room owned active spawn per room per tick without bypassing defender priority or energy budget.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'In a one-spawn colony this cannot recover an occupied or stuck Spawn; incident #369 remains undiagnosed.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'No game API deploy, force spawn, Spawn.cancel, write to GitHub writer refs or Main merge.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'World exact-Main original LIVE_100T_PASS remains missing: HOLD_EXACT_PREDECESSOR_PAIR_MISSING.' >> "$GITHUB_STEP_SUMMARY"
