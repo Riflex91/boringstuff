@@ -19,12 +19,13 @@ const originalGate=config.ENABLE_PARALLEL_SPAWN_EXECUTION;
 
 const calls=[];
 const state={room:{name:'E8N1'},spawnParallelShadow:null};
-const game={time:7000};
+const game={time:7000,cpu:{limit:20,getUsed(){return 1;}}};
 const memory={creeps:{}};
 function check({flag,proposal,expectedStatus,expectedReason=null,
                 legacyCount=0,parallelCount=0,parallelOutcome=null,
-                parallelThrows=false}) {
+                parallelThrows=false,cpuUsed=1,cpuAvailable=true}) {
   calls.length=0;
+  game.cpu=cpuAvailable ? {limit:20,getUsed(){return cpuUsed;}} : null;
   config.ENABLE_PARALLEL_SPAWN_EXECUTION=flag;
   state.spawnParallelShadow=proposal;
   parallel.execute=(s,p,g,m)=>{
@@ -65,6 +66,10 @@ try {
     legacyCount:1});
   check({flag:true,proposal:deferred,expectedStatus:'DEFERRED',
     expectedReason:'CPU_SHADOW_DEFERRED',legacyCount:1});
+  check({flag:true,proposal:proposed,expectedStatus:'DEFERRED',
+    expectedReason:'CPU_EXECUTOR_HEADROOM',cpuUsed:11,legacyCount:1});
+  check({flag:true,proposal:proposed,expectedStatus:'DEFERRED',
+    expectedReason:'CPU_EXECUTOR_HEADROOM',cpuAvailable:false,legacyCount:1});
   check({flag:true,proposal:proposed,expectedStatus:'EXECUTED',
     parallelCount:1});
   check({flag:true,proposal:partial,expectedStatus:'EXECUTED',
@@ -99,4 +104,4 @@ try {
 }
 assert.equal(config.ENABLE_PARALLEL_SPAWN_EXECUTION,false,
   'O69 review code must end with production gate OFF');
-console.log('O69 spawn-dispatch integration: default-off, CPU fallback, no dual authority, partial/error no retry PASS');
+console.log('O69 spawn-dispatch integration: default-off, dual-stage CPU fallback, no dual authority, partial/error no retry PASS');
