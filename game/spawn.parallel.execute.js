@@ -125,7 +125,8 @@ function execute(state, proposal, game, memory) {
   const config = require('config');
   if (config.ENABLE_PARALLEL_SPAWN_EXECUTION !== true)
     return reject('PARALLEL_EXECUTION_DISABLED');
-  if (state && state.room && tickAttemptedByRoom.get(state.room) === game?.time)
+  if (state && state.room && game && Number.isSafeInteger(game.time) &&
+      tickAttemptedByRoom.get(state.room) === game.time)
     return reject('DUPLICATE_EXECUTION_TICK');
   const checked = inspect(state, proposal, game, memory);
   if (checked.error) return reject(checked.error);
