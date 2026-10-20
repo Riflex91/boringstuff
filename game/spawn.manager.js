@@ -232,9 +232,27 @@ function productivePrespawnShortfall(state, role, wantCount) {
   return total >= want && available < want;
 }
 
+// O66: the room-state builder keeps the legacy primary Spawn for health
+// and recovery callers, but one busy primary must not mask an available
+// second owned Spawn in the SAME room. The room manager still issues at
+// most one spawnOne attempt per room/tick; no parallel energy spending.
+function selectIdleSpawn(state) {
+  if (!state || !state.room || !state.room.name) return null;
+  const candidates = Array.isArray(state.spawns)
+    ? state.spawns : (state.spawn ? [state.spawn] : []);
+  for (const spawn of candidates) {
+    if (!spawn || spawn.my === false || spawn.spawning ||
+        typeof spawn.spawnCreep !== 'function') continue;
+    if (spawn.room && spawn.room.name !== state.room.name) continue;
+    if (typeof spawn.isActive === 'function' && !spawn.isActive()) continue;
+    return spawn;
+  }
+  return null;
+}
+
 function spawnOne(state) {
-  const spawn = state.spawn;
-  if (!spawn || spawn.spawning) return false;
+  const spawn = selectIdleSpawn(state);
+  if (!spawn) return false;
   const want = desired(state);
   const priority = ['defender', 'harvester', 'hauler', 'worker', 'builder', 'repairer', 'upgrader', 'scout'];
   let role = null;
@@ -390,4 +408,4 @@ function spawnOne(state) {
   return false;
 }
 
-module.exports = { desired, spawnOne, _test: { countRole, baseUpgraderTarget, productivePrespawnHorizon, countRoleAvailable, countRoleForDesired, productivePrespawnShortfall, defenderDemand } };
+module.exports = { desired, spawnOne, _test: { countRole, baseUpgraderTarget, productivePrespawnHorizon, countRoleAvailable, countRoleForDesired, productivePrespawnShortfall, defenderDemand, selectIdleSpawn } };
