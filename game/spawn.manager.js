@@ -318,8 +318,15 @@ function spawnOne(state) {
     const builders = countRoleAvailable(state, 'builder');
     const upgraders = countRoleForDesired(state, 'upgrader', want.upgrader);
     const haulers = countRoleAvailable(state, 'hauler');
+    // Critical Spawn/Tower damage OR an authenticated active core-shield
+    // siege must mobilize ONE repairer before optional upgrading/building.
+    // Never preempt the actual one-per-source miner, one worker or one
+    // essential hauler recovery floor.
     const emergencyRepairNeeded = !state.emergency &&
-      workPriority.hasEmergencyRepair(state.structures) &&
+      (workPriority.hasEmergencyRepair(state.structures) ||
+        (state.rcl >= 4 &&
+         workPriority.hasCriticalCoreShieldThreat(
+           state.structures,state.hostileCreeps))) &&
       countRole(state.room, 'repairer') < want.repairer;
 
     // Preserve essential colony functions before scaling throughput. If a
