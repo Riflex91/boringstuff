@@ -14,7 +14,9 @@ const own=(obj,key)=>Object.prototype.hasOwnProperty.call(obj,key);
 function baseline(now){
   const sums={};
   for(const k of FIELDS)sums[k]=0;
-  return {startTick:now,lastTick:now-1,observedTicks:0,...sums};
+  return {startTick:now,lastTick:now-1,observedTicks:0,...sums,
+    minObservedCoreShieldHits:null,coreShieldSamples:0,
+    latestCoreStructures:0,latestCoveredCoreStructures:0};
 }
 function cleanWindow(x){
   return !!x&&validTick(x.startTick)&&Number.isSafeInteger(x.lastTick)&&
@@ -22,7 +24,17 @@ function cleanWindow(x){
     x.observedTicks>=0&&x.observedTicks<=WINDOW_TICKS&&
     x.lastTick===x.startTick+x.observedTicks-1&&
     FIELDS.every(k=>Number.isSafeInteger(x[k])&&x[k]>=0&&
-      x[k]<=100000000);
+      x[k]<=100000000)&&
+    Number.isSafeInteger(x.coreShieldSamples)&&
+    x.coreShieldSamples>=0&&x.coreShieldSamples<=x.observedTicks&&
+    (x.minObservedCoreShieldHits===null||
+      (Number.isSafeInteger(x.minObservedCoreShieldHits)&&
+       x.minObservedCoreShieldHits>=0))&&
+    Number.isSafeInteger(x.latestCoreStructures)&&
+    x.latestCoreStructures>=0&&x.latestCoreStructures<=600&&
+    Number.isSafeInteger(x.latestCoveredCoreStructures)&&
+    x.latestCoveredCoreStructures>=0&&
+    x.latestCoveredCoreStructures<=x.latestCoreStructures;
 }
 function snapshot(w,status){
   if(!cleanWindow(w))return {status:'UNVERIFIED',authority:'SHADOW_EVIDENCE',
@@ -32,8 +44,14 @@ function snapshot(w,status){
     attribution:'CURRENT_VISIBLE_OWNED_OBJECTS_ONLY_LOWER_BOUND',
     startObservationTick:w.startTick,endObservationTick:w.lastTick,
     firstSettledEventTick:w.startTick-1,lastSettledEventTick:w.lastTick-1,
-    observedTicks:w.observedTicks,...Object.fromEntries(
-      FIELDS.map(k=>[k,w[k]]))};
+    observedTicks:w.observedTicks,
+    minimumObservedCoreShieldHits:w.minObservedCoreShieldHits,
+    coreShieldSamples:w.coreShieldSamples,
+    latestCoreStructures:w.latestCoreStructures,
+    latestCoveredCoreStructures:w.latestCoveredCoreStructures,
+    latestUncoveredCoreStructures:
+      w.latestCoreStructures-w.latestCoveredCoreStructures,
+    ...Object.fromEntries(FIELDS.map(k=>[k,w[k]]))};
 }
 function safeNumber(value){
   return Number.isSafeInteger(value)&&value>=0&&value<=1000000;
@@ -47,7 +65,7 @@ function roomInspect(state){
       !Array.isArray(state.hostileCreeps)||state.hostileCreeps.length>40||
       typeof room.getEventLog!=='function')return null;
   const ownObjects=new Set(), ownActors=new Set(), towers=new Set();
-  const core=new Set(), shields=new Set();
+  const shields=new Set();
   const ownedCore=state.structures.filter(s=>s?.my===true&&s.pos&&
     ['spawn','tower','storage'].includes(s.structureType));
   for(const s of state.structures) {
@@ -57,6 +75,17 @@ function roomInspect(state){
     if(s.structureType==='rampart'&&s.pos&&
        ownedCore.some(c=>c.pos.x===s.pos.x&&c.pos.y===s.pos.y))
       shields.add(s.id);
+  }
+  const coveredIds=new Set();
+  let minimumCoreHits=null;
+  for(const s of state.structures) {
+    if(!shields.has(s?.id))continue;
+    const hits=s.hits;
+    if(!Number.isSafeInteger(hits)||hits<0)return null;
+    minimumCoreHits=minimumCoreHits===null?hits:Math.min(minimumCoreHits,hits);
+    for(const c of ownedCore) {
+      if(c.pos.x===s.pos.x&&c.pos.y===s.pos.y)coveredIds.add(c.id);
+    }
   }
   for(const t of state.towers) {
     if(t?.my===true&&typeof t.id==='string'&&t.id) {
@@ -72,6 +101,9 @@ function roomInspect(state){
   try {events=room.getEventLog();}catch(_){return null;}
   if(!Array.isArray(events)||events.length>MAX_EVENTS)return null;
   const m={};for(const k of FIELDS)m[k]=0;
+  m._coreStructures=ownedCore.length;
+  m._coveredCoreStructures=coveredIds.size;
+  m._minCoreShieldHits=minimumCoreHits;
   m.ticksWithArmedHostiles=state.hostileCreeps.some(c=>Array.isArray(c.body)&&
     c.body.some(p=>p?.hits>0&&['attack','ranged_attack','work','heal'].includes(p.type)))?1:0;
   if(typeof EVENT_ATTACK==='undefined'||
@@ -148,6 +180,14 @@ function observe(states,game,memory) {
       continue;
     }
     for(const k of FIELDS)w[k]+=m[k];
+    w.latestCoreStructures=m._coreStructures;
+    w.latestCoveredCoreStructures=m._coveredCoreStructures;
+    if(m._minCoreShieldHits!==null){
+      w.coreShieldSamples++;
+      w.minObservedCoreShieldHits=w.minObservedCoreShieldHits===null
+        ?m._minCoreShieldHits
+        :Math.min(w.minObservedCoreShieldHits,m._minCoreShieldHits);
+    }
     w.observedTicks++;
     w.lastTick=game.time;
     if(!cleanWindow(w)){
