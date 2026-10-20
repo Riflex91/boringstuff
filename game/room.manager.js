@@ -199,10 +199,32 @@ function dispatchSpawn(state, game, memory) {
   return state.spawnParallelExecution;
 }
 
+// D3: life-saving intents must execute immediately after the authoritative
+// room snapshot. CPU-heavy economic/shadow work is NEVER a prerequisite.
+// Isolate failures: a broken tower API cannot suppress Safe Mode and vice versa.
+function immediateDefense(state) {
+  try { maybeSafeMode(state); }
+  catch (_) {
+    try { logger.warn('DEFENSE_SAFE_MODE_EXCEPTION',
+      'Safe mode could not be assessed', {room:state.room.name},
+      {dedupeTicks:25}); } catch (_) {}
+  }
+  try { towerManager.run(state); }
+  catch (_) {
+    try { logger.warn('DEFENSE_TOWER_EXCEPTION',
+      'Tower defense could not be issued', {room:state.room.name},
+      {dedupeTicks:25}); } catch (_) {}
+  }
+}
+
 function run(room, lowCpu) {
   const state = profiler.detailSection('room.state', function() {
     return stateBuilder.get(room);
   });
+
+  // Defend on EVERY tick, including low CPU, before ALL optional planners
+  // and request/economy diagnostics. Tower/Mode intents are issued once.
+  immediateDefense(state);
 
   profiler.detailSection('room.economy', function() {
     state.economyMetrics = economyMetrics.observe(state);
@@ -338,8 +360,6 @@ function run(room, lowCpu) {
   });
 
   profiler.detailSection('room.legacy', function() {
-    towerManager.run(state);
-    maybeSafeMode(state);
     maybeWarnUpgraderStall(state);
     dispatchSpawn(state, Game, Memory);
   });
@@ -358,4 +378,4 @@ function run(room, lowCpu) {
   return state;
 }
 
-module.exports = { run, _test: { status, shadowCpuHeadroom, safeModeDecision, maybeSafeMode, dispatchSpawn } };
+module.exports = { run, _test: { status, shadowCpuHeadroom, safeModeDecision, maybeSafeMode, immediateDefense, dispatchSpawn } };
