@@ -1,0 +1,56 @@
+name: Screeps O69 release-gated parallel-spawn executor (OFF BY DEFAULT, REVIEW ONLY)
+on:
+  push:
+    branches: [feature/o69-guarded-parallel-spawn-executor-20261020]
+permissions:
+  contents: read
+concurrency:
+  group: o69-parallel-spawn-executor-review
+  cancel-in-progress: false
+jobs:
+  node24-gameplay-p3-offline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: tools
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Check original Main and precisely bounded gameplay delta
+        shell: bash
+        run: |
+          git -C .. fetch origin main --quiet
+          test "$(git -C .. rev-parse origin/main)" = bc43f2faf1f345e63d9bfe78b6bbaa59e5eaab0c
+          actual="$(git -C .. diff --name-only origin/main HEAD -- game | sort)"
+          expected="$(printf '%s\n' game/config.js game/main.js game/room.manager.js game/room.state.js game/spawn.job.stall.shadow.js game/spawn.fleet.telemetry.js game/spawn.manager.js game/spawn.parallel.plan.js game/spawn.parallel.execute.js | sort)"
+          test "$actual" = "$expected"
+          git -C .. diff --quiet 9a2e964c5f35cdf0b3b89e555113e3f729c10507 HEAD -- game/spawn.manager.js
+          git -C .. diff --quiet origin/main HEAD -- game/body.builder.js
+          grep -Eq 'ENABLE_PARALLEL_SPAWN_EXECUTION:[[:space:]]*false' ../game/config.js
+          git -C .. diff --quiet c773ce6d95ebce3223d93cb543e250ded938d367 HEAD -- game/spawn.manager.js game/spawn.parallel.plan.js game/body.builder.js
+          git -C .. diff --quiet origin/main HEAD -- game/defense.regional.live.js
+          if grep -E '(\.spawnCreep[[:space:]]*\(|\.cancel[[:space:]]*\(|\.renewCreep[[:space:]]*\(|\.createConstructionSite[[:space:]]*\()' ../game/spawn.parallel.plan.js; then
+            echo 'O68 planner must not create gameplay actions' >&2
+            exit 1
+          fi
+      - name: Full canonical Node24 O65-O69 gameplay regressions
+        run: |
+          node --check ../game/spawn.parallel.plan.js
+          node --check ../game/spawn.parallel.execute.js
+          npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+          npm test
+      - name: Original P3 4-mode reproducibility benchmark
+        run: npm run bench:p3
+      - name: No live deploy or authorization
+        run: |
+          echo '### O69 release-disabled multi-spawn executor review only' >> "$GITHUB_STEP_SUMMARY"
+          echo 'All parallel execution is default-OFF; synthetic mocks alone exercise actual intent path.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Validates tick, ownership, body costs and energy before dryRun and at-most-once spawn intents.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'No Screeps credentials, production spawn action, API POST, Main merge or World placement.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'No original exact-Main World LIVE_100T_PASS. HOLD_EXACT_PREDECESSOR_PAIR_MISSING.' >> "$GITHUB_STEP_SUMMARY"
