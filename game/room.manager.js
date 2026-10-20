@@ -98,6 +98,38 @@ function safeModeDecision(state) {
     if (nextTickDamage > 0 && nextTickDamage * 3 >= structure.hits)
       return { reason: 'PREDICTED_CORE_LOSS', structure };
   }
+  // A healthy Spawn beneath a nearly breached defensive Rampart may lose
+  // thousands of hits in the first UNPROTECTED tick. Existing core-health
+  // checks cannot see this risk while damage is absorbed by the shield.
+  // Trigger only for an ACTUAL OWNED rampart over an ACTUAL OWNED critical
+  // asset and ACTIVE hostile damage in weapon range. Never trigger for
+  // a remote wall, old damage or a harmless passing scout.
+  if (typeof STRUCTURE_RAMPART !== 'undefined') {
+    const ramps=(state.structures || []).filter(s=>
+      s && s.my===true && s.structureType===STRUCTURE_RAMPART &&
+      s.pos && Number.isFinite(s.hits) && s.hits>0);
+    for(const ramp of ramps) {
+      if(!core.some(s=>s.pos.x===ramp.pos.x && s.pos.y===ramp.pos.y))
+        continue;
+      let perTick=0;
+      for(const hostile of hostiles) {
+        if(!hostile?.pos || typeof hostile.pos.getRangeTo!=='function' ||
+           !Array.isArray(hostile.body))continue;
+        const d=hostile.pos.getRangeTo(ramp);
+        if(!Number.isSafeInteger(d) || d<0)continue;
+        for(const part of hostile.body) {
+          if(!part || !(part.hits>0))continue;
+          let base=0;
+          if(d<=1 && part.type==='attack')base=30;
+          else if(d<=1 && part.type==='work')base=50;
+          else if(d<=3 && part.type==='ranged_attack')base=10;
+          if(base)perTick+=base*(part.boost?4:1);
+        }
+      }
+      if(perTick>0 && ramp.hits<=perTick*8)
+        return {reason:'CORE_RAMPART_BREACH_IMMINENT',structure:ramp};
+    }
+  }
   return null;
 }
 
@@ -199,10 +231,32 @@ function dispatchSpawn(state, game, memory) {
   return state.spawnParallelExecution;
 }
 
+// D3: life-saving intents must execute immediately after the authoritative
+// room snapshot. CPU-heavy economic/shadow work is NEVER a prerequisite.
+// Isolate failures: a broken tower API cannot suppress Safe Mode and vice versa.
+function immediateDefense(state) {
+  try { maybeSafeMode(state); }
+  catch (_) {
+    try { logger.warn('DEFENSE_SAFE_MODE_EXCEPTION',
+      'Safe mode could not be assessed', {room:state.room.name},
+      {dedupeTicks:25}); } catch (_) {}
+  }
+  try { towerManager.run(state); }
+  catch (_) {
+    try { logger.warn('DEFENSE_TOWER_EXCEPTION',
+      'Tower defense could not be issued', {room:state.room.name},
+      {dedupeTicks:25}); } catch (_) {}
+  }
+}
+
 function run(room, lowCpu) {
   const state = profiler.detailSection('room.state', function() {
     return stateBuilder.get(room);
   });
+
+  // Defend on EVERY tick, including low CPU, before ALL optional planners
+  // and request/economy diagnostics. Tower/Mode intents are issued once.
+  immediateDefense(state);
 
   profiler.detailSection('room.economy', function() {
     state.economyMetrics = economyMetrics.observe(state);
@@ -338,8 +392,6 @@ function run(room, lowCpu) {
   });
 
   profiler.detailSection('room.legacy', function() {
-    towerManager.run(state);
-    maybeSafeMode(state);
     maybeWarnUpgraderStall(state);
     dispatchSpawn(state, Game, Memory);
   });
@@ -358,4 +410,4 @@ function run(room, lowCpu) {
   return state;
 }
 
-module.exports = { run, _test: { status, shadowCpuHeadroom, safeModeDecision, maybeSafeMode, dispatchSpawn } };
+module.exports = { run, _test: { status, shadowCpuHeadroom, safeModeDecision, maybeSafeMode, immediateDefense, dispatchSpawn } };

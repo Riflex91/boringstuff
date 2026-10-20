@@ -40,6 +40,34 @@ function placeNear(room, origin, type, maxRange, budget) {
   return false;
 }
 
+// Secondary Spawns are legal only after the controller actually grants
+// another slot (normally RCL7). Keep 3+ tiles from the primary Spawn and
+// let the engine reject blocked/illegal sites through the existing place()
+// validator. No destructive relocation or arbitrary fallback placement.
+function secondarySpawnSite(state,budget) {
+  const room=state?.room,spawn=state?.spawn;
+  if(!room?.controller?.my || !spawn?.my || !spawn.pos ||
+     state.rcl<7 || state.emergency || state.hostileCreeps?.length ||
+     !Number.isFinite(state.energyStored) || state.energyStored<12000 ||
+     !budget || budget.remaining<=0 ||
+     !Array.isArray(state.spawns))return false;
+  const allowed=CONTROLLER_STRUCTURES?.[STRUCTURE_SPAWN]?.[state.rcl]||0;
+  if(allowed<2 || countStructureAndSites(state,STRUCTURE_SPAWN)>=allowed)
+    return false;
+  const origin=spawn.pos;
+  for(let radius=3;radius<=5;radius++) {
+    for(let dx=-radius;dx<=radius;dx++) {
+      for(let dy=-radius;dy<=radius;dy++) {
+        if(Math.max(Math.abs(dx),Math.abs(dy))!==radius)continue;
+        if(place(room,STRUCTURE_SPAWN,origin.x+dx,origin.y+dy,budget))
+          return true;
+        if(budget.remaining<=0)return false;
+      }
+    }
+  }
+  return false;
+}
+
 function roadPath(room, from, to, budget) {
   if (budget.remaining <= 0) return 0;
   const path = room.findPath(from, to, { ignoreCreeps: true, swampCost: 5, plainCost: 2 });
@@ -126,6 +154,52 @@ function pruneExcessRoadSites(room, cap, reservedCriticalSites = 0) {
   return removed;
 }
 
+// D3: ramparts may legally overlay an existing owned spawn, tower or
+// storage. The ordinary place()/isBuildable() deliberately rejects occupied
+// tiles, so core fortification has a narrow separate placement gate.
+// No speculative walls, border seals, or large construction floods.
+function fortifyCore(state, budget) {
+  const room = state && state.room;
+  if (!room || !room.controller?.my || state.rcl < 4 ||
+      state.emergency || state.hostileCreeps?.length ||
+      !Number.isFinite(state.energyStored) || state.energyStored < 3000 ||
+      !budget || budget.remaining <= 0 ||
+      typeof room.lookForAt !== 'function' ||
+      typeof room.createConstructionSite !== 'function' ||
+      !Array.isArray(state.structures)) return 0;
+
+  const rank = s => s.structureType === STRUCTURE_SPAWN ? 0 :
+    s.structureType === STRUCTURE_TOWER ? 1 : 2;
+  const critical = state.structures.filter(s => s && s.my === true &&
+      s.pos && Number.isInteger(s.pos.x) && Number.isInteger(s.pos.y) &&
+      s.pos.x >= 2 && s.pos.x <= 47 &&
+      s.pos.y >= 2 && s.pos.y <= 47 &&
+      [STRUCTURE_SPAWN,STRUCTURE_TOWER,STRUCTURE_STORAGE].includes(s.structureType))
+    .sort((a,b)=>rank(a)-rank(b) ||
+      String(a.id||'').localeCompare(String(b.id||'')));
+  let placed = 0;
+  for (const s of critical) {
+    if (budget.remaining <= 0 || placed >= 2) break;
+    let buildings,sites;
+    try {
+      buildings = room.lookForAt(LOOK_STRUCTURES,s.pos.x,s.pos.y);
+      sites = room.lookForAt(LOOK_CONSTRUCTION_SITES,s.pos.x,s.pos.y);
+    } catch (_) { continue; }
+    if (!Array.isArray(buildings) || !Array.isArray(sites) ||
+        !buildings.some(b=>b && b.id===s.id && b.my===true) ||
+        buildings.some(b=>b && (b.structureType===STRUCTURE_RAMPART ||
+          b.structureType===STRUCTURE_WALL)) ||
+        sites.length) continue;
+    let rc;
+    try { rc=room.createConstructionSite(
+      s.pos.x,s.pos.y,STRUCTURE_RAMPART); }
+    catch (_) { continue; }
+    if (rc === OK) { placed++; budget.remaining--; }
+    else if (rc === ERR_FULL) break;
+  }
+  return placed;
+}
+
 function plan(state) {
   const room = state.room;
   if (!state.spawn || !room.controller || !room.controller.my) return;
@@ -177,6 +251,19 @@ function plan(state) {
     if (towerCount < towerAllowed && placeNear(room, state.spawn.pos, STRUCTURE_TOWER, 4, budget)) changed++;
   }
 
+  // D3: a physically independent second Spawn is the only true
+  // production redundancy once the controller permits two (RCL7+).
+  // This sits behind essential mining/tower construction and a strong
+  // energy buffer; an already accepted Spawn construction site counts.
+  if (rcl >= 7 && budget.remaining > 0 && secondarySpawnSite(state,budget))
+    changed++;
+
+  // After energy infrastructure and towers, protect the core BEFORE
+  // discretionary roads. Limit new ramparts to two verified occupied
+  // core tiles per planning interval; productive workers then build them.
+  if (rcl >= 4 && budget.remaining > 0)
+    changed += fortifyCore(state,budget);
+
   if (rcl >= 2 && budget.remaining > 0 && !hasCriticalRcl2Work(state)) {
     const roadBudget = { remaining: Math.min(config.ROAD_SITE_BUDGET_PER_PLAN, budget.remaining) };
     for (const source of state.sources) {
@@ -198,4 +285,4 @@ function plan(state) {
   }
 }
 
-module.exports = { plan };
+module.exports = { plan, _test: { fortifyCore, secondarySpawnSite } };
