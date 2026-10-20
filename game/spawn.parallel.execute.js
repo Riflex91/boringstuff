@@ -3,6 +3,10 @@
 // O69: separately gated ACTIVE executor for O68's read-only plan.
 // Config defaults OFF. Do not activate without an approved runtime release.
 const MAX_SPAWNS = 3;
+const planner = require('spawn.parallel.plan');
+// Room-object identity is stable inside one Screeps tick. Keep the guard in
+// module memory, not persistent Memory; ambiguous writes must not be retried.
+const tickAttemptedByRoom = new WeakMap();
 const ROLES = new Set([
   'defender','harvester','worker','hauler',
   'repairer','builder','upgrader','scout'
@@ -51,6 +55,7 @@ function inspect(state, proposal, game, memory) {
       state.energyAvailable > state.energyCapacityAvailable ||
       state.room.energyAvailable < 0 ||
       state.room.energyAvailable > state.energyCapacityAvailable ||
+      state.room.energyAvailable !== state.energyAvailable ||
       !Array.isArray(state.spawns) || state.spawns.length > MAX_SPAWNS)
     return {error:'INVALID_RELEASE_SNAPSHOT'};
 
@@ -92,6 +97,26 @@ function inspect(state, proposal, game, memory) {
   if (reserved > available ||
       reserved !== proposal.summary.reservedEnergy)
     return {error:'STALE_ENERGY_RESERVATION'};
+
+  // The caller-owned SHADOW proposal is not authority. Recreate it against
+  // CURRENT jobs, roles, ownership and energy to detect stale/forged priority.
+  let fresh;
+  try { fresh = planner.plan(state, game, memory); }
+  catch (_) { return {error:'FRESH_PLAN_UNAVAILABLE'}; }
+  if (!fresh || fresh.status !== proposal.status ||
+      !fresh.summary || fresh.summary.reservedEnergy !== reserved ||
+      proposal.summary.plannedCount !== intents.length ||
+      !Array.isArray(fresh.intents) ||
+      fresh.intents.length !== proposal.intents.length)
+    return {error:'PLAN_DRIFT'};
+  for (let n = 0; n < intents.length; n++) {
+    const a = proposal.intents[n], b = fresh.intents[n];
+    if (a.spawnName !== b.spawnName || a.role !== b.role ||
+        a.slot !== b.slot || a.tick !== b.tick || a.cost !== b.cost ||
+        !Array.isArray(b.body) || a.body.length !== b.body.length ||
+        a.body.some((part, k) => part !== b.body[k]))
+      return {error:'PLAN_DRIFT'};
+  }
   return {intents,available};
 }
 
@@ -100,6 +125,8 @@ function execute(state, proposal, game, memory) {
   const config = require('config');
   if (config.ENABLE_PARALLEL_SPAWN_EXECUTION !== true)
     return reject('PARALLEL_EXECUTION_DISABLED');
+  if (state && state.room && tickAttemptedByRoom.get(state.room) === game?.time)
+    return reject('DUPLICATE_EXECUTION_TICK');
   const checked = inspect(state, proposal, game, memory);
   if (checked.error) return reject(checked.error);
   const room=state.room.name;
@@ -117,7 +144,15 @@ function execute(state, proposal, game, memory) {
     if (rc !== OK) return reject('DRY_RUN_REJECTED');
   }
 
-  let remaining=checked.available;
+  // Official dryRun should be side-effect free, but verify the invariant
+  // immediately before submitting ANY productive intent.
+  const refreshed = inspect(state, proposal, game, memory);
+  if (refreshed.error) return reject(refreshed.error);
+  if (tickAttemptedByRoom.get(state.room) === game.time)
+    return reject('DUPLICATE_EXECUTION_TICK');
+  tickAttemptedByRoom.set(state.room, game.time);
+
+  let remaining=refreshed.available;
   let accepted=0, attempted=0, spent=0;
   for (const i of checked.intents) {
     // Compare with the virtual shared ledger even if the host API exposes
