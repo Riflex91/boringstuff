@@ -1,0 +1,78 @@
+name: Screeps World operator-approved O65-O70 one-shot active-branch deployment
+on:
+  push:
+    branches: [release/world-chatgpt-o65-o70-20261020]
+permissions:
+  contents: read
+concurrency:
+  group: screeps-world-chatgpt
+  cancel-in-progress: false
+jobs:
+  guarded-world-live-trial:
+    runs-on: ubuntu-latest
+    timeout-minutes: 38
+    defaults:
+      run:
+        working-directory: tools
+    env:
+      SCREEPS_SERVER: world
+      SCREEPS_BRANCH: chatgpt
+      SCREEPS_SHARD: shard0
+      SCREEPS_ROOM: W37S79
+      WORLD_DEPLOY_APPROVAL: DEPLOY_WORLD
+      SCREEPS_TOKEN_WORLD: ${{ secrets.SCREEPS_TOKEN_WORLD }}
+    steps:
+      - name: Set isolated ephemeral paths
+        working-directory: .
+        shell: bash
+        run: |
+          echo "SCREEPS_CONFIG=$RUNNER_TEMP/screeps-world-authorized-o70.json" >> "$GITHUB_ENV"
+          echo "SCREEPS_LOG_DIR=$RUNNER_TEMP/screeps-world-authorized-o70-evidence" >> "$GITHUB_ENV"
+      - name: Checkout exact merged and previously tested Main
+        uses: actions/checkout@v4
+        with:
+          ref: 51c59e2fb06f4546d8b9304d680275cb150361cc
+          fetch-depth: 0
+      - name: Reject stale release target and validate exact active code
+        shell: bash
+        run: |
+          git fetch origin main --quiet
+          test "$(git rev-parse HEAD)" = 51c59e2fb06f4546d8b9304d680275cb150361cc
+          test "$(git rev-parse origin/main)" = 51c59e2fb06f4546d8b9304d680275cb150361cc
+          grep -Eq 'ENABLE_PARALLEL_SPAWN_EXECUTION:[[:space:]]*true' ../game/config.js
+          grep -Eq 'AUTO_SAFE_MODE:[[:space:]]*true' ../game/config.js
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Full exact-Main tests and original P3 benchmark
+        run: |
+          npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+          npm test
+          npm run bench:p3
+      - name: Verify World account, shard, OWNED Spawn, ACTIVE branch and rollback code (GET only)
+        run: node world-deploy-guard.mjs
+      - name: Confirm active branch and pre-upload backup retrieval (GET only)
+        run: node ci-deployment-guard.mjs preflight
+      - name: Upload exact verified main modules to active World branch
+        run: node deploy-live.mjs
+      - name: Verify real World game ticks, fatal errors and CPU guards
+        run: node ci-deployment-guard.mjs verify
+      - name: Observe World post-deploy consumer supply (GET only)
+        if: success()
+        run: node world-supply-evidence.mjs
+      - name: Preserve World pre-deploy code, evidence receipt and report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screeps-world-o65-o70-one-shot-51c59e2fb06f4546d8b9304d680275cb150361cc
+          path: |
+            logs/deploy-backup-*.json
+            ${{ runner.temp }}/screeps-world-authorized-o70-evidence/deployment-receipt-*.json
+            ${{ runner.temp }}/screeps-world-authorized-o70-evidence/consumer-supply-world-report.json
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Remove ephemeral World API credentials
+        if: always()
+        working-directory: .
+        shell: bash
+        run: rm -f "$SCREEPS_CONFIG"
