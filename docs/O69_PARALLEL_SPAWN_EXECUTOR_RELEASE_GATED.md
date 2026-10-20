@@ -46,8 +46,16 @@ der bestehende einzelne `spawnManager.spawnOne(state)` zuständig.
 Wenn das Gate künftig **separat freigegeben und aktiviert** wird,
 übernimmt ausschließlich der O69-Executor. Bei CPU-bedingtem
 Planer-DEFERRED fällt der Raum fail-safe auf den bisherigen
-einzelnen Spawn-Executor zurück; bei unklarer Planung folgt HOLD,
-kein Spekulieren. Die Zusatztelemetrie
+einzelnen Spawn-Executor zurück. **Unmittelbar vor der produktiven
+Ausführung** wird das verbliebene CPU-Budget erneut geprüft, da zwischen
+SHADOW-Planung und dem Spawn-Dispatch weitere Auswertungen stattfinden.
+Bei fehlendem oder zu knappem aktuellem CPU-Limit erfolgt unter
+`CPU_EXECUTOR_HEADROOM` ebenfalls genau ein Legacy-Aufruf; Parallel-
+und Legacy-Ausführung dürfen im selben Dispatch niemals kombiniert
+werden. Bei unklarer Planung folgt HOLD, kein Spekulieren. Auch eine
+ungefangene Exception aus einem eventuell bereits teilweise schreibenden
+Parallel-Executor führt ohne zweiten produktiven Versuch zum HOLD.
+Die Zusatztelemetrie
 `spawnParallelExecution` bleibt getrennt vom nur modellierten
 `spawnParallel`-Plan.
 
@@ -61,6 +69,15 @@ fehlende Eigentumsrechte; manipulierte Bodys und doppelte Slots;
 vollständiger Abbruch bei fehlerhaftem Dry-Run und **kein Replay**
 bei Fehler des zweiten produktiven Calls. Regelfall und Fehler sind
 synthetische Screeps-API-Mocks, keine Live-Beweise.
+
+`tools/o69-room-spawn-dispatch.test.mjs` prüft den **wirklich im
+Raumablauf aufgerufenen Dispatch** mit instrumentierten Legacy- und
+Parallel-Executor-Schnittstellen: default-OFF, CPU-Plan-DEFERRED,
+zweite CPU-Headroom-Sperre, fehlende CPU-Metadaten, planlose Holds,
+erfolgreiche/teilweise Ausführung und Exceptions. Jeder Zweig
+stellt den Ausschluss beider schreibenden Spawn-Manager sicher.
+Die instrumentierten Funktionen bleiben Simulationen, keine
+beobachteten Screeps-Spiel-Ticks.
 
 Der Review-Only-Workflow enthält weder Screeps-Credentials noch
 einen HTTP-POST- oder Deployment-Schritt und prüft den exakten
