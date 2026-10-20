@@ -2,6 +2,7 @@
 
 const stateBuilder = require('room.state');
 const spawnManager = require('spawn.manager');
+const spawnParallelPlan = require('spawn.parallel.plan');
 const towerManager = require('tower.manager');
 const planner = require('room.planner');
 const economyMetrics = require('economy.metrics');
@@ -36,6 +37,7 @@ function status(state) {
     logisticsRequests: state.requestShadow ? state.requestShadow.logisticsGraph : null,
     scoutingFrontier: state.requestShadow ? state.requestShadow.scoutingFrontier : null,
     capacitySpawn: state.capacitySpawnShadow ? state.capacitySpawnShadow.summary : null,
+    spawnParallel: state.spawnParallelShadow ? state.spawnParallelShadow.summary : null,
     assignments: state.assignmentShadow ? state.assignmentShadow.summary : null,
     logisticsMatching: state.logisticsMatchingShadow ? state.logisticsMatchingShadow.summary : null,
     logisticsMatchingEvidence: state.logisticsMatchingEvidence ? (state.logisticsMatchingEvidence.lastWindow || state.logisticsMatchingEvidence.current) : null,
@@ -131,6 +133,7 @@ function maybeWarnUpgraderStall(state) {
 
 const SHADOW_STAGE_FALLBACK_CPU = Object.freeze({
   'room.capacity-spawn': 2.5,
+  'room.spawn-parallel-plan': 1.0,
   'room.assignment': 2.5,
   'room.logistics-match': 1.0
 });
@@ -207,6 +210,15 @@ function run(room, lowCpu) {
       : capacitySpawnShadow.deferredSnapshot(shadowDeferReason);
     snapshot.summary.legacyDesired = spawnManager.desired(state);
     return snapshot;
+  });
+
+  // O68 is a bounded, CPU-gated simulation. The live executor below remains
+  // the original single spawnOne call, with no new game mutation authority.
+  state.spawnParallelShadow = profiler.detailSection('room.spawn-parallel-plan', function() {
+    if (!canRunShadowStage('room.spawn-parallel-plan'))
+      return spawnParallelPlan.deferred(shadowDeferReason);
+    try { return spawnParallelPlan.plan(state, Game, Memory); }
+    catch (_) { return spawnParallelPlan.deferred('PLAN_EXCEPTION'); }
   });
 
   state.assignmentShadow = profiler.detailSection('room.assignment', function() {
