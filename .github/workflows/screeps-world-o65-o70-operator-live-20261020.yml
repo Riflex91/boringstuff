@@ -9,6 +9,9 @@ concurrency:
   cancel-in-progress: false
 jobs:
   guarded-world-live-trial:
+    # One-shot: only the already executed authorized triggering commit may
+    # start this job. Subsequent branch pushes are skipped, not redeployed.
+    if: ${{ github.sha == 'a2624064209a0426e42905a26a82366fb18e2229' }}
     runs-on: ubuntu-latest
     timeout-minutes: 38
     defaults:
