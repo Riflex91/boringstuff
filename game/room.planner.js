@@ -40,6 +40,34 @@ function placeNear(room, origin, type, maxRange, budget) {
   return false;
 }
 
+// Secondary Spawns are legal only after the controller actually grants
+// another slot (normally RCL7). Keep 3+ tiles from the primary Spawn and
+// let the engine reject blocked/illegal sites through the existing place()
+// validator. No destructive relocation or arbitrary fallback placement.
+function secondarySpawnSite(state,budget) {
+  const room=state?.room,spawn=state?.spawn;
+  if(!room?.controller?.my || !spawn?.my || !spawn.pos ||
+     state.rcl<7 || state.emergency || state.hostileCreeps?.length ||
+     !Number.isFinite(state.energyStored) || state.energyStored<12000 ||
+     !budget || budget.remaining<=0 ||
+     !Array.isArray(state.spawns))return false;
+  const allowed=CONTROLLER_STRUCTURES?.[STRUCTURE_SPAWN]?.[state.rcl]||0;
+  if(allowed<2 || countStructureAndSites(state,STRUCTURE_SPAWN)>=allowed)
+    return false;
+  const origin=spawn.pos;
+  for(let radius=3;radius<=5;radius++) {
+    for(let dx=-radius;dx<=radius;dx++) {
+      for(let dy=-radius;dy<=radius;dy++) {
+        if(Math.max(Math.abs(dx),Math.abs(dy))!==radius)continue;
+        if(place(room,STRUCTURE_SPAWN,origin.x+dx,origin.y+dy,budget))
+          return true;
+        if(budget.remaining<=0)return false;
+      }
+    }
+  }
+  return false;
+}
+
 function roadPath(room, from, to, budget) {
   if (budget.remaining <= 0) return 0;
   const path = room.findPath(from, to, { ignoreCreeps: true, swampCost: 5, plainCost: 2 });
@@ -223,6 +251,13 @@ function plan(state) {
     if (towerCount < towerAllowed && placeNear(room, state.spawn.pos, STRUCTURE_TOWER, 4, budget)) changed++;
   }
 
+  // D3: a physically independent second Spawn is the only true
+  // production redundancy once the controller permits two (RCL7+).
+  // This sits behind essential mining/tower construction and a strong
+  // energy buffer; an already accepted Spawn construction site counts.
+  if (rcl >= 7 && budget.remaining > 0 && secondarySpawnSite(state,budget))
+    changed++;
+
   // After energy infrastructure and towers, protect the core BEFORE
   // discretionary roads. Limit new ramparts to two verified occupied
   // core tiles per planning interval; productive workers then build them.
@@ -250,4 +285,4 @@ function plan(state) {
   }
 }
 
-module.exports = { plan, _test: { fortifyCore } };
+module.exports = { plan, _test: { fortifyCore, secondarySpawnSite } };
