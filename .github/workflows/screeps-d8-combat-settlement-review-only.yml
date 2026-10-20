@@ -40,4 +40,5 @@ jobs:
       - name: Original P3 four-mode benchmark
         run: npm run bench:p3
       - name: No deployment
-        run: echo 'D8: review-only no Screeps tokens/credentials/API writes'
+        run: |
+          echo 'D8 review-only: no Screeps tokens, credentials or API writes'
