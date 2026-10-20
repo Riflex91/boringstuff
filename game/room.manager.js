@@ -39,6 +39,7 @@ function status(state) {
     scoutingFrontier: state.requestShadow ? state.requestShadow.scoutingFrontier : null,
     capacitySpawn: state.capacitySpawnShadow ? state.capacitySpawnShadow.summary : null,
     spawnParallel: state.spawnParallelShadow ? state.spawnParallelShadow.summary : null,
+    spawnParallelExecution: state.spawnParallelExecution || null,
     assignments: state.assignmentShadow ? state.assignmentShadow.summary : null,
     logisticsMatching: state.logisticsMatchingShadow ? state.logisticsMatchingShadow.summary : null,
     logisticsMatchingEvidence: state.logisticsMatchingEvidence ? (state.logisticsMatchingEvidence.lastWindow || state.logisticsMatchingEvidence.current) : null,
