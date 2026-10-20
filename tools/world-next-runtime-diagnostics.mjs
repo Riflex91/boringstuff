@@ -6,13 +6,14 @@ import {inspectWorldRecoveryEvidence} from './world-recovery-evidence.mjs';
 import {buildWorldConfig} from './world-deployment-profile.mjs';
 import {WORLD_NEXT_TARGET_CANDIDATE as target} from './world-next-target-candidate.mjs';
 import {STAGING_BRANCH} from './world-next-staged-readiness.mjs';
-export function assessWorldRuntime({me,branches,status,room,memory}){
+export function assessWorldRuntime({me,branches,status,room,memory},
+  expectedActiveBranch=STAGING_BRANCH){
   const failures=[],warnings=[];
   const id=me?._id||me?.id;
   if(!id)failures.push('AUTH_UNVERIFIED');
   const list=Array.isArray(branches?.list)?branches.list:[];
   const active=list.filter(b=>b?.activeWorld===true);
-  if(active.length!==1||active[0]?.branch!==STAGING_BRANCH)failures.push('EXPECTED_BRANCH_NOT_ACTIVE');
+  if(active.length!==1||active[0]?.branch!==expectedActiveBranch)failures.push('EXPECTED_BRANCH_NOT_ACTIVE');
   if(status?.status==='empty'||typeof status?.status!=='string')failures.push('WORLD_STATUS_INVALID');
   if(!Array.isArray(room?.objects))failures.push('ROOM_OBJECTS_UNAVAILABLE');
   const objects=Array.isArray(room?.objects)?room.objects:[];

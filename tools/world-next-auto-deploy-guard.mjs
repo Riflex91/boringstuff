@@ -5,7 +5,9 @@ import {ScreepsHttpClient} from './screeps-client.mjs';
 import {buildWorldConfig} from './world-deployment-profile.mjs';
 import {assessWorldRuntime} from './world-next-runtime-diagnostics.mjs';
 export function assessAutoDeployGate(input){
-  const runtime=assessWorldRuntime(input);
+  // The operator-authorized W37S79 production branch is chatgpt.
+  // Staging-specific read-only diagnostics retain their original default.
+  const runtime=assessWorldRuntime(input,'chatgpt');
   const failures=[...runtime.failures];
   if(input?.status?.status!=='normal')failures.push('WORLD_STATUS_NOT_NORMAL');
   const objects=input?.room?.objects;
@@ -19,7 +21,7 @@ export function assessAutoDeployGate(input){
     activeBranch:runtime.activeBranch,mode:'GET_ONLY',uploadAttempted:false};
 }
 async function main(){
-  if(process.env.SCREEPS_SERVER!=='world'||process.env.SCREEPS_BRANCH!=='chatgpt-w37s79-stage'||
+  if(process.env.SCREEPS_SERVER!=='world'||process.env.SCREEPS_BRANCH!=='chatgpt'||
      process.env.SCREEPS_SHARD!=='shard0'||process.env.SCREEPS_ROOM!=='W37S79')
     throw new Error('EXACT_WORLD_TARGET_REQUIRED');
   const config=process.env.SCREEPS_CONFIG;
@@ -30,7 +32,7 @@ async function main(){
   const [me,branches,status,room,code]=await Promise.all([
     api.authMe(),api.userBranches(),api.userWorldStatus(),
     api.gameRoomObjects('W37S79','shard0'),
-    api._request('GET','/api/user/code',{branch:'chatgpt-w37s79-stage'})]);
+    api._request('GET','/api/user/code',{branch:'chatgpt'})]);
   const result=assessAutoDeployGate({me,branches,status,room,code});
   console.log('WORLD_W37S79_AUTO_DEPLOY_GATE '+JSON.stringify(result));
   if(!result.ok)throw new Error('AUTO_DEPLOY_GATE_BLOCKED');

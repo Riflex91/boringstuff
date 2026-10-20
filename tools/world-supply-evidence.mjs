@@ -377,9 +377,13 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(new URL(im
   const branch = process.env.SCREEPS_BRANCH;
   const room = process.env.SCREEPS_ROOM;
   const logDir = process.env.SCREEPS_LOG_DIR || DEFAULT_VERIFICATION_LOG_DIR;
-  if (server !== 'world' || branch !== 'chatgpt-w37s79-stage' ||
+  if (server !== 'world' ||
+      (branch !== 'chatgpt' && branch !== 'chatgpt-w37s79-stage') ||
       room !== 'W37S79' || process.env.SCREEPS_SHARD !== 'shard0')
     throw new Error('EXACT_WORLD_TARGET_REQUIRED');
+  // The receipt must refer to the very same live/staged branch selected
+  // by the current guarded workflow. Never accept a receipt from another
+  // branch merely because both share the same server and room.
   const pinned = readDeploymentReceipt({logDir, server, branch});
   if (!pinned?.receipt?.deploymentId) throw new Error('EXACT_RECEIPT_REQUIRED');
   const api = await ScreepsHttpClient.fromConfig(server, {shard:'shard0'});
