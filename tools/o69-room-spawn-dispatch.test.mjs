@@ -102,6 +102,6 @@ try {
   legacy.spawnOne=originalLegacy;
   config.ENABLE_PARALLEL_SPAWN_EXECUTION=originalGate;
 }
-assert.equal(config.ENABLE_PARALLEL_SPAWN_EXECUTION,false,
-  'O69 review code must end with production gate OFF');
+assert.equal(config.ENABLE_PARALLEL_SPAWN_EXECUTION,true,
+  'Operator-approved live release must retain explicit gate ON');
 console.log('O69 spawn-dispatch integration: default-off, dual-stage CPU fallback, no dual authority, partial/error no retry PASS');
