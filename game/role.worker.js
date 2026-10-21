@@ -169,7 +169,7 @@ function emergencyRepair(creep) {
 // D6: only verified enemy damage to an owned Spawn/Tower/Storage shield
 // displaces discretionary construction. Evacuation still executes before
 // this role and prevents a worker from being ordered into immediate danger.
-function repairCoreShield(creep) {
+function repairCoreShield(creep,options) {
   if(!creep?.room?.controller?.my || creep.room.controller.safeMode ||
      !creep.pos || !creep.store ||
      (creep.store[RESOURCE_ENERGY]||0)<=0 ||
@@ -181,7 +181,8 @@ function repairCoreShield(creep) {
     if(!Array.isArray(hostiles) || !hostiles.length)return false;
     structures=creep.room.find(FIND_STRUCTURES);
   }catch(_){return false;}
-  const targets=workPriority.criticalCoreShieldTargets(structures,hostiles);
+  const targets=workPriority.criticalCoreShieldTargets(structures,hostiles,
+    options?.imminentOnly===true?{imminentOnly:true}:undefined);
   if(!targets.length ||
      typeof creep.pos.findClosestByPath!=='function')return false;
   const target=creep.pos.findClosestByPath(targets,{
@@ -196,6 +197,24 @@ function repairCoreShield(creep) {
       maxOps:config.PATH_MAX_OPS});
   }
   return rc===OK || rc===ERR_NOT_IN_RANGE;
+}
+
+// D11: the *dedicated* siege repairer must not donate its last carried
+// energy to infrastructure while a REAL protected Spawn/Tower/Storage
+// shield is at most three observed hostile-damage ticks from collapse.
+// A live Hauler must still be available to keep Spawn/Tower logistics
+// running. Never divert the sole productive worker/builder/upgrader.
+// Directly damaged owned core remains above shields in the D6 hierarchy.
+function preemptForImminentShield(creep) {
+  if(creep?.memory?.role!=='repairer'||
+     !creep.room?.controller?.my || creep.room.controller.safeMode)
+    return false;
+  try {
+    if(liveHaulerCount(creep.room)<1)return false;
+    if(workPriority.hasEmergencyRepair(creep.room.find(FIND_STRUCTURES)))
+      return false;
+  }catch(_){return false;}
+  return repairCoreShield(creep,{imminentOnly:true});
 }
 
 function repair(creep) {
@@ -254,6 +273,10 @@ function run(creep) {
     return;
   }
 
+  // A measured imminent breach takes precedence over optional repairer
+  // energy delivery ONLY while a dedicated live hauler survives.
+  if (preemptForImminentShield(creep)) return;
+
   if (shouldAssistInfrastructure(creep) && refill(creep)) return;
 
   // Preserve infrastructure refill for recovery rooms, then immediately
@@ -280,4 +303,4 @@ function run(creep) {
   upgrade(creep);
 }
 
-module.exports = { run, _test: { acquireWorkEnergy, needsEnergy, liveHaulerCount, shouldAssistInfrastructure, emergencyRepair, repairCoreShield, economicConstructionSite, preferredConstructionSite } };
+module.exports = { run, _test: { acquireWorkEnergy, needsEnergy, liveHaulerCount, shouldAssistInfrastructure, emergencyRepair, repairCoreShield, preemptForImminentShield, economicConstructionSite, preferredConstructionSite } };
