@@ -28,9 +28,9 @@ function creep(id,store,my=true) {
   const a=colony('E8N1',[
     structure('a-store','storage',{energy:2000,H:40}),
     structure('a-spawn','spawn',{energy:300}),
-    structure('a-neutral','container',{energy:100},undefined),
+    structure('a-neutral','container',{energy:100},null),
     structure('a-enemy','storage',{energy:40000},false),
-    structure('a-enemy-container','container',{energy:600},undefined,{username:'other'})
+    structure('a-enemy-container','container',{energy:600},null,{username:'other'})
   ],[creep('a-hauler',{energy:90}),creep('a-miner',{energy:10})]);
   const b=colony('E7N1',[
     structure('b-terminal','terminal',{energy:700,Z:25}),
