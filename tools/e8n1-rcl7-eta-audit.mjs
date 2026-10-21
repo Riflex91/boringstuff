@@ -62,7 +62,13 @@ try {
  const mean=total>0?gain/total:null;
  const latest=sameRcl.at(-1)||null;
  const progress= current.progress??latest?.progress??null;
- const target= current.progressTotal??latest?.progressTotal??null;
+ // Screeps room-objects can omit progressTotal or return zero even
+ // when current room telemetry verifies the RCL6 requirement as 3,645,000.
+ // Never treat an invalid zero target as a completed upgrade.
+ const target= current.progressTotal>0?current.progressTotal:
+   (latest?.progressTotal>0?latest.progressTotal:null);
+ const targetSource=current.progressTotal>0?'ROOM_OBJECTS':
+   latest?.progressTotal>0?'BOT_STATUS_SNAPSHOT':'UNKNOWN';
  const remaining=progress!==null&&target!==null?Math.max(0,target-progress):null;
  const approxTicks=mean>0&&remaining!==null?Math.ceil(remaining/mean):null;
  console.log('E8N1_RCL7_ETA_GET '+JSON.stringify({
@@ -75,6 +81,7 @@ try {
    observedWindows:recent,
    observedTotalTicks:total,observedProgressGain:gain,
    observedMeanProgressPerTick:mean===null?null:+mean.toFixed(5),
+   progressTargetUsed:target,progressTargetSource:targetSource,
    remainingProgress:remaining,
    projectedTicksAtObservedMean:approxTicks,
    gameWrites:0
