@@ -6,6 +6,14 @@ const SCHEMA_VERSION = 1;
 const MAX_ROOMS = 25;
 const MAX_ENTITIES_PER_ROOM = 3000;
 
+// Owned defensive/utility structures are visible in FIND_STRUCTURES but have
+// no resource Store in Screeps. Their absence must not invalidate an otherwise
+// complete resource census. Unknown/new store-bearing structures remain
+// eligible; unknown objects WITHOUT a store still fail closed.
+const NON_STORING_STRUCTURES = new Set([
+  'rampart', 'constructedWall', 'road', 'observer', 'extractor', 'controller'
+]);
+
 function empty() {
   return Object.create(null);
 }
@@ -90,6 +98,9 @@ function snapshot(states, tick) {
     const carried = empty();
     for (const s of state.structures) {
       if (!structureEligible(s)) continue;
+      // A legitimate rampart/road/etc. has no Store to inspect. Keep missing
+      // store on storage/terminal/spawn or unknown types an explicit error.
+      if (s.store == null && NON_STORING_STRUCTURES.has(s.structureType)) continue;
       add(s.store, held, errors, seenEntities, s.id);
     }
     for (const c of state.creeps) {
