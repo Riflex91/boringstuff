@@ -1,0 +1,39 @@
+name: Screeps D12 imminent partial-energy repair (REVIEW ONLY)
+on:
+  push:
+    branches: [feature/d12-imminent-repairer-partial-energy-20261021]
+permissions:
+  contents: read
+jobs:
+  exact-main-node24-p3:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: tools
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Exact D11 predecessor and only worker role runtime modification
+        shell: bash
+        run: |
+          git -C .. fetch origin main --quiet
+          test "$(git -C .. rev-parse origin/main)" = 117c087999ba2eef86a6634dae80f27c73a4f629
+          actual="$(git -C .. diff --name-only origin/main HEAD -- game | sort)"
+          test "$actual" = "game/role.worker.js"
+          grep -Eq 'AUTO_SAFE_MODE:[[:space:]]*true' ../game/config.js
+          grep -Eq 'ENABLE_PARALLEL_SPAWN_EXECUTION:[[:space:]]*true' ../game/config.js
+      - name: Canonical Node24 entire gameplay regressions
+        run: |
+          npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+          npm test
+      - name: Original P3 four-mode benchmark
+        run: npm run bench:p3
+      - name: No gameplay deployment on review branch
+        run: |
+          echo 'D12 review has no Screeps credentials or upload authority'
