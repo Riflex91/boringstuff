@@ -177,7 +177,8 @@ function scene({shieldHits=400,haulers=1,towerAmmo=750,
   storage,state,tick:0,log:[]};
  return sim;
 }
-function simulateTick(sim,enemy,{cutHaulers=false,starveSource=false}={}){
+function simulateTick(sim,enemy,{cutHaulers=false,starveSource=false,
+ safeModeProtection=false}={}){
  currentSim=sim;sim.tick++;
  sim.room.hostiles=enemy?[enemy]:[];
  sim.state.hostileCreeps=sim.room.hostiles;
@@ -212,7 +213,7 @@ function simulateTick(sim,enemy,{cutHaulers=false,starveSource=false}={}){
    sim.storage.store.energy-=take;carrier.store.energy+=take;
   }
  }
- if(enemy){
+ if(enemy && !(safeModeProtection && sim.room.controller.safeMode>0)){
   // Hostile damage is applied AFTER owned intents (same-tick simplified
   // resolution). Combat body parts remain active for the worst-case raid.
   const damage=policyDamage(enemy,sim.shield);
@@ -361,3 +362,6 @@ function policyDamage(enemy,target){
   scope:'OFFLINE_MODEL_NOT_LIVE_SIEGE_OR_SETTLED_EVENTS'}));
 }
 console.log('D13 multistage adversarial siege campaign: REAL bot policy exercised against SYNTHETIC engine with known boosted-overwhelm and lost-hauler limits PASS');
+
+// D14 exports synthetic fixtures, never claims actual game enemy kills.
+export {scene,simulateTick,hostile,EVENT_WAVES,policyDamage};

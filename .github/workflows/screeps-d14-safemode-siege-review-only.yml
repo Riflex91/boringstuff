@@ -1,0 +1,40 @@
+name: Screeps D14 Safe Mode siege envelope (NO DEPLOY)
+on:
+  push:
+    branches: [feature/d14-safemode-siege-envelope-20261021]
+permissions:
+  contents: read
+jobs:
+  exact-main-node24-p3:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: tools
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Exact D13 predecessor and bounded runtime delta
+        shell: bash
+        run: |
+          git -C .. fetch origin main --quiet
+          test "$(git -C .. rev-parse origin/main)" = d5d2d55e76bcb43b6ec22494fc4d9683510fa621
+          actual="$(git -C .. diff --name-only origin/main HEAD -- game | sort)"
+          test "$actual" = "game/room.manager.js"
+          grep -Eq 'AUTO_SAFE_MODE:[[:space:]]*true' ../game/config.js
+          grep -Eq 'ENABLE_PARALLEL_SPAWN_EXECUTION:[[:space:]]*true' ../game/config.js
+          test "$(grep -c 'controller.activateSafeMode()' ../game/room.manager.js)" = 1
+      - name: Full Node24 tests including D13 and D14 stress cases
+        run: |
+          npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+          npm test
+      - name: Original P3 four-mode benchmark
+        run: npm run bench:p3
+      - name: Review environment is not live game
+        run: |
+          echo 'D14 no credentials, no upload, no game API mutations'
