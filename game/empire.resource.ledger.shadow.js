@@ -17,6 +17,56 @@ function emptyProduction() {
   return { labs: 0, factories: 0, terminals: 0, powerSpawns: 0 };
 }
 
+// M0 strategic needs are observational refill pressure / memory-reported
+// consumer starvation; never verified surplus, spendable stock or authority.
+const CONSUMER_ROLES = Object.freeze({
+  builder: true, worker: true, repairer: true, upgrader: true
+});
+
+function observeStrategicNeeds(state) {
+  const reasons = [];
+  const available = state.energyAvailable;
+  const capacity = state.energyCapacityAvailable;
+  const capacityVerified = Number.isSafeInteger(available) &&
+    Number.isSafeInteger(capacity) && capacity > 0 &&
+    available >= 0 && available <= capacity;
+  if (!capacityVerified) reasons.push('INFRASTRUCTURE_ENERGY_UNVERIFIED');
+
+  let waiting = 0, fallback = 0;
+  for (const creep of state.creeps) {
+    if (creep && creep.my === false) continue;
+    if (!creep || !creep.memory || typeof creep.memory !== 'object') {
+      reasons.push('CONSUMER_MEMORY_UNVERIFIED');
+      continue;
+    }
+    if (!Object.prototype.hasOwnProperty.call(CONSUMER_ROLES, creep.memory.role))
+      continue;
+    const ticks = creep.memory.waitingEnergyTicks == null
+      ? 0 : creep.memory.waitingEnergyTicks;
+    const flag = creep.memory.logisticsFallback == null
+      ? false : creep.memory.logisticsFallback;
+    if (!Number.isSafeInteger(ticks) || ticks < 0 ||
+        typeof flag !== 'boolean') {
+      reasons.push('CONSUMER_PRESSURE_UNVERIFIED');
+      continue;
+    }
+    if (ticks > 0) waiting++;
+    if (flag) fallback++;
+  }
+  const pressureVerified = !reasons.includes('CONSUMER_MEMORY_UNVERIFIED') &&
+    !reasons.includes('CONSUMER_PRESSURE_UNVERIFIED');
+  return {
+    status: reasons.length ? 'PARTIAL' : 'OBSERVED',
+    reasonCodes: [...new Set(reasons)].sort(),
+    spawnExtensionRefillDeficit: capacityVerified ? capacity - available : null,
+    reportedWaitingConsumers: pressureVerified ? waiting : null,
+    reportedFallbackConsumers: pressureVerified ? fallback : null,
+    verifiedStrategicReserve: null,
+    verifiedSupportCapacity: null,
+    availableForExternalAllocation: null
+  };
+}
+
 // Owned defensive/utility structures are visible in FIND_STRUCTURES but have
 // no resource Store in Screeps. Their absence must not invalidate an otherwise
 // complete resource census. Unknown/new store-bearing structures remain
@@ -149,6 +199,7 @@ function snapshot(states, tick) {
       roomName: name,
       resources: { structures: sortedTotals(held), carried: sortedTotals(carried) },
       productionInfrastructure,
+      strategicNeeds: observeStrategicNeeds(state),
       // Presence is not operational readiness; never authorize recipes here.
       productionReadyToUse: null,
       // Reserves/commitments are NOT proven by this inventory-only census.
