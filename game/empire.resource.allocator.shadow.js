@@ -119,6 +119,7 @@ function evaluate(ledger, request, offers) {
       typeof request.roomName !== 'string' || !request.roomName ||
       typeof request.resourceType !== 'string' ||
       !/^[A-Za-z0-9_]{1,50}$/.test(request.resourceType) ||
+      ['__proto__','prototype','constructor'].includes(request.resourceType) ||
       !safeAmount(request.amount) || request.amount === 0 ||
       !safeCost(request.urgencyPerTickCredits) ||
       !roomByName(ledger, request.roomName))
@@ -146,7 +147,9 @@ function evaluate(ledger, request, offers) {
   }
   for (const offer of offers.market) {
     const valid = offers.marketAvailable === true && offer &&
-      typeof offer.id === 'string' && offer.id && !ids.has(offer.id);
+      typeof offer.id === 'string' && offer.id && !ids.has(offer.id) &&
+      offer.resourceType === need.resourceType &&
+      offer.destinationRoom === need.roomName;
     if (offer && typeof offer.id === 'string') ids.add(offer.id);
     const candidate = valid && score(offer, need, true);
     if (candidate) candidates.push(candidate);
