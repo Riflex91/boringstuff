@@ -109,6 +109,15 @@ function nearbyFundedSourceContainer(creep, dropped) {
   return chosen;
 }
 
+// A moveTo error is not necessarily a route in progress. Only accepted
+// movement and documented transient busy/tired outcomes consume this tick's
+// acquisition path. Unknown failures must not suppress safe source failover.
+function haulerAcquisitionMovementHandled(rc) {
+  return rc === OK ||
+    (typeof ERR_BUSY !== 'undefined' && rc === ERR_BUSY) ||
+    (typeof ERR_TIRED !== 'undefined' && rc === ERR_TIRED);
+}
+
 function acquireForHauler(creep) {
   const dropped = creep.pos.findClosestByPath(FIND_DROPPED_RESOURCES, {
     maxOps: config.PATH_MAX_OPS,
@@ -126,7 +135,7 @@ function acquireForHauler(creep) {
       });
       consumerSupplyObserver.recordAcquisitionTravel(
         creep, preferredContainer, moveRc, 'container');
-      if (moveRc !== ERR_NO_PATH && moveRc !== ERR_INVALID_TARGET)
+      if (haulerAcquisitionMovementHandled(moveRc))
         return true;
     } else if (rc !== ERR_NOT_ENOUGH_RESOURCES &&
                rc !== ERR_INVALID_TARGET) {
@@ -145,7 +154,7 @@ function acquireForHauler(creep) {
         visualizePathStyle: { stroke: '#ffaa00' }
       });
       consumerSupplyObserver.recordAcquisitionTravel(creep, dropped, moveRc, 'drop');
-      if (moveRc !== ERR_NO_PATH && moveRc !== ERR_INVALID_TARGET)
+      if (haulerAcquisitionMovementHandled(moveRc))
         return true;
     } else if (rc !== ERR_NOT_ENOUGH_RESOURCES &&
                rc !== ERR_INVALID_TARGET) {
@@ -172,7 +181,7 @@ function acquireForHauler(creep) {
         visualizePathStyle: { stroke: '#ffaa00' }
       });
       consumerSupplyObserver.recordAcquisitionTravel(creep, container, moveRc, 'container');
-      if (moveRc !== ERR_NO_PATH && moveRc !== ERR_INVALID_TARGET)
+      if (haulerAcquisitionMovementHandled(moveRc))
         return true;
     } else if (rc !== ERR_NOT_ENOUGH_RESOURCES &&
                rc !== ERR_INVALID_TARGET) {
@@ -193,7 +202,7 @@ function acquireForHauler(creep) {
     if (rc === ERR_NOT_IN_RANGE) {
       const moveRc = creep.moveTo(tomb, { reusePath: 8, maxOps: config.PATH_MAX_OPS });
       consumerSupplyObserver.recordAcquisitionTravel(creep, tomb, moveRc, 'tomb');
-      return moveRc !== ERR_NO_PATH && moveRc !== ERR_INVALID_TARGET;
+      return haulerAcquisitionMovementHandled(moveRc);
     }
     // Last candidate: an error is never an accepted pickup intent.
     return rc === OK;
