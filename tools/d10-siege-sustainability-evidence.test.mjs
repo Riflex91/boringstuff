@@ -163,7 +163,7 @@ function summary(){return d10.summary('E8N1',memory,game.time);}
  const pos=(x,y)=>({x,y,getRangeTo(target){const p=target?.pos||target;
    return Math.max(Math.abs(x-p.x),Math.abs(y-p.y));}});
  const spawn={id:'spawn1',my:true,structureType:'spawn',pos:pos(10,10)};
- const tower={id:'tower1',my:true,structureType:'tower',pos:pos(12,10),
+ const tower={id:'tower1',my:true,structureType:'tower',pos:pos(14,10),
   store:{energy:1000}};
  const rampart={id:'ramp1',my:true,structureType:'rampart',pos:pos(10,10),
   hits:390,hitsMax:100000};
