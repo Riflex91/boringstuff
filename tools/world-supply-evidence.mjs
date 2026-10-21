@@ -306,7 +306,9 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
     for (let tick = samples[i-1].tick + 25; tick < samples[i].tick; tick += 25)
       missingSampleTicks.push(tick);
   }
-  const observedCadenceComplete = missingSampleTicks.length === 0;
+  const observedCadenceComplete = missingSampleTicks.length === 0 && invalid === 0;
+  // A rejected or duplicate sample breaks evidence continuity even when
+  // every nominal 25-tick position exists in the journal.
   // Invalid cross-field telemetry cannot constitute a consecutive pattern.
   const patterns = repeatedSupplyObservations(patternEligibleSamples);
   // Correlate only observations from the exact same tick. A waiting consumer
