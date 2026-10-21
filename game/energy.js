@@ -287,6 +287,54 @@ function safeProactiveTowerRefill(room) {
   return room.energyAvailable>=Math.max(300,
     room.energyCapacityAvailable*0.8);
 }
+// D17: During an authenticated ACTIVE assault on an actual owned
+// Spawn/Tower/Storage, an explicitly exhausted Safe Mode stock warrants a
+// slightly earlier Tower ammunition refill. Require >=50% *actual available*
+// room energy (and >=300), protecting defender/harvester spawn viability.
+// This does NOT authorize proactive refill on distant scouts, heal-only
+// strangers, phantom core targets, unknown safe-mode stock or stale intel.
+// Strict small scan bounds prevent CPU spirals under mass-hostile pressure.
+function noSafeModeCoreTowerRefill(room) {
+  const controller=room?.controller;
+  if(!controller?.my || controller.safeModeAvailable!==0 ||
+     controller.safeMode || !Number.isFinite(room.energyAvailable) ||
+     !Number.isFinite(room.energyCapacityAvailable) ||
+     room.energyCapacityAvailable<=0 ||
+     room.energyAvailable<Math.max(300,
+       room.energyCapacityAvailable*0.5) ||
+     typeof room.find!=='function' ||
+     typeof FIND_MY_STRUCTURES==='undefined' ||
+     typeof FIND_HOSTILE_CREEPS==='undefined')return false;
+  let structures,hostiles;
+  try{
+    structures=room.find(FIND_MY_STRUCTURES);
+    hostiles=room.find(FIND_HOSTILE_CREEPS);
+  }catch(_){return false;}
+  if(!Array.isArray(structures)||structures.length>400 ||
+     !Array.isArray(hostiles)||!hostiles.length||hostiles.length>40)
+    return false;
+  const critical=structures.filter(s=>s?.my===true && s.pos &&
+    (s.structureType===STRUCTURE_SPAWN ||
+     s.structureType===STRUCTURE_TOWER ||
+     s.structureType===STRUCTURE_STORAGE));
+  if(!critical.length||critical.length>16)return false;
+  for(const h of hostiles) {
+    if(!h?.pos||typeof h.pos.getRangeTo!=='function' ||
+       !Array.isArray(h.body)||h.body.length>50)continue;
+    for(const target of critical){
+      let range;
+      try{range=h.pos.getRangeTo(target);}catch(_){continue;}
+      if(!Number.isSafeInteger(range)||range<0||range>3)continue;
+      for(const part of h.body){
+        if(!part||!(part.hits>0))continue;
+        if((range<=1&&(part.type==='attack'||part.type==='work'))||
+           (range<=3&&part.type==='ranged_attack'))return true;
+      }
+    }
+  }
+  return false;
+}
+
 function siegeTowerReserveDeficit(room) {
   if(!armedHostilePresent(room))return false;
   if(typeof FIND_MY_STRUCTURES==='undefined')return true;
@@ -305,10 +353,15 @@ function deliveryTargets(creep) {
     filter: s => (s.structureType === STRUCTURE_SPAWN || s.structureType === STRUCTURE_EXTENSION || s.structureType === STRUCTURE_TOWER) && freeEnergyCapacity(s) > 0
   });
   const combatPressure = armedHostilePresent(creep.room);
+  // Read the expensive bounded D17 core threat ONCE per hauler decision,
+  // never once per target; ordinary D7 stays unchanged with Safe Mode or
+  // uncertain room data. Spawn remains strictly above every Tower.
+  const proactiveCombatRefill=combatPressure &&
+    (safeProactiveTowerRefill(creep.room) ||
+      noSafeModeCoreTowerRefill(creep.room));
   const priority = s => s.structureType === STRUCTURE_SPAWN ? 0 :
     combatPressure && needsCombatTowerRefill(s) ? 1 :
-    combatPressure && safeProactiveTowerRefill(creep.room) &&
-      towerBelowSiegeReserve(s) ? 1 :
+    proactiveCombatRefill && towerBelowSiegeReserve(s) ? 1 :
     s.structureType === STRUCTURE_EXTENSION ? 2 : 3;
   targets.sort((a, b) =>
     priority(a) - priority(b) ||
@@ -759,6 +812,7 @@ module.exports = {
     selectConsumerGuardHauler,
     selectConsumerGuardHaulers,
     rescueInfrastructureSafe,
-    selectConsumerRescueHauler
+    selectConsumerRescueHauler,
+    noSafeModeCoreTowerRefill
   }
 };
