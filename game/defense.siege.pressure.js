@@ -199,8 +199,10 @@ function summary(room,memory,tick) {
   if(!isRoom(room)||!validateRoot(root)||!own(root.rooms,room))
     return unknown;
   const row=root.rooms[room];
-  if(!row||!validPrivate(row.private)||row.status!=='OBSERVED'||
-     !isTick(tick)||row.private.tick!==tick)return {
+  if(!row||!validPrivate(row.private))return {
+    ...unknown,status:'UNVERIFIED'};
+  if(row.status!=='OBSERVED'||!isTick(tick)||
+     row.private.tick!==tick)return {
        ...unknown,status:'STALE_OR_UNKNOWN'};
   const x=row.result;
   if(!x||![
