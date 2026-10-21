@@ -211,7 +211,11 @@ function acquireForConsumer(creep) {
     const rc = creep.pickup(localDrop);
     if (rc === OK) return true;
     if (rc === ERR_NOT_IN_RANGE) return creep.moveTo(localDrop, { reusePath: 5, maxOps: config.PATH_MAX_OPS }) === OK;
-    return false;
+    // A stale/emptied drop can still appear in the pre-action room snapshot.
+    // Only terminal source failures may try a funded local buffer/storage;
+    // busy, full or unknown results must not issue a second resource intent.
+    if (rc !== ERR_NOT_ENOUGH_RESOURCES && rc !== ERR_INVALID_TARGET)
+      return false;
   }
 
   // An upgrader works at controller range. If its controller-side buffer
