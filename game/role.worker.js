@@ -254,7 +254,31 @@ function shouldAssistInfrastructure(creep) {
   // productive work instead of donating it back to spawn/extensions and then
   // waiting for another delivery. If logistics loses redundancy, immediately
   // restore the historical infrastructure-first behavior.
-  return liveHaulerCount(creep.room) < 2;
+  const haulers=liveHaulerCount(creep.room);
+  // D13: D11/D12 rescue is a single-tick imminent override. Immediately
+  // after its first successful repair, a shield can rise ABOVE the three-tick
+  // cutoff while the same active attacker is still in range. With exactly
+  // one ready Hauler the old code would then donate ALL remaining repairer
+  // energy into ordinary structure top-ups. This oscillation can destroy
+  // the sole core shield despite an otherwise sustainable repair rate.
+  // Preserve the dedicated repairer's carried ammo across that recovery
+  // band ONLY for an independently observed, active owned core-shield siege;
+  // the genuinely live Hauler remains responsible for infrastructure.
+  // Keep old logistics fallback if the last Hauler is missing, if a direct
+  // core building is critically damaged or if observations are unavailable.
+  if(haulers>=1 && creep?.memory?.role==='repairer' &&
+     creep.room?.controller?.my && !creep.room.controller.safeMode &&
+     creep.store && (creep.store[RESOURCE_ENERGY]||0)>0) {
+    try{
+      const structures=creep.room.find(FIND_STRUCTURES);
+      if(Array.isArray(structures) &&
+         !workPriority.hasEmergencyRepair(structures) &&
+         workPriority.hasCriticalCoreShieldThreat(
+           structures,creep.room.find(FIND_HOSTILE_CREEPS)))
+        return false;
+    }catch(_) { /* no verified shield threat: retain existing fallback */ }
+  }
+  return haulers<2;
 }
 
 function refill(creep) { return energy.deliver(creep); }

@@ -1,0 +1,42 @@
+name: Screeps D13 adversarial multi-wave siege lab (NO DEPLOY)
+on:
+  push:
+    branches: [feature/d13-multiphase-siege-lab-20261021]
+permissions:
+  contents: read
+jobs:
+  node24-p3-and-siege-campaign:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: tools
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Enforce exact live-verified D12 predecessor and bounded gameplay
+        shell: bash
+        run: |
+          git -C .. fetch origin main --quiet
+          test "$(git -C .. rev-parse origin/main)" = e76a1d1defb61115c24cfd6cf2c3fe2a041a2880
+          changed="$(git -C .. diff --name-only origin/main HEAD -- game | sort)"
+          allowed="$(printf '%s\n' game/work.priority.js game/role.worker.js | sort)"
+          if [ -n "$changed" ]; then
+            test "$changed" = "$allowed" || test "$changed" = "game/work.priority.js" || test "$changed" = "game/role.worker.js"
+          fi
+          grep -Eq 'AUTO_SAFE_MODE:[[:space:]]*true' ../game/config.js
+          grep -Eq 'ENABLE_PARALLEL_SPAWN_EXECUTION:[[:space:]]*true' ../game/config.js
+      - name: Full canonical Node24 tests with 75-tick siege scenarios
+        run: |
+          npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+          npm test
+      - name: Original P3 four-mode benchmark
+        run: npm run bench:p3
+      - name: No live game changes on the review branch
+        run: |
+          echo 'D13 test policy is real bot code, simulated engine, no credentials and no deployment.'
