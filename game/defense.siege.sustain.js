@@ -65,7 +65,10 @@ function blank(status='UNOBSERVED'){
 }
 function validPoint(p){
   return p&&tickOk(p.tick)&&RISK.has(p.risk)&&
-    p.activeHostiles>0===p.armedPressure &&
+    typeof p.armedPressure==='boolean'&&
+    (p.activeHostiles>0)===p.armedPressure &&
+    (p.defenderCount===null||countOk(p.defenderCount))&&
+    (p.storedEnergy===null||countOk(p.storedEnergy))&&
     ['CONSECUTIVE'].includes(p.shieldContinuity)&&
     ['SETTLED_PREVIOUS_TICK'].includes(p.settlement)&&
     ['CORE_UNSHIELDED_UNDER_FIRE','CORE_SHIELD_BREACH_IMMINENT',
@@ -196,7 +199,7 @@ function observe(states,game,memory,d8,d9){
     // Keep the last D8 observed cumulative values ONLY for future
     // consecutive same-window delta validation. A malformed/missing
     // D9 sample is never counted as a valid observation.
-    if(window&&owner(root.rooms,name)===false||window)
+    if(window)
       next.lastD8={tick:t,start:window.startObservationTick,
         ...Object.fromEntries(FIELDS.map(k=>[k,window[k]]))};
     root.rooms[name]=next;
