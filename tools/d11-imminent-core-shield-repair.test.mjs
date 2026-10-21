@@ -3,6 +3,11 @@ import vm from 'node:vm';
 import fs from 'node:fs';
 import {createRequire} from 'node:module';
 const nativeRequire=createRequire(import.meta.url);
+// The shared work.priority is a real CommonJS game module, not executed
+// in the worker VM. Give its own Node context the same Screeps symbols.
+global.STRUCTURE_SPAWN='spawn';
+global.STRUCTURE_TOWER='tower';
+global.STRUCTURE_STORAGE='storage';
 const priority=nativeRequire('../game/work.priority.js');
 const source=fs.readFileSync(new URL('../game/role.worker.js',import.meta.url),'utf8');
 const calls=[];
@@ -72,14 +77,7 @@ assert.equal(roleWorker._test.liveHaulerCount(room),1,
 assert.deepEqual(priority.criticalCoreShieldTargets(room.structures,
  room.hostiles,{imminentOnly:true}).map(x=>x.id),['coreRamp'],
  'actual owned shield must be in hostile WORK range');
-console.log('D11_DEBUG',JSON.stringify({
- haulers:roleWorker._test.liveHaulerCount(room),
- emergency:priority.hasEmergencyRepair(room.structures),
- currentRole:creep.memory.role,
- directRepair:roleWorker._test.repairCoreShield(creep,{imminentOnly:true}),
- calls
-}));
-calls.length=0;
+
 assert.equal(roleWorker._test.preemptForImminentShield(creep),true,
  'direct current-world imminent preemption must be reachable');
 calls.length=0;
