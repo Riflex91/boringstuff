@@ -18,8 +18,8 @@ const primary=hits('spawn','spawn',5000,5000,10);
 const towerCore=hits('tower-core','tower',3000,3000,11);
 const shield=hits('spawn-rampart','rampart',3000,1000000,10);
 const road=hits('damaged-road','road',100,5000,13,10,undefined);
-const container=hits('damaged-container','container',100,5000,14,10,undefined);
-const extension=hits('damaged-extension','extension',10,1000,15);
+const container=hits('damaged-container','container',200,5000,14,10,undefined);
+const extension=hits('damaged-extension','extension',100,1000,15);
 const events=[];
 const tower=(id,energy)=>({id,store:{energy},
  repair(target){events.push({tower:id,kind:'repair',target:target.id});return 0;},
