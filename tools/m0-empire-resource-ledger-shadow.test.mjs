@@ -79,6 +79,49 @@ function creep(id,store,my=true) {
   assert.ok(x.reasonCodes.includes('RESOURCE_OVERFLOW'));
   assert.equal(x.availableToCommit,null);
 }
+// Defensive/utility structures have no Store and must not force PARTIAL
+// on every real fortified room. All actual stock remains strictly accounted.
+{
+  const room=colony('E8N1',[
+    structure('rampart-a','rampart',undefined,true),
+    structure('wall-a','constructedWall',null,true),
+    structure('road-a','road',undefined,true),
+    structure('observer-a','observer',undefined,true),
+    structure('extractor-a','extractor',undefined,true),
+    structure('controller-a','controller',undefined,true),
+    structure('storage-a','storage',{energy:1250,H:3},true),
+    structure('source-container','container',{energy:175},false),
+  ],[creep('carrier',{energy:25})]);
+  const result=ledger.snapshot([room],31);
+  assert.equal(result.status,'OBSERVED',
+    'ordinary owned non-store structures may not invalidate a verified census');
+  assert.deepEqual(result.reasonCodes,[]);
+  assert.deepEqual(result.totals.structures,{H:3,energy:1425});
+  assert.deepEqual(result.totals.carried,{energy:25});
+  assert.equal(result.availableToCommit,null);
+}
+// Do not silently ignore unknown new structure types or known resource
+// structures with missing stores: their unverified inventory is a hard HOLD
+// for prospective reserve and market/allocation consumers.
+for (const type of ['storage','terminal','spawn','lab','factory','customStore']) {
+  const bad=ledger.snapshot([colony('E8N1',[
+    structure('missing-'+type,type,undefined,true),
+    structure('other','storage',{energy:10},true)
+  ])],32);
+  assert.equal(bad.status,'PARTIAL',type+' missing store is unverified');
+  assert.ok(bad.reasonCodes.includes('STORE_MISSING'));
+  assert.equal(bad.availableToCommit,null);
+}
+// Forward-compatible owned store-bearing types are included even when
+// their type has not yet appeared in the baseline Screeps structure roster.
+{
+  const result=ledger.snapshot([colony('E8N1',[
+    structure('future','newStoreType',{energy:3,X:9},true)
+  ])],33);
+  assert.equal(result.status,'OBSERVED');
+  assert.deepEqual(result.totals.structures,{X:9,energy:3});
+}
+
 {
   const broken=colony('E8N1',[
     structure('invalid','storage',{energy:-3,Z:NaN}),
