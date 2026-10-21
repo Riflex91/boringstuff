@@ -62,6 +62,28 @@ function selectHostile(state) {
   return best;
 }
 
+// D16: a second defensive buffer is earned only from REAL stored energy.
+// The ordinary RCL-based core shield baseline remains untouched. RCL5+
+// colonies may harden built owned critical overlays to 300k if storage
+// truly holds >=20k. If Safe Mode charges are actually depleted, a
+// narrower 12k allowance is safe enough to invest a LITTLE earlier.
+// These numbers are thresholds for peace-time investment, not evidence
+// of future enemy damage or a claim of invulnerability.
+function surplusCoreHardening(state) {
+  if(!state?.room?.controller?.my ||
+     !Number.isSafeInteger(state.room.controller.level) ||
+     state.room.controller.level<5 ||
+     !Number.isFinite(state.energyStored))return false;
+  return state.energyStored>=20000 ||
+    (state.room.controller.safeModeAvailable===0 &&
+     state.energyStored>=12000);
+}
+function baseCoreShieldTarget(state) {
+  const rcl=state?.room?.controller?.level;
+  return Math.min(150000,Math.max(25000,
+    (Number.isSafeInteger(rcl)?rcl:3)*20000));
+}
+
 // During peace, one genuinely surplus-energy tower reinforces an EXISTING
 // owned rampart directly covering the spawn/tower/storage. Generic walls and
 // remote ramparts are never a reason to drain the last combat ammunition.
@@ -75,14 +97,13 @@ function coreRampartTarget(state) {
      s.structureType === STRUCTURE_TOWER ||
      s.structureType === STRUCTURE_STORAGE));
   if (!core.length) return null;
-  const rcl = state.room && state.room.controller &&
-    state.room.controller.level;
-  const targetHits = Math.min(150000, Math.max(25000,
-    (Number.isSafeInteger(rcl) ? rcl : 3) * 20000));
+  const baseTarget=baseCoreShieldTarget(state);
+  const targetHits=surplusCoreHardening(state)?
+    Math.max(baseTarget,300000):baseTarget;
   const ramps = state.structures.filter(s=>s &&
     s.structureType === STRUCTURE_RAMPART && s.my === true &&
     s.pos && Number.isFinite(s.hits) && Number.isFinite(s.hitsMax) &&
-    s.hitsMax > 0 && s.hits >= 0 &&
+    s.hitsMax > 0 && s.hits > 0 &&
     s.hits < Math.min(targetHits,s.hitsMax) &&
     core.some(c=>c.pos.x===s.pos.x && c.pos.y===s.pos.y));
   ramps.sort((a,b)=>a.hits-b.hits ||
@@ -160,9 +181,15 @@ function run(state) {
   }
   const rampart = coreRampartTarget(state);
   if (rampart) {
+    // Never weaken D3 baseline: one >=800 Tower may bring an underbuilt
+    // owned shield to its original threshold. Above that, D16 invests
+    // only from genuinely surplus >=900-energy Towers, leaving >=890
+    // or more combat ammo after one ordinary repair attempt.
+    const hardening=rampart.hits>=baseCoreShieldTarget(state);
+    const minimumAmmo=hardening?900:800;
     const tower = state.towers.find(t =>
       typeof t.repair === 'function' &&
-      (t.store?.[RESOURCE_ENERGY] || 0) >= 800);
+      (t.store?.[RESOURCE_ENERGY] || 0) >= minimumAmmo);
     if (tower) {tower.repair(rampart);result('FORTIFY_CORE',0,0,1);}
     else result('RESERVE_ENERGY');
     return;
@@ -199,4 +226,4 @@ function run(state) {
   result('IDLE');
 }
 
-module.exports = { run, _test: { hostilePriority, selectHostile, activeThreat, coreRampartTarget } };
+module.exports = { run, _test: { hostilePriority, selectHostile, activeThreat, coreRampartTarget, surplusCoreHardening, baseCoreShieldTarget } };
