@@ -73,7 +73,8 @@ function safeModeDecision(state) {
     // an armed attacker stood nearby, even behind a healthy full shield.
     // Assess that shield in the owned-Rampart imminent-breach branch
     // below, rather than mistaking old Spawn hits for exposed-core damage.
-    const protectedByOwnedShield=(state.structures||[]).some(s=>
+    const protectedByOwnedShield=typeof STRUCTURE_RAMPART!=='undefined' &&
+      (state.structures||[]).some(s=>
       s?.my===true && s.structureType===STRUCTURE_RAMPART &&
       s.pos && Number.isFinite(s.hits) && s.hits>0 &&
       s.pos.x===structure.pos.x && s.pos.y===structure.pos.y);
