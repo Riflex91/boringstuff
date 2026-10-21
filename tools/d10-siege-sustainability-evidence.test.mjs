@@ -66,6 +66,10 @@ function summary(){return d10.summary('E8N1',memory,game.time);}
  assert.equal(a.settledCoreShieldRepair,0);
  assert.equal(a.confidence,
   'TIMING_ALIGNED_AGGREGATES_NOT_TARGET_LEVEL_CAUSALITY');
+ assert.equal(a.causalRepairDeficit,
+  'NOT_ESTABLISHED_WITHOUT_SAME_TARGET_SETTLED_DAMAGE_AND_REPAIR');
+ assert.equal(a.liveDefenseOutcome,
+  'NOT_ESTABLISHED_WITHOUT_REAL_HOSTILE_COMBAT_OUTCOME');
  assert.equal(a.observationBasis,
   'D9_MATCHED_SHIELD_NET_HITS_AND_D8_PREVIOUS_TICK_SETTLED_EVENTS');
  assert.equal(d10.observe(states,game,memory,d8,d9).observedRooms,0,
