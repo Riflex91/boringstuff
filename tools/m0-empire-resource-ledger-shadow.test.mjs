@@ -205,4 +205,85 @@ for(const args of [
   assert.deepEqual(x.reasonCodes,['INPUT_UNVERIFIED']);
   assert.equal(x.availableToCommit,null);
 }
+// M0: observed infrastructure refill demand and reported starvation are
+// distinct from strategic reserves and must never grant transfer authority.
+{
+  const state=colony('E8N1',[
+    structure('storage-needs','storage',{energy:9000})
+  ],[
+    {...creep('upgrader-needs',{energy:0}),memory:{
+      role:'upgrader',waitingEnergyTicks:5,logisticsFallback:true}},
+    {...creep('builder-needs',{energy:20}),memory:{
+      role:'builder',waitingEnergyTicks:2}},
+    {...creep('repairer-needs',{energy:10}),memory:{
+      role:'repairer',waitingEnergyTicks:0,logisticsFallback:false}},
+    {...creep('worker-needs',{energy:20}),memory:{role:'worker'}},
+    {...creep('scout-needs',{}),memory:{role:'scout',
+      waitingEnergyTicks:100,logisticsFallback:true}}
+  ]);
+  state.energyAvailable=300;
+  state.energyCapacityAvailable=800;
+  const before=JSON.stringify(state);
+  const v=ledger.snapshot([state],40);
+  assert.equal(v.status,'OBSERVED');
+  assert.deepEqual(v.rooms[0].strategicNeeds,{
+    status:'OBSERVED',reasonCodes:[],spawnExtensionRefillDeficit:500,
+    reportedWaitingConsumers:2,reportedFallbackConsumers:1,
+    verifiedStrategicReserve:null,verifiedSupportCapacity:null,
+    availableForExternalAllocation:null
+  });
+  assert.equal(v.availableToCommit,null);
+  assert.equal(v.actionEnabled,false);
+  assert.equal(JSON.stringify(state),before,'strategic analysis remains pure');
+}
+{
+  const state=colony('E8N1',[],[
+    {...creep('upgrader-needs',{energy:0}),memory:{
+      role:'upgrader',waitingEnergyTicks:5,logisticsFallback:true}}
+  ]);
+  state.energyAvailable=800;
+  state.energyCapacityAvailable=800;
+  const v=ledger.snapshot([state],41);
+  assert.equal(v.rooms[0].strategicNeeds.spawnExtensionRefillDeficit,0);
+  assert.equal(v.rooms[0].strategicNeeds.reportedWaitingConsumers,1);
+  assert.equal(v.rooms[0].strategicNeeds.reportedFallbackConsumers,1);
+  assert.equal(v.rooms[0].strategicNeeds.availableForExternalAllocation,null,
+    'full spawn/extensions do not prove exportable energy');
+}
+for(const bad of [
+  {energyAvailable:-1,energyCapacityAvailable:800},
+  {energyAvailable:801,energyCapacityAvailable:800},
+  {energyAvailable:20.5,energyCapacityAvailable:800},
+  {energyAvailable:0,energyCapacityAvailable:0},
+  {energyAvailable:10,energyCapacityAvailable:null}
+]){
+  const state={...colony('E8N1'),...bad};
+  const v=ledger.snapshot([state],42);
+  assert.equal(v.status,'OBSERVED',
+    'stock census and separate refill-signal quality are independent');
+  assert.equal(v.rooms[0].strategicNeeds.status,'PARTIAL');
+  assert.ok(v.rooms[0].strategicNeeds.reasonCodes.includes(
+    'INFRASTRUCTURE_ENERGY_UNVERIFIED'));
+  assert.equal(v.rooms[0].strategicNeeds.spawnExtensionRefillDeficit,null);
+  assert.equal(v.rooms[0].strategicNeeds.availableForExternalAllocation,null);
+}
+{
+  const state=colony('E8N1',[],[
+    creep('missing-memory',{energy:5}),
+    {...creep('broken-memory',{energy:5}),memory:{
+      role:'worker',waitingEnergyTicks:-2,logisticsFallback:'yes'}},
+    {...creep('known-worker',{energy:5}),memory:{
+      role:'worker',waitingEnergyTicks:7,logisticsFallback:true}}
+  ]);
+  const v=ledger.snapshot([state],43);
+  const needs=v.rooms[0].strategicNeeds;
+  assert.equal(needs.status,'PARTIAL');
+  assert.ok(needs.reasonCodes.includes('CONSUMER_MEMORY_UNVERIFIED'));
+  assert.ok(needs.reasonCodes.includes('CONSUMER_PRESSURE_UNVERIFIED'));
+  assert.equal(needs.spawnExtensionRefillDeficit,0);
+  assert.equal(needs.reportedWaitingConsumers,null);
+  assert.equal(needs.reportedFallbackConsumers,null);
+  assert.equal(needs.verifiedStrategicReserve,null);
+  assert.equal(needs.verifiedSupportCapacity,null);
+}
 console.log('M0 passive resource ledger ownership, double-count, invalid-stock and reserve HOLD PASS');
