@@ -93,6 +93,24 @@ reset();
 assert.equal(energy.acquireForHauler(carrier), true);
 assert.deepEqual(calls, [['pickup', drop]]);
 
+// A rejected pickup/withdraw is never a successful acquisition intent.
+// An unexpected engine error must also remain fail-closed: no speculative
+// second acquisition action after a nonterminal failure.
+for (const code of [ERR_BUSY, -8 /* ERR_FULL */, -99 /* unknown */]) {
+  reset(); pickupRc=code;
+  assert.equal(energy.acquireForHauler(carrier),false);
+  assert.deepEqual(calls,[['pickup',drop]],
+    'failed drop pickup neither succeeds nor issues a second action');
+  reset(); present.drop=false; withdrawRc=code;
+  assert.equal(energy.acquireForHauler(carrier),false);
+  assert.deepEqual(calls,[['withdraw',container]],
+    'failed container withdrawal is not a successful intent');
+  reset(); present.drop=false; present.container=false; tombWithdrawRc=code;
+  assert.equal(energy.acquireForHauler(carrier),false);
+  assert.deepEqual(calls,[['withdraw',tomb]],
+    'failed tombstone withdrawal is not a successful intent');
+}
+
 // Viable or transiently busy movement must not be overwritten by the alternate.
 for (const code of [OK, ERR_BUSY]) {
   reset(); pickupRc = ERR_NOT_IN_RANGE; moveRc = code;
@@ -203,6 +221,12 @@ for (const code of [OK, ERR_BUSY]) {
   assert.equal(energy.acquireForHauler(carrier), true);
   assert.deepEqual(calls, [['withdraw',container]],
     'near funded source container wins over >10-range drop');
+
+  reset();
+  withdrawRc=ERR_BUSY;
+  assert.equal(energy.acquireForHauler(carrier),false);
+  assert.deepEqual(calls,[['withdraw',container]],
+    'rejected preferred-container intent must not be treated as accepted');
 
   reset();
   withdrawRc=ERR_NOT_IN_RANGE;
