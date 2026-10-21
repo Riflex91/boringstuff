@@ -88,6 +88,7 @@ function snapshot(states, tick) {
   const errors = new Set();
   const names = new Set();
   const seenEntities = new Set();
+  const observedProductionIds = new Set();
   const structureTotals = empty();
   const carriedTotals = empty();
   for (const state of states) {
@@ -110,13 +111,14 @@ function snapshot(states, tick) {
     const held = empty();
     const carried = empty();
     const productionInfrastructure = emptyProduction();
-    const observedProductionIds = new Set();
     for (const s of state.structures) {
       if (!structureEligible(s)) continue;
       // Hardware presence is a verified fact, not permission to produce.
       // Ignore unowned/neutral installations and deduplicate by object ID;
       // readiness, reagent stocks, cooldowns and reservations are unknown.
-      const kind = s.my === true && PRODUCTION_TYPES[s.structureType];
+      const kind = s.my === true &&
+        Object.prototype.hasOwnProperty.call(PRODUCTION_TYPES, s.structureType)
+        ? PRODUCTION_TYPES[s.structureType] : null;
       if (kind && typeof s.id === 'string' && s.id &&
           !observedProductionIds.has(s.id)) {
         productionInfrastructure[kind] += 1;
