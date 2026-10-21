@@ -104,6 +104,72 @@ function makeHauler(id, rangeMap = {}) {
 const config = require('../game/config.js');
 const energy = require('../game/energy.js');
 
+// E4: generic worker fallback acquisition must reject failed intents as well.
+// An accepted moveTo is only a movement intent, never settled energy.
+{
+  const constants={FIND_TOMBSTONES:11,FIND_RUINS:12,
+    FIND_SOURCES_ACTIVE:13,FIND_SOURCES:14,WORK:'work'};
+  const previous=Object.fromEntries(Object.keys(constants).map(k=>[
+    k,{present:Object.hasOwn(global,k),value:global[k]}
+  ]));
+  Object.assign(global,constants);
+  try {
+    const drop={resourceType:RESOURCE_ENERGY,amount:50};
+    const tomb={store:{energy:80}};
+    const source={id:'fallback-source'};
+    let selected='pickup',intentRc=OK,moveRc=OK;
+    let actionCount=0,moveCount=0;
+    const worker={
+      store:{getFreeCapacity:()=>100},
+      room:{find(type) {
+        assert.equal(type,FIND_STRUCTURES);
+        return [];
+      }},
+      pos:{findClosestByPath(type) {
+        if(type===FIND_DROPPED_RESOURCES)return selected==='pickup'?drop:null;
+        if(type===FIND_TOMBSTONES)return selected==='withdraw'?tomb:null;
+        if(type===FIND_RUINS)return null;
+        if(type===FIND_SOURCES_ACTIVE)return selected==='harvest'?source:null;
+        if(type===FIND_SOURCES)return null;
+        throw new Error('unexpected generic acquisition search');
+      }},
+      getActiveBodyparts:()=>selected==='harvest'?1:0,
+      pickup(target){assert.equal(target,drop);actionCount++;return intentRc;},
+      withdraw(target,resource){assert.equal(target,tomb);
+        assert.equal(resource,RESOURCE_ENERGY);actionCount++;return intentRc;},
+      harvest(target){assert.equal(target,source);actionCount++;return intentRc;},
+      moveTo(){moveCount++;return moveRc;}
+    };
+    for(const kind of ['pickup','withdraw','harvest']) {
+      selected=kind;
+      for(const rc of [OK,ERR_BUSY,ERR_FULL,ERR_INVALID_TARGET,-6,-42]) {
+        intentRc=rc;moveRc=OK;actionCount=0;moveCount=0;
+        assert.equal(energy.acquire(worker,true),rc===OK,
+          kind+' rejected intent '+rc+' must not appear accepted');
+        assert.equal(actionCount,1);
+        assert.equal(moveCount,0,'no movement on a terminal acquisition code');
+      }
+      for(const movement of [OK,ERR_NO_PATH,ERR_INVALID_TARGET,ERR_TIRED]) {
+        intentRc=ERR_NOT_IN_RANGE;moveRc=movement;
+        actionCount=0;moveCount=0;
+        assert.equal(energy.acquire(worker,true),movement===OK,
+          kind+' reports a move only if moveTo accepted it');
+        assert.equal(actionCount,1);
+        assert.equal(moveCount,1);
+      }
+    }
+    selected='harvest';intentRc=OK;actionCount=0;
+    assert.equal(energy.acquire(worker,false),false,
+      'harvest-disabled generic worker may not issue harvest intents');
+    assert.equal(actionCount,0);
+  } finally {
+    for(const [key,old] of Object.entries(previous)) {
+      if(old.present)global[key]=old.value;
+      else delete global[key];
+    }
+  }
+}
+
 // Failed pickup/withdraw intents do not represent delivered energy or even
 // progress. The waiting counter must keep aging so a genuine unresolved
 // consumer request can trigger the existing bounded self-supply fallback.
