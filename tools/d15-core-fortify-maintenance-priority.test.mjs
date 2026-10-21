@@ -90,7 +90,8 @@ state.energyStored=1200;
 shield.hits=3000;
 assert.deepEqual(act(),[],
  'core fortification respects the existing 3k stored-energy reserve');
-assert.equal(state.defenseTowerAction.status,'IDLE');
+assert.equal(state.defenseTowerAction.status,'RESERVE_ENERGY',
+ 'depleted stores also block discretionary maintenance without spending ammo');
 
 // No fighting behavior is reordered; danger always outranks fortification.
 state.energyStored=9000;
