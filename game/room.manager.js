@@ -59,7 +59,7 @@ function safeModeDecision(state) {
       !controller.safeModeAvailable || controller.safeModeCooldown) return null;
   const coreTypes = [STRUCTURE_SPAWN, STRUCTURE_STORAGE, STRUCTURE_TOWER];
   const core = (state.structures || []).filter(s =>
-    s && s.my !== false && coreTypes.includes(s.structureType) &&
+    s && s.my === true && coreTypes.includes(s.structureType) &&
     Number.isFinite(s.hits) && Number.isFinite(s.hitsMax) &&
     s.hitsMax > 0 && s.hits >= 0 && s.hits <= s.hitsMax && s.pos);
 
@@ -67,6 +67,17 @@ function safeModeDecision(state) {
   // Inactive body parts, unarmed scouts and distant hostiles cannot trigger
   // Safe Mode, even when a structure was damaged earlier.
   for (const structure of core) {
+    // D14: an ACTUALLY BUILT owned Rampart absorbs hostile attacks on
+    // structures under it. Previously a Spawn damaged in an OLD fight
+    // could trigger one of our scarce Safe Mode charges merely because
+    // an armed attacker stood nearby, even behind a healthy full shield.
+    // Assess that shield in the owned-Rampart imminent-breach branch
+    // below, rather than mistaking old Spawn hits for exposed-core damage.
+    const protectedByOwnedShield=(state.structures||[]).some(s=>
+      s?.my===true && s.structureType===STRUCTURE_RAMPART &&
+      s.pos && Number.isFinite(s.hits) && s.hits>0 &&
+      s.pos.x===structure.pos.x && s.pos.y===structure.pos.y);
+    if(protectedByOwnedShield)continue;
     let nextTickDamage = 0;
     let armedInRange = false;
     for (const hostile of hostiles) {
