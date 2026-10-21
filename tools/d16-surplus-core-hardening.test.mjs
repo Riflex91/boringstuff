@@ -81,8 +81,8 @@ shieldSpawn.hits=150000;
 assert.equal(mgr._test.coreRampartTarget(state),null);
 state.energyStored=20000;t1.store.energy=950;t2.store.energy=970;
 shieldSpawn.hits=300000;
-assert.equal(mgr._test.coreRampartTarget(state).id,'shieldTower',
- '300k target stops work on adequately reinforced shield');
+assert.equal(mgr._test.coreRampartTarget(state).id,'shieldStore',
+ '300k target stops work on adequately reinforced Spawn shield and chooses deterministic next weakest target');
 shieldTower.hits=300000;shieldStore.hits=300000;
 assert.equal(mgr._test.coreRampartTarget(state),null,
  'once every built core shield is 300k no excess hit-wall chase');
