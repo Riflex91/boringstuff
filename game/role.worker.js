@@ -259,7 +259,38 @@ function shouldAssistInfrastructure(creep) {
 
 function refill(creep) { return energy.deliver(creep); }
 
+// D12: The D11 last-second shield repair still never executes for a
+// repairer stuck in the ordinary waiting-for-full-load phase. A real
+// partially filled Creep can perform useful WORK immediately rather than
+// waiting up to CONSUMER_HAULER_WAIT_TICKS for a complete Hauler transfer.
+// This bypass changes only the repairer's work/gather state, not energy
+// supply or the existing authenticated D11 repair target selection.
+function resumePartialLoadForImminentShield(creep) {
+  if(!creep || creep.memory?.role!=='repairer' ||
+     creep.memory.working!==false ||
+     !creep.room?.controller?.my || creep.room.controller.safeMode ||
+     !creep.store || !(creep.store[RESOURCE_ENERGY]>0) ||
+     typeof creep.getActiveBodyparts!=='function' ||
+     creep.getActiveBodyparts(WORK)<=0)return false;
+  try {
+    if(liveHaulerCount(creep.room)<1)return false;
+    const structures=creep.room.find(FIND_STRUCTURES);
+    if(workPriority.hasEmergencyRepair(structures))return false;
+    const hostiles=creep.room.find(FIND_HOSTILE_CREEPS);
+    if(!workPriority.criticalCoreShieldTargets(
+      structures,hostiles,{imminentOnly:true}).length)return false;
+  }catch(_){return false;}
+  // Actual current energy > 0 is required; an accepted transfer alone
+  // never authorizes this state transition. Hauler receipt telemetry is
+  // unchanged and is not misreported as settled by this optimization.
+  creep.memory.working=true;
+  creep.memory.logisticsFallback=false;
+  creep.memory.waitingEnergyTicks=0;
+  return true;
+}
+
 function run(creep) {
+  resumePartialLoadForImminentShield(creep);
   if (needsEnergy(creep)) {
     acquireWorkEnergy(creep);
     return;
@@ -303,4 +334,4 @@ function run(creep) {
   upgrade(creep);
 }
 
-module.exports = { run, _test: { acquireWorkEnergy, needsEnergy, liveHaulerCount, shouldAssistInfrastructure, emergencyRepair, repairCoreShield, preemptForImminentShield, economicConstructionSite, preferredConstructionSite } };
+module.exports = { run, _test: { acquireWorkEnergy, needsEnergy, liveHaulerCount, shouldAssistInfrastructure, emergencyRepair, repairCoreShield, preemptForImminentShield, resumePartialLoadForImminentShield, economicConstructionSite, preferredConstructionSite } };
