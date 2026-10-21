@@ -166,7 +166,7 @@ function summary(){return d10.summary('E8N1',memory,game.time);}
  const tower={id:'tower1',my:true,structureType:'tower',pos:pos(12,10),
   store:{energy:1000}};
  const rampart={id:'ramp1',my:true,structureType:'rampart',pos:pos(10,10),
-  hits:2000,hitsMax:100000};
+  hits:390,hitsMax:100000};
  const friendly={id:'worker1',my:true,body:[{type:'work',hits:100}]};
  const attacker={id:'hostile1',pos:pos(11,10),
   body:[{type:'attack',hits:100}]};
@@ -180,7 +180,7 @@ function summary(){return d10.summary('E8N1',memory,game.time);}
  realD8.observe([state],clock,local);
  assert.equal(d10.observe([state],clock,local,realD8,realD9).observedRooms,0,
   'D9 lacks authenticated predecessor on first observation');
- rampart.hits=1900;clock.time=401;
+ rampart.hits=290;clock.time=401;
  log=[{event:EVENT_REPAIR,objectId:'worker1',
   data:{targetId:'ramp1',amount:70}}];
  realD9.observe([state],clock,local);
