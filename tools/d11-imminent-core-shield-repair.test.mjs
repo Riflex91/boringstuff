@@ -72,6 +72,9 @@ assert.equal(roleWorker._test.liveHaulerCount(room),1,
 assert.deepEqual(priority.criticalCoreShieldTargets(room.structures,
  room.hostiles,{imminentOnly:true}).map(x=>x.id),['coreRamp'],
  'actual owned shield must be in hostile WORK range');
+assert.equal(roleWorker._test.preemptForImminentShield(creep),true,
+ 'direct current-world imminent preemption must be reachable');
+calls.length=0;
 assert.deepEqual(execute(),['REPAIR_coreRamp'],
  'dedicated repairer preempts logistics when spawn overlay shield <=3 attack ticks');
 assert.deepEqual(priority.criticalCoreShieldTargets(room.structures,room.hostiles,
