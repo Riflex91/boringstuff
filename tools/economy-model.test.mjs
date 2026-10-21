@@ -5,6 +5,8 @@ const require = createRequire(import.meta.url);
 
 global.WORK = 'work';
 global.CARRY = 'carry';
+global.MOVE = 'move';
+global.BODYPART_COST = {carry:50,move:50};
 global.HARVEST_POWER = 2;
 global.CARRY_CAPACITY = 50;
 global.BUILD_POWER = 5;
@@ -128,6 +130,29 @@ assert.equal(capacitySufficient.haulerCarryDeficit, 0);
 assert.equal(capacitySufficient.recommendedHaulerCount, 2);
 
 
+
+// E2: The actual hauler body caps its [2 CARRY,1 MOVE] repeats at
+// 30 body parts, even when RCL7/8 room capacity can buy much more.
+// The recommendation must use REAL affordable CARRY rather than counting
+// extra theoretical CARRY parts that will never spawn.
+const haulerBodyBuilder = require('../game/body.builder.js');
+for(const [capacity,expectedCarry] of [
+  [150,2],[550,6],[1350,18],[1500,20],[2400,20],[12900,20]
+]) {
+  const highCapState = {
+    ...liveState,
+    room:{...liveState.room,name:'E2-cap-'+capacity},
+    spawn:{...liveState.spawn,id:'E2-cap-spawn-'+capacity},
+    energyCapacityAvailable:capacity
+  };
+  const forecast=require('../game/economy.model.js').analyze(highCapState);
+  const actual=haulerBodyBuilder.hauler(capacity);
+  assert.equal(actual.filter(part=>part===CARRY).length,expectedCarry,
+    'test fixture anchors modeled CARRY in real hauler construction');
+  assert.ok(actual.length<=30,'body builder preserves its live body size cap');
+  assert.equal(forecast.nextHaulerCarryParts,expectedCarry,
+    'capacity planning must not exceed actual same-energy hauler body');
+}
 
 // shadow.8 live regression: aggregate source-route carrying capacity can be
 // exactly sufficient with one 800-energy hauler (10 CARRY) while consumer
