@@ -275,6 +275,9 @@ for(const bad of [
     {...creep('known-worker',{energy:5}),memory:{
       role:'worker',waitingEnergyTicks:7,logisticsFallback:true}}
   ]);
+  // Isolate invalid memory signals: the independent room energy input is
+  // deliberately complete so refill remains a verified zero.
+  state.energyCapacityAvailable=state.energyAvailable;
   const v=ledger.snapshot([state],43);
   const needs=v.rooms[0].strategicNeeds;
   assert.equal(needs.status,'PARTIAL');
