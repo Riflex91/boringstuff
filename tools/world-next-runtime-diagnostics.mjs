@@ -5,9 +5,9 @@ import {ScreepsHttpClient} from './screeps-client.mjs';
 import {inspectWorldRecoveryEvidence} from './world-recovery-evidence.mjs';
 import {buildWorldConfig} from './world-deployment-profile.mjs';
 import {WORLD_NEXT_TARGET_CANDIDATE as target} from './world-next-target-candidate.mjs';
-import {STAGING_BRANCH} from './world-next-staged-readiness.mjs';
+import {WORLD_PROFILE} from './world-deployment-profile.mjs';
 export function assessWorldRuntime({me,branches,status,room,memory},
-  expectedActiveBranch=STAGING_BRANCH){
+  expectedActiveBranch=WORLD_PROFILE.branch){
   const failures=[],warnings=[];
   const id=me?._id||me?.id;
   if(!id)failures.push('AUTH_UNVERIFIED');
