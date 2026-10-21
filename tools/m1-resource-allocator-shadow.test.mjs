@@ -180,6 +180,7 @@ for(const bad of [
   {...internal,terminalOpportunityCost:Infinity},
   {...internal,arrivalDelayTicks:-2},
   {...internal,amount:50},
+  {...internal,amount:200}, // a 200-unit energy quote cannot price 100 units
   {...internal,evidence:{...evidence,verified:false}},
   {...internal,sourceRoom:'E7N1'}
 ]){
