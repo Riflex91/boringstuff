@@ -9,22 +9,22 @@ const mainSource = fs.readFileSync(path.resolve(here, '../game/main.js'), 'utf8'
 // M0 read-only census must remain on the existing status cadence and
 // guard CPU reserve; it cannot authorize spending, transfers or claims.
 assert.match(mainSource,
-  /const\\s+empireResourceLedgerShadow\\s*=\\s*require\\(['\"]empire\\.resource\\.ledger\\.shadow['\"]\\);/,
+  /const\s+empireResourceLedgerShadow\s*=\s*require\(['\"]empire\.resource\.ledger\.shadow['\"]\);/,
   'M0 status must import the pure resource ledger');
 assert.match(mainSource,
-  /Game\\.cpu\\.limit\\s*-\\s*Game\\.cpu\\.getUsed\\(\\)\\s*>=\\s*config\\.SHADOW_CPU_RESERVE\\s*\\+\\s*3/,
+  /Game\.cpu\.limit\s*-\s*Game\.cpu\.getUsed\(\)\s*>=\s*config\.SHADOW_CPU_RESERVE\s*\+\s*3/,
   'M0 status requires bounded CPU headroom');
 assert.match(mainSource,
-  /empireResourceLedger\\s*=\\s*empireResourceLedgerShadow\\.snapshot\\(roomStates,\\s*Game\\.time\\)/,
+  /empireResourceLedger\s*=\s*empireResourceLedgerShadow\.snapshot\(roomStates,\s*Game\.time\)/,
   'M0 must use actual owned room-state observations');
 assert.match(mainSource,
-  /empireResourceLedger,\\s*expansionReadiness/,
+  /empireResourceLedger,\s*expansionReadiness/,
   'M0 read-only ledger must appear in STATUS_SNAPSHOT telemetry');
 assert.match(mainSource,
-  /availableToCommit:\\s*null/,
+  /availableToCommit:\s*null/,
   'M0 must not infer spendable stock from gross inventory');
 assert.match(mainSource,
-  /if\\s*\\(Game\\.time\\s*%\\s*config\\.STATUS_SNAPSHOT_INTERVAL\\s*===\\s*0\\)\\s*statusSnapshot\\(roomStates,\\s*tickCpu\\)/,
+  /if\s*\(Game\.time\s*%\s*config\.STATUS_SNAPSHOT_INTERVAL\s*===\s*0\)\s*statusSnapshot\(roomStates,\s*tickCpu\)/,
   'M0 telemetry must use existing bounded STATUS_SNAPSHOT cadence');
 
 assert.match(
