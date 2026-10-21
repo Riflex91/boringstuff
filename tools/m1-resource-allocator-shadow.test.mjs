@@ -44,6 +44,7 @@ const internal={
 };
 const market={
   id:'market-buy',amount:100,evidence,
+  resourceType:'energy',destinationRoom:'E7N1',
   transactionEnergy:5,energyShadowPrice:2,pricePerUnit:2,
   terminalOpportunityCost:10,arrivalDelayTicks:0
 };
