@@ -99,8 +99,10 @@ assert.deepEqual(execute(),['INFRASTRUCTURE_DELIVERY'],
  'still spawning hauler cannot be claimed as ready logistics');
 room.haulers=[liveHauler()];
 rampart.hits=1000;
-assert.deepEqual(execute(),['INFRASTRUCTURE_DELIVERY'],
- 'shield at 20 weapon turns is not authorized to override delivery');
+assert.equal(roleWorker._test.preemptForImminentShield(creep),false,
+ 'D11 three-tick imminent bypass remains strict at 20 turns');
+assert.deepEqual(execute(),['REPAIR_coreRamp'],
+ 'D13 reserves dedicated repairer energy for sustained D6 active core siege even outside three-tick cutoff');
 // Boosted dismantlers threaten healthy-looking core shields sooner.
 rampart.hits=400;
 room.hostiles=[{pos:pos(9,10),body:[{type:'work',hits:100,
