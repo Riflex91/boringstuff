@@ -57,9 +57,9 @@ const room={controller:{my:true,safeMode:0},
 const creep={room,memory:{role:'repairer',working:true},
  store:{energy:100,getFreeCapacity(){return 0;}},
  pos:{findClosestByPath(items) {return items[0]||null;}},
- repair(target){calls.push('REPAIR_'+target.id);return OK;},
- moveTo(){calls.push('MOVE');return OK;},
- upgradeController(){calls.push('UPGRADE');return OK;}
+ repair(target){calls.push('REPAIR_'+target.id);return 0;},
+ moveTo(){calls.push('MOVE');return 0;},
+ upgradeController(){calls.push('UPGRADE');return 0;}
 };
 function execute(role='repairer') {
  creep.memory.role=role;creep.memory.working=true;
@@ -124,7 +124,7 @@ creep.store.energy=0;
 assert.equal(roleWorker._test.preemptForImminentShield(creep),false,
  'empty repairer has no repair intent or delivery override');
 creep.store.energy=100;
-creep.repair=target=>{calls.push('REPAIR_'+target.id);return ERR_NOT_IN_RANGE;};
+creep.repair=target=>{calls.push('REPAIR_'+target.id);return -9;};
 assert.deepEqual(execute(),['REPAIR_coreRamp','MOVE'],
  'imminent shield outside range issues one repair intent plus safe-range movement');
 const optional=roleWorker._test.preemptForImminentShield;
