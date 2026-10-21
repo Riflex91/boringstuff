@@ -57,8 +57,10 @@ function acquire(creep, allowHarvest) {
   const source = findWithdrawTarget(creep);
   if (source) {
     const rc = source.type === 'pickup' ? creep.pickup(source.target) : creep.withdraw(source.target, RESOURCE_ENERGY);
-    if (rc === ERR_NOT_IN_RANGE) creep.moveTo(source.target, { reusePath: 10, maxOps: config.PATH_MAX_OPS, visualizePathStyle: { stroke: '#ffaa00' } });
-    return true;
+    if (rc === ERR_NOT_IN_RANGE) return creep.moveTo(source.target, { reusePath: 10, maxOps: config.PATH_MAX_OPS, visualizePathStyle: { stroke: '#ffaa00' } }) === OK;
+    // Reject stale pickups/withdrawals and busy/full/unknown results. An
+    // attempted intent is not evidence of accepted resource acquisition.
+    return rc === OK;
   }
 
   if (allowHarvest !== false && creep.getActiveBodyparts(WORK) > 0) {
@@ -66,8 +68,10 @@ function acquire(creep, allowHarvest) {
       creep.pos.findClosestByPath(FIND_SOURCES, { maxOps: config.PATH_MAX_OPS });
     if (target) {
       const rc = creep.harvest(target);
-      if (rc === ERR_NOT_IN_RANGE) creep.moveTo(target, { reusePath: 10, maxOps: config.PATH_MAX_OPS, visualizePathStyle: { stroke: '#ffaa00' } });
-      return true;
+      if (rc === ERR_NOT_IN_RANGE) return creep.moveTo(target, { reusePath: 10, maxOps: config.PATH_MAX_OPS, visualizePathStyle: { stroke: '#ffaa00' } }) === OK;
+      // Harvesting can also fail after selection (e.g. a depleted source).
+      // Do not report that failed intent as energy-acquisition progress.
+      return rc === OK;
     }
   }
   return false;
