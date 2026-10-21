@@ -147,7 +147,7 @@ for(const proof of [
 }
 {
   const p=plan(ledger,request,{internal:[
-    {...internal,reserveProof:{...internal.reserveProof,strategicReserve:900}}
+    {...internal,reserveProof:{...internal.reserveProof,strategicReserve:901}}
   ],market:[market],marketAvailable:true});
   assert.equal(p.status,'PARTIAL');
   assert.equal(p.selected.kind,'MARKET_BUY');
