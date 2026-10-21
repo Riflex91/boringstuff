@@ -167,7 +167,7 @@ function scene(){
 {
  const f=scene();
  assert.equal(d9.observe([f.state],f.game,{bot:{d9SiegePressure:{
-  schemaVersion:1,rooms:{E8N1:{private:{
+  schemaVersion:1,rooms:{W3N3:{private:{
     tick:199,shields:[{id:'bad',hits:0}]}
   },W1N1:{private:{tick:199,shields:[]}},
   W2N2:{private:{tick:199,shields:[]}}}
