@@ -1,0 +1,34 @@
+name: Screeps D16 real core overlay audit (ONE SHOT GET ONLY)
+on:
+  push:
+    branches: [audit/d16-actual-core-overlay-20261021]
+    paths:
+      - '.github/workflows/screeps-d16-core-overlay-get-only.yml'
+permissions:
+  contents: read
+jobs:
+  actual-owned-core-overlays:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    defaults:
+      run:
+        working-directory: tools
+    env:
+      SCREEPS_USERNAME_NEWBIELAND: Riflex91
+      SCREEPS_TOKEN_NEWBIELAND: ${{ secrets.SCREEPS_TOKEN_NEWBIELAND }}
+      SCREEPS_PASSWORD_NEWBIELAND: ${{ secrets.SCREEPS_PASSWORD_NEWBIELAND }}
+      SCREEPS_TOKEN_WORLD: ${{ secrets.SCREEPS_TOKEN_WORLD }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Install HTTP client dependencies
+        run: npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+      - name: GET actual Spawn Tower Storage overlay Ramparts and planner eligibility
+        run: node d16-core-overlay-get-audit.mjs
+      - name: Confirm zero Screeps mutation authority
+        run: |
+          echo 'D16 one-shot real objects and status snapshots: GET only, no construction or game writes' >> "$GITHUB_STEP_SUMMARY"
