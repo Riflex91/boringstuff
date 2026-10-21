@@ -137,13 +137,25 @@ function run(state) {
     return;
   }
 
-  const repair = state.structures
-    .filter(s => s.hits !== undefined && s.hits < s.hitsMax * 0.35 && s.structureType !== STRUCTURE_WALL && s.structureType !== STRUCTURE_RAMPART)
-    .sort((a, b) => (a.hits / a.hitsMax) - (b.hits / b.hitsMax))[0];
-  if (repair) {
-    const rich=state.towers.filter(t => (t.store?.[RESOURCE_ENERGY] || 0) > 500);
-    rich.forEach(t => t.repair(repair));
-    result('REPAIR_CORE',0,0,rich.length);
+  // D15: a historically damaged road/container/extension must not
+  // monopolize the combat ammo needed to fortify an OWNED critical core.
+  // Keep genuine direct Spawn/Tower/Storage emergency repair first.
+  const coreDamaged = (state.structures || [])
+    .filter(s => s && s.my === true &&
+      (s.structureType === STRUCTURE_SPAWN ||
+       s.structureType === STRUCTURE_TOWER ||
+       s.structureType === STRUCTURE_STORAGE) &&
+      Number.isFinite(s.hits) && Number.isFinite(s.hitsMax) &&
+      s.hitsMax > 0 && s.hits > 0 &&
+      s.hits < s.hitsMax * 0.35)
+    .sort((a,b)=>a.hits/a.hitsMax - b.hits/b.hitsMax ||
+      String(a.id||'').localeCompare(String(b.id||'')))[0];
+  if (coreDamaged) {
+    const rich = state.towers.filter(t =>
+      typeof t.repair==='function' &&
+      (t.store?.[RESOURCE_ENERGY] || 0) > 500);
+    rich.forEach(t => t.repair(coreDamaged));
+    result(rich.length ? 'REPAIR_CORE' : 'RESERVE_ENERGY',0,0,rich.length);
     return;
   }
   const rampart = coreRampartTarget(state);
@@ -153,6 +165,35 @@ function run(state) {
       (t.store?.[RESOURCE_ENERGY] || 0) >= 800);
     if (tower) {tower.repair(rampart);result('FORTIFY_CORE',0,0,1);}
     else result('RESERVE_ENERGY');
+    return;
+  }
+
+  // Discretionary maintenance uses at most ONE exceptionally well-fed
+  // tower and only a verifiable 5k+ colony store. Never multiply routine
+  // road repair intents by the number of available defensive towers.
+  const ordinary = (state.structures || [])
+    .filter(s => s && Number.isFinite(s.hits) &&
+      Number.isFinite(s.hitsMax) && s.hitsMax > 0 &&
+      s.hits > 0 && s.hits < s.hitsMax * 0.35 &&
+      (s.my === true ||
+       (s.my !== false &&
+        ((typeof STRUCTURE_ROAD !== 'undefined' &&
+          s.structureType === STRUCTURE_ROAD) ||
+         (typeof STRUCTURE_CONTAINER !== 'undefined' &&
+          s.structureType === STRUCTURE_CONTAINER)))) &&
+      s.structureType !== STRUCTURE_WALL &&
+      s.structureType !== STRUCTURE_RAMPART)
+    .sort((a,b)=>a.hits/a.hitsMax-b.hits/b.hitsMax ||
+      String(a.id||'').localeCompare(String(b.id||'')))[0];
+  if (ordinary) {
+    const maintenance = Number.isFinite(state.energyStored) &&
+      state.energyStored>=5000 &&
+      state.towers.find(t=>typeof t.repair==='function' &&
+        (t.store?.[RESOURCE_ENERGY] || 0)>=900);
+    if (maintenance) {
+      maintenance.repair(ordinary);
+      result('REPAIR_DISCRETIONARY',0,0,1);
+    } else result('RESERVE_ENERGY');
     return;
   }
   result('IDLE');

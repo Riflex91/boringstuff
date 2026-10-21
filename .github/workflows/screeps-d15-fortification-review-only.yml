@@ -1,0 +1,40 @@
+name: Screeps D15 core fortification before discretionary repair (NO DEPLOY)
+on:
+  push:
+    branches: [feature/d15-core-fortification-before-discretionary-repair-20261021]
+permissions:
+  contents: read
+jobs:
+  exact-main-node24-p3:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: tools
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Exact tested D14 predecessor, only Tower policy changed
+        shell: bash
+        run: |
+          git -C .. fetch origin main --quiet
+          test "$(git -C .. rev-parse origin/main)" = 8c7114250e8942581262771bb38a9695f3a18b3d
+          actual="$(git -C .. diff --name-only origin/main HEAD -- game | sort)"
+          test "$actual" = "game/tower.manager.js"
+          grep -Eq 'AUTO_SAFE_MODE:[[:space:]]*true' ../game/config.js
+          grep -Eq 'ENABLE_PARALLEL_SPAWN_EXECUTION:[[:space:]]*true' ../game/config.js
+          git -C .. diff --quiet origin/main HEAD -- game/room.manager.js game/spawn.manager.js game/role.worker.js game/defense.siege.sustain.js
+      - name: Full canonical Node24 regressions
+        run: |
+          npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+          npm test
+      - name: Original P3 four-mode CPU benchmark
+        run: npm run bench:p3
+      - name: Secretless branch-only review
+        run: |
+          echo 'D15 review has no Screeps credentials, code upload or game writes.'
