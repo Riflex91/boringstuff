@@ -154,7 +154,7 @@ assert.equal(creep.memory.lastHaulerIntentEnergy,25,
  'existing delivery reconciliation metadata remains untouched');
 const helper=worker._test.resumePartialLoadForImminentShield;
 assert.equal(typeof helper,'function');
-assert.equal(source.indexOf('resumePartialLoadForImminentShield(creep);')<
+assert.ok(source.indexOf('resumePartialLoadForImminentShield(creep);')<
  source.indexOf('if (needsEnergy(creep))'),
  'D12 must check real partial energy BEFORE the 12-tick gather wait');
 console.log('D12 partially loaded critical repairer immediate rescue, 1-hauler supply guard and no false siege regression PASS');
