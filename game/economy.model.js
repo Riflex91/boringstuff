@@ -56,7 +56,11 @@ function plannedHaulerCarryParts(energyCapacity) {
   // body.hauler() repeats [CARRY, CARRY, MOVE] at 150 energy per block.
   // Use the same sizing rule here so capacity planning matches the body that
   // spawn.manager will actually create at the room's current capacity.
-  return Math.max(2, Math.floor(Math.max(150, energyCapacity) / 150) * 2);
+  // body.builder.hauler caps its [CARRY,CARRY,MOVE] template at 30 parts.
+  // Without this cap, mature high-capacity rooms model hypothetical 40+ CARRY
+  // parts in one hauler and understate the required fleet size.
+  const affordableBlocks = Math.floor(Math.max(150, energyCapacity) / 150);
+  return Math.max(2, Math.min(10, affordableBlocks) * 2);
 }
 
 function analyze(state) {
