@@ -13,6 +13,7 @@ const stats = require('stats');
 const visuals = require('visuals');
 const commands = require('commands');
 const runtimeCapabilities = require('runtime.capabilities');
+const empireResourceLedgerShadow = require('empire.resource.ledger.shadow');
 const expansionReadinessShadow = require('expansion.readiness.shadow');
 const expansionCandidatesShadow = require('expansion.candidates.shadow');
 const expansionOperationShadow = require('expansion.operation.shadow');
@@ -160,6 +161,28 @@ function memoryFootprintSnapshot() {
 
 function statusSnapshot(roomStates, tickCpu) {
   const rooms = {};
+  // M0 is observation only. Compute a bounded, fail-closed gross inventory
+  // census on the existing STATUS_SNAPSHOT cadence, never on each creep tick.
+  // No ledger amount is available for spend/transfer/market authorization.
+  let empireResourceLedger = {
+    schemaVersion: 1, authority: 'SHADOW', actionEnabled: false,
+    status: 'HOLD', reasonCodes: ['CPU_OR_ROOM_BOUND'],
+    availableToCommit: null
+  };
+  if (roomStates.length > 0 && roomStates.length <= 3 &&
+      typeof Game.cpu?.getUsed === 'function' &&
+      Number.isFinite(Game.cpu.limit) &&
+      Game.cpu.limit - Game.cpu.getUsed() >= config.SHADOW_CPU_RESERVE + 3) {
+    try {
+      empireResourceLedger = empireResourceLedgerShadow.snapshot(roomStates, Game.time);
+    } catch (_) {
+      empireResourceLedger = {
+        schemaVersion: 1, authority: 'SHADOW', actionEnabled: false,
+        status: 'HOLD', reasonCodes: ['CENSUS_EXCEPTION'],
+        availableToCommit: null
+      };
+    }
+  }
   const profile = serverProfile.snapshot();
   const capabilities = runtimeCapabilities.observe(undefined, profile);
   const expansionReadiness = expansionReadinessShadow.evaluate(capabilities,roomStates,tickCpu);
@@ -343,6 +366,7 @@ function statusSnapshot(roomStates, tickCpu) {
     gcl: Game.gcl ? { level: Game.gcl.level, progress: Game.gcl.progress, progressTotal: Game.gcl.progressTotal } : null,
     totalCreeps: Object.keys(Game.creeps).length,
     capabilities,
+    empireResourceLedger,
     expansionReadiness,
     expansionCandidates,
     expansionOperation,
