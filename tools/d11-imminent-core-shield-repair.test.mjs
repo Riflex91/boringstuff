@@ -101,6 +101,13 @@ room.haulers=[liveHauler()];
 rampart.hits=1000;
 assert.deepEqual(execute(),['INFRASTRUCTURE_DELIVERY'],
  'shield at 20 weapon turns is not authorized to override delivery');
+// Boosted dismantlers threaten healthy-looking core shields sooner.
+rampart.hits=400;
+room.hostiles=[{pos:pos(9,10),body:[{type:'work',hits:100,
+ boost:'XZH2O'},{type:'move',hits:100}]}];
+assert.deepEqual(execute(),['REPAIR_coreRamp'],
+ 'boosted WORK in range brings shield inside three-tick emergency cutoff');
+room.hostiles=[hostile];
 rampart.hits=120;
 room.hostiles=[{pos:pos(9,10),body:[{type:'work',hits:0},
  {type:'move',hits:100}]}];
