@@ -21,6 +21,15 @@ assert.equal(result.patterns[0].endTick,150);
 assert.equal(result.patterns[0].reasonCode,'NO_READY_HAULERS');
 assert.equal(result.settledDeliveryProof,false);
 assert.equal(summarizeSupplyJournal({...bot,telemetryJournal:{events:[sample(100),sample(100)]}},id).state,'REVIEW_REQUIRED');
+
+// Nominally contiguous journal ticks cannot certify continuous evidence when
+// any sample is duplicated or rejected by the fail-closed parser.
+const duplicateCadence=summarizeSupplyJournal({...bot,telemetryJournal:{
+  events:[sample(100),sample(125),sample(125),sample(150)]
+}},id);
+assert.equal(duplicateCadence.state,'REVIEW_REQUIRED');
+assert.deepEqual(duplicateCadence.missingSampleTicks,[]);
+assert.equal(duplicateCadence.observedCadenceComplete,false);
 const gap = summarizeSupplyJournal({...bot,telemetryJournal:{events:[sample(100),sample(150)]}},id);
 assert.deepEqual(gap.missingSampleTicks,[125]);
 assert.equal(gap.observedCadenceComplete,false);
