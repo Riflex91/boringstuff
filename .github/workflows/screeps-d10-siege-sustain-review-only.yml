@@ -1,0 +1,44 @@
+name: Screeps D10 aligned siege repair evidence (NO DEPLOY)
+on:
+  push:
+    branches: [feature/d10-siege-repair-sustainability-evidence-20261021]
+permissions:
+  contents: read
+jobs:
+  exact-main-node24-p3:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: tools
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Exact verified D9 Main predecessor and bounded read-only runtime
+        shell: bash
+        run: |
+          git -C .. fetch origin main --quiet
+          test "$(git -C .. rev-parse origin/main)" = e23287dac2820057416b76098b92157669d10297
+          actual="$(git -C .. diff --name-only origin/main HEAD -- game | sort)"
+          expected="$(printf '%s\n' game/defense.siege.sustain.js game/main.js | sort)"
+          test "$actual" = "$expected"
+          grep -Eq 'AUTO_SAFE_MODE:[[:space:]]*true' ../game/config.js
+          grep -Eq 'ENABLE_PARALLEL_SPAWN_EXECUTION:[[:space:]]*true' ../game/config.js
+          if grep -E '(\.attack[[:space:]]*\(|\.heal[[:space:]]*\(|\.repair[[:space:]]*\(|\.spawnCreep[[:space:]]*\(|\.createConstructionSite[[:space:]]*\(|\.activateSafeMode[[:space:]]*\(|\.moveTo[[:space:]]*\()' ../game/defense.siege.sustain.js; then
+            echo 'D10 read-only analytics may not issue game intents' >&2
+            exit 1
+          fi
+      - name: Full canonical Node24 test chain
+        run: |
+          npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+          npm test
+      - name: Original P3 four-mode benchmark
+        run: npm run bench:p3
+      - name: No Screeps deployment in review
+        run: |
+          echo 'Read-only D10: no deploy/credential/API mutation'

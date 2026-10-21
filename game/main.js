@@ -39,6 +39,7 @@ const defenseTransitEvidence = require('defense.transit.evidence');
 const combatAggressionEvidence = require('combat.aggression.evidence');
 const combatSettlementEvidence = require('defense.combat.settlement');
 const siegePressure = require('defense.siege.pressure');
+const siegeSustain = require('defense.siege.sustain');
 const combatCounterattackShadow = require('combat.counterattack.shadow');
 const combatCounterattackLaunch = require('combat.counterattack.launch');
 const regionalDefenseLive = require('defense.regional.live');
@@ -309,6 +310,7 @@ function statusSnapshot(roomStates, tickCpu) {
       defenseTowerAction: state.defenseTowerAction || null,
       defenseCombatSettlement: combatSettlementEvidence.summary(state.room.name, Memory),
       defenseSiegePressure: siegePressure.summary(state.room.name, Memory, Game.time),
+      defenseSiegeSustain: siegeSustain.summary(state.room.name, Memory, Game.time),
       spawnParallelReconciliation: spawnParallelReconcile.summary(state.room.name, Memory),
       spawnRemainingTime: state.spawn && state.spawn.spawning ? state.spawn.spawning.remainingTime : 0,
       economy: state.economyMetrics || null,
@@ -538,6 +540,36 @@ module.exports.loop = function() {
             {force:true,persist:true,dedupeTicks:0});
         }
       } catch (_) { /* optional observation never suppresses core defense */ }
+    }
+
+    // D10: correlate only freshly observed D9 same-shield net hit changes
+    // and D8 previous-tick engine-settled Tower/repair receipts. This is
+    // diagnostic only; never drive Tower, Spawn, Safe Mode or repair intents.
+    if (!lowCpu && !criticalCpu && roomStates.length>0 &&
+        roomStates.length<=3 && Game.time>1 &&
+        Number.isFinite(Game.cpu?.limit) &&
+        Game.cpu.limit-Game.cpu.getUsed()>config.SHADOW_CPU_RESERVE+3) {
+      try {
+        const sample=siegeSustain.observe(roomStates,Game,Memory,
+          combatSettlementEvidence,siegePressure);
+        if(sample.observedRooms)for(const state of roomStates){
+          const s=siegeSustain.summary(state.room.name,Memory,Game.time);
+          if(s.status!=='ALIGNED')continue;
+          if(['CRITICAL_UNSHIELDED_CORE','CRITICAL_CORE_SHIELD_BREACH',
+            'SUSTAINED_ATTRITION_NO_OBSERVED_CORE_REPAIR',
+            'SUSTAINED_ATTRITION_WITH_REPAIR_EVIDENCE',
+            'SIEGE_TOWER_AMMO_SHORTFALL'].includes(s.diagnosis)){
+            logger.warn('D10_SIEGE_SUSTAINABILITY',
+              'Aligned prior-tick siege repair and shield net-hit evidence',
+              {room:state.room.name,diagnosis:s.diagnosis,
+                ticks:s.sampledConsecutiveTicks,
+                matchedNetShieldLoss:s.shieldNetHitLoss,
+                settledRepair:s.settledCoreShieldRepair,
+                lowAmmoTicks:s.ticksWithTowerAmmoBelowReserve},
+              {persist:true,dedupeTicks:25});
+          }
+        }
+      }catch(_){ /* optional evidence must never delay live defense */ }
     }
 
     // O65: inspect only actual Game.spawns timers and consecutive game ticks.
