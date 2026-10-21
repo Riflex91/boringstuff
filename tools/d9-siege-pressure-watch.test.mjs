@@ -161,7 +161,7 @@ function scene(){
   {id:'shield-spawn',hits:-5}];
  assert.equal(d9.observe([f.state],{time:201},mem).observedRooms,0,
   'corrupt private data cannot silently become valid');
- assert.equal(d9.summary('E8N1',mem,201).status,'UNOBSERVED',
+ assert.equal(d9.summary('E8N1',mem,201).status,'UNVERIFIED',
   'corrupted sample never receives a current verified risk');
 }
 {
