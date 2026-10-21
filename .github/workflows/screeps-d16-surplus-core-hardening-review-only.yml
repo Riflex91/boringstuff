@@ -1,0 +1,39 @@
+name: Screeps D16 surplus own-core fortification (REVIEW ONLY)
+on:
+  push:
+    branches: [feature/d16-surplus-core-hardening-rebased-20261021]
+permissions:
+  contents: read
+jobs:
+  exact-main-node24-p3:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: tools
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Exact D15 predecessor and only one real gameplay module modified
+        shell: bash
+        run: |
+          git -C .. fetch origin main --quiet
+          test "$(git -C .. rev-parse origin/main)" = e69eb20dab2c189a4c3af8be5ff350668b3f5346
+          actual="$(git -C .. diff --name-only origin/main HEAD -- game | sort)"
+          test "$actual" = "game/tower.manager.js"
+          grep -Eq 'AUTO_SAFE_MODE:[[:space:]]*true' ../game/config.js
+          grep -Eq 'ENABLE_PARALLEL_SPAWN_EXECUTION:[[:space:]]*true' ../game/config.js
+          git -C .. diff --quiet origin/main HEAD -- game/role.worker.js game/room.manager.js game/spawn.manager.js game/energy.js
+      - name: Full canonical Node24 regressions
+        run: |
+          npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+          npm test
+      - name: Original P3 four-mode benchmark
+        run: npm run bench:p3
+      - name: No deployment credentials or writes on review
+        run: echo 'D16 branch CI never deploys to Screeps.'
