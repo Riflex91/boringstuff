@@ -67,6 +67,11 @@ function execute(role='repairer') {
  roleWorker.run(creep);
  return calls.slice();
 }
+assert.equal(roleWorker._test.liveHaulerCount(room),1,
+ 'fixture must contain one ready hauler');
+assert.deepEqual(priority.criticalCoreShieldTargets(room.structures,
+ room.hostiles,{imminentOnly:true}).map(x=>x.id),['coreRamp'],
+ 'actual owned shield must be in hostile WORK range');
 assert.deepEqual(execute(),['REPAIR_coreRamp'],
  'dedicated repairer preempts logistics when spawn overlay shield <=3 attack ticks');
 assert.deepEqual(priority.criticalCoreShieldTargets(room.structures,room.hostiles,
