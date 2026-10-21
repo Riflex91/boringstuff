@@ -44,7 +44,7 @@ function hasEmergencyRepair(structures) {
 // active enemy weapon pressure is a priority repair, not a wall-hits race.
 // Ignore distant enemy scouts, non-owned shields and speculative perimeter
 // walls. Upper-bound all scans to avoid a siege causing a CPU spiral.
-function criticalCoreShieldTargets(structures,hostiles) {
+function criticalCoreShieldTargets(structures,hostiles,options) {
   if(!Array.isArray(structures) || structures.length>600 ||
      !Array.isArray(hostiles) || hostiles.length>40)return [];
   const core=structures.filter(s=>s && s.my===true && s.pos &&
@@ -83,7 +83,12 @@ function criticalCoreShieldTargets(structures,hostiles) {
   threatened.sort((a,b)=>a.turns-b.turns ||
     a.priority-b.priority ||
     String(a.shield.id||'').localeCompare(String(b.shield.id||'')));
-  return threatened.slice(0,5).map(x=>x.shield);
+  // D11: only the physically imminent (<=3 equivalent attack ticks)
+  // candidates may preempt a dedicated repairer's infrastructure refill.
+  // The ordinary D6 function remains unchanged for everyone else.
+  const imminentOnly=options?.imminentOnly===true;
+  return threatened.filter(x=>!imminentOnly || x.turns<=3)
+    .slice(0,5).map(x=>x.shield);
 }
 function hasCriticalCoreShieldThreat(structures,hostiles) {
   return criticalCoreShieldTargets(structures,hostiles).length>0;
