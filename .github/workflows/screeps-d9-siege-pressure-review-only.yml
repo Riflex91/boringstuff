@@ -1,0 +1,44 @@
+name: Screeps D9 siege pressure evidence (REVIEW ONLY)
+on:
+  push:
+    branches: [feature/d9-live-siege-pressure-watch-20261021]
+permissions:
+  contents: read
+jobs:
+  exact-main-node24-p3:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: tools
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Exact verified predecessor, bounded runtime delta
+        shell: bash
+        run: |
+          git -C .. fetch origin main --quiet
+          test "$(git -C .. rev-parse origin/main)" = 230981f051dd654fb946346ad9cd40e9a6265aea
+          actual="$(git -C .. diff --name-only origin/main HEAD -- game | sort)"
+          expected="$(printf '%s\n' game/defense.siege.pressure.js game/main.js | sort)"
+          test "$actual" = "$expected"
+          grep -Eq 'AUTO_SAFE_MODE:[[:space:]]*true' ../game/config.js
+          grep -Eq 'ENABLE_PARALLEL_SPAWN_EXECUTION:[[:space:]]*true' ../game/config.js
+          if grep -E '(\.attack[[:space:]]*\(|\.heal[[:space:]]*\(|\.repair[[:space:]]*\(|\.spawnCreep[[:space:]]*\(|\.createConstructionSite[[:space:]]*\(|\.activateSafeMode[[:space:]]*\()' ../game/defense.siege.pressure.js; then
+            echo 'Read-only D9 risk observer must never issue intents' >&2
+            exit 1
+          fi
+      - name: Full canonical Node24 regressions
+        run: |
+          npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+          npm test
+      - name: Original P3 four-mode CPU benchmark
+        run: npm run bench:p3
+      - name: No live deployment
+        run: |
+          echo 'D9 review has no Screeps credentials, API writes or deployment'

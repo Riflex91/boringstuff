@@ -38,6 +38,7 @@ const regionalDefenseShadow = require('defense.reinforcement.shadow');
 const defenseTransitEvidence = require('defense.transit.evidence');
 const combatAggressionEvidence = require('combat.aggression.evidence');
 const combatSettlementEvidence = require('defense.combat.settlement');
+const siegePressure = require('defense.siege.pressure');
 const combatCounterattackShadow = require('combat.counterattack.shadow');
 const combatCounterattackLaunch = require('combat.counterattack.launch');
 const regionalDefenseLive = require('defense.regional.live');
@@ -307,6 +308,7 @@ function statusSnapshot(roomStates, tickCpu) {
       defenseSiege: state.defenseSiege || null,
       defenseTowerAction: state.defenseTowerAction || null,
       defenseCombatSettlement: combatSettlementEvidence.summary(state.room.name, Memory),
+      defenseSiegePressure: siegePressure.summary(state.room.name, Memory, Game.time),
       spawnParallelReconciliation: spawnParallelReconcile.summary(state.room.name, Memory),
       spawnRemainingTime: state.spawn && state.spawn.spawning ? state.spawn.spawning.remainingTime : 0,
       economy: state.economyMetrics || null,
@@ -490,6 +492,34 @@ module.exports.loop = function() {
         }
       });
     }, schedulerContext);
+
+    // D9: observe only the current physical OWNED shield/tower/core state
+    // after immediate Tower+Safe Mode. Private same-ID shields distinguish
+    // real consecutive net hit changes from different minimum-hit ramparts.
+    // No gameplay intents and never consume the emergency CPU reserve.
+    if (!lowCpu && !criticalCpu && roomStates.length>0 &&
+        roomStates.length<=3 && Game.time>1 &&
+        Number.isFinite(Game.cpu?.limit) &&
+        Game.cpu.limit-Game.cpu.getUsed()>config.SHADOW_CPU_RESERVE+3) {
+      try {
+        const observed=siegePressure.observe(roomStates,Game,Memory);
+        if(observed.observedRooms) for(const state of roomStates) {
+          const pressure=siegePressure.summary(state.room.name,Memory,Game.time);
+          if(pressure.status!=='OBSERVED')continue;
+          if(['CORE_SHIELD_BREACH_IMMINENT','CORE_UNSHIELDED_UNDER_FIRE',
+              'CORE_SHIELD_AT_RISK'].includes(pressure.risk)) {
+            logger.warn('D9_CORE_SIEGE_PRESSURE',
+              'Observed defensive core under direct threat',
+              {room:state.room.name,risk:pressure.risk,
+                threatenedCoreShields:pressure.endangeredCoreShields,
+                unshieldedCoreUnderFire:pressure.attackedUncoveredCore,
+                sameShieldNetHitLoss:pressure.observedNetShieldHitLoss,
+                towerAmmo:pressure.towerAmmo},
+              {persist:true,dedupeTicks:25});
+          }
+        }
+      } catch (_) { /* read-only telemetry cannot interrupt defense */ }
+    }
 
     // D8: Room.getEventLog() contains the PREVIOUS game tick's settled
     // actions, not intents from this tick. This optional read-only stage
