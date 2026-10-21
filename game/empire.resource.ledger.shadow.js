@@ -6,6 +6,17 @@ const SCHEMA_VERSION = 1;
 const MAX_ROOMS = 25;
 const MAX_ENTITIES_PER_ROOM = 3000;
 
+const PRODUCTION_TYPES = Object.freeze({
+  lab: 'labs',
+  factory: 'factories',
+  terminal: 'terminals',
+  powerSpawn: 'powerSpawns'
+});
+
+function emptyProduction() {
+  return { labs: 0, factories: 0, terminals: 0, powerSpawns: 0 };
+}
+
 // Owned defensive/utility structures are visible in FIND_STRUCTURES but have
 // no resource Store in Screeps. Their absence must not invalidate an otherwise
 // complete resource census. Unknown/new store-bearing structures remain
@@ -66,7 +77,9 @@ function snapshot(states, tick) {
     status: 'HOLD',
     reasonCodes: [],
     rooms: [],
-    totals: { structures: {}, carried: {} }
+    totals: { structures: {}, carried: {} },
+    productionInfrastructure: emptyProduction(),
+    productionReadyToUse: null
   };
   if (!Array.isArray(states) || !Number.isSafeInteger(tick) || tick < 0 ||
       states.length > MAX_ROOMS)
@@ -96,8 +109,19 @@ function snapshot(states, tick) {
     }
     const held = empty();
     const carried = empty();
+    const productionInfrastructure = emptyProduction();
+    const observedProductionIds = new Set();
     for (const s of state.structures) {
       if (!structureEligible(s)) continue;
+      // Hardware presence is a verified fact, not permission to produce.
+      // Ignore unowned/neutral installations and deduplicate by object ID;
+      // readiness, reagent stocks, cooldowns and reservations are unknown.
+      const kind = s.my === true && PRODUCTION_TYPES[s.structureType];
+      if (kind && typeof s.id === 'string' && s.id &&
+          !observedProductionIds.has(s.id)) {
+        productionInfrastructure[kind] += 1;
+        observedProductionIds.add(s.id);
+      }
       // A legitimate rampart/road/etc. has no Store to inspect. Keep missing
       // store on storage/terminal/spawn or unknown types an explicit error.
       if (s.store == null && NON_STORING_STRUCTURES.has(s.structureType)) continue;
@@ -117,9 +141,14 @@ function snapshot(states, tick) {
       if (!Number.isSafeInteger(total)) errors.add('RESOURCE_OVERFLOW');
       else carriedTotals[resource] = total;
     }
+    for (const kind of Object.keys(productionInfrastructure))
+      base.productionInfrastructure[kind] += productionInfrastructure[kind];
     base.rooms.push({
       roomName: name,
       resources: { structures: sortedTotals(held), carried: sortedTotals(carried) },
+      productionInfrastructure,
+      // Presence is not operational readiness; never authorize recipes here.
+      productionReadyToUse: null,
       // Reserves/commitments are NOT proven by this inventory-only census.
       availableToCommit: null
     });
