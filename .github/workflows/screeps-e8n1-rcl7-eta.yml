@@ -1,0 +1,33 @@
+name: Screeps E8N1 exact RCL7 ETA (ONE SHOT READ ONLY)
+on:
+  push:
+    branches: [audit/e8n1-rcl7-eta-20261021]
+    paths:
+      - '.github/workflows/screeps-e8n1-rcl7-eta.yml'
+permissions:
+  contents: read
+jobs:
+  controller-progress-get-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    defaults:
+      run:
+        working-directory: tools
+    env:
+      SCREEPS_USERNAME_NEWBIELAND: Riflex91
+      SCREEPS_TOKEN_NEWBIELAND: ${{ secrets.SCREEPS_TOKEN_NEWBIELAND }}
+      SCREEPS_PASSWORD_NEWBIELAND: ${{ secrets.SCREEPS_PASSWORD_NEWBIELAND }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Install read-only HTTPS client dependencies
+        run: npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+      - name: Read authenticated controller progress and upgrade history
+        run: node e8n1-rcl7-eta-audit.mjs
+      - name: Confirm only GET game operations
+        run: |
+          echo 'E8N1 controller progress, prior-tick snapshots, no gameplay writes or secret disclosure' >> "$GITHUB_STEP_SUMMARY"
