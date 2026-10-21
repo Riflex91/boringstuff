@@ -1,0 +1,40 @@
+name: Screeps D17 no-Safe-Mode critical Tower ammunition (NO DEPLOY)
+on:
+  push:
+    branches: [feature/d17-no-safemode-core-ammo-20261021]
+permissions:
+  contents: read
+jobs:
+  exact-d16-node24-and-p3:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: tools
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Verify exact D16 live predecessor and sole energy policy delta
+        shell: bash
+        run: |
+          git -C .. fetch origin main --quiet
+          test "$(git -C .. rev-parse origin/main)" = aa96362ebef73126a075bd1f7d5d4ec835efd44c
+          changed="$(git -C .. diff --name-only origin/main HEAD -- game | sort)"
+          test "$changed" = "game/energy.js"
+          grep -Eq 'AUTO_SAFE_MODE:[[:space:]]*true' ../game/config.js
+          grep -Eq 'ENABLE_PARALLEL_SPAWN_EXECUTION:[[:space:]]*true' ../game/config.js
+          git -C .. diff --quiet origin/main HEAD -- game/tower.manager.js game/room.manager.js game/spawn.manager.js game/role.worker.js
+      - name: All canonical Node24 regression tests
+        run: |
+          npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+          npm test
+      - name: Original P3 four-mode CPU benchmark
+        run: npm run bench:p3
+      - name: Secretless review only
+        run: |
+          echo 'D17 review does not possess Screeps deployment credentials or issue gameplay writes.'
