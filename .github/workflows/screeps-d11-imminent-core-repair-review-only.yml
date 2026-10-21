@@ -1,0 +1,41 @@
+name: Screeps D11 critical Rampart repairer (REVIEW ONLY)
+on:
+  push:
+    branches: [feature/d11-imminent-core-shield-repair-20261021]
+permissions:
+  contents: read
+jobs:
+  exact-d10-main-full-node24:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: tools
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+      - name: Verify exact tested predecessor and only work-priority change
+        shell: bash
+        run: |
+          git -C .. fetch origin main --quiet
+          test "$(git -C .. rev-parse origin/main)" = d36321e151bddf49884604c171439f0bedc6973c
+          actual="$(git -C .. diff --name-only origin/main HEAD -- game | sort)"
+          expected="$(printf '%s\n' game/work.priority.js game/role.worker.js | sort)"
+          test "$actual" = "$expected"
+          grep -Eq 'AUTO_SAFE_MODE:[[:space:]]*true' ../game/config.js
+          grep -Eq 'ENABLE_PARALLEL_SPAWN_EXECUTION:[[:space:]]*true' ../game/config.js
+          git -C .. diff --quiet origin/main HEAD -- game/tower.manager.js game/room.manager.js game/spawn.manager.js game/defense.siege.pressure.js game/defense.siege.sustain.js
+      - name: Canonical Node24 entire gameplay regressions
+        run: |
+          npm install --no-package-lock --ignore-scripts --no-audit --no-fund
+          npm test
+      - name: Original P3 four-mode benchmark
+        run: npm run bench:p3
+      - name: Secretless review only
+        run: |
+          echo 'D11 review passes do not upload to Screeps. Main guarded deployments are a separate gate.'
