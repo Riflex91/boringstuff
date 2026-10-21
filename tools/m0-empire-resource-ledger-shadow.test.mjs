@@ -50,8 +50,57 @@ function creep(id,store,my=true) {
   assert.deepEqual(x.totals.carried,{Z:2,energy:105});
   assert.deepEqual(x.rooms[1].resources.structures,{H:40,energy:2400});
   assert.deepEqual(x.rooms[0].resources.carried,{Z:2,energy:5});
+  assert.deepEqual(x.productionInfrastructure,{labs:0,factories:1,terminals:1,powerSpawns:0});
+  assert.deepEqual(x.rooms[0].productionInfrastructure,{labs:0,factories:1,terminals:1,powerSpawns:0});
+  assert.deepEqual(x.rooms[1].productionInfrastructure,{labs:0,factories:0,terminals:0,powerSpawns:0});
+  assert.equal(x.productionReadyToUse,null);
+  assert.equal(x.rooms[0].productionReadyToUse,null);
   assert.equal(x.rooms[0].availableToCommit,null);
   assert.equal(JSON.stringify([a,b]),before,'snapshot is side-effect free');
+}
+// M0: infrastructure presence is read-only evidence, never lab/reaction
+// readiness. Ignore neutral and hostile facilities; never invoke methods
+// that could have side effects or conflate gross stock with free capacity.
+{
+  const readyProbe=()=>{throw new Error('isActive must not be used');};
+  const room=colony('E8N1',[
+    {...structure('lab-one','lab',{energy:30,X:5}),isActive:readyProbe},
+    structure('lab-two','lab',{energy:20}),
+    structure('factory-one','factory',{energy:100}),
+    structure('terminal-one','terminal',{energy:80}),
+    structure('power-one','powerSpawn',{energy:60,power:2}),
+    structure('enemy-lab','lab',{energy:500},false,{username:'enemy'}),
+    structure('neutral-lab','lab',{energy:200},false)
+  ]);
+  const v=ledger.snapshot([room],37);
+  assert.equal(v.status,'OBSERVED');
+  assert.deepEqual(v.productionInfrastructure,
+    {labs:2,factories:1,terminals:1,powerSpawns:1});
+  assert.deepEqual(v.rooms[0].productionInfrastructure,v.productionInfrastructure);
+  assert.equal(v.productionReadyToUse,null);
+  assert.equal(v.rooms[0].productionReadyToUse,null);
+  assert.equal(v.availableToCommit,null);
+  assert.deepEqual(v.totals.structures,{X:5,energy:290,power:2});
+}
+{
+  const duplicate=ledger.snapshot([
+    colony('E8N1',[structure('shared-factory','factory',{energy:50})]),
+    colony('E7N1',[structure('shared-factory','factory',{energy:500})])
+  ],38);
+  assert.equal(duplicate.status,'PARTIAL');
+  assert.ok(duplicate.reasonCodes.includes('ENTITY_ID_MISSING_OR_DUPLICATE'));
+  assert.deepEqual(duplicate.productionInfrastructure,
+    {labs:0,factories:1,terminals:0,powerSpawns:0},
+    'same device ID cannot inflate empire manufacturing counts');
+  assert.equal(duplicate.availableToCommit,null);
+}
+{
+  const prototype=ledger.snapshot([colony('E8N1',[
+    structure('unexpected','__proto__',{energy:4})
+  ])],39);
+  assert.equal(prototype.status,'OBSERVED');
+  assert.deepEqual(prototype.productionInfrastructure,
+    {labs:0,factories:0,terminals:0,powerSpawns:0});
 }
 {
   const unknownOwner=colony('E8N1',[],[],false);
