@@ -40,10 +40,11 @@ function sortedTotals(totals) {
 }
 
 function structureEligible(s) {
-  if (!s || s.my === false) return false;
+  if (!s) return false;
   if (s.my === true) return true;
-  // Source containers in owned rooms have no ownership flag. A structure
-  // belonging to someone else must never be counted as our inventory.
+  // Neutral source containers can report my=false even within our room.
+  // Count only ownerless, publicly withdrawable containers; never include a
+  // foreign-owned structure merely because it is visible in the room.
   return s.structureType === 'container' && !s.owner;
 }
 
