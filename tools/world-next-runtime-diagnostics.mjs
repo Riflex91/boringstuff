@@ -5,9 +5,10 @@ import {ScreepsHttpClient} from './screeps-client.mjs';
 import {inspectWorldRecoveryEvidence} from './world-recovery-evidence.mjs';
 import {buildWorldConfig} from './world-deployment-profile.mjs';
 import {WORLD_NEXT_TARGET_CANDIDATE as target} from './world-next-target-candidate.mjs';
+import {STAGING_BRANCH} from './world-next-staged-readiness.mjs';
 import {WORLD_PROFILE} from './world-deployment-profile.mjs';
 export function assessWorldRuntime({me,branches,status,room,memory},
-  expectedActiveBranch=WORLD_PROFILE.branch){
+  expectedActiveBranch=STAGING_BRANCH){
   const failures=[],warnings=[];
   const id=me?._id||me?.id;
   if(!id)failures.push('AUTH_UNVERIFIED');
@@ -48,13 +49,13 @@ export function assessWorldRuntime({me,branches,status,room,memory},
     placementAttempted:false,activationAttempted:false};
   return result;
 }
-export async function inspectWorldRuntime(api){
+export async function inspectWorldRuntime(api,expectedActiveBranch=STAGING_BRANCH){
   if(api?.defaultShard!==target.shard)throw new Error('EXACT_SHARD_REQUIRED');
   const [me,branches,status,room,memory]=await Promise.all([
     api.authMe(),api.userBranches(),api.userWorldStatus(),
     api.gameRoomObjects(target.room,target.shard),
     api.userMemory('bot',target.shard).catch(()=>null)]);
-  return assessWorldRuntime({me,branches,status,room,memory});
+  return assessWorldRuntime({me,branches,status,room,memory},expectedActiveBranch);
 }
 async function main(){
   if(!process.env.RUNNER_TEMP)throw new Error('RUNNER_TEMP_REQUIRED');
@@ -62,7 +63,7 @@ async function main(){
   fs.writeFileSync(config,JSON.stringify(buildWorldConfig(process.env)),{mode:0o600,flag:'wx'});
   try{
     const api=await ScreepsHttpClient.fromConfig('world',{file:config,shard:target.shard});
-    const result=await inspectWorldRuntime(api);
+    const result=await inspectWorldRuntime(api,WORLD_PROFILE.branch);
     console.log('WORLD_W37S79_RUNTIME '+JSON.stringify(result));
     if(!result.ok)process.exitCode=2;
   }finally{fs.rmSync(config,{force:true});}
