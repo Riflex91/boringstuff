@@ -126,7 +126,9 @@ function acquireForHauler(creep) {
         return true;
     } else if (rc !== ERR_NOT_ENOUGH_RESOURCES &&
                rc !== ERR_INVALID_TARGET) {
-      return true;
+      // Only OK accepts an acquisition intent. A busy/full/unknown failure
+      // is not collected energy; do not attempt a second source either.
+      return rc === OK;
     }
     preferredContainerFailed = true;
   }
@@ -143,7 +145,9 @@ function acquireForHauler(creep) {
         return true;
     } else if (rc !== ERR_NOT_ENOUGH_RESOURCES &&
                rc !== ERR_INVALID_TARGET) {
-      return true;
+      // Only OK accepts an acquisition intent. A busy/full/unknown failure
+      // is not collected energy; do not attempt a second source either.
+      return rc === OK;
     }
     // A permanently unreachable or stale drop cannot hold a hauler idle.
     // Fall through to an alternative source container or tombstone, never
@@ -168,7 +172,9 @@ function acquireForHauler(creep) {
         return true;
     } else if (rc !== ERR_NOT_ENOUGH_RESOURCES &&
                rc !== ERR_INVALID_TARGET) {
-      return true;
+      // Only OK accepts an acquisition intent. A busy/full/unknown failure
+      // is not collected energy; do not attempt a second source either.
+      return rc === OK;
     }
     // Concurrent pickups can empty a filtered source container before this
     // hauler's withdrawal intent. A permanent path failure has the same
@@ -185,7 +191,8 @@ function acquireForHauler(creep) {
       consumerSupplyObserver.recordAcquisitionTravel(creep, tomb, moveRc, 'tomb');
       return moveRc !== ERR_NO_PATH && moveRc !== ERR_INVALID_TARGET;
     }
-    return rc !== ERR_NOT_ENOUGH_RESOURCES && rc !== ERR_INVALID_TARGET;
+    // Last candidate: an error is never an accepted pickup intent.
+    return rc === OK;
   }
   return false;
 }
