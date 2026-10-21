@@ -51,7 +51,7 @@ function boundedNumber(n) {
 function score(offer, request, market) {
   if (!offer || typeof offer !== 'object' ||
       !quoteFresh(offer.evidence, request.tick) ||
-      !safeAmount(offer.amount) || offer.amount < request.amount ||
+      !safeAmount(offer.amount) || offer.amount !== request.amount ||
       !safeAmount(offer.transactionEnergy) ||
       !boundedNumber(offer.energyShadowPrice) ||
       !boundedNumber(offer.terminalOpportunityCost) ||
