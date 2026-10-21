@@ -72,6 +72,14 @@ assert.equal(roleWorker._test.liveHaulerCount(room),1,
 assert.deepEqual(priority.criticalCoreShieldTargets(room.structures,
  room.hostiles,{imminentOnly:true}).map(x=>x.id),['coreRamp'],
  'actual owned shield must be in hostile WORK range');
+console.log('D11_DEBUG',JSON.stringify({
+ haulers:roleWorker._test.liveHaulerCount(room),
+ emergency:priority.hasEmergencyRepair(room.structures),
+ currentRole:creep.memory.role,
+ directRepair:roleWorker._test.repairCoreShield(creep,{imminentOnly:true}),
+ calls
+}));
+calls.length=0;
 assert.equal(roleWorker._test.preemptForImminentShield(creep),true,
  'direct current-world imminent preemption must be reachable');
 calls.length=0;
