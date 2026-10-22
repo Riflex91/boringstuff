@@ -109,6 +109,17 @@ function nearbyFundedSourceContainer(creep, dropped) {
   return chosen;
 }
 
+// A return of true means the acquisition path is occupied for this tick,
+// NOT that movement completed or energy was received. Unknown moveTo codes
+// must not be treated as progress or trigger a second movement intent.
+function haulerMoveInFlight(rc) {
+  return rc === OK || rc === ERR_BUSY ||
+    (typeof ERR_TIRED !== 'undefined' && rc === ERR_TIRED);
+}
+function haulerMoveTerminalFailure(rc) {
+  return rc === ERR_NO_PATH || rc === ERR_INVALID_TARGET;
+}
+
 function acquireForHauler(creep) {
   const dropped = creep.pos.findClosestByPath(FIND_DROPPED_RESOURCES, {
     maxOps: config.PATH_MAX_OPS,
@@ -126,8 +137,8 @@ function acquireForHauler(creep) {
       });
       consumerSupplyObserver.recordAcquisitionTravel(
         creep, preferredContainer, moveRc, 'container');
-      if (moveRc !== ERR_NO_PATH && moveRc !== ERR_INVALID_TARGET)
-        return true;
+      if (haulerMoveInFlight(moveRc)) return true;
+      if (!haulerMoveTerminalFailure(moveRc)) return false;
     } else if (rc !== ERR_NOT_ENOUGH_RESOURCES &&
                rc !== ERR_INVALID_TARGET) {
       // Only OK accepts an acquisition intent. A busy/full/unknown failure
@@ -145,8 +156,8 @@ function acquireForHauler(creep) {
         visualizePathStyle: { stroke: '#ffaa00' }
       });
       consumerSupplyObserver.recordAcquisitionTravel(creep, dropped, moveRc, 'drop');
-      if (moveRc !== ERR_NO_PATH && moveRc !== ERR_INVALID_TARGET)
-        return true;
+      if (haulerMoveInFlight(moveRc)) return true;
+      if (!haulerMoveTerminalFailure(moveRc)) return false;
     } else if (rc !== ERR_NOT_ENOUGH_RESOURCES &&
                rc !== ERR_INVALID_TARGET) {
       // Only OK accepts an acquisition intent. A busy/full/unknown failure
@@ -172,8 +183,8 @@ function acquireForHauler(creep) {
         visualizePathStyle: { stroke: '#ffaa00' }
       });
       consumerSupplyObserver.recordAcquisitionTravel(creep, container, moveRc, 'container');
-      if (moveRc !== ERR_NO_PATH && moveRc !== ERR_INVALID_TARGET)
-        return true;
+      if (haulerMoveInFlight(moveRc)) return true;
+      if (!haulerMoveTerminalFailure(moveRc)) return false;
     } else if (rc !== ERR_NOT_ENOUGH_RESOURCES &&
                rc !== ERR_INVALID_TARGET) {
       // Only OK accepts an acquisition intent. A busy/full/unknown failure
@@ -193,7 +204,7 @@ function acquireForHauler(creep) {
     if (rc === ERR_NOT_IN_RANGE) {
       const moveRc = creep.moveTo(tomb, { reusePath: 8, maxOps: config.PATH_MAX_OPS });
       consumerSupplyObserver.recordAcquisitionTravel(creep, tomb, moveRc, 'tomb');
-      return moveRc !== ERR_NO_PATH && moveRc !== ERR_INVALID_TARGET;
+      return haulerMoveInFlight(moveRc);
     }
     // Last candidate: an error is never an accepted pickup intent.
     return rc === OK;
