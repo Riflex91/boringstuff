@@ -26,6 +26,20 @@ function hasTerminal(room) {
     Number.isSafeInteger(room.productionInfrastructure.terminals) &&
     room.productionInfrastructure.terminals > 0);
 }
+// Explicit terminal-local inventory: an observed resource somewhere in the
+// room is not necessarily available in a terminal or able to pay send cost.
+function terminalAmount(room, resource) {
+  const stock = room && room.resources && room.resources.terminal;
+  if (!stock || typeof stock !== 'object') return null;
+  const n = Object.prototype.hasOwnProperty.call(stock, resource)
+    ? stock[resource] : 0;
+  return safeAmount(n) ? n : null;
+}
+function terminalCanPay(room, offer) {
+  const energy = terminalAmount(room, 'energy');
+  return safeAmount(offer.transactionEnergy) && energy !== null &&
+    energy >= offer.transactionEnergy;
+}
 function validatedLedger(ledger) {
   return ledger && ledger.schemaVersion === 1 &&
     ledger.authority === 'SHADOW' && ledger.actionEnabled === false &&
@@ -33,7 +47,9 @@ function validatedLedger(ledger) {
     Array.isArray(ledger.rooms) && ledger.rooms.length > 0 &&
     ledger.rooms.length <= 25 &&
     ledger.rooms.every(r => r && typeof r.roomName === 'string' &&
-      r.resources && r.resources.structures && r.productionInfrastructure &&
+      r.resources && r.resources.structures &&
+      r.resources.terminal && typeof r.resources.terminal === 'object' &&
+      r.productionInfrastructure &&
       r.availableToCommit === null) &&
     new Set(ledger.rooms.map(r => r.roomName)).size === ledger.rooms.length &&
     ledger.availableToCommit === null;
@@ -100,7 +116,16 @@ function validReserve(offer, source, request) {
   if (!safeAmount(observed) || observed !== p.observedStructureStock)
     return false;
   const available = observed - p.strategicReserve - p.committedAmount;
-  return available >= request.amount && offer.amount >= request.amount;
+  const terminalStock = terminalAmount(source, request.resourceType);
+  const requiredStock = request.amount +
+    (request.resourceType === 'energy' ? offer.transactionEnergy : 0);
+  // Sending energy consumes both the exported amount AND transaction cost
+  // from the source terminal; minerals consume their own quantity plus
+  // transaction energy. Gross room stock alone cannot prove either condition.
+  return safeAmount(offer.transactionEnergy) && safeAmount(requiredStock) &&
+    terminalStock !== null && terminalStock >= requiredStock &&
+    terminalCanPay(source, offer) &&
+    available >= request.amount && offer.amount >= request.amount;
 }
 
 // ledger: existing M0 SHADOW gross-stock census.
@@ -151,7 +176,10 @@ function evaluate(ledger, request, offers) {
       offer.resourceType === need.resourceType &&
       offer.destinationRoom === need.roomName;
     if (offer && typeof offer.id === 'string') ids.add(offer.id);
-    const candidate = valid && score(offer, need, true);
+    // A market BUY charges transaction energy to the buyer's terminal.
+    // This remains advisory, not a free-capacity/cooldown/credit proof.
+    const candidate = valid && terminalCanPay(target, offer) &&
+      score(offer, need, true);
     if (candidate) candidates.push(candidate);
     else invalidOffers++;
   }
