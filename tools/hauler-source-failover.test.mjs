@@ -21,6 +21,7 @@ global.ERR_NO_PATH = -2;
 global.ERR_INVALID_TARGET = -7;
 global.ERR_NOT_ENOUGH_RESOURCES = -6;
 global.ERR_BUSY = -4;
+global.ERR_TIRED = -11;
 
 const energy = require('../game/energy.js');
 const config = require('../game/config.js');
@@ -112,12 +113,28 @@ for (const code of [ERR_BUSY, -8 /* ERR_FULL */, -99 /* unknown */]) {
 }
 
 // Viable or transiently busy movement must not be overwritten by the alternate.
-for (const code of [OK, ERR_BUSY]) {
+for (const code of [OK, ERR_BUSY, ERR_TIRED]) {
   reset(); pickupRc = ERR_NOT_IN_RANGE; moveRc = code;
   assert.equal(energy.acquireForHauler(carrier), true);
   assert.deepEqual(calls, [['pickup', drop], ['move', drop]]);
 }
 
+// ERR_TIRED is transient; an unknown engine return code is neither a
+// movement intent nor terminal proof. Stop before speculative source fallthrough.
+for (const kind of ['drop','container','tomb']) {
+  reset();
+  present.drop = kind === 'drop';
+  present.container = kind === 'container';
+  present.tomb = kind === 'tomb';
+  pickupRc = withdrawRc = tombWithdrawRc = ERR_NOT_IN_RANGE;
+  moveRc = -99;
+  assert.equal(energy.acquireForHauler(carrier), null,
+    'unknown moveTo outcome is indeterminate, not accepted or terminal');
+  const target = kind === 'drop' ? drop : kind === 'container' ? container : tomb;
+  const action = kind === 'drop' ? 'pickup' : 'withdraw';
+  assert.deepEqual(calls, [[action,target],['move',target]],
+    'unknown moveTo must stop, never double-issue another acquisition/move');
+}
 // A terminally invalid drop may fall through to a tombstone if there is no
 // source container; the acquisition attempt count remains <= 2.
 reset();
@@ -146,7 +163,7 @@ for (const code of [ERR_NO_PATH,ERR_INVALID_TARGET]) {
     ['withdraw',tomb],['move',tomb]
   ],'terminally blocked container route can instead approach the tombstone');
 }
-for (const code of [OK,ERR_BUSY]) {
+for (const code of [OK,ERR_BUSY,ERR_TIRED]) {
   reset(); present.drop = false;
   withdrawRc = ERR_NOT_IN_RANGE; moveRc = code;
   assert.equal(energy.acquireForHauler(carrier),true);
@@ -198,7 +215,7 @@ for (const code of [ERR_NO_PATH, ERR_INVALID_TARGET]) {
     'terminal tombstone route permits role-level positioning fallback');
   assert.deepEqual(calls, [['withdraw', tomb], ['move', tomb]]);
 }
-for (const code of [OK, ERR_BUSY]) {
+for (const code of [OK, ERR_BUSY, ERR_TIRED]) {
   reset();
   present.drop = false; present.container = false;
   tombWithdrawRc = ERR_NOT_IN_RANGE; moveRc = code;
@@ -233,6 +250,12 @@ for (const code of [OK, ERR_BUSY]) {
   assert.equal(energy.acquireForHauler(carrier),true);
   assert.deepEqual(calls,[['withdraw',container],['move',container]],
     'successful movement to nearby container remains the only move');
+
+  reset();
+  withdrawRc=ERR_NOT_IN_RANGE; moveRc=-99;
+  assert.equal(energy.acquireForHauler(carrier),null,
+    'unknown local-container movement must not fall through to distant drop');
+  assert.deepEqual(calls,[['withdraw',container],['move',container]]);
 
   reset();
   withdrawRc=ERR_NOT_IN_RANGE; moveRc=ERR_NO_PATH;
@@ -431,6 +454,51 @@ for (const code of [OK, ERR_BUSY]) {
   container.store.energy=originalEnergy;
   carrier.pos = previousPos;
   global.Game = previousGame;
+}
+
+// Integration: the caller must not misread a NULL indeterminate return
+// as permission to issue a second source-container/harvester move this tick.
+{
+  const role = require('../game/role.hauler.js');
+  const previousAcquire = energy.acquireForHauler;
+  const previousRescue = energy.shouldRescueConsumer;
+  const oldStore = carrier.store;
+  const moves = [];
+  carrier.store = {
+    energy:0,
+    getCapacity(){ return 300; },
+    getFreeCapacity(){ return 300; }
+  };
+  const previousMove = carrier.moveTo;
+  carrier.moveTo = (target, opts) => {
+    moves.push(target);
+    assert.equal(opts.maxOps,config.PATH_MAX_OPS);
+    return OK;
+  };
+  energy.shouldRescueConsumer = () => false;
+  try {
+    reset(); present={drop:false,container:true,tomb:false};
+    energy.acquireForHauler = () => null;
+    role.run(carrier);
+    assert.deepEqual(moves,[],
+      'unexpected move result forbids any competing role-level movement');
+
+    energy.acquireForHauler = () => false;
+    role.run(carrier);
+    assert.deepEqual(moves,[container],
+      'terminal/no-source result preserves existing role fallback');
+
+    moves.length=0;
+    energy.acquireForHauler = () => true;
+    role.run(carrier);
+    assert.deepEqual(moves,[],
+      'accepted intent/valid movement also precludes duplicate fallback');
+  } finally {
+    energy.acquireForHauler = previousAcquire;
+    energy.shouldRescueConsumer = previousRescue;
+    carrier.moveTo = previousMove;
+    carrier.store = oldStore;
+  }
 }
 
 // No viable resource: report false and let the established role-level

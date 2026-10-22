@@ -24,7 +24,11 @@ function run(creep) {
     // immediately relinquish the reservation if infrastructure deteriorates.
     if (energy.shouldRescueConsumer(creep) && energy.deliverToConsumer(creep, true)) return;
     energy.clearConsumerTarget(creep);
-    if (!energy.acquireForHauler(creep)) {
+    // false means all acquisition candidates are exhausted or terminally
+    // inaccessible. null means an unexpected movement outcome: do not issue
+    // a second, conflicting route in the same tick, nor claim pickup success.
+    const acquisition = energy.acquireForHauler(creep);
+    if (acquisition === false) {
       const sourceContainers = creep.room.find(FIND_STRUCTURES, {
         filter: s => energy.isSourceContainer(creep.room, s)
       });
