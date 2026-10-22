@@ -165,4 +165,4 @@ function assess(room, now, cpu, delivery) {
     topologySwitchAuthorized:false
   };
 }
-module.exports={SCHEMA_VERSION,assess,_test:{validCpu,validDelivery}};
+module.exports={SCHEMA_VERSION,assess,validDelivery,_test:{validCpu,validDelivery}};
