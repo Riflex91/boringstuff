@@ -356,7 +356,17 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
     for (let tick = samples[i-1].tick + 25; tick < samples[i].tick; tick += 25)
       missingSampleTicks.push(tick);
   }
-  const observedCadenceComplete = missingSampleTicks.length === 0 && invalid === 0;
+  // An empty/singleton journal is not positive cadence evidence: the 25-tick
+  // sample loop has not demonstrated even two observations. Also require the
+  // earliest eligible post-deploy cadence slot to be covered; otherwise a
+  // late pair of adjacent samples could conceal a long release-start gap.
+  // This witnesses the observed diagnostic cadence ONLY, not a 100-tick
+  // settled delivery or full consumer-service window.
+  const firstPostDeployTick = Math.floor(markerTick / 25) * 25 + 25;
+  const observedCadenceComplete = samples.length >= 2 &&
+    samples[0].tick <= firstPostDeployTick &&
+    samples.at(-1).tick >= firstPostDeployTick &&
+    missingSampleTicks.length === 0 && invalid === 0;
   // A rejected or duplicate sample breaks evidence continuity even when
   // every nominal 25-tick position exists in the journal.
   // Invalid cross-field telemetry cannot constitute a consecutive pattern.
