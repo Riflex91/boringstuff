@@ -39,6 +39,36 @@ assert.equal(gap.observedCadenceComplete,false);
 assert.equal(gap.patterns.length,0);
 assert.equal(result.observedCadenceComplete,true);
 assert.deepEqual(result.missingSampleTicks,[]);
+// Post-release cadence completeness is not vacuous: an empty journal, a
+// singleton and a late-start contiguous pair never certify observed cadence.
+const emptyCadence=summarizeSupplyJournal({...bot,telemetryJournal:{events:[]}},id);
+assert.equal(emptyCadence.state,'UNKNOWN');
+assert.equal(emptyCadence.sampleCount,0);
+assert.equal(emptyCadence.observedCadenceComplete,false,
+  'zero real samples cannot establish cadence (regression from live World)');
+assert.equal(emptyCadence.settledDeliveryProof,false);
+const singleCadence=summarizeSupplyJournal({...bot,telemetryJournal:{events:[sample(125)]}},id);
+assert.equal(singleCadence.sampleCount,1);
+assert.equal(singleCadence.observedCadenceComplete,false,
+  'a single diagnostic event cannot establish repeated cadence');
+const lateCadence=summarizeSupplyJournal({...bot,telemetryJournal:{
+  events:[sample(150),sample(175)]
+}},id);
+assert.equal(lateCadence.sampleCount,2);
+assert.deepEqual(lateCadence.missingSampleTicks,[],
+  'pair has no interior gap but omits first post-deployment cadence slot');
+assert.equal(lateCadence.observedCadenceComplete,false,
+  'late-start contiguous pair cannot certify release-start continuity');
+const startingAfterDeploy=summarizeSupplyJournal({...bot,telemetryJournal:{
+  events:[sample(125),sample(150)]
+}},id);
+assert.equal(startingAfterDeploy.observedCadenceComplete,true,
+  'two valid consecutive samples from first post-release slot suffice');
+const partialStart=summarizeSupplyJournal({...bot,deploymentTick:101,
+  telemetryJournal:{events:[sample(125),sample(150)]}},id);
+assert.equal(partialStart.observedCadenceComplete,true,
+  'deployment on non-cadence tick starts observation at next 25-tick slot');
+
 // New load-state telemetry is strictly optional for historical deployments.
 // Missing values must not be interpreted as zero collecting haulers.
 assert.equal(result.observedHaulerLoadStateSamples,0);
