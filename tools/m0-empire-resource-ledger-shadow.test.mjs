@@ -48,6 +48,9 @@ function creep(id,store,my=true) {
   assert.deepEqual(x.rooms.map(r=>r.roomName),['E7N1','E8N1']);
   assert.deepEqual(x.totals.structures,{H:40,Z:25,energy:3150});
   assert.deepEqual(x.totals.carried,{Z:2,energy:105});
+  assert.deepEqual(x.totals.terminal,{Z:25,energy:700});
+  assert.deepEqual(x.rooms[0].resources.terminal,{Z:25,energy:700});
+  assert.deepEqual(x.rooms[1].resources.terminal,{});
   assert.deepEqual(x.rooms[1].resources.structures,{H:40,energy:2400});
   assert.deepEqual(x.rooms[0].resources.carried,{Z:2,energy:5});
   assert.deepEqual(x.productionInfrastructure,{labs:0,factories:1,terminals:1,powerSpawns:0});
@@ -288,5 +291,43 @@ for(const bad of [
   assert.equal(needs.reportedFallbackConsumers,null);
   assert.equal(needs.verifiedStrategicReserve,null);
   assert.equal(needs.verifiedSupportCapacity,null);
+}
+// M0/M1: prove the origin of terminal-local stock. Resources in storage,
+// spawns or neutral containers can count toward gross room inventory, but
+// may not masquerade as already located in the owned terminal.
+{
+  const room=colony('E8N1',[
+    structure('owned-terminal','terminal',{energy:40,Z:7},true),
+    structure('owned-storage','storage',{energy:1000,Z:50},true),
+    structure('neutral-container','container',{energy:250},false),
+    structure('foreign-terminal','terminal',{energy:9000,Z:500},
+      false,{username:'enemy'})
+  ]);
+  const x=ledger.snapshot([room],44);
+  assert.equal(x.status,'OBSERVED');
+  assert.deepEqual(x.totals.structures,{Z:57,energy:1290});
+  assert.deepEqual(x.totals.terminal,{Z:7,energy:40});
+  assert.deepEqual(x.rooms[0].resources.terminal,{Z:7,energy:40});
+  assert.equal(x.availableToCommit,null);
+}
+{
+  const x=ledger.snapshot([
+    colony('E8N1',[structure('duplicated-terminal','terminal',{energy:80})]),
+    colony('E7N1',[structure('duplicated-terminal','terminal',{energy:90})])
+  ],45);
+  assert.equal(x.status,'PARTIAL');
+  assert.ok(x.reasonCodes.includes('ENTITY_ID_MISSING_OR_DUPLICATE'));
+  assert.deepEqual(x.totals.terminal,{energy:80},
+    'duplicated IDs across rooms cannot inflate terminal stock');
+  assert.equal(x.availableToCommit,null);
+}
+{
+  const x=ledger.snapshot([colony('E8N1',[
+    structure('terminal-without-store','terminal',null)
+  ])],46);
+  assert.equal(x.status,'PARTIAL');
+  assert.ok(x.reasonCodes.includes('STORE_MISSING'));
+  assert.deepEqual(x.totals.terminal,{});
+  assert.equal(x.availableToCommit,null);
 }
 console.log('M0 passive resource ledger ownership, double-count, invalid-stock and reserve HOLD PASS');
