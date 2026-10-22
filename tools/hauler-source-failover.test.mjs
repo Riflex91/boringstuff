@@ -21,6 +21,7 @@ global.ERR_NO_PATH = -2;
 global.ERR_INVALID_TARGET = -7;
 global.ERR_NOT_ENOUGH_RESOURCES = -6;
 global.ERR_BUSY = -4;
+global.ERR_TIRED = -11;
 
 const energy = require('../game/energy.js');
 const config = require('../game/config.js');
@@ -112,12 +113,28 @@ for (const code of [ERR_BUSY, -8 /* ERR_FULL */, -99 /* unknown */]) {
 }
 
 // Viable or transiently busy movement must not be overwritten by the alternate.
-for (const code of [OK, ERR_BUSY]) {
+for (const code of [OK, ERR_BUSY, ERR_TIRED]) {
   reset(); pickupRc = ERR_NOT_IN_RANGE; moveRc = code;
   assert.equal(energy.acquireForHauler(carrier), true);
   assert.deepEqual(calls, [['pickup', drop], ['move', drop]]);
 }
 
+// ERR_TIRED is transient; an unknown engine return code is neither a
+// movement intent nor terminal proof. Stop before speculative source fallthrough.
+for (const kind of ['drop','container','tomb']) {
+  reset();
+  present.drop = kind === 'drop';
+  present.container = kind === 'container';
+  present.tomb = kind === 'tomb';
+  pickupRc = withdrawRc = tombWithdrawRc = ERR_NOT_IN_RANGE;
+  moveRc = -99;
+  assert.equal(energy.acquireForHauler(carrier), false,
+    'unknown moveTo outcome cannot be reported as active acquisition');
+  const target = kind === 'drop' ? drop : kind === 'container' ? container : tomb;
+  const action = kind === 'drop' ? 'pickup' : 'withdraw';
+  assert.deepEqual(calls, [[action,target],['move',target]],
+    'unknown moveTo must stop, never double-issue another acquisition/move');
+}
 // A terminally invalid drop may fall through to a tombstone if there is no
 // source container; the acquisition attempt count remains <= 2.
 reset();
@@ -146,7 +163,7 @@ for (const code of [ERR_NO_PATH,ERR_INVALID_TARGET]) {
     ['withdraw',tomb],['move',tomb]
   ],'terminally blocked container route can instead approach the tombstone');
 }
-for (const code of [OK,ERR_BUSY]) {
+for (const code of [OK,ERR_BUSY,ERR_TIRED]) {
   reset(); present.drop = false;
   withdrawRc = ERR_NOT_IN_RANGE; moveRc = code;
   assert.equal(energy.acquireForHauler(carrier),true);
@@ -198,7 +215,7 @@ for (const code of [ERR_NO_PATH, ERR_INVALID_TARGET]) {
     'terminal tombstone route permits role-level positioning fallback');
   assert.deepEqual(calls, [['withdraw', tomb], ['move', tomb]]);
 }
-for (const code of [OK, ERR_BUSY]) {
+for (const code of [OK, ERR_BUSY, ERR_TIRED]) {
   reset();
   present.drop = false; present.container = false;
   tombWithdrawRc = ERR_NOT_IN_RANGE; moveRc = code;
@@ -233,6 +250,12 @@ for (const code of [OK, ERR_BUSY]) {
   assert.equal(energy.acquireForHauler(carrier),true);
   assert.deepEqual(calls,[['withdraw',container],['move',container]],
     'successful movement to nearby container remains the only move');
+
+  reset();
+  withdrawRc=ERR_NOT_IN_RANGE; moveRc=-99;
+  assert.equal(energy.acquireForHauler(carrier),false,
+    'unknown local-container movement must not fall through to distant drop');
+  assert.deepEqual(calls,[['withdraw',container],['move',container]]);
 
   reset();
   withdrawRc=ERR_NOT_IN_RANGE; moveRc=ERR_NO_PATH;
