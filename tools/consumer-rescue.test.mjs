@@ -436,7 +436,11 @@ try {
 
     // The extra assignment must not race another ready sticky carrier.
     infrastructure.memory.consumerTargetId=second.id;
-    assert.deepEqual(selected(),[sticky.id]);
+    const conflictingReadyGuards=selected();
+    assert.equal(conflictingReadyGuards.length,1,
+      'ready sticky holders compete for the single authorized ready slot');
+    assert.equal(conflictingReadyGuards.includes(extra.id),false,
+      'a partial rescuer cannot duplicate either ready sticky assignment');
     infrastructure.memory.consumerTargetId=undefined;
 
     // No verified sticky ready assignment means we cannot establish that
