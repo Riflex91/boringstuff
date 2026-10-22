@@ -635,8 +635,12 @@ function shouldPrioritizeConsumer(creep) {
 }
 
 function shouldRescueConsumer(creep) {
+  // A regular delivery-ready carrier belongs to the normal ready-guard
+  // path, never the underfilled-rescuer path, even before role.run() flips
+  // the delivering flag on its current tick.
   if (!creep || !creep.memory || creep.memory.role !== 'hauler' ||
-      creep.memory.delivering || !creep.room) return false;
+      creep.memory.delivering || !creep.room ||
+      haulerReadyToDeliver(creep)) return false;
   const selected = selectConsumerGuardHaulers(creep.room)
     .some(guard => guard.id === creep.id);
   // Read-only diagnostic: a selected partial-load rescuer is intentionally
