@@ -17,7 +17,7 @@ const stock={
   energyAvailable:800,energyCapacityAvailable:800,creeps:[],
   structures:[
     {id:'source-storage',my:true,structureType:'storage',store:{energy:1000,Z:50}},
-    {id:'source-terminal',my:true,structureType:'terminal',store:{energy:200}}
+    {id:'source-terminal',my:true,structureType:'terminal',store:{energy:200,Z:10}}
   ]
 };
 const target={
@@ -199,11 +199,116 @@ for(const bad of [
 {
   const p=plan(ledger,{...request,resourceType:'Z',amount:5},
     {internal:[{...internal,amount:5,reserveProof:{
-      ...internal.reserveProof,resourceType:'Z',observedStructureStock:50,
+      ...internal.reserveProof,resourceType:'Z',observedStructureStock:60,
       strategicReserve:10,committedAmount:5
     }}],market:[],marketAvailable:false});
   assert.equal(p.status,'ADVISORY',
     'M1 understands minerals without assuming energy-only requests');
   assert.equal(p.selected.resourceType,'Z');
+}
+// The gross room inventory may be abundant while the sending terminal
+// cannot ship the resource. Both amount AND transaction energy must be held
+// by the actual sending terminal. A score is not an executable send.
+for(const energy of [0,19,70,100,119]) {
+  const source={
+    ...stock,structures:[
+      stock.structures[0],
+      {...stock.structures[1],store:{energy,Z:10}}
+    ]
+  };
+  const observed=ledgerModule.snapshot([source,target],tick);
+  const proof={...internal.reserveProof,observedStructureStock:1000+energy};
+  const p=plan(observed,request,{
+    internal:[{...internal,reserveProof:proof}],market:[],marketAvailable:false
+  });
+  assert.equal(observed.status,'OBSERVED');
+  assert.equal(p.status,'HOLD',
+    'unshippable source-terminal energy cannot be replaced by storage stock');
+  assert.deepEqual(p.reasonCodes,['NO_VERIFIED_ALLOCATION_OFFER']);
+  assert.equal(p.command,'NO_ACTION');
+}
+{
+  const source={
+    ...stock,structures:[
+      stock.structures[0],
+      {...stock.structures[1],store:{energy:120,Z:10}}
+    ]
+  };
+  const observed=ledgerModule.snapshot([source,target],tick);
+  const p=plan(observed,request,{
+    internal:[{...internal,reserveProof:{
+      ...internal.reserveProof,observedStructureStock:1120
+    }}],market:[],marketAvailable:false
+  });
+  assert.equal(p.status,'ADVISORY',
+    'exact amount plus energy transfer cost is a valid terminal-stock quote');
+  assert.equal(p.selected.kind,'INTERNAL_TRANSFER');
+  assert.equal(p.selected.readyForExecution,false);
+}
+{
+  const observed=ledgerModule.snapshot([stock,{
+    ...target,structures:[{
+      ...target.structures[0],store:{energy:3}
+    }]
+  }],tick);
+  const p=plan(observed,request,offerSet);
+  assert.equal(p.status,'PARTIAL',
+    'invalid market buyer-energy fee must be excluded, not preferred');
+  assert.deepEqual(p.reasonCodes,['UNVERIFIED_OFFERS_EXCLUDED']);
+  assert.equal(p.selected.kind,'INTERNAL_TRANSFER');
+  assert.equal(p.alternatives.length,1);
+  const marketOnly=plan(observed,request,{
+    internal:[],market:[market],marketAvailable:true
+  });
+  assert.equal(marketOnly.status,'HOLD');
+  assert.deepEqual(marketOnly.reasonCodes,
+    ['NO_VERIFIED_ALLOCATION_OFFER']);
+  assert.equal(marketOnly.command,'NO_ACTION');
+}
+{
+  // Stock located solely in storage cannot back a terminal mineral offer.
+  const observed=ledgerModule.snapshot([{
+    ...stock,structures:[
+      stock.structures[0],
+      {...stock.structures[1],store:{energy:200}}
+    ]
+  },target],tick);
+  const p=plan(observed,{...request,resourceType:'Z',amount:5},{
+    internal:[{...internal,amount:5,reserveProof:{
+      ...internal.reserveProof,resourceType:'Z',observedStructureStock:50,
+      strategicReserve:10,committedAmount:5
+    }}],market:[],marketAvailable:false
+  });
+  assert.equal(p.status,'HOLD');
+  assert.deepEqual(p.reasonCodes,['NO_VERIFIED_ALLOCATION_OFFER']);
+}
+{
+  const observed=ledgerModule.snapshot([{
+    ...stock,structures:[
+      stock.structures[0],
+      {...stock.structures[1],store:{energy:19,Z:10}}
+    ]
+  },target],tick);
+  const p=plan(observed,{...request,resourceType:'Z',amount:5},{
+    internal:[{...internal,amount:5,reserveProof:{
+      ...internal.reserveProof,resourceType:'Z',observedStructureStock:60,
+      strategicReserve:10,committedAmount:5
+    }}],market:[],marketAvailable:false
+  });
+  assert.equal(p.status,'HOLD',
+    'mineral quantity without terminal transaction energy cannot be sent');
+}
+{
+  const observed=ledgerModule.snapshot([{
+    ...stock,structures:[
+      stock.structures[0],stock.structures[1],
+      {id:'foreign-terminal',my:false,owner:{username:'enemy'},
+        structureType:'terminal',store:{energy:9999,Z:9999}}
+    ]
+  },target],tick);
+  assert.equal(observed.status,'OBSERVED');
+  assert.deepEqual(observed.rooms.find(r=>r.roomName==='E8N1').resources.terminal,
+    {Z:10,energy:200},'foreign terminal may not inflate donor stock');
+  assert.equal(plan(observed).selected.kind,'INTERNAL_TRANSFER');
 }
 console.log('M1 internal vs market advisory economic comparisons, reserve proofs and fail-closed guards PASS');

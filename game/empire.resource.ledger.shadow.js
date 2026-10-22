@@ -127,7 +127,7 @@ function snapshot(states, tick) {
     status: 'HOLD',
     reasonCodes: [],
     rooms: [],
-    totals: { structures: {}, carried: {} },
+    totals: { structures: {}, carried: {}, terminal: {} },
     productionInfrastructure: emptyProduction(),
     productionReadyToUse: null
   };
@@ -138,8 +138,10 @@ function snapshot(states, tick) {
   const errors = new Set();
   const names = new Set();
   const seenEntities = new Set();
+  const seenTerminalIds = new Set();
   const observedProductionIds = new Set();
   const structureTotals = empty();
+  const terminalTotals = empty();
   const carriedTotals = empty();
   for (const state of states) {
     const room = state && state.room;
@@ -159,6 +161,7 @@ function snapshot(states, tick) {
       continue;
     }
     const held = empty();
+    const heldInTerminal = empty();
     const carried = empty();
     const productionInfrastructure = emptyProduction();
     for (const s of state.structures) {
@@ -178,6 +181,11 @@ function snapshot(states, tick) {
       // store on storage/terminal/spawn or unknown types an explicit error.
       if (s.store == null && NON_STORING_STRUCTURES.has(s.structureType)) continue;
       add(s.store, held, errors, seenEntities, s.id);
+      // A room-wide gross total is NOT terminal-accessible inventory.
+      // Only explicitly owned terminals count toward terminal-local stock.
+      // Duplicate IDs across rooms are excluded by the bounded global set.
+      if (s.my === true && s.structureType === 'terminal')
+        add(s.store, heldInTerminal, errors, seenTerminalIds, s.id);
     }
     for (const c of state.creeps) {
       if (!c || c.my === false) continue;
@@ -188,6 +196,11 @@ function snapshot(states, tick) {
       if (!Number.isSafeInteger(total)) errors.add('RESOURCE_OVERFLOW');
       else structureTotals[resource] = total;
     }
+    for (const [resource, amount] of Object.entries(heldInTerminal)) {
+      const total = (terminalTotals[resource] || 0) + amount;
+      if (!Number.isSafeInteger(total)) errors.add('RESOURCE_OVERFLOW');
+      else terminalTotals[resource] = total;
+    }
     for (const [resource, amount] of Object.entries(carried)) {
       const total = (carriedTotals[resource] || 0) + amount;
       if (!Number.isSafeInteger(total)) errors.add('RESOURCE_OVERFLOW');
@@ -197,7 +210,8 @@ function snapshot(states, tick) {
       base.productionInfrastructure[kind] += productionInfrastructure[kind];
     base.rooms.push({
       roomName: name,
-      resources: { structures: sortedTotals(held), carried: sortedTotals(carried) },
+      resources: { structures: sortedTotals(held), carried: sortedTotals(carried),
+        terminal: sortedTotals(heldInTerminal) },
       productionInfrastructure,
       strategicNeeds: observeStrategicNeeds(state),
       // Presence is not operational readiness; never authorize recipes here.
@@ -209,7 +223,8 @@ function snapshot(states, tick) {
   base.rooms.sort((a,b) => a.roomName.localeCompare(b.roomName));
   base.totals = {
     structures: sortedTotals(structureTotals),
-    carried: sortedTotals(carriedTotals)
+    carried: sortedTotals(carriedTotals),
+    terminal: sortedTotals(terminalTotals)
   };
   if (!base.rooms.length) errors.add('NO_VERIFIED_OWNED_ROOM');
   base.reasonCodes = [...errors].sort();
