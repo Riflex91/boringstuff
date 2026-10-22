@@ -206,6 +206,50 @@ for(const bad of [
     'M1 understands minerals without assuming energy-only requests');
   assert.equal(p.selected.resourceType,'Z');
 }
+// ResourceReserve must protect not only the energy shipped to the buyer
+// but also the sender-paid energy transaction fee. Both are debited from
+// the same resource, so a gross excess of 100 cannot support 100 + 20.
+for(const [available,valid] of [[100,false],[119,false],[120,true],[121,true]]) {
+  const strategicReserve=1200-200-available;
+  const quote={...internal,reserveProof:{
+    ...internal.reserveProof,strategicReserve
+  }};
+  const result=plan(ledger,request,{
+    internal:[quote],market:[],marketAvailable:false
+  });
+  assert.equal(result.status,valid?'ADVISORY':'HOLD',
+    'energy export must preserve protected gross energy including the fee');
+  assert.equal(result.command,'NO_ACTION');
+  assert.equal(result.verifiedAvailableToCommit,null);
+  if(valid) assert.equal(result.selected.readyForExecution,false);
+  else assert.deepEqual(result.reasonCodes,['NO_VERIFIED_ALLOCATION_OFFER']);
+}
+{
+  // Only source-terminal stock and protected gross excess both count.
+  // A zero-fee transfer may consume exactly the resource excess; no
+  // fictitious extra fee may be applied when transactionEnergy === 0.
+  const offer={...internal,transactionEnergy:0,reserveProof:{
+    ...internal.reserveProof,strategicReserve:900
+  }};
+  const result=plan(ledger,request,{
+    internal:[offer],market:[],marketAvailable:false
+  });
+  assert.equal(result.status,'ADVISORY');
+  assert.equal(result.selected.effectiveCost,115);
+  assert.equal(result.selected.readyForExecution,false);
+}
+{
+  // A cheap market quote cannot retroactively validate a donor reserve
+  // violation; unverified internal transfer is excluded independently.
+  const forbidden={...internal,reserveProof:{
+    ...internal.reserveProof,strategicReserve:881
+  }};
+  const result=plan(ledger,request,{internal:[forbidden],
+    market:[market],marketAvailable:true});
+  assert.equal(result.status,'PARTIAL');
+  assert.equal(result.selected.kind,'MARKET_BUY');
+  assert.deepEqual(result.reasonCodes,['UNVERIFIED_OFFERS_EXCLUDED']);
+}
 // The gross room inventory may be abundant while the sending terminal
 // cannot ship the resource. Both amount AND transaction energy must be held
 // by the actual sending terminal. A score is not an executable send.
