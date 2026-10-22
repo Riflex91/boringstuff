@@ -481,7 +481,7 @@ function rescueInfrastructureSafe(room) {
 function selectConsumerRescueHauler(room, haulers, ready, critical) {
   // Keep the sole normally ready hauler for infrastructure. No rescue with
   // one hauler, no ready infrastructure hauler, or uncertain room supply.
-  if (haulers.length < 2 || ready.length !== 1 ||
+  if (haulers.length < 2 || ready.length < 1 ||
       !rescueInfrastructureSafe(room)) return null;
   const urgent = critical.filter(c => c.memory &&
     (c.memory.logisticsFallback ||
@@ -596,6 +596,28 @@ function selectConsumerGuardHaulers(room) {
   for (const hauler of remaining) {
     if (selected.length >= maxGuards) break;
     selected.push(hauler);
+  }
+
+  // E4: with three+ haulers and at least TWO delivery-ready carriers, one
+  // normally ready carrier stays completely outside consumer duty. An extra
+  // partially loaded collecting hauler (>=25 energy, below the normal 50%
+  // threshold) may serve a SECOND genuinely urgent consumer only when:
+  //  - spawn/extensions are FULL and tower reserves are healthy;
+  //  - all selected ready guards have unique existing critical sticky targets;
+  //  - another critical request remains without a ready sticky reservation.
+  // Without the sticky proof we cannot establish distinct assignments, so
+  // preserve the old single ready-guard behavior rather than racing a target.
+  if (haulers.length >= 3 && ready.length >= 2 &&
+      critical.length >= 2 && selected.length > 0 &&
+      selected.length < critical.length &&
+      selected.length < haulers.length - 1 &&
+      selected.every(h => h.memory && h.memory.consumerTargetId &&
+        coveredReservedTargets.has(h.memory.consumerTargetId))) {
+    const uncovered = critical.filter(c => !coveredReservedTargets.has(c.id));
+    const spareRescuer = selectConsumerRescueHauler(
+      room, haulers, ready, uncovered
+    );
+    if (spareRescuer) selected.push(spareRescuer);
   }
   return selected;
 }
