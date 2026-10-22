@@ -837,8 +837,16 @@ function deliverToControllerBuffer(creep) {
   })[0];
   if (!target) return false;
   const rc = creep.transfer(target, RESOURCE_ENERGY);
-  if (rc === ERR_NOT_IN_RANGE) creep.moveTo(target, { reusePath: 8, maxOps: config.PATH_MAX_OPS, visualizePathStyle: { stroke: '#ffffff' } });
-  return rc === OK || rc === ERR_NOT_IN_RANGE;
+  if (rc === ERR_NOT_IN_RANGE) {
+    const moveRc = creep.moveTo(target, { reusePath: 8,
+      maxOps: config.PATH_MAX_OPS,
+      visualizePathStyle: { stroke: '#ffffff' } });
+    // Only a terminally impossible buffer route may try the existing
+    // storage alternative. Accepted/transient/unknown movement owns this
+    // tick's path slot; it is NOT proof of deposited energy.
+    return moveRc !== ERR_NO_PATH && moveRc !== ERR_INVALID_TARGET;
+  }
+  return rc === OK;
 }
 
 module.exports = {
