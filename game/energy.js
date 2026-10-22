@@ -540,7 +540,8 @@ function selectConsumerGuardHaulers(room) {
   if (!ready.length) return [];
   // Unlike the normal guard, rescue assigns the underfilled hauler to the
   // consumer and leaves the one ready hauler outside consumer service.
-  const rescuer = selectConsumerRescueHauler(room, haulers, ready, critical);
+  const rescuer = ready.length === 1
+    ? selectConsumerRescueHauler(room, haulers, ready, critical) : null;
   if (rescuer) return [rescuer];
 
   // Protect a delivery-READY infrastructure carrier, not merely a living
