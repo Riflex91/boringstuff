@@ -365,4 +365,104 @@ try {
   assert.equal(energy.shouldRescueConsumer(candidate), false);
 }
 
+
+// E4: the spare partially loaded THIRD carrier may serve a distinct urgent
+// consumer alongside ONE sticky ready guard only while hard infrastructure
+// remains safely covered by ANOTHER ready carrier.
+{
+  const safe=room();
+  const first=consumer('first-sticky-critical',safe,8,true);
+  const second=consumer('second-uncovered-critical',safe,7,true);
+  const sticky=makeHauler('sticky-critical-guard',safe,220,2);
+  sticky.memory.delivering=true;
+  sticky.memory.consumerTargetId=first.id;
+  const infrastructure=makeHauler('preserved-infrastructure',safe,250,4);
+  infrastructure.memory.delivering=true;
+  const extra=makeHauler('partial-spare-rescuer',safe,75,1);
+  safe.creeps=[sticky,infrastructure,extra,first,second];
+  const oldGet=Game.getObjectById;
+  Game.getObjectById=id=>id===first.id?first:id===second.id?second:null;
+  const selected=()=>energy._test.selectConsumerGuardHaulers(safe).map(h=>h.id);
+  try {
+    assert.deepEqual(selected(),[sticky.id,extra.id],
+      'second distinct critical request may use the available partial carrier');
+    assert.equal(energy.shouldPrioritizeConsumer(sticky),true);
+    assert.equal(energy.shouldPrioritizeConsumer(infrastructure),false,
+      'one completely loaded ready carrier remains infrastructure-first');
+    assert.equal(energy.shouldRescueConsumer(extra),true);
+    assert.equal(energy.shouldRescueConsumer(infrastructure),false);
+    assert.equal(energy._test.haulerReadyToDeliver(extra),false);
+    assert.equal(energy._test.selectConsumerTarget(extra,true).id,second.id,
+      'extra rescuer never duplicates sticky ready guard assignment');
+    let deliveredTo=null,transferCount=0;
+    const savedAcquire=energy.acquireForHauler;
+    extra.transfer=target=>{deliveredTo=target;transferCount++;return ERR_NOT_IN_RANGE;};
+    extra.moveTo=()=>OK;
+    energy.acquireForHauler=()=>{throw Error('authorized extra rescuer must not collect');};
+    try {
+      role.run(extra);
+      assert.equal(deliveredTo,second);
+      assert.equal(transferCount,1);
+      assert.equal(extra.memory.consumerTargetId,second.id);
+      assert.equal(extra.memory.delivering,false,
+        'bounded extra rescue must not force regular delivery');
+    } finally {
+      energy.acquireForHauler=savedAcquire;
+    }
+    // Empty or under-minimum loads cannot claim extra consumer coverage.
+    extra.memory.consumerTargetId=undefined;
+    extra.store.energy=24;
+    assert.deepEqual(selected(),[sticky.id]);
+    extra.store.energy=0;
+    assert.deepEqual(selected(),[sticky.id]);
+    extra.store.energy=75;
+
+    // No second urgent request: the existing ready guard is enough.
+    second.memory.waitingEnergyTicks=1;
+    second.memory.logisticsFallback=false;
+    assert.deepEqual(selected(),[sticky.id]);
+    second.memory.waitingEnergyTicks=7;
+    second.memory.logisticsFallback=true;
+
+    // Full infrastructure is mandatory for partial-load diversion.
+    safe.energyAvailable=1000;
+    assert.deepEqual(selected(),[sticky.id]);
+    assert.equal(energy.shouldRescueConsumer(extra),false);
+    safe.energyAvailable=1050;
+    safe.structures[2].store.energy=499;
+    assert.deepEqual(selected(),[sticky.id],
+      'defensive towers below half capacity block new rescue');
+    safe.structures[2].store.energy=600;
+
+    // The extra assignment must not race another ready sticky carrier.
+    infrastructure.memory.consumerTargetId=second.id;
+    assert.deepEqual(selected(),[sticky.id]);
+    infrastructure.memory.consumerTargetId=undefined;
+
+    // No verified sticky ready assignment means we cannot establish that
+    // a new partial rescuer will target a different critical consumer.
+    sticky.memory.consumerTargetId=undefined;
+    assert.equal(selected().includes(extra.id),false);
+    sticky.memory.consumerTargetId=first.id;
+
+    // Only one ready hauler: retain the existing 2-hauler rescue mode;
+    // NEVER divert the one ready carrier from infrastructure.
+    safe.creeps=[sticky,extra,first,second];
+    assert.deepEqual(selected(),[extra.id]);
+    assert.equal(energy.shouldPrioritizeConsumer(sticky),false);
+    assert.equal(energy.shouldRescueConsumer(extra),true);
+    safe.creeps=[sticky,infrastructure,extra,first,second];
+
+    // A genuinely ready third carrier returns to the old ready-guard
+    // selection, always reserving at least one ready infrastructure unit.
+    extra.store.energy=160;
+    const guards=selected();
+    assert.equal(guards.length,2);
+    assert.equal(guards.includes(sticky.id),true);
+    assert.equal(guards.includes(extra.id)||guards.includes(infrastructure.id),true);
+    assert.equal(energy.shouldRescueConsumer(extra),false);
+  } finally {
+    Game.getObjectById=oldGet;
+  }
+}
 console.log('active consumer rescue behavior and infrastructure interlocks PASS');
