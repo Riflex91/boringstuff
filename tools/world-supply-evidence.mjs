@@ -1,6 +1,11 @@
 // Read-only, post-deployment diagnostic. Never claims settled deliveries.
 import fs from 'node:fs';
 import path from 'node:path';
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
+// Reuse the existing strict E5 100-tick previous-tick event validator; do not
+// mistake a post-intent CONSUMER_SUPPLY_DIAG counter for game settlement.
+const { validDelivery } = require('../game/logistics.evidence.pair.shadow.js');
 import { ScreepsHttpClient } from './screeps-client.mjs';
 import { parseBotMemory } from './ci-deployment-guard.mjs';
 import { readDeploymentReceipt, DEFAULT_VERIFICATION_LOG_DIR } from './deployment-receipt.mjs';
@@ -11,6 +16,51 @@ const PRESWPAN_BLOCKER_CODES = new Set([
   'SOURCE_CONTAINER_COVERAGE_MISMATCH',
   'MODELED_HAULER_DEMAND_BELOW_TWO'
 ]);
+
+// Independently inspect the first-party E5 Room.getEventLog() lower-bound
+// witness retained in the pinned deployment's bot Memory. It is not an
+// independent re-query of past engine events, delivery latency, or ALL routes.
+// A missing/old/invalid 100-real-tick witness stays UNVERIFIED, never zero.
+export function summarizeSettledConsumerWitness(bot, markerTick, room, latestSampleTick) {
+  const unknown = reason => ({
+    status: 'UNVERIFIED', reason, authority: 'SHADOW_EVIDENCE',
+    source: 'SCREEPS_PREVIOUS_TICK_SETTLED_TRANSFER_EVENTS',
+    actionAuthority: 'NONE', room,
+    startGameTick: null, endGameTick: null,
+    confirmedConsumerDeliveryEvents: null,
+    confirmedConsumerEnergyLowerBound: null,
+    confirmedFirstWaitingReceipts: null,
+    topologySwitchAuthorized: false
+  });
+  const record = bot?.e5SettledConsumerEnergy;
+  const report = record?.rooms?.[room]?.lastWindow;
+  if (record?.schemaVersion !== 5 || !report)
+    return unknown('NO_COMPLETED_E5_WINDOW');
+  if (!validDelivery(report, room))
+    return unknown('E5_WINDOW_INVALID');
+  // The previous-tick event log at first observation belongs to the tick
+  // BEFORE the first game tick. Never credit a pre-release transfer to the
+  // newly deployed release. Correlate only with actual post-release samples.
+  if (!Number.isSafeInteger(markerTick) || !Number.isSafeInteger(latestSampleTick) ||
+      report.startEventTick < markerTick ||
+      report.endGameTick > latestSampleTick ||
+      latestSampleTick - report.endGameTick > 125)
+    return unknown('E5_WINDOW_OUTSIDE_DEPLOYMENT_OR_STALE');
+  return {
+    status: report.confirmedConsumerDeliveryEvents > 0
+      ? 'SETTLED_CONSUMER_TRANSFER_OBSERVED' : 'OBSERVED_ZERO',
+    reason: 'FIRST_PARTY_E5_100_TICK_EVENT_LOWER_BOUND',
+    authority: 'SHADOW_EVIDENCE', source: report.source,
+    actionAuthority: 'NONE', room,
+    startGameTick: report.startGameTick, endGameTick: report.endGameTick,
+    confirmedConsumerDeliveryEvents: report.confirmedConsumerDeliveryEvents,
+    confirmedConsumerEnergyLowerBound:
+      report.confirmedConsumerEnergyLowerBound,
+    confirmedFirstWaitingReceipts:
+      report.confirmedFirstDeliveryForPreviouslyWaitingConsumers,
+    topologySwitchAuthorized: false
+  };
+}
 
 export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
   const markerTick = bot?.deploymentId === deploymentId ? bot.deploymentTick : null;
@@ -350,6 +400,9 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
       uncoveredCriticalCount: s.triage.uncoveredCriticalCount,
       reasonCodes: s.triage.reasonCodes
     }));
+  const settledConsumerEventWindow = summarizeSettledConsumerWitness(
+    bot, markerTick, room, samples.at(-1)?.tick ?? null
+  );
   return {state: invalid ? 'REVIEW_REQUIRED' : samples.length ? 'OBSERVATIONS_AVAILABLE' : 'UNKNOWN',
     reason: invalid ? 'INVALID_DIAGNOSTIC_SAMPLES' : samples.length ?
       'POST_INTENT_OBSERVATIONS_ONLY' : 'NO_POST_DEPLOYMENT_DIAGNOSTICS',
@@ -371,7 +424,13 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
     criticalGapLifetimeStates,
     classifications: samples.map(s => ({tick:s.tick, classification:s.triage.classification,
       reasonCodes:s.triage.reasonCodes})), patterns,
-    settledDeliveryProof:false, actionAuthority:'NONE'};
+    // Positive E5 evidence is independent of sampled transfer() return
+    // codes. If any supply samples were malformed, do not certify a joined
+    // release outcome even with an otherwise valid E5 100-tick window.
+    settledConsumerEventWindow,
+    settledDeliveryProof:invalid===0 &&
+      settledConsumerEventWindow.status==='SETTLED_CONSUMER_TRANSFER_OBSERVED',
+    actionAuthority:'NONE'};
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(new URL(import.meta.url).pathname)) {
@@ -415,5 +474,6 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(new URL(im
     haulerLifetimeStates:report.haulerLifetimeStates,
     criticalGapLifetimeStates:report.criticalGapLifetimeStates,
     classifications:report.classifications,
-    settledDeliveryProof:false}));
+    settledDeliveryProof:report.settledDeliveryProof,
+    settledConsumerEventWindow:report.settledConsumerEventWindow}));
 }
