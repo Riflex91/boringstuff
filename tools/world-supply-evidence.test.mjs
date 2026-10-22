@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
-import { summarizeSupplyJournal } from './world-supply-evidence.mjs';
+import { createRequire } from 'node:module';
+import { summarizeSupplyJournal, summarizeSettledConsumerWitness } from './world-supply-evidence.mjs';
+const require = createRequire(import.meta.url);
+const e5Window = require('../game/logistics.settled.delivery.evidence.js')._test;
 const id='deploy-1';
 assert.equal(summarizeSupplyJournal(null,id).state,'UNKNOWN');
 assert.equal(summarizeSupplyJournal({deploymentId:'other',deploymentTick:100,telemetryJournal:{events:[]}},id).state,'UNKNOWN');
@@ -740,5 +743,124 @@ assert.deepEqual(result.criticalGapRoomEnergyStates,[],
   assert.deepEqual(interrupted.haulerActionStates.map(x=>x.tick),[100,150]);
   assert.deepEqual(interrupted.patterns,[],
     'invalid movement evidence cannot complete an observed three-sample pattern');
+}
+
+// E5 lower-bound Room.getEventLog witness is a DIFFERENT source from
+// post-intent consumer supply counts. Verify exact 100-tick source/provenance,
+// same-room deployment chronology and fail-closed malformed/stale inputs.
+{
+  const window = e5Window.newWindow(150);
+  window.lastGameTick=249;
+  window.ticks=100;
+  window.deliveryEvents=2;
+  window.deliveredEnergy=40;
+  window.ticksWithDelivery=1;
+  const report=e5Window.summarize(window,'W37S79');
+  report.openWaitingEpisodesAtWindowEnd=0;
+  report.openWaitingEpisodesWithoutConfirmedReceiptAtWindowEnd=0;
+  const observedBot={
+    ...bot,
+    telemetryJournal:{events:[150,175,200,225,250].map(sample)},
+    e5SettledConsumerEnergy:{
+      schemaVersion:5,rooms:{W37S79:{lastWindow:report}}
+    }
+  };
+  const verified=summarizeSupplyJournal(observedBot,id);
+  assert.equal(verified.state,'OBSERVATIONS_AVAILABLE');
+  assert.equal(verified.invalidSamples,0);
+  assert.equal(verified.settledDeliveryProof,true,
+    'validated previous-tick engine event is settled energy, not OK intent');
+  assert.deepEqual(verified.settledConsumerEventWindow,{
+    status:'SETTLED_CONSUMER_TRANSFER_OBSERVED',
+    reason:'FIRST_PARTY_E5_100_TICK_EVENT_LOWER_BOUND',
+    authority:'SHADOW_EVIDENCE',
+    source:'SCREEPS_PREVIOUS_TICK_SETTLED_TRANSFER_EVENTS',
+    actionAuthority:'NONE',room:'W37S79',
+    startGameTick:150,endGameTick:249,
+    confirmedConsumerDeliveryEvents:2,
+    confirmedConsumerEnergyLowerBound:40,
+    confirmedFirstWaitingReceipts:0,
+    topologySwitchAuthorized:false
+  });
+  const direct=summarizeSettledConsumerWitness(observedBot,100,'W37S79',250);
+  assert.deepEqual(direct,verified.settledConsumerEventWindow);
+  // Retained per-sample post-intent reports must remain NOT SETTLED even
+  // when separate E5 positive evidence is available.
+  assert.equal(verified.haulerActionStates.length,0);
+  assert.equal(verified.actionAuthority,'NONE');
+
+  const zero={...report,
+    confirmedConsumerDeliveryEvents:0,
+    confirmedConsumerEnergyLowerBound:0,
+    confirmedConsumerEnergyPerTickLowerBound:0,
+    ticksWithConfirmedConsumerDelivery:0
+  };
+  const memoryWith=lastWindow=>({
+    ...observedBot,
+    e5SettledConsumerEnergy:{
+      schemaVersion:5,rooms:{W37S79:{lastWindow}}
+    }
+  });
+  const noReceipts=summarizeSupplyJournal(memoryWith(zero),id);
+  assert.equal(noReceipts.settledDeliveryProof,false);
+  assert.equal(noReceipts.settledConsumerEventWindow.status,'OBSERVED_ZERO');
+  assert.equal(noReceipts.settledConsumerEventWindow.confirmedConsumerDeliveryEvents,0);
+  assert.equal(noReceipts.settledConsumerEventWindow.confirmedConsumerEnergyLowerBound,0);
+
+  for(const invalid of [
+    {...report,actionAuthority:'EXECUTE'},
+    {...report,topologySwitchAuthorized:true},
+    {...report,source:'ACCEPTED_INTENTS'},
+    {...report,room:'E8N1'},
+    {...report,confirmedConsumerDeliveryEvents:3},
+    {...report,confirmedConsumerEnergyLowerBound:1},
+    {...report,endEventTick:249},
+    {...report,waitingObservationPhase:'AFTER_INTENTS'},
+    {...report,observedTicks:99}
+  ]){
+    const r=summarizeSupplyJournal(memoryWith(invalid),id);
+    assert.equal(r.settledDeliveryProof,false);
+    assert.equal(r.settledConsumerEventWindow.status,'UNVERIFIED');
+    assert.equal(r.settledConsumerEventWindow.reason,'E5_WINDOW_INVALID');
+  }
+  for(const old of [
+    {...report,startGameTick:100,startEventTick:99},
+    {...report,startGameTick:1,endGameTick:100,startEventTick:0,endEventTick:99}
+  ]){
+    const r=summarizeSupplyJournal(memoryWith(old),id);
+    assert.equal(r.settledDeliveryProof,false);
+    assert.equal(r.settledConsumerEventWindow.status,'UNVERIFIED');
+  }
+  const tooEarly=summarizeSupplyJournal({
+    ...memoryWith(report),telemetryJournal:{events:[150,175].map(sample)}
+  },id);
+  assert.equal(tooEarly.settledDeliveryProof,false);
+  assert.equal(tooEarly.settledConsumerEventWindow.reason,
+    'E5_WINDOW_OUTSIDE_DEPLOYMENT_OR_STALE');
+  const stale=summarizeSupplyJournal({
+    ...memoryWith(report),
+    telemetryJournal:{events:Array.from({length:11},(_,i)=>sample(150+i*25))}
+  },id);
+  assert.equal(stale.settledDeliveryProof,false);
+  assert.equal(stale.settledConsumerEventWindow.reason,
+    'E5_WINDOW_OUTSIDE_DEPLOYMENT_OR_STALE');
+
+  const invalidSample=summarizeSupplyJournal({
+    ...observedBot,
+    telemetryJournal:{events:[...observedBot.telemetryJournal.events,sample(200)]}
+  },id);
+  assert.equal(invalidSample.state,'REVIEW_REQUIRED');
+  assert.equal(invalidSample.settledDeliveryProof,false,
+    'invalid journal evidence cannot certify a combined World outcome');
+  assert.equal(invalidSample.settledConsumerEventWindow.status,
+    'SETTLED_CONSUMER_TRANSFER_OBSERVED',
+    'independent first-party window must not be rewritten as accepted intent');
+  const missing=summarizeSupplyJournal({...observedBot,
+    e5SettledConsumerEnergy:undefined
+  },id);
+  assert.equal(missing.settledDeliveryProof,false);
+  assert.equal(missing.settledConsumerEventWindow.status,'UNVERIFIED');
+  assert.equal(missing.settledConsumerEventWindow.reason,
+    'NO_COMPLETED_E5_WINDOW');
 }
 console.log('World supply evidence tests: PASS');
