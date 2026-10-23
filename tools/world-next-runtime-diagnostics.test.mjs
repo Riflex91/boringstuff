@@ -166,6 +166,51 @@ assert.equal(stalled.recoveryConstructionRisk.currentBuilderAvailability,'UNVERI
 assert.equal(stalled.recoveryConstructionRisk.executionAuthority,false);
 assert.ok(stalled.warnings.includes('RETAINED_RECOVERY_CONSTRUCTION_STALL_RISK'));
 assert.equal(stalled.operationalReadiness.status,'HOLD');
+// Latest World GET can show zero owned creeps while the retained snapshot
+// reports stalled construction and zero modeled harvest. This is a bounded
+// cross-source risk, not a current construction observation or a build order.
+const emptyPinnedRoom={...good,status:{status:'lost'},
+  room:{objects:good.room.objects.filter(o=>o.type!=='creep')},
+  memory:stalledMemory};
+const emptyCrew=assessWorldRuntime(emptyPinnedRoom,WORLD_PROFILE.branch);
+assert.equal(emptyCrew.ok,true,'valid GET-only inspection still succeeds');
+assert.equal(emptyCrew.ownedCreepCount,0);
+assert.equal(emptyCrew.currentRoomCrewRisk.status,'POTENTIAL_STALL');
+assert.equal(emptyCrew.currentRoomCrewRisk.observedRoomCreepCount,0);
+assert.equal(emptyCrew.currentRoomCrewRisk.lastSnapshotTick,200);
+assert.equal(emptyCrew.currentRoomCrewRisk.executionAuthority,false);
+assert.equal(emptyCrew.currentRoomCrewRisk.evidenceType,
+  'PINNED_ROOM_GET_CREW_PLUS_RETAINED_STATUS_SNAPSHOT');
+assert.ok(emptyCrew.warnings.includes('PINNED_ROOM_CREW_ABSENT_RETAINED_STALL'));
+assert.equal(emptyCrew.operationalReadiness.status,'HOLD');
+// The newer CRITICAL snapshot has no verified upgrader count; do not force
+// the older upgrader-specific R1 risk, but preserve the independent GET risk.
+const criticalMemory=JSON.parse(stalledMemory.data);
+criticalMemory.telemetryJournal.snapshots[0].x.rooms.W37S79.health.status='CRITICAL';
+criticalMemory.telemetryJournal.snapshots[0].x.rooms.W37S79.creeps={};
+const criticalEmpty=assessWorldRuntime({...emptyPinnedRoom,
+  memory:{data:JSON.stringify(criticalMemory)}},WORLD_PROFILE.branch);
+assert.equal(criticalEmpty.recoveryConstructionRisk.status,'UNVERIFIED');
+assert.equal(criticalEmpty.currentRoomCrewRisk.status,'POTENTIAL_STALL');
+// No false empty-crew risk from a current creep, missing bot memory, failed
+// room GET, absent pinned Spawn, unverified owner, or absent retained stall.
+for(const [label,patch] of [
+  ['creep-present',{room:good.room}],
+  ['memory-unknown',{memory:null}],
+  ['room-unavailable',{room:{}}],
+  ['spawn-missing',{room:{objects:[{type:'controller',level:1}]}}],
+  ['owner-unverified',{me:null}],
+  ['no-stall',{memory:good.memory}]
+]) {
+  const observed=assessWorldRuntime({...emptyPinnedRoom,...patch},
+    WORLD_PROFILE.branch);
+  assert.equal(observed.currentRoomCrewRisk.status,'UNVERIFIED',label);
+  assert.equal(observed.currentRoomCrewRisk.executionAuthority,false,label);
+  assert.equal(observed.warnings.includes('PINNED_ROOM_CREW_ABSENT_RETAINED_STALL'),
+    false,label);
+}
+assert.equal(assessWorldRuntime({...emptyPinnedRoom,room:{}},
+  WORLD_PROFILE.branch).currentRoomCrewRisk.observedRoomCreepCount,null);
 const noIntent=JSON.parse(stalledMemory.data);
 noIntent.telemetryJournal.events=[];
 const noIntentResult=assessWorldRuntime({...good,
