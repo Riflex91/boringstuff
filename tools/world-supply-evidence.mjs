@@ -112,8 +112,15 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
   const roomEnergyStates = [];
   let invalid = 0;
   for (const e of entries) {
-    if (e?.c !== 'CONSUMER_SUPPLY_DIAG' || !Number.isSafeInteger(e.t) ||
-        e.t < markerTick || e.t % 25 !== 0 || e.x?.room !== room) continue;
+    if (e?.c !== 'CONSUMER_SUPPLY_DIAG' || e.x?.room !== room) continue;
+    // Ignore only provably pre-release observations. An in-scope malformed
+    // or off-cadence tick must not disappear and leave a seemingly complete
+    // release cadence or repeated supply pattern behind.
+    if (Number.isSafeInteger(e.t) && e.t < markerTick) continue;
+    if (!Number.isSafeInteger(e.t) || e.t % 25 !== 0) {
+      invalid++;
+      continue;
+    }
     if (ticks.has(e.t)) { invalid++; continue; }
     ticks.add(e.t);
     const x = e.x;

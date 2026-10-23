@@ -43,6 +43,27 @@ const corruptTail=summarizeSupplyJournal({...bot,telemetryJournal:{
 assert.equal(corruptTail.state,'REVIEW_REQUIRED');
 assert.deepEqual(corruptTail.patterns,[],
   'a later malformed sample invalidates whole-journal pattern authority');
+// In-scope off-grid and non-integer ticks are corrupt journal evidence,
+// not invisible events that can leave a valid-looking cadence behind.
+for (const badTick of [151, 175.5, '175', null]) {
+  const malformed=sample(175);
+  malformed.t=badTick;
+  const bad=summarizeSupplyJournal({...bot,telemetryJournal:{
+    events:[sample(100),sample(125),sample(150),malformed]
+  }},id);
+  assert.equal(bad.state,'REVIEW_REQUIRED',String(badTick));
+  assert.equal(bad.invalidSamples,1);
+  assert.equal(bad.observedCadenceComplete,false);
+  assert.deepEqual(bad.patterns,[]);
+  assert.deepEqual(bad.missingSampleTicks,[]);
+  assert.equal(bad.settledDeliveryProof,false);
+}
+const historical=summarizeSupplyJournal({...bot,telemetryJournal:{
+  events:[sample(75),sample(100),sample(125)]
+}},id);
+assert.equal(historical.invalidSamples,0,
+  'valid pre-release samples remain outside this deployment');
+assert.equal(historical.observedCadenceComplete,true);
 const gap = summarizeSupplyJournal({...bot,telemetryJournal:{events:[sample(100),sample(150)]}},id);
 assert.deepEqual(gap.missingSampleTicks,[125]);
 assert.equal(gap.observedCadenceComplete,false);
