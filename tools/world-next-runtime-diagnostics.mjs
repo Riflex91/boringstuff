@@ -42,6 +42,28 @@ function retainedRecoveryConstructionRisk(evidence) {
     executionAuthority:false
   };
 }
+// A room GET with no owned creeps and a *retained* construction-stalled
+// snapshot is a recovery continuity warning, not proof of current build
+// execution or of a server-wide creep census. A missing/failed room GET,
+// unknown owner, or unverified pinned Spawn cannot establish this signal.
+function currentRoomCrewConstructionRisk({id,room,spawn,creeps,evidence}) {
+  const currentObserved=Boolean(id)&&Boolean(spawn)&&Array.isArray(room?.objects);
+  const home=evidence?.expansion?.home;
+  const snapshotTick=evidence?.latestSnapshotTick;
+  const retainedStall=Number.isSafeInteger(snapshotTick)&&snapshotTick>=0&&
+    home?.room===target.room&&
+    home?.healthReasons?.includes('CONSTRUCTION_STALLED')&&
+    home.harvestedCapacityPerTick===0&&
+    Number.isSafeInteger(home.constructionSites)&&home.constructionSites>0;
+  return {
+    status:currentObserved&&creeps.length===0&&retainedStall?
+      'POTENTIAL_STALL':'UNVERIFIED',
+    evidenceType:'PINNED_ROOM_GET_CREW_PLUS_RETAINED_STATUS_SNAPSHOT',
+    observedRoomCreepCount:currentObserved?creeps.length:null,
+    lastSnapshotTick:Number.isSafeInteger(snapshotTick)?snapshotTick:null,
+    executionAuthority:false
+  };
+}
 export function assessWorldRuntime({me,branches,status,room,memory},
   expectedActiveBranch=STAGING_BRANCH){
   const failures=[],warnings=[];
@@ -90,6 +112,11 @@ export function assessWorldRuntime({me,branches,status,room,memory},
   const recoveryConstructionRisk=retainedRecoveryConstructionRisk(recoveryEvidence);
   if(recoveryConstructionRisk.status==='POTENTIAL_STALL')
     warnings.push('RETAINED_RECOVERY_CONSTRUCTION_STALL_RISK');
+  const currentRoomCrewRisk=currentRoomCrewConstructionRisk({
+    id,room,spawn,creeps,evidence:recoveryEvidence
+  });
+  if(currentRoomCrewRisk.status==='POTENTIAL_STALL')
+    warnings.push('PINNED_ROOM_CREW_ABSENT_RETAINED_STALL');
   const operationalReadiness={
     status:operationalReasons.length?'HOLD':'UNVERIFIED',
     reasons:operationalReasons,
@@ -97,7 +124,7 @@ export function assessWorldRuntime({me,branches,status,room,memory},
     executionAuthority:false
   };
   const result={ok:failures.length===0,failures,warnings,mode:'GET_ONLY',
-    operationalReadiness,recoveryConstructionRisk,
+    operationalReadiness,recoveryConstructionRisk,currentRoomCrewRisk,
     target:{shard:target.shard,room:target.room,x:target.x,y:target.y},
     activeBranch:active.length===1?active[0].branch:null,
     worldStatus:status?.status??null,spawnVerified:Boolean(spawn),
