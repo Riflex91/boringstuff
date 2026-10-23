@@ -125,7 +125,12 @@ function validReserve(offer, source, request) {
   return safeAmount(offer.transactionEnergy) && safeAmount(requiredStock) &&
     terminalStock !== null && terminalStock >= requiredStock &&
     terminalCanPay(source, offer) &&
-    available >= request.amount && offer.amount >= request.amount;
+    // When exporting ENERGY the terminal transaction fee also consumes
+    // protected energy reserves. An amount-only gross-excess test would
+    // authorize a shadow quote that breaches survival/buffer commitments.
+    available >= (request.resourceType === 'energy'
+      ? requiredStock : request.amount) &&
+    offer.amount >= request.amount;
 }
 
 // ledger: existing M0 SHADOW gross-stock census.
