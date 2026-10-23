@@ -31,7 +31,22 @@ export function assessWorldRuntime({me,branches,status,room,memory},
   const recoveryEvidence=inspectWorldRecoveryEvidence(memory);
   if(recoveryEvidence.availability==='UNKNOWN')
     warnings.push('RECOVERY_MEMORY_UNVERIFIED');
+  // A successful GET-only inspection is not proof that the World is deployable.
+  // The server's current status and observed spawn are independent of older
+  // retained STATUS_SNAPSHOT health reasons. Never grant execution authority.
+  const operationalReasons=[];
+  if(status?.status!=='normal')operationalReasons.push('WORLD_STATUS_NOT_NORMAL');
+  if(!spawn)operationalReasons.push('OWNED_PINNED_SPAWN_MISSING');
+  if(recoveryEvidence.expansion?.home?.healthReasons?.includes('SPAWN_MISSING'))
+    warnings.push('RETAINED_SNAPSHOT_SPAWN_MISSING');
+  const operationalReadiness={
+    status:operationalReasons.length?'HOLD':'UNVERIFIED',
+    reasons:operationalReasons,
+    evidenceType:'CURRENT_GET_ONLY_STATUS_AND_ROOM_OBJECTS',
+    executionAuthority:false
+  };
   const result={ok:failures.length===0,failures,warnings,mode:'GET_ONLY',
+    operationalReadiness,
     target:{shard:target.shard,room:target.room,x:target.x,y:target.y},
     activeBranch:active.length===1?active[0].branch:null,
     worldStatus:status?.status??null,spawnVerified:Boolean(spawn),
