@@ -58,6 +58,14 @@ export function assessWorldRuntime({me,branches,status,room,memory},
     String(o.user||'')===String(id));
   if(!spawn)failures.push('OWNED_PINNED_SPAWN_MISSING');
   const creeps=objects.filter(o=>o?.type==='creep'&&String(o.user||'')===String(id));
+  // Creep memory is untrusted. A null-prototype counter prevents inherited
+  // names such as constructor/__proto__ from corrupting role observations.
+  const ownedCreepRoles=Object.create(null);
+  for(const creep of creeps) {
+    const role=creep?.memory?.role;
+    if(typeof role==='string'&&role.length>0&&role.length<50)
+      ownedCreepRoles[role]=(ownedCreepRoles[role]||0)+1;
+  }
   const controller=objects.find(o=>o?.type==='controller');
   if(!controller)warnings.push('CONTROLLER_NOT_OBSERVED');
   if(!creeps.length)warnings.push('NO_OWNED_CREEPS_OBSERVED');
@@ -94,9 +102,7 @@ export function assessWorldRuntime({me,branches,status,room,memory},
     spawnEnergy:Number.isSafeInteger(energy)&&energy>=0?energy:null,
     spawnEnergyCapacity:Number.isSafeInteger(capacity)&&capacity>=0?capacity:null,
     ownedCreepCount:creeps.length,
-    ownedCreepRoles:creeps.reduce((acc,c)=>{const role=c?.memory?.role;
-      if(typeof role==='string'&&role.length<50)acc[role]=(acc[role]||0)+1;
-      return acc;},{}),
+    ownedCreepRoles,
     controllerLevel:Number.isInteger(controller?.level)?controller.level:null,
     controllerProgress:Number.isSafeInteger(controller?.progress)&&controller.progress>=0?
       controller.progress:null,
