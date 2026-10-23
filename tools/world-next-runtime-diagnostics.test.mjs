@@ -63,6 +63,27 @@ assert.equal(reservedRoles.ownedCreepRoles.__proto__,2);
 assert.equal(Object.hasOwn(reservedRoles.ownedCreepRoles,''),false);
 assert.equal(JSON.parse(JSON.stringify(reservedRoles.ownedCreepRoles)).__proto__,2);
 assert.equal(result.spawnEnergy,300);
+// Contradictory GET values cannot establish spendable Spawn energy. A
+// missing capacity is unknown, not proof of a capacity violation.
+const impossibleEnergy=assessWorldRuntime({...good,room:{objects:
+  good.room.objects.map(o=>o.type==='spawn'?
+    {...o,energy:301,energyCapacity:300}:o)
+}},WORLD_PROFILE.branch);
+assert.equal(impossibleEnergy.ok,true,'GET itself can still succeed');
+assert.equal(impossibleEnergy.spawnEnergy,null,
+  'energy above observed capacity is not valid spendable evidence');
+assert.equal(impossibleEnergy.spawnEnergyCapacity,300);
+assert.ok(impossibleEnergy.warnings.includes('SPAWN_ENERGY_EXCEEDS_CAPACITY'));
+assert.equal(impossibleEnergy.operationalReadiness.executionAuthority,false);
+const capacityUnknown=assessWorldRuntime({...good,room:{objects:
+  good.room.objects.map(o=>o.type==='spawn'?
+    {...o,energy:301,energyCapacity:null}:o)
+}},WORLD_PROFILE.branch);
+assert.equal(capacityUnknown.spawnEnergy,301);
+assert.equal(capacityUnknown.spawnEnergyCapacity,null);
+assert.equal(capacityUnknown.warnings.includes('SPAWN_ENERGY_EXCEEDS_CAPACITY'),
+  false,'unknown capacity must not invent a contradiction');
+assert.equal(result.warnings.includes('SPAWN_ENERGY_EXCEEDS_CAPACITY'),false);
 assert.equal(result.controllerProgress,100);
 // Controller level is untrusted GET evidence too. Negative, fractional,
 // string, boolean and unsafe integer values must never be published as levels.
