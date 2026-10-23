@@ -102,6 +102,12 @@ export function assessWorldRuntime({me,branches,status,room,memory},
   // A zero is evidence only when the API supplied an actual numeric zero.
   const energy=spawn?.energy;
   const capacity=spawn?.energyCapacity;
+  const validEnergy=Number.isSafeInteger(energy)&&energy>=0;
+  const validCapacity=Number.isSafeInteger(capacity)&&capacity>=0;
+  // A valid-looking energy value above the observed Spawn capacity is
+  // internally inconsistent GET evidence, not spendable energy proof.
+  const energyExceedsCapacity=validEnergy&&validCapacity&&energy>capacity;
+  if(energyExceedsCapacity)warnings.push('SPAWN_ENERGY_EXCEEDS_CAPACITY');
   const recoveryEvidence=inspectWorldRecoveryEvidence(memory);
   if(recoveryEvidence.availability==='UNKNOWN')
     warnings.push('RECOVERY_MEMORY_UNVERIFIED');
@@ -137,8 +143,8 @@ export function assessWorldRuntime({me,branches,status,room,memory},
     worldStatus:status?.status??null,
     spawnVerified:ownerVerified&&roomObjectsVerified?Boolean(spawn):null,
     spawnSpawning:spawn?.spawning??null,
-    spawnEnergy:Number.isSafeInteger(energy)&&energy>=0?energy:null,
-    spawnEnergyCapacity:Number.isSafeInteger(capacity)&&capacity>=0?capacity:null,
+    spawnEnergy:validEnergy&&!energyExceedsCapacity?energy:null,
+    spawnEnergyCapacity:validCapacity?capacity:null,
     ownedCreepCount:ownerVerified&&roomObjectsVerified?creeps.length:null,
     ownedCreepRoles:ownerVerified&&roomObjectsVerified?ownedCreepRoles:null,
     controllerLevel:Number.isSafeInteger(controller?.level)&&controller.level>=0?
