@@ -62,4 +62,52 @@ assert.equal(lostWithHistory.operationalReadiness.status,'HOLD');
 assert.ok(lostWithHistory.warnings.includes('RETAINED_SNAPSHOT_SPAWN_MISSING'));
 assert.equal(lostWithHistory.operationalReadiness.executionAuthority,false);
 
+// R1 site intent is not a completed Spawn, and WORK/CARRY/MOVE upgraders
+// are not proof that a builder executes the site. Historical risk only.
+const stalledMemory={data:JSON.stringify({
+  deploymentId:'test-deployment',
+  telemetryJournal:{
+    events:[{c:'R1_OWNED_SPAWN_REBUILD_SITE_INTENT',t:175,
+      x:{room:'W37S79',siteIntentAccepted:true}}],
+    snapshots:[{c:'STATUS_SNAPSHOT',t:200,x:{
+      expansionReadiness:{status:'HOLD',reasons:[]},
+      rooms:{W37S79:{
+        health:{status:'DEGRADED',reasons:['CONSTRUCTION_STALLED','SPAWN_MISSING']},
+        creeps:{upgrader:2},constructionSites:15,
+        economyModel:{dedicatedHarvestCapacityPerTick:0}
+      }}
+    }}]
+  }
+})};
+const stalled=assessWorldRuntime({...good,status:{status:'lost'},
+  memory:stalledMemory},WORLD_PROFILE.branch);
+assert.equal(stalled.recoveryConstructionRisk.status,'POTENTIAL_STALL');
+assert.equal(stalled.recoveryConstructionRisk.lastSnapshotTick,200);
+assert.equal(stalled.recoveryConstructionRisk.lastSiteIntentTick,175);
+assert.equal(stalled.recoveryConstructionRisk.currentBuilderAvailability,'UNVERIFIED');
+assert.equal(stalled.recoveryConstructionRisk.executionAuthority,false);
+assert.ok(stalled.warnings.includes('RETAINED_RECOVERY_CONSTRUCTION_STALL_RISK'));
+assert.equal(stalled.operationalReadiness.status,'HOLD');
+const noIntent=JSON.parse(stalledMemory.data);
+noIntent.telemetryJournal.events=[];
+const noIntentResult=assessWorldRuntime({...good,
+  memory:{data:JSON.stringify(noIntent)}},WORLD_PROFILE.branch);
+assert.equal(noIntentResult.recoveryConstructionRisk.status,'UNVERIFIED');
+const futureIntent=JSON.parse(stalledMemory.data);
+futureIntent.telemetryJournal.events[0].t=225;
+const future=assessWorldRuntime({...good,
+  memory:{data:JSON.stringify(futureIntent)}},WORLD_PROFILE.branch);
+assert.equal(future.recoveryConstructionRisk.status,'UNVERIFIED',
+  'a post-snapshot intent cannot prove earlier construction stall');
+const confirmed=JSON.parse(stalledMemory.data);
+confirmed.telemetryJournal.events.push({
+  c:'R1_OWNED_SPAWN_REBUILD_CONFIRMED',t:190,
+  x:{room:'W37S79',oldSpawnId:'old',newSpawnId:'new',confirmedTick:190}
+});
+const rebuilt=assessWorldRuntime({...good,
+  memory:{data:JSON.stringify(confirmed)}},WORLD_PROFILE.branch);
+assert.equal(rebuilt.recoveryConstructionRisk.status,'UNVERIFIED',
+  'a later confirmed rebuild supersedes retained site-intent risk');
+assert.equal(result.recoveryConstructionRisk.status,'UNVERIFIED');
+
 console.log('W37S79 runtime diagnostics: PASS');
