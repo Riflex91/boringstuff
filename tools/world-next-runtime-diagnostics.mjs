@@ -118,6 +118,10 @@ export function assessWorldRuntime({me,branches,status,room,memory},
   // World status itself is normal. An unsuccessful GET inspection must not
   // be presented as an otherwise unblocked operational observation.
   const operationalReasons=[...failures];
+  // A self-contradictory Spawn GET is a concrete integrity failure, not
+  // merely unknown readiness. Preserve successful GET collection in `ok`.
+  if(energyExceedsCapacity)
+    operationalReasons.push('SPAWN_ENERGY_EXCEEDS_CAPACITY');
   if(status?.status!=='normal')operationalReasons.push('WORLD_STATUS_NOT_NORMAL');
   // OWNED_PINNED_SPAWN_MISSING is already included in failures above.
   if(recoveryEvidence.expansion?.home?.healthReasons?.includes('SPAWN_MISSING'))
