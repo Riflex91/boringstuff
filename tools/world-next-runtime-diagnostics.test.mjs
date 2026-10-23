@@ -10,6 +10,42 @@ assert.equal(result.ok,true);
 assert.equal(result.activeBranch,WORLD_PROFILE.branch);
 assert.equal(result.spawnVerified,true);
 assert.equal(result.ownedCreepCount,1);
+ // Missing GET evidence is unknown, not proof of zero creeps or missing Spawn.
+ // This distinction matters when World is lost and the API returns partial data.
+ for(const [label,patch] of [
+   ['room GET missing',{room:{}}],
+   ['owner missing',{me:null}],
+   ['owner malformed',{me:{_id:{untrusted:true}}}]
+ ]) {
+   const unknown=assessWorldRuntime({...good,...patch},WORLD_PROFILE.branch);
+   assert.equal(unknown.ok,false,label);
+   assert.equal(unknown.ownedCreepCount,null,label+' count');
+   assert.equal(unknown.ownedCreepRoles,null,label+' roles');
+   assert.equal(unknown.spawnVerified,null,label+' spawn');
+   assert.equal(unknown.currentRoomCrewRisk.status,'UNVERIFIED',label);
+   assert.equal(unknown.warnings.includes('NO_OWNED_CREEPS_OBSERVED'),false,
+     label+' must not claim empty crew');
+   assert.equal(unknown.operationalReadiness.status,'HOLD',label);
+   assert.equal(unknown.operationalReadiness.reasons.includes(
+     'OWNED_PINNED_SPAWN_MISSING'),false,
+     label+' must not claim missing Spawn from unverifiable GET');
+ }
+ const validEmpty=assessWorldRuntime({...good,room:{objects:
+   good.room.objects.filter(o=>o.type!=='creep')
+ }},WORLD_PROFILE.branch);
+ assert.equal(validEmpty.spawnVerified,true);
+ assert.equal(validEmpty.ownedCreepCount,0);
+ assert.ok(validEmpty.warnings.includes('NO_OWNED_CREEPS_OBSERVED'));
+ assert.equal(Object.getPrototypeOf(validEmpty.ownedCreepRoles),null);
+ const validMissingSpawn=assessWorldRuntime({...good,room:{objects:
+   good.room.objects.filter(o=>o.type!=='spawn')
+ }},WORLD_PROFILE.branch);
+ assert.equal(validMissingSpawn.spawnVerified,false);
+ assert.equal(validMissingSpawn.ownedCreepCount,1);
+ assert.equal(validMissingSpawn.warnings.includes('NO_OWNED_CREEPS_OBSERVED'),false);
+ assert.ok(validMissingSpawn.operationalReadiness.reasons.includes(
+   'OWNED_PINNED_SPAWN_MISSING'));
+
 // GET creep memory may contain inherited object property names. Counting
 // must preserve those literal labels without prototype pollution or coercion.
 const reservedRoles=assessWorldRuntime({...good,room:{objects:[
