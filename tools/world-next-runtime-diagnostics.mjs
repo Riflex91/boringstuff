@@ -64,6 +64,16 @@ function currentRoomCrewConstructionRisk({id,room,spawn,creeps,evidence}) {
     executionAuthority:false
   };
 }
+// Preserve why a Spawn GET numeric field was not observable. A missing
+// property, an explicit null and a malformed value are distinct evidence;
+// none authorizes spending, spawning or a World deployment.
+function spawnNumericFieldEvidence(spawn,field) {
+  if(!spawn)return 'SPAWN_UNVERIFIED';
+  if(!Object.hasOwn(spawn,field))return 'FIELD_ABSENT';
+  if(spawn[field]===null)return 'EXPLICIT_NULL';
+  return Number.isSafeInteger(spawn[field])&&spawn[field]>=0?
+    'VALID':'INVALID_VALUE';
+}
 export function assessWorldRuntime({me,branches,status,room,memory},
   expectedActiveBranch=STAGING_BRANCH){
   const failures=[],warnings=[];
@@ -149,6 +159,9 @@ export function assessWorldRuntime({me,branches,status,room,memory},
     spawnSpawning:spawn?.spawning??null,
     spawnEnergy:validEnergy&&!energyExceedsCapacity?energy:null,
     spawnEnergyCapacity:validCapacity?capacity:null,
+    spawnEnergyEvidence:energyExceedsCapacity?'CONTRADICTORY':
+      spawnNumericFieldEvidence(spawn,'energy'),
+    spawnEnergyCapacityEvidence:spawnNumericFieldEvidence(spawn,'energyCapacity'),
     ownedCreepCount:ownerVerified&&roomObjectsVerified?creeps.length:null,
     ownedCreepRoles:ownerVerified&&roomObjectsVerified?ownedCreepRoles:null,
     controllerLevel:Number.isSafeInteger(controller?.level)&&controller.level>=0?
