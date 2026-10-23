@@ -74,6 +74,10 @@ assert.equal(impossibleEnergy.spawnEnergy,null,
   'energy above observed capacity is not valid spendable evidence');
 assert.equal(impossibleEnergy.spawnEnergyCapacity,300);
 assert.ok(impossibleEnergy.warnings.includes('SPAWN_ENERGY_EXCEEDS_CAPACITY'));
+assert.equal(impossibleEnergy.operationalReadiness.status,'HOLD',
+  'contradictory GET evidence must fail closed without claiming a deploy pass');
+assert.ok(impossibleEnergy.operationalReadiness.reasons.includes(
+  'SPAWN_ENERGY_EXCEEDS_CAPACITY'));
 assert.equal(impossibleEnergy.operationalReadiness.executionAuthority,false);
 const capacityUnknown=assessWorldRuntime({...good,room:{objects:
   good.room.objects.map(o=>o.type==='spawn'?
@@ -83,6 +87,8 @@ assert.equal(capacityUnknown.spawnEnergy,301);
 assert.equal(capacityUnknown.spawnEnergyCapacity,null);
 assert.equal(capacityUnknown.warnings.includes('SPAWN_ENERGY_EXCEEDS_CAPACITY'),
   false,'unknown capacity must not invent a contradiction');
+assert.equal(capacityUnknown.operationalReadiness.status,'UNVERIFIED',
+  'unknown capacity is not evidence of a contradiction');
 assert.equal(result.warnings.includes('SPAWN_ENERGY_EXCEEDS_CAPACITY'),false);
 assert.equal(result.controllerProgress,100);
 // Controller level is untrusted GET evidence too. Negative, fractional,
