@@ -11,6 +11,32 @@ assert.equal(result.activeBranch,WORLD_PROFILE.branch);
 assert.equal(result.spawnVerified,true);
 assert.equal(result.ownedCreepCount,1);
 assert.equal(result.spawnEnergy,300);
+assert.equal(result.controllerProgress,100);
+// World GET values are untrusted observations: null, strings, booleans,
+// negative values and fractions cannot be converted into fabricated energy
+// or controller progress. A genuine numeric zero remains observable.
+for(const [label,value] of [
+  ['null',null],['missing',undefined],['numeric-string','300'],
+  ['boolean',false],['negative',-1],['fraction',0.5]
+]) {
+  const malformed=assessWorldRuntime({...good,room:{objects:
+    good.room.objects.map(o=>o.type==='spawn'?
+      {...o,energy:value,energyCapacity:value}:
+      o.type==='controller'?{...o,progress:value}:o)
+  }},WORLD_PROFILE.branch);
+  assert.equal(malformed.spawnEnergy,null,label+' spawn energy');
+  assert.equal(malformed.spawnEnergyCapacity,null,label+' spawn capacity');
+  assert.equal(malformed.controllerProgress,null,label+' controller progress');
+  assert.equal(malformed.operationalReadiness.executionAuthority,false);
+}
+const zero=assessWorldRuntime({...good,room:{objects:
+  good.room.objects.map(o=>o.type==='spawn'?
+    {...o,energy:0,energyCapacity:0}:
+    o.type==='controller'?{...o,progress:0}:o)
+}},WORLD_PROFILE.branch);
+assert.equal(zero.spawnEnergy,0);
+assert.equal(zero.spawnEnergyCapacity,0);
+assert.equal(zero.controllerProgress,0);
 assert.equal(result.recoveryEvidence.availability,'OBSERVED_IN_BOT_MEMORY');
 assert.equal(result.recoveryEvidence.observedEventCount,0);
 assert.equal(result.recoveryEvidence.observationScope,'RETAINED_EVENTS_AND_BOUNDED_MISSION_HISTORY_ONLY');
