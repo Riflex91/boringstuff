@@ -33,6 +33,16 @@ const duplicateCadence=summarizeSupplyJournal({...bot,telemetryJournal:{
 assert.equal(duplicateCadence.state,'REVIEW_REQUIRED');
 assert.deepEqual(duplicateCadence.missingSampleTicks,[]);
 assert.equal(duplicateCadence.observedCadenceComplete,false);
+assert.deepEqual(duplicateCadence.patterns,[],
+  'duplicate at an otherwise valid tick must not support a repeated pattern');
+const malformedAfterPattern=sample(175);
+malformedAfterPattern.x.acceptedIsIntentNotSettled=false;
+const corruptTail=summarizeSupplyJournal({...bot,telemetryJournal:{
+  events:[sample(100),sample(125),sample(150),malformedAfterPattern]
+}},id);
+assert.equal(corruptTail.state,'REVIEW_REQUIRED');
+assert.deepEqual(corruptTail.patterns,[],
+  'a later malformed sample invalidates whole-journal pattern authority');
 const gap = summarizeSupplyJournal({...bot,telemetryJournal:{events:[sample(100),sample(150)]}},id);
 assert.deepEqual(gap.missingSampleTicks,[125]);
 assert.equal(gap.observedCadenceComplete,false);

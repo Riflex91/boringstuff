@@ -406,7 +406,11 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
   // A rejected or duplicate sample breaks evidence continuity even when
   // every nominal 25-tick position exists in the journal.
   // Invalid cross-field telemetry cannot constitute a consecutive pattern.
-  const patterns = repeatedSupplyObservations(patternEligibleSamples);
+  // Any malformed or duplicate journal tick invalidates a claimed repeated
+  // association, even when the first copy of that tick looked coherent.
+  // Preserve individual read-only observations for diagnosis, not patterns.
+  const patterns = invalid === 0 ?
+    repeatedSupplyObservations(patternEligibleSamples) : [];
   // Correlate only observations from the exact same tick. A waiting consumer
   // and an underfilled hauler at different ticks cannot be paired into an
   // invented causal narrative or delivery outcome.
