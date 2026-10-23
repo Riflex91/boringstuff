@@ -90,6 +90,41 @@ assert.equal(capacityUnknown.warnings.includes('SPAWN_ENERGY_EXCEEDS_CAPACITY'),
 assert.equal(capacityUnknown.operationalReadiness.status,'UNVERIFIED',
   'unknown capacity is not evidence of a contradiction');
 assert.equal(result.warnings.includes('SPAWN_ENERGY_EXCEEDS_CAPACITY'),false);
+// Null is not zero, and absent GET properties are not malformed values.
+// Expose the provenance of non-spendable Spawn energy without claiming a
+// spawn action, live recovery or deployment authority.
+assert.equal(result.spawnEnergyEvidence,'VALID');
+assert.equal(result.spawnEnergyCapacityEvidence,'VALID');
+assert.equal(impossibleEnergy.spawnEnergyEvidence,'CONTRADICTORY');
+assert.equal(impossibleEnergy.spawnEnergyCapacityEvidence,'VALID');
+assert.equal(capacityUnknown.spawnEnergyEvidence,'VALID');
+assert.equal(capacityUnknown.spawnEnergyCapacityEvidence,'EXPLICIT_NULL');
+assert.equal(validMissingSpawn.spawnEnergyEvidence,'SPAWN_UNVERIFIED');
+assert.equal(validMissingSpawn.spawnEnergyCapacityEvidence,'SPAWN_UNVERIFIED');
+const withSpawnFields=modify=>assessWorldRuntime({...good,room:{objects:
+  good.room.objects.map(o=>o.type==='spawn'?modify({...o}):o)
+}},WORLD_PROFILE.branch);
+const explicitNull=withSpawnFields(o=>({...o,energy:null,energyCapacity:null}));
+assert.equal(explicitNull.spawnEnergy,null);
+assert.equal(explicitNull.spawnEnergyEvidence,'EXPLICIT_NULL');
+assert.equal(explicitNull.spawnEnergyCapacityEvidence,'EXPLICIT_NULL');
+const absentFields=withSpawnFields(o=>{
+  delete o.energy;
+  delete o.energyCapacity;
+  return o;
+});
+assert.equal(absentFields.spawnEnergy,null);
+assert.equal(absentFields.spawnEnergyCapacity,null);
+assert.equal(absentFields.spawnEnergyEvidence,'FIELD_ABSENT');
+assert.equal(absentFields.spawnEnergyCapacityEvidence,'FIELD_ABSENT');
+const malformedFields=withSpawnFields(o=>({...o,
+  energy:'300',energyCapacity:false}));
+assert.equal(malformedFields.spawnEnergyEvidence,'INVALID_VALUE');
+assert.equal(malformedFields.spawnEnergyCapacityEvidence,'INVALID_VALUE');
+assert.equal(malformedFields.spawnEnergy,null);
+assert.equal(malformedFields.spawnEnergyCapacity,null);
+assert.equal(malformedFields.operationalReadiness.executionAuthority,false);
+
 assert.equal(result.controllerProgress,100);
 // Controller level is untrusted GET evidence too. Negative, fractional,
 // string, boolean and unsafe integer values must never be published as levels.
