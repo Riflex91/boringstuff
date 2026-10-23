@@ -7,6 +7,37 @@ import {buildWorldConfig} from './world-deployment-profile.mjs';
 import {WORLD_NEXT_TARGET_CANDIDATE as target} from './world-next-target-candidate.mjs';
 import {STAGING_BRANCH} from './world-next-staged-readiness.mjs';
 import {WORLD_PROFILE} from './world-deployment-profile.mjs';
+// R1 recovery can record a Spawn-site intent while the retained workforce
+// has no modeled harvest throughput and construction is stalled. An upgrader
+// has WORK/CARRY/MOVE, but the current role.worker upgrader path always
+// upgrades the controller; that is NOT proof of available build execution.
+// This is a bounded historical hypothesis, never a live builder count.
+function retainedRecoveryConstructionRisk(evidence) {
+  const events=Array.isArray(evidence?.events)?evidence.events:[];
+  const snapshotTick=evidence?.latestSnapshotTick;
+  const home=evidence?.expansion?.home;
+  const intent=events.filter(e=>e.code==='R1_OWNED_SPAWN_REBUILD_SITE_INTENT'&&
+    e.room===target.room&&Number.isSafeInteger(e.tick)&&
+    Number.isSafeInteger(snapshotTick)&&e.tick<=snapshotTick)
+    .reduce((best,e)=>!best||e.tick>best.tick?e:best,null);
+  const confirmed=intent&&events.some(e=>
+    e.code==='R1_OWNED_SPAWN_REBUILD_CONFIRMED'&&
+    e.room===target.room&&e.tick>=intent.tick);
+  const atRisk=Boolean(intent&&!confirmed&&
+    home?.room===target.room&&
+    home?.healthReasons?.includes('CONSTRUCTION_STALLED')&&
+    Number.isSafeInteger(home.upgraderCount)&&home.upgraderCount>0&&
+    home.harvestedCapacityPerTick===0&&
+    Number.isSafeInteger(home.constructionSites)&&home.constructionSites>0);
+  return {
+    status:atRisk?'POTENTIAL_STALL':'UNVERIFIED',
+    evidenceType:'RETAINED_STATUS_SNAPSHOT_AND_EVENTS_ONLY',
+    lastSnapshotTick:Number.isSafeInteger(snapshotTick)?snapshotTick:null,
+    lastSiteIntentTick:intent?.tick??null,
+    currentBuilderAvailability:'UNVERIFIED',
+    executionAuthority:false
+  };
+}
 export function assessWorldRuntime({me,branches,status,room,memory},
   expectedActiveBranch=STAGING_BRANCH){
   const failures=[],warnings=[];
@@ -39,6 +70,9 @@ export function assessWorldRuntime({me,branches,status,room,memory},
   if(!spawn)operationalReasons.push('OWNED_PINNED_SPAWN_MISSING');
   if(recoveryEvidence.expansion?.home?.healthReasons?.includes('SPAWN_MISSING'))
     warnings.push('RETAINED_SNAPSHOT_SPAWN_MISSING');
+  const recoveryConstructionRisk=retainedRecoveryConstructionRisk(recoveryEvidence);
+  if(recoveryConstructionRisk.status==='POTENTIAL_STALL')
+    warnings.push('RETAINED_RECOVERY_CONSTRUCTION_STALL_RISK');
   const operationalReadiness={
     status:operationalReasons.length?'HOLD':'UNVERIFIED',
     reasons:operationalReasons,
@@ -46,7 +80,7 @@ export function assessWorldRuntime({me,branches,status,room,memory},
     executionAuthority:false
   };
   const result={ok:failures.length===0,failures,warnings,mode:'GET_ONLY',
-    operationalReadiness,
+    operationalReadiness,recoveryConstructionRisk,
     target:{shard:target.shard,room:target.room,x:target.x,y:target.y},
     activeBranch:active.length===1?active[0].branch:null,
     worldStatus:status?.status??null,spawnVerified:Boolean(spawn),
