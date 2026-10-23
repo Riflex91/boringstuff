@@ -87,15 +87,26 @@ export function assessWorldRuntime({me,branches,status,room,memory},
   if(status?.status==='empty'||typeof status?.status!=='string')failures.push('WORLD_STATUS_INVALID');
   if(!roomObjectsVerified)failures.push('ROOM_OBJECTS_UNAVAILABLE');
   const objects=roomObjectsVerified?room.objects:[];
-  const spawn=ownerVerified&&roomObjectsVerified?objects.find(o=>
+  // GET owner IDs must be strings. Coercing numeric/object owners with
+  // String(...) can fabricate ownership, and a malformed owner cannot
+  // establish that a pinned Spawn or owned creep is absent.
+  const pinnedSpawns=roomObjectsVerified?objects.filter(o=>
     (o?.type==='spawn'||o?.structureType==='spawn')&&
-    o.x===target.x&&o.y===target.y&&o.name===target.spawnName&&
-    String(o.user||'')===id):null;
-  // Failed owner/room GET cannot establish that a Spawn or crew is absent.
-  if(ownerVerified&&roomObjectsVerified&&!spawn)
-    failures.push('OWNED_PINNED_SPAWN_MISSING');
+    o.x===target.x&&o.y===target.y&&o.name===target.spawnName):[];
+  const spawnOwnerUnverified=pinnedSpawns.some(o=>typeof o.user!=='string');
+  const spawn=ownerVerified&&roomObjectsVerified?pinnedSpawns.find(o=>
+    o.user===id):null;
+  if(ownerVerified&&roomObjectsVerified) {
+    if(spawnOwnerUnverified)failures.push('PINNED_SPAWN_OWNER_UNVERIFIED');
+    else if(!spawn)failures.push('OWNED_PINNED_SPAWN_MISSING');
+  }
+  const creepObjects=roomObjectsVerified?objects.filter(o=>o?.type==='creep'):[];
+  const crewOwnerUnverified=creepObjects.some(o=>typeof o.user!=='string');
   const creeps=ownerVerified&&roomObjectsVerified?
-    objects.filter(o=>o?.type==='creep'&&String(o.user||'')===id):[];
+    creepObjects.filter(o=>o.user===id):[];
+  if(ownerVerified&&roomObjectsVerified&&crewOwnerUnverified)
+    failures.push('ROOM_CREEP_OWNER_UNVERIFIED');
+  const crewVerified=ownerVerified&&roomObjectsVerified&&!crewOwnerUnverified;
   // Creep memory is untrusted. A null-prototype counter prevents inherited
   // names such as constructor/__proto__ from corrupting role observations.
   const ownedCreepRoles=Object.create(null);
@@ -106,7 +117,7 @@ export function assessWorldRuntime({me,branches,status,room,memory},
   }
   const controller=objects.find(o=>o?.type==='controller');
   if(roomObjectsVerified&&!controller)warnings.push('CONTROLLER_NOT_OBSERVED');
-  if(ownerVerified&&roomObjectsVerified&&!creeps.length)
+  if(crewVerified&&!creeps.length)
     warnings.push('NO_OWNED_CREEPS_OBSERVED');
   // Do not coerce absent/null/string GET fields into fabricated energy.
   // A zero is evidence only when the API supplied an actual numeric zero.
@@ -140,7 +151,7 @@ export function assessWorldRuntime({me,branches,status,room,memory},
   if(recoveryConstructionRisk.status==='POTENTIAL_STALL')
     warnings.push('RETAINED_RECOVERY_CONSTRUCTION_STALL_RISK');
   const currentRoomCrewRisk=currentRoomCrewConstructionRisk({
-    id,room,spawn,creeps,evidence:recoveryEvidence
+    id:crewVerified?id:null,room,spawn,creeps,evidence:recoveryEvidence
   });
   if(currentRoomCrewRisk.status==='POTENTIAL_STALL')
     warnings.push('PINNED_ROOM_CREW_ABSENT_RETAINED_STALL');
@@ -155,15 +166,16 @@ export function assessWorldRuntime({me,branches,status,room,memory},
     target:{shard:target.shard,room:target.room,x:target.x,y:target.y},
     activeBranch:active.length===1?active[0].branch:null,
     worldStatus:status?.status??null,
-    spawnVerified:ownerVerified&&roomObjectsVerified?Boolean(spawn):null,
+    spawnVerified:ownerVerified&&roomObjectsVerified&&!spawnOwnerUnverified?
+      Boolean(spawn):null,
     spawnSpawning:spawn?.spawning??null,
     spawnEnergy:validEnergy&&!energyExceedsCapacity?energy:null,
     spawnEnergyCapacity:validCapacity?capacity:null,
     spawnEnergyEvidence:energyExceedsCapacity?'CONTRADICTORY':
       spawnNumericFieldEvidence(spawn,'energy'),
     spawnEnergyCapacityEvidence:spawnNumericFieldEvidence(spawn,'energyCapacity'),
-    ownedCreepCount:ownerVerified&&roomObjectsVerified?creeps.length:null,
-    ownedCreepRoles:ownerVerified&&roomObjectsVerified?ownedCreepRoles:null,
+    ownedCreepCount:crewVerified?creeps.length:null,
+    ownedCreepRoles:crewVerified?ownedCreepRoles:null,
     controllerLevel:Number.isSafeInteger(controller?.level)&&controller.level>=0?
       controller.level:null,
     controllerProgress:Number.isSafeInteger(controller?.progress)&&controller.progress>=0?
