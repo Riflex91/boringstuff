@@ -10,6 +10,22 @@ assert.equal(result.ok,true);
 assert.equal(result.activeBranch,WORLD_PROFILE.branch);
 assert.equal(result.spawnVerified,true);
 assert.equal(result.ownedCreepCount,1);
+// GET creep memory may contain inherited object property names. Counting
+// must preserve those literal labels without prototype pollution or coercion.
+const reservedRoles=assessWorldRuntime({...good,room:{objects:[
+  ...good.room.objects,
+  {type:'creep',user:'me',memory:{role:'constructor'}},
+  {type:'creep',user:'me',memory:{role:'__proto__'}},
+  {type:'creep',user:'me',memory:{role:'__proto__'}},
+  {type:'creep',user:'me',memory:{role:''}}
+]}},WORLD_PROFILE.branch);
+assert.equal(reservedRoles.ownedCreepCount,5);
+assert.equal(Object.getPrototypeOf(reservedRoles.ownedCreepRoles),null);
+assert.equal(reservedRoles.ownedCreepRoles.harvester,1);
+assert.equal(reservedRoles.ownedCreepRoles.constructor,1);
+assert.equal(reservedRoles.ownedCreepRoles.__proto__,2);
+assert.equal(Object.hasOwn(reservedRoles.ownedCreepRoles,''),false);
+assert.equal(JSON.parse(JSON.stringify(reservedRoles.ownedCreepRoles)).__proto__,2);
 assert.equal(result.spawnEnergy,300);
 assert.equal(result.controllerProgress,100);
 // World GET values are untrusted observations: null, strings, booleans,
