@@ -61,8 +61,10 @@ export function assessWorldRuntime({me,branches,status,room,memory},
   const controller=objects.find(o=>o?.type==='controller');
   if(!controller)warnings.push('CONTROLLER_NOT_OBSERVED');
   if(!creeps.length)warnings.push('NO_OWNED_CREEPS_OBSERVED');
-  const energy=Number(spawn?.energy);
-  const capacity=Number(spawn?.energyCapacity);
+  // Do not coerce absent/null/string GET fields into fabricated energy.
+  // A zero is evidence only when the API supplied an actual numeric zero.
+  const energy=spawn?.energy;
+  const capacity=spawn?.energyCapacity;
   const recoveryEvidence=inspectWorldRecoveryEvidence(memory);
   if(recoveryEvidence.availability==='UNKNOWN')
     warnings.push('RECOVERY_MEMORY_UNVERIFIED');
@@ -89,14 +91,15 @@ export function assessWorldRuntime({me,branches,status,room,memory},
     activeBranch:active.length===1?active[0].branch:null,
     worldStatus:status?.status??null,spawnVerified:Boolean(spawn),
     spawnSpawning:spawn?.spawning??null,
-    spawnEnergy:Number.isFinite(energy)?energy:null,
-    spawnEnergyCapacity:Number.isFinite(capacity)?capacity:null,
+    spawnEnergy:Number.isSafeInteger(energy)&&energy>=0?energy:null,
+    spawnEnergyCapacity:Number.isSafeInteger(capacity)&&capacity>=0?capacity:null,
     ownedCreepCount:creeps.length,
     ownedCreepRoles:creeps.reduce((acc,c)=>{const role=c?.memory?.role;
       if(typeof role==='string'&&role.length<50)acc[role]=(acc[role]||0)+1;
       return acc;},{}),
     controllerLevel:Number.isInteger(controller?.level)?controller.level:null,
-    controllerProgress:Number.isFinite(Number(controller?.progress))?Number(controller.progress):null,
+    controllerProgress:Number.isSafeInteger(controller?.progress)&&controller.progress>=0?
+      controller.progress:null,
     memoryAvailable:recoveryEvidence.availability!=='UNKNOWN',
     recoveryEvidence,
     placementAttempted:false,activationAttempted:false};
