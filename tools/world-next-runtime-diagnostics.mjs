@@ -84,7 +84,7 @@ export function assessWorldRuntime({me,branches,status,room,memory},
   // be presented as an otherwise unblocked operational observation.
   const operationalReasons=[...failures];
   if(status?.status!=='normal')operationalReasons.push('WORLD_STATUS_NOT_NORMAL');
-  if(!spawn)operationalReasons.push('OWNED_PINNED_SPAWN_MISSING');
+  // OWNED_PINNED_SPAWN_MISSING is already included in failures above.
   if(recoveryEvidence.expansion?.home?.healthReasons?.includes('SPAWN_MISSING'))
     warnings.push('RETAINED_SNAPSHOT_SPAWN_MISSING');
   const recoveryConstructionRisk=retainedRecoveryConstructionRisk(recoveryEvidence);
