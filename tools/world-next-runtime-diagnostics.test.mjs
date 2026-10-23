@@ -77,8 +77,26 @@ assert.equal(result.recoveryEvidence.observationScope,'RETAINED_EVENTS_AND_BOUND
 assert.equal(assessWorldRuntime({...good,memory:null},WORLD_PROFILE.branch).recoveryEvidence.availability,'UNKNOWN');
 assert.ok(assessWorldRuntime({...good,memory:null}).warnings.includes('RECOVERY_MEMORY_UNVERIFIED'));
 
-for(const patch of [{room:{objects:[]}},{branches:{list:[{branch:'chatgpt-w37s79-stage',activeWorld:true}]}},{status:{status:'empty'}},{me:{_id:'other'}}])
-  assert.equal(assessWorldRuntime({...good,...patch},WORLD_PROFILE.branch).ok,false);
+// Failed GET prerequisites must be reflected in the operational HOLD gate,
+// not merely in result.ok. Reasons remain deduplicated and non-authoritative.
+for(const [patch,expectedReason] of [
+  [{room:{objects:[]}},'OWNED_PINNED_SPAWN_MISSING'],
+  [{room:{}},'ROOM_OBJECTS_UNAVAILABLE'],
+  [{branches:{list:[{branch:'chatgpt-w37s79-stage',activeWorld:true}]}},
+    'EXPECTED_BRANCH_NOT_ACTIVE'],
+  [{status:{status:'empty'}},'WORLD_STATUS_INVALID'],
+  [{me:null},'AUTH_UNVERIFIED'],
+  [{me:{_id:'other'}},'OWNED_PINNED_SPAWN_MISSING']
+]) {
+  const invalid=assessWorldRuntime({...good,...patch},WORLD_PROFILE.branch);
+  assert.equal(invalid.ok,false,expectedReason+' must fail inspection');
+  assert.equal(invalid.operationalReadiness.status,'HOLD',expectedReason);
+  assert.ok(invalid.operationalReadiness.reasons.includes(expectedReason));
+  assert.equal(invalid.operationalReadiness.executionAuthority,false);
+  assert.equal(new Set(invalid.operationalReadiness.reasons).size,
+    invalid.operationalReadiness.reasons.length,
+    'operational HOLD reasons must not be duplicated');
+}
 // World can be LOST while the pinned spawn is still visible to room GET.
 // A successful read-only inspection must never imply deployment readiness.
 assert.deepEqual(result.operationalReadiness,{
