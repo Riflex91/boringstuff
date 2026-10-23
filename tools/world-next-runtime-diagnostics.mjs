@@ -20,9 +20,13 @@ function retainedRecoveryConstructionRisk(evidence) {
     e.room===target.room&&Number.isSafeInteger(e.tick)&&
     Number.isSafeInteger(snapshotTick)&&e.tick<=snapshotTick)
     .reduce((best,e)=>!best||e.tick>best.tick?e:best,null);
+  // A confirmation recorded after the retained STATUS_SNAPSHOT cannot
+  // disprove the construction stall observed at that earlier snapshot.
+  // Keep the event window bounded; this is historical risk, not live state.
   const confirmed=intent&&events.some(e=>
     e.code==='R1_OWNED_SPAWN_REBUILD_CONFIRMED'&&
-    e.room===target.room&&e.tick>=intent.tick);
+    e.room===target.room&&Number.isSafeInteger(e.tick)&&
+    e.tick>=intent.tick&&e.tick<=snapshotTick);
   const atRisk=Boolean(intent&&!confirmed&&
     home?.room===target.room&&
     home?.healthReasons?.includes('CONSTRUCTION_STALLED')&&
