@@ -79,7 +79,10 @@ export function assessWorldRuntime({me,branches,status,room,memory},
   // A successful GET-only inspection is not proof that the World is deployable.
   // The server's current status and observed spawn are independent of older
   // retained STATUS_SNAPSHOT health reasons. Never grant execution authority.
-  const operationalReasons=[];
+  // Any failed prerequisite makes operational readiness HOLD, even when
+  // World status itself is normal. An unsuccessful GET inspection must not
+  // be presented as an otherwise unblocked operational observation.
+  const operationalReasons=[...failures];
   if(status?.status!=='normal')operationalReasons.push('WORLD_STATUS_NOT_NORMAL');
   if(!spawn)operationalReasons.push('OWNED_PINNED_SPAWN_MISSING');
   if(recoveryEvidence.expansion?.home?.healthReasons?.includes('SPAWN_MISSING'))
