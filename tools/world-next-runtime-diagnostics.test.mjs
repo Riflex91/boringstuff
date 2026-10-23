@@ -108,6 +108,27 @@ const rebuilt=assessWorldRuntime({...good,
   memory:{data:JSON.stringify(confirmed)}},WORLD_PROFILE.branch);
 assert.equal(rebuilt.recoveryConstructionRisk.status,'UNVERIFIED',
   'a later confirmed rebuild supersedes retained site-intent risk');
+// A valid confirmation event may be newer than the latest retained snapshot.
+// It cannot retroactively settle the earlier construction-stall observation.
+const postSnapshotConfirmation=JSON.parse(stalledMemory.data);
+postSnapshotConfirmation.telemetryJournal.events.push({
+  c:'R1_OWNED_SPAWN_REBUILD_CONFIRMED',t:225,
+  x:{room:'W37S79',oldSpawnId:'old',newSpawnId:'new',confirmedTick:225}
+});
+const postSnapshot=assessWorldRuntime({...good,
+  memory:{data:JSON.stringify(postSnapshotConfirmation)}},WORLD_PROFILE.branch);
+assert.equal(postSnapshot.recoveryConstructionRisk.status,'POTENTIAL_STALL',
+  'a post-snapshot confirmation cannot suppress retained R1 stall risk');
+assert.ok(postSnapshot.warnings.includes('RETAINED_RECOVERY_CONSTRUCTION_STALL_RISK'));
+const sameTickConfirmation=JSON.parse(stalledMemory.data);
+sameTickConfirmation.telemetryJournal.events.push({
+  c:'R1_OWNED_SPAWN_REBUILD_CONFIRMED',t:200,
+  x:{room:'W37S79',oldSpawnId:'old',newSpawnId:'new',confirmedTick:200}
+});
+const atSnapshot=assessWorldRuntime({...good,
+  memory:{data:JSON.stringify(sameTickConfirmation)}},WORLD_PROFILE.branch);
+assert.equal(atSnapshot.recoveryConstructionRisk.status,'UNVERIFIED',
+  'a valid confirmation at the snapshot tick supersedes the earlier intent');
 assert.equal(result.recoveryConstructionRisk.status,'UNVERIFIED');
 
 console.log('W37S79 runtime diagnostics: PASS');
