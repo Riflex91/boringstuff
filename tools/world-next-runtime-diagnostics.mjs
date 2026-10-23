@@ -103,7 +103,8 @@ export function assessWorldRuntime({me,branches,status,room,memory},
     spawnEnergyCapacity:Number.isSafeInteger(capacity)&&capacity>=0?capacity:null,
     ownedCreepCount:creeps.length,
     ownedCreepRoles,
-    controllerLevel:Number.isInteger(controller?.level)?controller.level:null,
+    controllerLevel:Number.isSafeInteger(controller?.level)&&controller.level>=0?
+      controller.level:null,
     controllerProgress:Number.isSafeInteger(controller?.progress)&&controller.progress>=0?
       controller.progress:null,
     memoryAvailable:recoveryEvidence.availability!=='UNKNOWN',
