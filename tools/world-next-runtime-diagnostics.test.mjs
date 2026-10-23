@@ -46,6 +46,43 @@ assert.equal(result.ownedCreepCount,1);
  assert.ok(validMissingSpawn.operationalReadiness.reasons.includes(
    'OWNED_PINNED_SPAWN_MISSING'));
 
+// Owner IDs in GET room objects must be verified strings. Numeric IDs
+// must not be coerced to authenticated IDs, and malformed owner evidence
+// cannot establish an absent owned Spawn or a zero-creep room.
+const numericOwnerRoom={...good,me:{_id:'42'},room:{objects:
+  good.room.objects.map(o=>o.type==='spawn'||o.type==='creep'?
+    {...o,user:42}:o)
+}};
+const numericOwner=assessWorldRuntime(numericOwnerRoom,WORLD_PROFILE.branch);
+assert.equal(numericOwner.ok,false);
+assert.equal(numericOwner.spawnVerified,null);
+assert.equal(numericOwner.ownedCreepCount,null);
+assert.equal(numericOwner.ownedCreepRoles,null);
+assert.equal(numericOwner.spawnEnergyEvidence,'SPAWN_UNVERIFIED');
+assert.ok(numericOwner.failures.includes('PINNED_SPAWN_OWNER_UNVERIFIED'));
+assert.ok(numericOwner.failures.includes('ROOM_CREEP_OWNER_UNVERIFIED'));
+assert.equal(numericOwner.failures.includes('OWNED_PINNED_SPAWN_MISSING'),false);
+assert.equal(numericOwner.warnings.includes('NO_OWNED_CREEPS_OBSERVED'),false);
+assert.equal(numericOwner.currentRoomCrewRisk.status,'UNVERIFIED');
+assert.equal(numericOwner.operationalReadiness.status,'HOLD');
+assert.equal(numericOwner.operationalReadiness.executionAuthority,false);
+const malformedCreep=assessWorldRuntime({...good,room:{objects:
+  good.room.objects.map(o=>o.type==='creep'?{...o,user:null}:o)
+}},WORLD_PROFILE.branch);
+assert.equal(malformedCreep.spawnVerified,true);
+assert.equal(malformedCreep.ownedCreepCount,null);
+assert.equal(malformedCreep.ownedCreepRoles,null);
+assert.ok(malformedCreep.failures.includes('ROOM_CREEP_OWNER_UNVERIFIED'));
+assert.equal(malformedCreep.warnings.includes('NO_OWNED_CREEPS_OBSERVED'),false);
+const stringOwner=assessWorldRuntime({...numericOwnerRoom,room:{objects:
+  numericOwnerRoom.room.objects.map(o=>o.type==='spawn'||o.type==='creep'?
+    {...o,user:'42'}:o)
+}},WORLD_PROFILE.branch);
+assert.equal(stringOwner.ok,true);
+assert.equal(stringOwner.spawnVerified,true);
+assert.equal(stringOwner.ownedCreepCount,1);
+assert.equal(stringOwner.operationalReadiness.status,'UNVERIFIED');
+
 // GET creep memory may contain inherited object property names. Counting
 // must preserve those literal labels without prototype pollution or coercion.
 const reservedRoles=assessWorldRuntime({...good,room:{objects:[
