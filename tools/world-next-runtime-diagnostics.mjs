@@ -68,18 +68,24 @@ export function assessWorldRuntime({me,branches,status,room,memory},
   expectedActiveBranch=STAGING_BRANCH){
   const failures=[],warnings=[];
   const id=me?._id||me?.id;
-  if(!id)failures.push('AUTH_UNVERIFIED');
+  const ownerVerified=typeof id==='string'&&id.length>0;
+  const roomObjectsVerified=Array.isArray(room?.objects);
+  if(!ownerVerified)failures.push('AUTH_UNVERIFIED');
   const list=Array.isArray(branches?.list)?branches.list:[];
   const active=list.filter(b=>b?.activeWorld===true);
   if(active.length!==1||active[0]?.branch!==expectedActiveBranch)failures.push('EXPECTED_BRANCH_NOT_ACTIVE');
   if(status?.status==='empty'||typeof status?.status!=='string')failures.push('WORLD_STATUS_INVALID');
-  if(!Array.isArray(room?.objects))failures.push('ROOM_OBJECTS_UNAVAILABLE');
-  const objects=Array.isArray(room?.objects)?room.objects:[];
-  const spawn=objects.find(o=>(o?.type==='spawn'||o?.structureType==='spawn')&&
+  if(!roomObjectsVerified)failures.push('ROOM_OBJECTS_UNAVAILABLE');
+  const objects=roomObjectsVerified?room.objects:[];
+  const spawn=ownerVerified&&roomObjectsVerified?objects.find(o=>
+    (o?.type==='spawn'||o?.structureType==='spawn')&&
     o.x===target.x&&o.y===target.y&&o.name===target.spawnName&&
-    String(o.user||'')===String(id));
-  if(!spawn)failures.push('OWNED_PINNED_SPAWN_MISSING');
-  const creeps=objects.filter(o=>o?.type==='creep'&&String(o.user||'')===String(id));
+    String(o.user||'')===id):null;
+  // Failed owner/room GET cannot establish that a Spawn or crew is absent.
+  if(ownerVerified&&roomObjectsVerified&&!spawn)
+    failures.push('OWNED_PINNED_SPAWN_MISSING');
+  const creeps=ownerVerified&&roomObjectsVerified?
+    objects.filter(o=>o?.type==='creep'&&String(o.user||'')===id):[];
   // Creep memory is untrusted. A null-prototype counter prevents inherited
   // names such as constructor/__proto__ from corrupting role observations.
   const ownedCreepRoles=Object.create(null);
@@ -89,8 +95,9 @@ export function assessWorldRuntime({me,branches,status,room,memory},
       ownedCreepRoles[role]=(ownedCreepRoles[role]||0)+1;
   }
   const controller=objects.find(o=>o?.type==='controller');
-  if(!controller)warnings.push('CONTROLLER_NOT_OBSERVED');
-  if(!creeps.length)warnings.push('NO_OWNED_CREEPS_OBSERVED');
+  if(roomObjectsVerified&&!controller)warnings.push('CONTROLLER_NOT_OBSERVED');
+  if(ownerVerified&&roomObjectsVerified&&!creeps.length)
+    warnings.push('NO_OWNED_CREEPS_OBSERVED');
   // Do not coerce absent/null/string GET fields into fabricated energy.
   // A zero is evidence only when the API supplied an actual numeric zero.
   const energy=spawn?.energy;
@@ -127,12 +134,13 @@ export function assessWorldRuntime({me,branches,status,room,memory},
     operationalReadiness,recoveryConstructionRisk,currentRoomCrewRisk,
     target:{shard:target.shard,room:target.room,x:target.x,y:target.y},
     activeBranch:active.length===1?active[0].branch:null,
-    worldStatus:status?.status??null,spawnVerified:Boolean(spawn),
+    worldStatus:status?.status??null,
+    spawnVerified:ownerVerified&&roomObjectsVerified?Boolean(spawn):null,
     spawnSpawning:spawn?.spawning??null,
     spawnEnergy:Number.isSafeInteger(energy)&&energy>=0?energy:null,
     spawnEnergyCapacity:Number.isSafeInteger(capacity)&&capacity>=0?capacity:null,
-    ownedCreepCount:creeps.length,
-    ownedCreepRoles,
+    ownedCreepCount:ownerVerified&&roomObjectsVerified?creeps.length:null,
+    ownedCreepRoles:ownerVerified&&roomObjectsVerified?ownedCreepRoles:null,
     controllerLevel:Number.isSafeInteger(controller?.level)&&controller.level>=0?
       controller.level:null,
     controllerProgress:Number.isSafeInteger(controller?.progress)&&controller.progress>=0?
