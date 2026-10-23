@@ -6,6 +6,8 @@ const require = createRequire(import.meta.url);
 // Reuse the existing strict E5 100-tick previous-tick event validator; do not
 // mistake a post-intent CONSUMER_SUPPLY_DIAG counter for game settlement.
 const { validDelivery } = require('../game/logistics.evidence.pair.shadow.js');
+const { validIncompleteWindow, validIncompleteWaitingHistory } =
+  require('../game/logistics.settled.delivery.evidence.js');
 import { ScreepsHttpClient } from './screeps-client.mjs';
 import { parseBotMemory } from './ci-deployment-guard.mjs';
 import { readDeploymentReceipt, DEFAULT_VERIFICATION_LOG_DIR } from './deployment-receipt.mjs';
@@ -16,6 +18,33 @@ const PRESWPAN_BLOCKER_CODES = new Set([
   'SOURCE_CONTAINER_COVERAGE_MISMATCH',
   'MODELED_HAULER_DEMAND_BELOW_TWO'
 ]);
+
+// Read-only progress only: never infer an E5 delivery or authorize a mode
+// switch from a partial window. Reuse the same strict runtime window validator.
+function partialE5Progress(record, markerTick, room, latestSampleTick) {
+  const entry = record?.rooms?.[room];
+  const w = entry?.window;
+  if (!validIncompleteWindow(w) ||
+      !validIncompleteWaitingHistory(entry?.waiting) ||
+      // The live observer refreshes every retained waiting episode each tick.
+      // Stale/future episodes cannot corroborate a contiguous current window.
+      Object.values(entry.waiting).some(e => e.lastTick !== w.lastGameTick) ||
+      w.ticks < 1 ||
+      !Number.isSafeInteger(markerTick) || markerTick < 0 ||
+      !Number.isSafeInteger(latestSampleTick) || latestSampleTick < 0 ||
+      w.startGameTick < 1 || w.startGameTick - 1 < markerTick ||
+      entry.lastProcessedGameTick !== w.lastGameTick ||
+      // A skipped E5 observation tick breaks the contiguous window.
+      w.lastGameTick !== latestSampleTick) return null;
+  return {
+    status: 'IN_PROGRESS_ONLY',
+    startGameTick: w.startGameTick,
+    lastGameTick: w.lastGameTick,
+    observedTicks: w.ticks,
+    ticksRemainingFor100: 100 - w.ticks,
+    settledDeliveryProof: false
+  };
+}
 
 // Independently inspect the first-party E5 Room.getEventLog() lower-bound
 // witness retained in the pinned deployment's bot Memory. It is not an
@@ -34,8 +63,15 @@ export function summarizeSettledConsumerWitness(bot, markerTick, room, latestSam
   });
   const record = bot?.e5SettledConsumerEnergy;
   const report = record?.rooms?.[room]?.lastWindow;
-  if (record?.schemaVersion !== 5 || !report)
-    return unknown('NO_COMPLETED_E5_WINDOW');
+  // Only null/absent lastWindow means no completed window. A malformed
+  // falsey value (0/false/'') is invalid evidence, not permission to fall
+  // back to a valid-looking incomplete window.
+  if (record?.schemaVersion !== 5 || report == null) {
+    const result = unknown('NO_COMPLETED_E5_WINDOW');
+    const progress = record?.schemaVersion === 5 ?
+      partialE5Progress(record, markerTick, room, latestSampleTick) : null;
+    return progress ? {...result, inProgressWindow: progress} : result;
+  }
   if (!validDelivery(report, room))
     return unknown('E5_WINDOW_INVALID');
   // The previous-tick event log at first observation belongs to the tick
@@ -413,6 +449,11 @@ export function summarizeSupplyJournal(bot, deploymentId, room = 'W37S79') {
   const settledConsumerEventWindow = summarizeSettledConsumerWitness(
     bot, markerTick, room, samples.at(-1)?.tick ?? null
   );
+  // A malformed/duplicate post-deployment diagnostic must not corroborate
+  // partial E5 progress. Completed E5 witnesses retain their independent
+  // first-party status and are not rewritten by journal corruption.
+  if (invalid > 0 && settledConsumerEventWindow.inProgressWindow)
+    delete settledConsumerEventWindow.inProgressWindow;
   return {state: invalid ? 'REVIEW_REQUIRED' : samples.length ? 'OBSERVATIONS_AVAILABLE' : 'UNKNOWN',
     reason: invalid ? 'INVALID_DIAGNOSTIC_SAMPLES' : samples.length ?
       'POST_INTENT_OBSERVATIONS_ONLY' : 'NO_POST_DEPLOYMENT_DIAGNOSTICS',
