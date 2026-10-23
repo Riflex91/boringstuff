@@ -893,4 +893,93 @@ assert.deepEqual(result.criticalGapRoomEnergyStates,[],
   assert.equal(missing.settledConsumerEventWindow.reason,
     'NO_COMPLETED_E5_WINDOW');
 }
+// E5 incomplete windows are observational only, never settled or executable.
+{
+  const w=e5Window.newWindow(151);
+  w.ticks=50;
+  w.lastGameTick=200;
+  const entry={window:w,lastWindow:null,lastProcessedGameTick:200,waiting:{}};
+  const record={schemaVersion:5,rooms:{W37S79:entry}};
+  const get=(r=record,marker=100,latest=200)=>
+    summarizeSettledConsumerWitness({e5SettledConsumerEnergy:r},
+      marker,'W37S79',latest);
+  const result=get();
+  assert.equal(result.status,'UNVERIFIED');
+  assert.equal(result.reason,'NO_COMPLETED_E5_WINDOW');
+  assert.equal(result.topologySwitchAuthorized,false);
+  assert.equal(result.confirmedConsumerDeliveryEvents,null);
+  assert.deepEqual(result.inProgressWindow,{
+    status:'IN_PROGRESS_ONLY',startGameTick:151,lastGameTick:200,
+    observedTicks:50,ticksRemainingFor100:50,settledDeliveryProof:false
+  });
+  for(const waiting of [undefined,null,[],{
+    creep:{firstTick:201,lastTick:200,firstSettledObserved:false,
+      lastHadLoadedSticky:false,lastExclusiveLoadedStickyHaulerId:null}
+  }]){
+    const changed={...entry};
+    if(waiting===undefined)delete changed.waiting;
+    else changed.waiting=waiting;
+    assert.equal(get({schemaVersion:5,rooms:{W37S79:changed}})
+      .inProgressWindow,undefined);
+  }
+  const episode={firstTick:140,lastTick:200,firstSettledObserved:false,
+    lastHadLoadedSticky:false,lastExclusiveLoadedStickyHaulerId:null};
+  assert.equal(get({schemaVersion:5,rooms:{W37S79:{
+    ...entry,waiting:{creep:episode}}}}).inProgressWindow.observedTicks,50,
+    'waiting episode may span a previous E5 window');
+  for(const tick of [199,201]){
+    assert.equal(get({schemaVersion:5,rooms:{W37S79:{
+      ...entry,waiting:{creep:{...episode,lastTick:tick}}}}})
+      .inProgressWindow,undefined,'stale or future waiting must fail closed');
+  }
+  for(const changed of [
+    {...entry,window:{...w,ticks:49}},
+    {...entry,window:{...w,deliveryEvents:-1}},
+    {...entry,lastProcessedGameTick:199},
+    {...entry,window:e5Window.newWindow(201)}
+  ]){
+    assert.equal(get({schemaVersion:5,rooms:{W37S79:changed}})
+      .inProgressWindow,undefined);
+  }
+  assert.equal(get(record,150).inProgressWindow.observedTicks,50);
+  assert.equal(get(record,151).inProgressWindow,undefined);
+  for(const tick of [199,201,326])
+    assert.equal(get(record,100,tick).inProgressWindow,undefined);
+  assert.equal(get({...record,schemaVersion:4}).inProgressWindow,undefined);
+  for(const lastWindow of [0,false,'',{room:'W37S79',actionAuthority:'EXECUTE'}]){
+    const bad=get({schemaVersion:5,rooms:{W37S79:{...entry,lastWindow}}});
+    assert.equal(bad.reason,'E5_WINDOW_INVALID');
+    assert.equal(bad.inProgressWindow,undefined);
+  }
+  const eventful={...w,deliveryEvents:1,deliveredEnergy:20,
+    ticksWithDelivery:1};
+  const eventfulRecord={schemaVersion:5,rooms:{W37S79:{
+    ...entry,window:eventful}}};
+  const eventfulResult=get(eventfulRecord);
+  assert.equal(eventfulResult.status,'UNVERIFIED');
+  assert.equal(eventfulResult.confirmedConsumerEnergyLowerBound,null);
+  assert.equal(eventfulResult.inProgressWindow.settledDeliveryProof,false);
+  assert.equal(eventfulResult.topologySwitchAuthorized,false);
+  const joined=summarizeSupplyJournal({...bot,e5SettledConsumerEnergy:record,
+    telemetryJournal:{events:[sample(150),sample(175),sample(200)]}},id);
+  assert.equal(joined.settledDeliveryProof,false);
+  assert.deepEqual(joined.settledConsumerEventWindow.inProgressWindow,
+    result.inProgressWindow);
+  const joinedEventful=summarizeSupplyJournal({...bot,
+    e5SettledConsumerEnergy:eventfulRecord,
+    telemetryJournal:{events:[sample(150),sample(175),sample(200)]}},id);
+  assert.equal(joinedEventful.settledDeliveryProof,false);
+  assert.equal(joinedEventful.settledConsumerEventWindow.status,'UNVERIFIED');
+  const missing=summarizeSupplyJournal({...bot,e5SettledConsumerEnergy:record,
+    telemetryJournal:{events:[]}},id);
+  assert.equal(missing.settledConsumerEventWindow.inProgressWindow,undefined);
+  const skipped=summarizeSupplyJournal({...bot,e5SettledConsumerEnergy:record,
+    telemetryJournal:{events:[sample(150),sample(175),sample(200),sample(225)]}},id);
+  assert.equal(skipped.settledConsumerEventWindow.inProgressWindow,undefined);
+  const duplicate=summarizeSupplyJournal({...bot,e5SettledConsumerEnergy:record,
+    telemetryJournal:{events:[sample(150),sample(175),sample(175),sample(200)]}},id);
+  assert.equal(duplicate.state,'REVIEW_REQUIRED');
+  assert.equal(duplicate.settledConsumerEventWindow.inProgressWindow,undefined);
+  assert.equal(get(null).inProgressWindow,undefined);
+}
 console.log('World supply evidence tests: PASS');

@@ -453,5 +453,10 @@ function snapshot(room,memory) {
     record.rooms && record.rooms[room] &&
     record.rooms[room].lastWindow || null;
 }
-module.exports={observe,snapshot,capturePreIntentWaiting,
+// Expose strict read-only incomplete-window validation to GET-only diagnostics.
+// This grants no settlement, assignment, or execution authority.
+function validIncompleteWindow(w) { return validWindow(w); }
+function validIncompleteWaitingHistory(h) { return validWaitingHistory(h); }
+module.exports={observe,snapshot,capturePreIntentWaiting,validIncompleteWindow,
+  validIncompleteWaitingHistory,
   _test:{inspectRoom,newWindow,validWindow,validWaitingHistory,summarize}};
