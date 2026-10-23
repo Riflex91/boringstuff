@@ -28,6 +28,24 @@ assert.equal(Object.hasOwn(reservedRoles.ownedCreepRoles,''),false);
 assert.equal(JSON.parse(JSON.stringify(reservedRoles.ownedCreepRoles)).__proto__,2);
 assert.equal(result.spawnEnergy,300);
 assert.equal(result.controllerProgress,100);
+// Controller level is untrusted GET evidence too. Negative, fractional,
+// string, boolean and unsafe integer values must never be published as levels.
+assert.equal(result.controllerLevel,1);
+for(const [label,value] of [
+  ['null',null],['missing',undefined],['string','1'],['boolean',true],
+  ['negative',-1],['fraction',1.5],['unsafe',Number.MAX_SAFE_INTEGER+1]
+]) {
+  const malformed=assessWorldRuntime({...good,room:{objects:
+    good.room.objects.map(o=>o.type==='controller'?{...o,level:value}:o)
+  }},WORLD_PROFILE.branch);
+  assert.equal(malformed.controllerLevel,null,label+' controller level');
+  assert.equal(malformed.operationalReadiness.executionAuthority,false);
+}
+const zeroLevel=assessWorldRuntime({...good,room:{objects:
+  good.room.objects.map(o=>o.type==='controller'?{...o,level:0}:o)
+}},WORLD_PROFILE.branch);
+assert.equal(zeroLevel.controllerLevel,0);
+
 // World GET values are untrusted observations: null, strings, booleans,
 // negative values and fractions cannot be converted into fabricated energy
 // or controller progress. A genuine numeric zero remains observable.
