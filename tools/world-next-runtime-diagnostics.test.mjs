@@ -83,6 +83,35 @@ assert.equal(stringOwner.spawnVerified,true);
 assert.equal(stringOwner.ownedCreepCount,1);
 assert.equal(stringOwner.operationalReadiness.status,'UNVERIFIED');
 
+// A duplicate pinned Spawn GET is ambiguous even when one object has the
+// authenticated owner. No first-match energy/spawning or builder evidence
+// may escape from contradictory objects at the same pinned coordinates.
+for(const [label,duplicate] of [
+  ['same-owner',{...good.room.objects[0],energy:200,spawning:{name:'x'}}],
+  ['foreign-owner',{...good.room.objects[0],user:'other',energy:1}],
+  ['malformed-owner',{...good.room.objects[0],user:42,energy:1}]
+]) {
+  const ambiguous=assessWorldRuntime({...good,room:{objects:[
+    ...good.room.objects,duplicate
+  ]}},WORLD_PROFILE.branch);
+  assert.equal(ambiguous.ok,false,label);
+  assert.ok(ambiguous.failures.includes('PINNED_SPAWN_AMBIGUOUS'),label);
+  assert.equal(ambiguous.spawnVerified,null,label);
+  assert.equal(ambiguous.spawnEnergy,null,label);
+  assert.equal(ambiguous.spawnEnergyCapacity,null,label);
+  assert.equal(ambiguous.spawnSpawning,null,label);
+  assert.equal(ambiguous.spawnEnergyEvidence,'SPAWN_UNVERIFIED',label);
+  assert.equal(ambiguous.spawnEnergyCapacityEvidence,'SPAWN_UNVERIFIED',label);
+  assert.equal(ambiguous.currentRoomCrewRisk.status,'UNVERIFIED',label);
+  assert.equal(ambiguous.operationalReadiness.status,'HOLD',label);
+  assert.ok(ambiguous.operationalReadiness.reasons.includes(
+    'PINNED_SPAWN_AMBIGUOUS'),label);
+  assert.equal(ambiguous.operationalReadiness.executionAuthority,false,label);
+  assert.equal(ambiguous.failures.includes('OWNED_PINNED_SPAWN_MISSING'),
+    false,label+' ambiguous is not missing');
+}
+
+
 // GET creep memory may contain inherited object property names. Counting
 // must preserve those literal labels without prototype pollution or coercion.
 const reservedRoles=assessWorldRuntime({...good,room:{objects:[
