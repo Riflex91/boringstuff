@@ -88,8 +88,7 @@ function analyze(ledger, roomName, resourceType, policy, commitments) {
       ledger.rooms.length < 1 || ledger.rooms.length > 25 ||
       ledger.rooms.some(r=>!r || !safeName(r.roomName) ||
         r.availableToCommit !== null) ||
-      new Set(ledger.rooms.map(r=>r.roomName)).size !== ledger.rooms.length ||
-      !consistentGrossLedger(ledger))
+      new Set(ledger.rooms.map(r=>r.roomName)).size !== ledger.rooms.length)
     return failure('LEDGER_UNVERIFIED');
   const room = ledger.rooms.find(r=>r.roomName === roomName);
   if(!room || !room.resources || !room.resources.structures ||
@@ -99,6 +98,7 @@ function analyze(ledger, roomName, resourceType, policy, commitments) {
     room.resources.structures, resourceType)
     ? room.resources.structures[resourceType] : 0;
   if(!safeInteger(stock)) return failure('ROOM_STOCK_UNVERIFIED');
+  if(!consistentGrossLedger(ledger)) return failure('LEDGER_UNVERIFIED');
   if(!policy || typeof policy !== 'object' || !safeName(policy.owner) ||
       !safeTick(policy.observedTick) || !safeTick(policy.expiresTick) ||
       policy.observedTick > ledger.tick ||
