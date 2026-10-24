@@ -144,6 +144,44 @@ const futureType=assessWorldRuntime({...good,room:{objects:[
 assert.equal(futureType.ok,true);
 assert.equal(futureType.ownedCreepCount,1);
 
+// Contradictory explicit type aliases make the entire GET room census
+// untrustworthy: one object must not count as both a Spawn and a creep.
+for(const [label,object] of [
+  ['creep versus spawn',{type:'creep',structureType:'spawn',
+    x:37,y:26,name:'Spawn1',user:'me'}],
+  ['controller versus spawn',{type:'controller',structureType:'spawn',
+    x:37,y:26,name:'Spawn1',user:'me'}],
+  ['spawn versus controller',{type:'spawn',structureType:'controller',
+    x:37,y:26,name:'Spawn1',user:'me'}]
+]) {
+  const conflict=assessWorldRuntime({...good,room:{objects:[
+    ...good.room.objects,object
+  ]}},WORLD_PROFILE.branch);
+  assert.equal(conflict.ok,false,label);
+  assert.ok(conflict.failures.includes('ROOM_OBJECTS_MALFORMED'),label);
+  assert.equal(conflict.spawnVerified,null,label);
+  assert.equal(conflict.ownedCreepCount,null,label);
+  assert.equal(conflict.ownedCreepRoles,null,label);
+  assert.equal(conflict.controllerLevel,null,label);
+  assert.equal(conflict.controllerProgress,null,label);
+  assert.equal(conflict.currentRoomCrewRisk.status,'UNVERIFIED',label);
+  assert.equal(conflict.operationalReadiness.status,'HOLD',label);
+  assert.equal(conflict.operationalReadiness.executionAuthority,false,label);
+}
+// Equal aliases and generic structure wrappers remain valid GET shapes.
+for(const alias of [
+  {type:'spawn',structureType:'spawn'},
+  {type:'structure',structureType:'spawn'}
+]) {
+  const compatible=assessWorldRuntime({...good,room:{objects:
+    good.room.objects.map(o=>o.type==='spawn'?{...o,...alias}:o)
+  }},WORLD_PROFILE.branch);
+  assert.equal(compatible.ok,true);
+  assert.equal(compatible.spawnVerified,true);
+  assert.equal(compatible.ownedCreepCount,1);
+  assert.equal(compatible.operationalReadiness.status,'UNVERIFIED');
+}
+
 // Owner IDs in GET room objects must be verified strings. Numeric IDs
 // must not be coerced to authenticated IDs, and malformed owner evidence
 // cannot establish an absent owned Spawn or a zero-creep room.
