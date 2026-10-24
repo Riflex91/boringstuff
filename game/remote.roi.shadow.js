@@ -274,6 +274,27 @@ function estimateCosts(candidate, route, state, game, options) {
   };
 }
 
+// I2 must not price a route unless its room chain actually connects the
+// requested home and target. A nominal {ok:true} without endpoints or a
+// bounded confidence estimate is not credible transit evidence.
+function verifiedRoute(route, home, target) {
+  if (!route || route.ok !== true || !Array.isArray(route.rooms) ||
+      route.rooms.length < 2 || route.rooms.length > 50 ||
+      route.rooms[0] !== home ||
+      route.rooms[route.rooms.length - 1] !== target ||
+      typeof route.confidence !== 'number' ||
+      !Number.isFinite(route.confidence) ||
+      route.confidence < 0 || route.confidence > 1)
+    return false;
+  const visited = new Set();
+  for (const room of route.rooms) {
+    if (typeof room !== 'string' || !/^[WE][0-9]+[NS][0-9]+$/.test(room) ||
+        visited.has(room)) return false;
+    visited.add(room);
+  }
+  return true;
+}
+
 function evaluateCandidate(candidate, state, memoryRoot, game, options) {
   const home = homeRoom(state);
   const eligibility = candidateEligibility(candidate, state, memoryRoot, game, options);
@@ -318,7 +339,21 @@ function evaluateCandidate(candidate, state, memoryRoot, game, options) {
     });
   }
 
-  const routeHops = Math.max(0, (route.rooms || []).length - 1);
+  if (!verifiedRoute(route, home, candidate.roomName)) {
+    return Object.assign(base, {
+      status: 'UNAVAILABLE',
+      reason: 'ROUTE_EVIDENCE_INVALID',
+      economicallyViable: false,
+      capacityBudgetEligible: capacityBudgetEligible(state, game),
+      recommendedState: 'SUSPENDED',
+      score: 0,
+      netEnergyPerTick: null,
+      route: null,
+      economics: null
+    });
+  }
+
+  const routeHops = route.rooms.length - 1;
   const maxRouteHops = numberOption(options, 'maxRouteHops', DEFAULT_MAX_ROUTE_HOPS, 1, 10);
   if (routeHops > maxRouteHops) {
     return Object.assign(base, {
