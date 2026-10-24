@@ -192,6 +192,30 @@ assert.equal(malformedFields.spawnEnergyCapacity,null);
 assert.equal(malformedFields.operationalReadiness.executionAuthority,false);
 
 assert.equal(result.controllerProgress,100);
+// A room GET with duplicate controller objects cannot establish which
+// level/progress is current. Fail closed without confusing ambiguity with
+// the absence of a controller or granting execution authority.
+const duplicateController=assessWorldRuntime({...good,room:{objects:[
+  ...good.room.objects,{type:'controller',level:8,progress:9999}
+]}},WORLD_PROFILE.branch);
+assert.equal(duplicateController.ok,false);
+assert.ok(duplicateController.failures.includes('CONTROLLER_GET_AMBIGUOUS'));
+assert.equal(duplicateController.controllerLevel,null);
+assert.equal(duplicateController.controllerProgress,null);
+assert.equal(duplicateController.warnings.includes('CONTROLLER_NOT_OBSERVED'),false);
+assert.equal(duplicateController.operationalReadiness.status,'HOLD');
+assert.ok(duplicateController.operationalReadiness.reasons.includes(
+  'CONTROLLER_GET_AMBIGUOUS'));
+assert.equal(duplicateController.operationalReadiness.executionAuthority,false);
+const absentController=assessWorldRuntime({...good,room:{objects:
+  good.room.objects.filter(o=>o.type!=='controller')
+}},WORLD_PROFILE.branch);
+assert.equal(absentController.ok,true,'absent controller remains a GET warning');
+assert.ok(absentController.warnings.includes('CONTROLLER_NOT_OBSERVED'));
+assert.equal(absentController.controllerLevel,null);
+assert.equal(absentController.controllerProgress,null);
+assert.equal(absentController.operationalReadiness.executionAuthority,false);
+
 // Controller level is untrusted GET evidence too. Negative, fractional,
 // string, boolean and unsafe integer values must never be published as levels.
 assert.equal(result.controllerLevel,1);
