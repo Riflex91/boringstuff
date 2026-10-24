@@ -82,8 +82,14 @@ export function assessWorldRuntime({me,branches,status,room,memory},
   // A partially malformed room GET is not a trustworthy census. Do not
   // infer a missing Spawn or zero owned creeps by silently dropping entries.
   const roomObjectsAvailable=Array.isArray(room?.objects);
+  // Every room object needs a recognizable type discriminator. An opaque
+  // object could hide a Spawn or creep; ignoring it would fabricate an
+  // absent Spawn or a zero-creep census. Some GET shapes use structureType
+  // instead of type, so either nonblank string is sufficient evidence.
   const roomObjectsMalformed=roomObjectsAvailable&&room.objects.some(o=>
-    o===null||typeof o!=='object'||Array.isArray(o));
+    o===null||typeof o!=='object'||Array.isArray(o)||
+    ![o.type,o.structureType].some(v=>
+      typeof v==='string'&&v.trim().length>0));
   const roomObjectsVerified=roomObjectsAvailable&&!roomObjectsMalformed;
   if(!ownerVerified)failures.push('AUTH_UNVERIFIED');
   const list=Array.isArray(branches?.list)?branches.list:[];
