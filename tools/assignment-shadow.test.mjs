@@ -245,4 +245,90 @@ function request(id, kind, capability, amount, options = {}) {
   assert.equal(deferred.assignmentCount, plan.summary.assignmentCount);
 }
 
+// E1 is a room-local shadow planner. A foreign worker or request can have
+// higher strategic priority but must never enter local assignment accounting.
+{
+  const memory = {};
+  const local = creep('local-builder', 'builder',
+    {work: 2, carry: 2, move: 2}, 10, 10, 50);
+  const foreign = creep('foreign-builder', 'builder',
+    {work: 20, carry: 20, move: 20}, 10, 10, 50);
+  foreign.room.name = 'E2N1';
+  foreign.pos.roomName = 'E2N1';
+  const ghost = creep('contradictory-creep', 'worker',
+    {work: 5, carry: 5, move: 5}, 10, 10, 50);
+  ghost.room.name = 'E2N1'; // cannot claim local location from pos alone
+  const noPosition = creep('no-position', 'worker',
+    {work: 5, carry: 5, move: 5}, 10, 10, 50);
+  delete noPosition.pos;
+
+  const build = request('build-local', 'BUILD', 'workBuild', 2,
+    {base: 80, pos: {x: 12, y: 10, roomName: 'E1N1'}});
+  const foreignRequest = request('build-foreign', 'BUILD', 'workBuild', 2,
+    {base: 1000, roomName: 'E2N1'});
+  const contradictoryRequest = request('build-contradiction', 'BUILD',
+    'workBuild', 2, {base: 1000});
+  contradictoryRequest.target.pos.roomName = 'E2N1';
+  const unverifiedRequest = request('build-no-room', 'BUILD',
+    'workBuild', 2, {base: 1000});
+  delete unverifiedRequest.target.roomName;
+  delete unverifiedRequest.target.pos.roomName;
+
+  const inputs = JSON.stringify({
+    creeps: [local, foreign, ghost, noPosition],
+    requests: [build, foreignRequest, contradictoryRequest, unverifiedRequest]
+  });
+  const plan = assignment.plan('E1N1',
+    [build, foreignRequest, contradictoryRequest, unverifiedRequest],
+    [local, foreign, ghost, noPosition], memory, {time: 201});
+  assert.equal(plan.summary.requestCount, 1,
+    'Only requests grounded in the selected room are assignable');
+  assert.equal(plan.summary.executorCount, 1,
+    'Only verified room-local executors enter E1 assignment evidence');
+  assert.equal(plan.assignments.length, 1);
+  assert.equal(plan.assignments[0].executorId, 'local-builder');
+  assert.equal(plan.assignments[0].requestId, 'build-local');
+  assert.equal(plan.unfilled.length, 0);
+  assert.equal(plan.assignments[0].authority, 'SHADOW');
+  assert.equal(JSON.stringify({
+    creeps: [local, foreign, ghost, noPosition],
+    requests: [build, foreignRequest, contradictoryRequest, unverifiedRequest]
+  }), inputs, 'Locality checks do not mutate requests or Creeps');
+
+  const onlyForeign = assignment.plan('E1N1', [build], [foreign, ghost],
+    {}, {time: 202});
+  assert.equal(onlyForeign.assignments.length, 0);
+  assert.equal(onlyForeign.summary.executorCount, 0);
+  assert.equal(onlyForeign.unfilled.length, 1);
+  assert.equal(onlyForeign.unfilled[0].remaining, 2,
+    'Foreign workers cannot fabricate settled local capacity');
+
+  assert.equal(assignment._test.localExecutor(local, 'E1N1'), true);
+  assert.equal(assignment._test.localExecutor(foreign, 'E1N1'), false);
+  assert.equal(assignment._test.localExecutor(ghost, 'E1N1'), false);
+  assert.equal(assignment._test.localExecutor(noPosition, 'E1N1'), false);
+  assert.equal(assignment._test.localRequest(build, 'E1N1'), true);
+  assert.equal(assignment._test.localRequest(foreignRequest, 'E1N1'), false);
+  assert.equal(assignment._test.localRequest(contradictoryRequest, 'E1N1'), false);
+  assert.equal(assignment._test.localRequest(unverifiedRequest, 'E1N1'), false);
+}
+
+// Valid local E0 requests may have either target.roomName or a position room
+// as their verified locality. Two consistent fields remain accepted.
+{
+  const local = creep('single-evidence-worker', 'worker',
+    {work: 2, carry: 1, move: 2}, 11, 10, 50);
+  const onlyTarget = request('local-target-only', 'BUILD', 'workBuild', 1);
+  onlyTarget.target.pos = null;
+  const onlyPosition = request('local-position-only', 'REPAIR', 'workRepair', 1);
+  delete onlyPosition.target.roomName;
+  assert.equal(assignment._test.localRequest(onlyTarget, 'E1N1'), true);
+  assert.equal(assignment._test.localRequest(onlyPosition, 'E1N1'), true);
+  const p = assignment.plan('E1N1', [onlyTarget, onlyPosition], [local],
+    {}, {time: 205});
+  assert.equal(p.summary.requestCount, 2);
+  assert.equal(p.summary.executorCount, 1);
+  assert.equal(p.assignments.length, 1);
+}
+
 console.log('assignment shadow tests passed');
