@@ -46,6 +46,34 @@ assert.equal(result.ownedCreepCount,1);
  assert.ok(validMissingSpawn.operationalReadiness.reasons.includes(
    'OWNED_PINNED_SPAWN_MISSING'));
 
+// A room GET array containing malformed entries is not a complete census.
+// Do not silently ignore them and claim a missing Spawn or zero owned creeps.
+for(const [label,badObject] of [
+  ['null room entry',null],
+  ['numeric room entry',7],
+  ['string room entry','creep'],
+  ['nested array room entry',[]]
+]) {
+  const malformedRoom=assessWorldRuntime({...good,room:{objects:[
+    ...good.room.objects,badObject
+  ]}},WORLD_PROFILE.branch);
+  assert.equal(malformedRoom.ok,false,label);
+  assert.ok(malformedRoom.failures.includes('ROOM_OBJECTS_MALFORMED'),label);
+  assert.equal(malformedRoom.failures.includes('ROOM_OBJECTS_UNAVAILABLE'),false,label);
+  assert.equal(malformedRoom.failures.includes('OWNED_PINNED_SPAWN_MISSING'),
+    false,label+' must not claim absent Spawn');
+  assert.equal(malformedRoom.spawnVerified,null,label);
+  assert.equal(malformedRoom.ownedCreepCount,null,label);
+  assert.equal(malformedRoom.ownedCreepRoles,null,label);
+  assert.equal(malformedRoom.controllerLevel,null,label);
+  assert.equal(malformedRoom.controllerProgress,null,label);
+  assert.equal(malformedRoom.currentRoomCrewRisk.status,'UNVERIFIED',label);
+  assert.equal(malformedRoom.warnings.includes('NO_OWNED_CREEPS_OBSERVED'),
+    false,label);
+  assert.equal(malformedRoom.operationalReadiness.status,'HOLD',label);
+  assert.equal(malformedRoom.operationalReadiness.executionAuthority,false,label);
+}
+
 // Owner IDs in GET room objects must be verified strings. Numeric IDs
 // must not be coerced to authenticated IDs, and malformed owner evidence
 // cannot establish an absent owned Spawn or a zero-creep room.
