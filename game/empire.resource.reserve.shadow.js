@@ -44,6 +44,34 @@ function hold(reason, roomName, resourceType, tick) {
   };
 }
 
+// M0 produces both per-room gross structures and their empire-wide sum.
+// A self-declared OBSERVED status does not authenticate contradictory stock.
+// Verify the complete census before reporting even a theoretical surplus.
+function validStockMap(stock) {
+  return stock && typeof stock === 'object' && !Array.isArray(stock) &&
+    Object.keys(stock).every(resource =>
+      safeResource(resource) && safeInteger(stock[resource]));
+}
+function consistentGrossLedger(ledger) {
+  const reported = ledger.totals && ledger.totals.structures;
+  if(!validStockMap(reported)) return false;
+  const computed = Object.create(null);
+  for(const room of ledger.rooms) {
+    const stock = room.resources && room.resources.structures;
+    if(!validStockMap(stock)) return false;
+    for(const resource of Object.keys(stock)) {
+      const total = (computed[resource] || 0) + stock[resource];
+      if(!safeInteger(total)) return false;
+      computed[resource] = total;
+    }
+  }
+  const keys = Object.keys(computed);
+  return keys.length === Object.keys(reported).length &&
+    keys.every(resource =>
+      Object.prototype.hasOwnProperty.call(reported, resource) &&
+      reported[resource] === computed[resource]);
+}
+
 // Policy and commitments are unverified upstream policy assertions.
 // Validation proves only numeric and temporal consistency. A positive
 // gross-stock upper bound NEVER proves terminal-accessible supply, collateral,
@@ -60,7 +88,8 @@ function analyze(ledger, roomName, resourceType, policy, commitments) {
       ledger.rooms.length < 1 || ledger.rooms.length > 25 ||
       ledger.rooms.some(r=>!r || !safeName(r.roomName) ||
         r.availableToCommit !== null) ||
-      new Set(ledger.rooms.map(r=>r.roomName)).size !== ledger.rooms.length)
+      new Set(ledger.rooms.map(r=>r.roomName)).size !== ledger.rooms.length ||
+      !consistentGrossLedger(ledger))
     return failure('LEDGER_UNVERIFIED');
   const room = ledger.rooms.find(r=>r.roomName === roomName);
   if(!room || !room.resources || !room.resources.structures ||
