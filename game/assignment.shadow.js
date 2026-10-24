@@ -195,6 +195,28 @@ function requestAssignable(request) {
   return true;
 }
 
+// E1 produces ROOM-LOCAL shadow assignments. A high priority score may not
+// convert an explicitly foreign target or executor into an available local job.
+// Missing locality evidence also fails closed instead of receiving zero-range
+// scoring and an artificial locality bonus.
+function localRequest(request, roomName) {
+  const target = request && request.target;
+  if (typeof roomName !== 'string' || !roomName || !target) return false;
+  const declared = target.roomName;
+  const positionRoom = target.pos && target.pos.roomName;
+  if (!declared && !positionRoom) return false;
+  if (declared && declared !== roomName) return false;
+  if (positionRoom && positionRoom !== roomName) return false;
+  return true;
+}
+
+function localExecutor(creep, roomName) {
+  if (!creep || typeof roomName !== 'string' || !roomName ||
+      !creep.pos || creep.pos.roomName !== roomName) return false;
+  const physicalRoom = creep.room && creep.room.name;
+  return !physicalRoom || physicalRoom === roomName;
+}
+
 function plan(roomName, requests, creeps, memoryRoot, game) {
   const now = tick(game);
   const roomState = ensureRoom(roomName, memoryRoot);
@@ -202,8 +224,10 @@ function plan(roomName, requests, creeps, memoryRoot, game) {
     const failure = roomState.failures[key];
     if (!failure || !Number.isFinite(failure.untilTick) || now >= failure.untilTick) delete roomState.failures[key];
   }
-  const activeRequests = (requests || []).filter(requestAssignable);
-  const executors = (creeps || []).filter(c => c && !c.spawning && (c.id || c.name));
+  const activeRequests = (requests || []).filter(request =>
+    requestAssignable(request) && localRequest(request, roomName));
+  const executors = (creeps || []).filter(c =>
+    c && !c.spawning && (c.id || c.name) && localExecutor(c, roomName));
   const remaining = {};
   for (const request of activeRequests) {
     const progressed = request.progress && Number.isFinite(request.progress.amount) ? request.progress.amount : 0;
@@ -353,5 +377,5 @@ module.exports = {
   recordFailure,
   snapshot,
   deferredSnapshot,
-  _test: { bodyParts, role, carriedEnergy, executorProfile, capabilityFor, localRange, deadlineUrgency, pairKey, activeFailure, requestActive, requestAssignable }
+  _test: { bodyParts, role, carriedEnergy, executorProfile, capabilityFor, localRange, deadlineUrgency, pairKey, activeFailure, requestActive, requestAssignable, localRequest, localExecutor }
 };
