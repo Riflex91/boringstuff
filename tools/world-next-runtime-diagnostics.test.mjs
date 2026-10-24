@@ -557,3 +557,44 @@ assert.equal(uniqueDualIds.ownedCreepCount,2);
 assert.equal(uniqueDualIds.operationalReadiness.status,'UNVERIFIED');
 
 console.log('W37S79 runtime diagnostics: PASS');
+
+// A supplied but malformed creep identity cannot be silently skipped by
+// duplicate detection. Unknown identity is not a verified crew census,
+// including when the malformed creep belongs to a different owner.
+for(const [label,patch] of [
+  ['numeric _id',{_id:42}],
+  ['object id',{id:{untrusted:true}}],
+  ['null id',{id:null}],
+  ['empty name',{name:''}],
+  ['whitespace name',{name:'   '}],
+  ['array name',{name:[]}]
+]) {
+  const invalid=assessWorldRuntime({...good,room:{objects:[
+    ...good.room.objects.filter(o=>o.type!=='creep'),
+    {...crewBase[0],...patch}
+  ]}},WORLD_PROFILE.branch);
+  assert.equal(invalid.ok,false,label);
+  assert.ok(invalid.failures.includes('ROOM_CREEP_IDENTITY_UNVERIFIED'),label);
+  assert.equal(invalid.ownedCreepCount,null,label);
+  assert.equal(invalid.ownedCreepRoles,null,label);
+  assert.equal(invalid.currentRoomCrewRisk.status,'UNVERIFIED',label);
+  assert.equal(invalid.warnings.includes('NO_OWNED_CREEPS_OBSERVED'),false,label);
+  assert.equal(invalid.operationalReadiness.status,'HOLD',label);
+  assert.equal(invalid.operationalReadiness.executionAuthority,false,label);
+}
+const invalidForeignIdentity=assessWorldRuntime({...good,room:{objects:[
+  ...good.room.objects.filter(o=>o.type!=='creep'),
+  {...crewBase[0],user:'another-user',id:12}
+]}},WORLD_PROFILE.branch);
+assert.ok(invalidForeignIdentity.failures.includes('ROOM_CREEP_IDENTITY_UNVERIFIED'));
+assert.equal(invalidForeignIdentity.ownedCreepCount,null);
+// Absent optional IDs/names in older GET responses are not malformed.
+const legacyIdentityAbsent=assessWorldRuntime({...good,room:{objects:[
+  ...good.room.objects.filter(o=>o.type!=='creep'),
+  {type:'creep',user:'me',memory:{role:'harvester'}}
+]}},WORLD_PROFILE.branch);
+assert.equal(legacyIdentityAbsent.ok,true);
+assert.equal(legacyIdentityAbsent.ownedCreepCount,1);
+assert.equal(legacyIdentityAbsent.ownedCreepRoles.harvester,1);
+assert.equal(legacyIdentityAbsent.failures.includes('ROOM_CREEP_IDENTITY_UNVERIFIED'),false);
+assert.equal(uniqueDualIds.failures.includes('ROOM_CREEP_IDENTITY_UNVERIFIED'),false);
