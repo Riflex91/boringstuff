@@ -202,7 +202,14 @@ export function assessWorldRuntime({me,branches,status,room,memory},
     Object.hasOwn(controller,'level')&&
     (!Number.isSafeInteger(controller.level)||
       controller.level<0||controller.level>8);
+  // A present malformed controller progress value is contradictory GET
+  // evidence, not a verified absence of progress. Preserve valid level
+  // evidence independently but hold operational readiness on this failure.
+  const controllerProgressInvalid=Boolean(controller)&&
+    Object.hasOwn(controller,'progress')&&
+    (!Number.isSafeInteger(controller.progress)||controller.progress<0);
   if(controllerLevelInvalid)failures.push('CONTROLLER_LEVEL_INVALID');
+  if(controllerProgressInvalid)failures.push('CONTROLLER_PROGRESS_INVALID');
   if(roomObjectsVerified&&!controller&&!controllerAmbiguous)
     warnings.push('CONTROLLER_NOT_OBSERVED');
   if(crewVerified&&!creeps.length)
@@ -266,7 +273,7 @@ export function assessWorldRuntime({me,branches,status,room,memory},
     ownedCreepRoles:crewVerified?ownedCreepRoles:null,
     controllerLevel:Number.isSafeInteger(controller?.level)&&
       controller.level>=0&&controller.level<=8?controller.level:null,
-    controllerProgress:!controllerLevelInvalid&&
+    controllerProgress:!controllerLevelInvalid&&!controllerProgressInvalid&&
       Number.isSafeInteger(controller?.progress)&&controller.progress>=0?
       controller.progress:null,
     memoryAvailable:recoveryEvidence.availability!=='UNKNOWN',
