@@ -158,6 +158,79 @@ function makeRoom(name = 'E1N1') {
   assert.equal(snap.lastInvalidation.reason, 'HOSTILE_ROUTE_INVALIDATION');
 }
 
+// P1: dynamic threat exclusions must not reuse a route cached under
+// different risk conditions. Array, Set and map forms describe the same
+// exclusion set; a caller-owned callback is opaque and must bypass cache.
+{
+  const memory = {};
+  let calls = 0;
+  const map = {
+    findRoute(from, to, options) {
+      calls++;
+      const blocked = options.routeCallback('E1N2', from) === Infinity;
+      return blocked
+        ? [{ exit: 3, room: 'E1N4' }, { exit: 3, room: to }]
+        : [{ exit: 3, room: 'E1N2' }, { exit: 3, room: to }];
+    }
+  };
+  const query = (tick, extra = {}) => routeCache.getWorldRoute(
+    'E1N1', 'E1N3', { tick, map, ...extra }, memory);
+
+  const plain = query(10);
+  assert.equal(plain.cached, false);
+  assert.deepEqual(plain.rooms, ['E1N1', 'E1N2', 'E1N3']);
+  assert.equal(calls, 1);
+
+  const blocked = new Set(['E1N2']);
+  const avoid = query(11, { hostileRooms: blocked });
+  assert.equal(avoid.cached, false,
+    'A plain route must not bypass newly supplied hostile exclusions');
+  assert.deepEqual(avoid.rooms, ['E1N1', 'E1N4', 'E1N3']);
+  assert.notEqual(avoid.key, plain.key);
+  assert.equal(calls, 2);
+
+  const sameExclusion = query(12, {
+    hostileRooms: { E1N2: true, E1N4: false }
+  });
+  assert.equal(sameExclusion.cached, true,
+    'Set, Array and object exclusions share a canonical cache signature');
+  assert.equal(calls, 2);
+  assert.equal(routeCache.worldKey('E1N1', 'E1N3',
+    { hostileRooms: ['E1N2', 'E1N2'] }), avoid.key);
+  assert.equal(routeCache.worldKey('E1N1', 'E1N3',
+    { hostileRooms: ['E1N2', 'E1N4'] }) === avoid.key, false);
+
+  // Mutating caller-owned threat data on the following tick must not
+  // accidentally reuse the route computed under the old exclusions.
+  blocked.clear();
+  const relaxed = query(13, { hostileRooms: blocked });
+  assert.equal(relaxed.cached, true);
+  assert.deepEqual(relaxed.rooms, plain.rooms);
+  assert.equal(calls, 2);
+
+  // A custom callback may depend on changing external intel even if its
+  // routeClass/profile are identical. Do not read or write shared cache.
+  let exclude = true;
+  const mutableCallback = roomName =>
+    roomName === 'E1N2' && exclude ? Infinity : 1;
+  const customAvoid = query(14, { routeCallback: mutableCallback });
+  assert.equal(customAvoid.cached, false);
+  assert.deepEqual(customAvoid.rooms, avoid.rooms);
+  assert.equal(calls, 3);
+  exclude = false;
+  const customAllow = query(15, { routeCallback: mutableCallback });
+  assert.equal(customAllow.cached, false);
+  assert.deepEqual(customAllow.rooms, plain.rooms);
+  assert.equal(calls, 4);
+
+  const afterCallback = query(16);
+  assert.equal(afterCallback.cached, true);
+  assert.deepEqual(afterCallback.rooms, plain.rooms);
+  assert.equal(routeCache.snapshot(memory).worldRoutes, 2,
+    'Opaque callback routes must not poison shared cached routes');
+  assert.equal(calls, 4);
+}
+
 {
   const memory = {};
   const room = makeRoom();

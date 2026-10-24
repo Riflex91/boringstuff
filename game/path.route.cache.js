@@ -67,7 +67,13 @@ function stableProfileKey(profile) {
 
 function worldKey(fromRoom, toRoom, options) {
   const routeClass = options && options.routeClass ? String(options.routeClass) : 'default';
-  return String(fromRoom) + '>' + String(toRoom) + '|' + stableProfileKey(options && options.profile) + '|' + routeClass;
+  // Hostile transit exclusions affect route feasibility and must participate
+  // in cache identity. Ignore false entries and canonicalize Array/Set/maps.
+  const hostileRooms = normalizeHostileRooms(options && options.hostileRooms);
+  const blocked = Object.keys(hostileRooms).filter(name => hostileRooms[name]).sort();
+  const hostileKey = blocked.length ? '|hostile:' + JSON.stringify(blocked) : '';
+  return String(fromRoom) + '>' + String(toRoom) + '|' +
+    stableProfileKey(options && options.profile) + '|' + routeClass + hostileKey;
 }
 
 function posOf(value) {
@@ -163,10 +169,14 @@ function getWorldRoute(fromRoom, toRoom, options, root) {
   const store = ensure(root);
   const tick = nowTick(opts);
   const ttl = Number.isFinite(opts.ttl) ? Math.max(0, opts.ttl) : DEFAULT_WORLD_TTL;
-  const key = worldKey(fromRoom, toRoom, opts);
+  // A caller-owned callback may close over mutable threat or road state.
+  // It has no durable signature, so never reuse or persist its result.
+  const dynamicCallback = typeof opts.routeCallback === 'function';
+  const hostileRooms = normalizeHostileRooms(opts.hostileRooms);
+  const key = worldKey(fromRoom, toRoom, Object.assign({}, opts, { hostileRooms }));
   const cached = store.world[key];
 
-  if (cacheFresh(cached, tick, ttl)) {
+  if (!dynamicCallback && cacheFresh(cached, tick, ttl)) {
     cached.lastUsedTick = tick;
     cached.hits = (cached.hits || 0) + 1;
     store.stats.worldHits += 1;
@@ -186,8 +196,7 @@ function getWorldRoute(fromRoom, toRoom, options, root) {
     return { ok: false, cached: false, key, reason: 'MAP_UNAVAILABLE', rooms: [] };
   }
 
-  const hostileRooms = normalizeHostileRooms(opts.hostileRooms);
-  const userCallback = typeof opts.routeCallback === 'function' ? opts.routeCallback : null;
+  const userCallback = dynamicCallback ? opts.routeCallback : null;
   const route = map.findRoute(fromRoom, toRoom, {
     routeCallback(roomName, from) {
       if (hostileRooms[roomName] && roomName !== toRoom) return Infinity;
@@ -202,20 +211,22 @@ function getWorldRoute(fromRoom, toRoom, options, root) {
 
   const rooms = routeRooms(fromRoom, route);
   const confidence = routeConfidence(rooms, opts.intelProvider);
-  store.world[key] = {
-    schemaVersion: SCHEMA_VERSION,
-    fromRoom,
-    toRoom,
-    profileKey: stableProfileKey(opts.profile),
-    routeClass: opts.routeClass || 'default',
-    rooms,
-    confidence,
-    createdTick: tick,
-    lastUsedTick: tick,
-    hits: 0
-  };
+  if (!dynamicCallback) {
+    store.world[key] = {
+      schemaVersion: SCHEMA_VERSION,
+      fromRoom,
+      toRoom,
+      profileKey: stableProfileKey(opts.profile),
+      routeClass: opts.routeClass || 'default',
+      rooms,
+      confidence,
+      createdTick: tick,
+      lastUsedTick: tick,
+      hits: 0
+    };
 
-  trimOldest(store.world, MAX_WORLD_ROUTES);
+    trimOldest(store.world, MAX_WORLD_ROUTES);
+  }
 
   return {
     ok: true,
