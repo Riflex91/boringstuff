@@ -242,4 +242,79 @@ function routeProvider(from, to) {
   assert.deepEqual(discovered, []);
 }
 
+// I2: a route adapter returning ok=true is insufficient evidence for
+// amortized travel cost. Reject wrong endpoints, cycles and malformed
+// confidence before producing any candidate economic viability estimate.
+{
+  const home = 'W6N6', target = 'W6N7';
+  const fixtures = [
+    ['missing room sequence', { ok: true, confidence: 1 }],
+    ['empty sequence', { ok: true, rooms: [], confidence: 1 }],
+    ['only home', { ok: true, rooms: [home], confidence: 1 }],
+    ['wrong origin', { ok: true, rooms: ['W6N5', target], confidence: 1 }],
+    ['wrong destination', { ok: true, rooms: [home, 'W6N5'], confidence: 1 }],
+    ['missing target', { ok: true, rooms: [home], confidence: 1 }],
+    ['repeat cycle', { ok: true, rooms: [home, target, home, target], confidence: 1 }],
+    ['malformed intermediate', { ok: true, rooms: [home, null, target], confidence: 1 }],
+    ['unrecognized room', { ok: true, rooms: [home, 'unknown', target], confidence: 1 }],
+    ['missing confidence', { ok: true, rooms: [home, target] }],
+    ['NaN confidence', { ok: true, rooms: [home, target], confidence: NaN }],
+    ['negative confidence', { ok: true, rooms: [home, target], confidence: -0.2 }],
+    ['inflated confidence', { ok: true, rooms: [home, target], confidence: 1.5 }],
+    ['boolean proof', { ok: 'yes', rooms: [home, target], confidence: 1 }],
+    ['unbounded route', {
+      ok: true, rooms: [home, ...Array.from({length: 50}, (_, i) => 'W'+(i+7)+'N8'), target],
+      confidence: 1
+    }]
+  ];
+  for (const [label, route] of fixtures) {
+    const memory = memoryWith([
+      record(home, 9000, [target], { my: true, sourceCount: 2 }),
+      record(target, 9000, [home], { sourceCount: 2 })
+    ]);
+    const result = remoteRoi.evaluate(state(home), memory, game(9000), {
+      routeProvider(from, to) {
+        assert.equal(from, home, label);
+        assert.equal(to, target, label);
+        return route;
+      }
+    });
+    assert.equal(result.candidates[0].status, 'UNAVAILABLE', label);
+    assert.equal(result.candidates[0].reason, 'ROUTE_EVIDENCE_INVALID', label);
+    assert.equal(result.candidates[0].economicallyViable, false, label);
+    assert.equal(result.candidates[0].recommendedState, 'SUSPENDED', label);
+    assert.equal(result.candidates[0].netEnergyPerTick, null, label);
+    assert.equal(result.candidates[0].economics, null, label);
+    assert.equal(result.readyCount, 0, label);
+    assert.equal(result.recommendedCandidateCount, 0, label);
+    assert.equal(result.bestCandidate, null, label);
+    const saved = memory.bot.worldIntel.rooms[target].economics.remoteScore.byHome[home];
+    assert.equal(saved.activationAuthority, 'NONE', label);
+    assert.equal(saved.status, 'UNAVAILABLE', label);
+  }
+}
+// Zero confidence is valid negative evidence, not permission to claim a
+// profitable remote. A direct, fully verified route remains advisory.
+{
+  const home = 'W7N7', target = 'W7N8';
+  for (const confidence of [0, 1]) {
+    const memory = memoryWith([
+      record(home, 9100, [target], { my: true, sourceCount: 2 }),
+      record(target, 9100, [home], { sourceCount: 2 })
+    ]);
+    const out = remoteRoi.evaluate(state(home), memory, game(9100), {
+      routeProvider: (from, to) => ({
+        ok: true, rooms: [from, to], confidence
+      })
+    });
+    const candidate = out.candidates[0];
+    assert.equal(candidate.status, 'READY');
+    assert.equal(candidate.activationAuthority, 'NONE');
+    assert.equal(candidate.route.hops, 1);
+    assert.equal(candidate.economics.confidence, confidence);
+    assert.equal(candidate.economicallyViable, confidence === 1);
+    assert.equal(candidate.recommendedState,
+      confidence === 1 ? 'CANDIDATE' : 'SUSPENDED');
+  }
+}
 console.log('remote ROI shadow tests passed');
