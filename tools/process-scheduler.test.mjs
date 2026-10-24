@@ -130,4 +130,38 @@ function context(tick, bucket, cpuValues) {
   assert.equal(scheduler.run(background, () => {}, context(4, 3000), memory).ran, true);
 }
 
+
+{
+  // K1: a private-server tick reset must not leave persisted background work
+  // asleep until the previous (much larger) Game.time is reached again.
+  const memory = {};
+  const descriptor = {
+    id: 'tick-reset-background',
+    priorityClass: scheduler.PRIORITY.BACKGROUND,
+    minimumInterval: 500,
+    freshnessRequirement: 50
+  };
+  let calls = 0;
+  assert.equal(scheduler.run(descriptor, () => { calls++; }, context(10000, 8000), memory).ran, true);
+  const afterReset = scheduler.run(descriptor, () => { calls++; }, context(10, 8000), memory);
+  assert.equal(afterReset.ran, true);
+  assert.equal(afterReset.reason, 'FRESHNESS_DUE');
+  assert.equal(scheduler.snapshot(memory).processes[descriptor.id].lastRunTick, 10);
+  assert.equal(scheduler.run(descriptor, () => { calls++; }, context(11, 8000), memory).reason, 'MINIMUM_INTERVAL');
+  assert.equal(calls, 2);
+}
+
+{
+  // A tick rollback does not bypass the ordinary low-bucket safety floor.
+  const state = { lastRunTick: 10000 };
+  const result = scheduler.decision({
+    priorityClass: scheduler.PRIORITY.BACKGROUND,
+    minimumInterval: 500,
+    freshnessRequirement: 50
+  }, state, context(10, 500));
+  assert.equal(result.run, false);
+  assert.equal(result.reason, 'BUCKET_BELOW_FLOOR');
+  assert.equal(result.stale, true);
+}
+
 console.log('process scheduler tests passed');
