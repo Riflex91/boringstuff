@@ -127,6 +127,35 @@ for(const [label,opaque] of [
   assert.equal(unknown.operationalReadiness.status,'HOLD',label);
   assert.equal(unknown.operationalReadiness.executionAuthority,false,label);
 }
+// A valid secondary discriminator cannot sanitize a malformed supplied
+// primary discriminator (or vice versa). An incomplete GET census must
+// never claim a missing pinned Spawn or an empty owned crew.
+for(const [label,badObject] of [
+  ['numeric type with valid structureType',{type:42,structureType:'spawn'}],
+  ['null type with valid structureType',{type:null,structureType:'spawn'}],
+  ['blank type with valid structureType',{type:'  ',structureType:'spawn'}],
+  ['array type with valid structureType',{type:[],structureType:'spawn'}],
+  ['numeric structureType with valid type',{type:'spawn',structureType:42}],
+  ['null structureType with valid type',{type:'spawn',structureType:null}],
+  ['blank structureType with valid type',{type:'spawn',structureType:'  '}],
+  ['array structureType with valid type',{type:'spawn',structureType:[]}]
+]) {
+  const invalid=assessWorldRuntime({...good,room:{objects:[
+    ...good.room.objects,badObject
+  ]}},WORLD_PROFILE.branch);
+  assert.equal(invalid.ok,false,label);
+  assert.ok(invalid.failures.includes('ROOM_OBJECTS_MALFORMED'),label);
+  assert.equal(invalid.spawnVerified,null,label);
+  assert.equal(invalid.ownedCreepCount,null,label);
+  assert.equal(invalid.ownedCreepRoles,null,label);
+  assert.equal(invalid.controllerLevel,null,label);
+  assert.equal(invalid.controllerProgress,null,label);
+  assert.equal(invalid.warnings.includes('NO_OWNED_CREEPS_OBSERVED'),false,label);
+  assert.equal(invalid.failures.includes('OWNED_PINNED_SPAWN_MISSING'),false,label);
+  assert.equal(invalid.currentRoomCrewRisk.status,'UNVERIFIED',label);
+  assert.equal(invalid.operationalReadiness.status,'HOLD',label);
+  assert.equal(invalid.operationalReadiness.executionAuthority,false,label);
+}
 // Older GET shapes may use structureType instead of type. Do not turn a
 // recognizable Spawn into an opaque object or manufacture a missing Spawn.
 const structureOnlySpawn=assessWorldRuntime({...good,room:{objects:[
