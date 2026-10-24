@@ -80,7 +80,7 @@ function empty() {
 }
 
 function add(store, totals, errors, seen, entityId) {
-  if (!store || typeof store !== 'object') {
+  if (!store || typeof store !== 'object' || Array.isArray(store)) {
     errors.add('STORE_MISSING');
     return;
   }
@@ -165,6 +165,12 @@ function snapshot(states, tick) {
     const carried = empty();
     const productionInfrastructure = emptyProduction();
     for (const s of state.structures) {
+      // A malformed GET census member cannot be silently treated as foreign
+      // or as an empty inventory; keep the entire gross snapshot PARTIAL.
+      if (!s || typeof s !== 'object' || Array.isArray(s)) {
+        errors.add('ROOM_INVENTORY_INCOMPLETE');
+        continue;
+      }
       if (!structureEligible(s)) continue;
       // Hardware presence is a verified fact, not permission to produce.
       // Ignore unowned/neutral installations and deduplicate by object ID;
@@ -188,7 +194,11 @@ function snapshot(states, tick) {
         add(s.store, heldInTerminal, errors, seenTerminalIds, s.id);
     }
     for (const c of state.creeps) {
-      if (!c || c.my === false) continue;
+      if (!c || typeof c !== 'object' || Array.isArray(c)) {
+        errors.add('ROOM_INVENTORY_INCOMPLETE');
+        continue;
+      }
+      if (c.my === false) continue;
       add(c.store, carried, errors, seenEntities, c.id || c.name);
     }
     for (const [resource, amount] of Object.entries(held)) {
