@@ -125,6 +125,8 @@ function summarise(points,tick){
   return {authority:'SHADOW_EVIDENCE',actionAuthority:'NONE',
     status:'ALIGNED',diagnosis,
     confidence:'TIMING_ALIGNED_AGGREGATES_NOT_TARGET_LEVEL_CAUSALITY',
+    causalRepairDeficit:'NOT_ESTABLISHED_WITHOUT_SAME_TARGET_SETTLED_DAMAGE_AND_REPAIR',
+    liveDefenseOutcome:'NOT_ESTABLISHED_WITHOUT_REAL_HOSTILE_COMBAT_OUTCOME',
     windowStartTick:points[0].tick,windowEndTick:tick,
     sampledConsecutiveTicks:points.length,
     latestPhysicalRisk:last.risk,
