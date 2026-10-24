@@ -99,6 +99,11 @@ export function assessWorldRuntime({me,branches,status,room,memory},
   // Generic "structure" is a permitted wrapper for a concrete structureType.
   const roomObjectsMalformed=roomObjectsAvailable&&room.objects.some(o=>
     o===null||typeof o!=='object'||Array.isArray(o)||
+    // Every supplied alias is evidence: a valid structureType must not
+    // conceal a malformed explicit type (or vice versa). Missing aliases
+    // remain supported for legacy GET responses.
+    ['type','structureType'].some(field=>Object.hasOwn(o,field)&&
+      (typeof o[field]!=='string'||o[field].trim().length===0))||
     ![o.type,o.structureType].some(v=>
       typeof v==='string'&&v.trim().length>0)||
     (typeof o.type==='string'&&o.type.trim().length>0&&
