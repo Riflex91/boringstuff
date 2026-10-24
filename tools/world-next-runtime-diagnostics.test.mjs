@@ -706,3 +706,55 @@ assert.equal(legacyIdentityAbsent.ownedCreepCount,1);
 assert.equal(legacyIdentityAbsent.ownedCreepRoles.harvester,1);
 assert.equal(legacyIdentityAbsent.failures.includes('ROOM_CREEP_IDENTITY_UNVERIFIED'),false);
 assert.equal(uniqueDualIds.failures.includes('ROOM_CREEP_IDENTITY_UNVERIFIED'),false);
+
+// A valid structureType-only GET object cannot disappear from the creep
+// census or controller observations merely because "type" is absent.
+const aliasRoomBase=good.room.objects.filter(o=>o.type==='spawn');
+const aliasCreep=assessWorldRuntime({...good,room:{objects:[
+  ...aliasRoomBase,
+  {structureType:'creep',id:'alias-creep',user:'me',
+    memory:{role:'harvester'}},
+  {type:'controller',level:5,progress:123}
+]}},WORLD_PROFILE.branch);
+assert.equal(aliasCreep.ok,true,'structureType-only creep GET aliases');
+assert.equal(aliasCreep.ownedCreepCount,1);
+assert.equal(aliasCreep.ownedCreepRoles.harvester,1);
+assert.equal(aliasCreep.warnings.includes('NO_OWNED_CREEPS_OBSERVED'),false);
+const aliasForeign=assessWorldRuntime({...good,room:{objects:[
+  ...aliasRoomBase,{structureType:'creep',id:'foreign',user:'other'},
+  {type:'controller',level:5}
+]}},WORLD_PROFILE.branch);
+assert.equal(aliasForeign.ok,true);
+assert.equal(aliasForeign.ownedCreepCount,0,
+  'valid foreign structureType-only creep is not owned');
+const aliasBadOwner=assessWorldRuntime({...good,room:{objects:[
+  ...aliasRoomBase,{structureType:'creep',id:'unknown',user:null}
+]}},WORLD_PROFILE.branch);
+assert.ok(aliasBadOwner.failures.includes('ROOM_CREEP_OWNER_UNVERIFIED'));
+assert.equal(aliasBadOwner.ownedCreepCount,null);
+assert.equal(aliasBadOwner.warnings.includes('NO_OWNED_CREEPS_OBSERVED'),false);
+assert.equal(aliasBadOwner.operationalReadiness.status,'HOLD');
+const aliasDuplicate=assessWorldRuntime({...good,room:{objects:[
+  ...aliasRoomBase,
+  {structureType:'creep',id:'duplicate',user:'me'},
+  {type:'creep',id:'duplicate',user:'me'}
+]}},WORLD_PROFILE.branch);
+assert.ok(aliasDuplicate.failures.includes('ROOM_CREEP_DUPLICATE_IDENTITY'));
+assert.equal(aliasDuplicate.ownedCreepCount,null);
+assert.equal(aliasDuplicate.operationalReadiness.status,'HOLD');
+const aliasController=assessWorldRuntime({...good,room:{objects:[
+  ...aliasRoomBase,{structureType:'controller',level:5,progress:123}
+]}},WORLD_PROFILE.branch);
+assert.equal(aliasController.ok,true);
+assert.equal(aliasController.controllerLevel,5);
+assert.equal(aliasController.controllerProgress,123);
+assert.equal(aliasController.warnings.includes('CONTROLLER_NOT_OBSERVED'),false);
+const aliasControllerDuplicate=assessWorldRuntime({...good,room:{objects:[
+  ...aliasRoomBase,
+  {structureType:'controller',level:5},
+  {type:'controller',level:6}
+]}},WORLD_PROFILE.branch);
+assert.ok(aliasControllerDuplicate.failures.includes('CONTROLLER_GET_AMBIGUOUS'));
+assert.equal(aliasControllerDuplicate.controllerLevel,null);
+assert.equal(aliasControllerDuplicate.operationalReadiness.status,'HOLD');
+assert.equal(aliasControllerDuplicate.operationalReadiness.executionAuthority,false);
