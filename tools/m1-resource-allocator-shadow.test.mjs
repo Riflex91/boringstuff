@@ -100,6 +100,56 @@ function plan(l=ledger,r=request,o=offerSet){return allocator.evaluate(l,r,o);}
     'unavailable market quotes are not eligible');
   assert.deepEqual(p.reasonCodes,['UNVERIFIED_OFFERS_EXCLUDED']);
 }
+// Source-terminal and buyer-terminal observations must be components of
+// the observed gross structures census, not a second, independently forged
+// store. A valid quote cannot compensate for contradicted M0 ownership data.
+for (const [name, corrupt] of [
+  ['inflated buyer energy', l => { l.rooms.find(r=>r.roomName==='E7N1')
+    .resources.terminal.energy=101; }],
+  ['invented donor mineral', l => { l.rooms.find(r=>r.roomName==='E8N1')
+    .resources.terminal.Z=61; }],
+  ['invented donor resource', l => { l.rooms.find(r=>r.roomName==='E8N1')
+    .resources.terminal.U=1; }],
+  ['negative terminal stock', l => { l.rooms[0].resources.terminal.energy=-1; }],
+  ['fractional terminal stock', l => { l.rooms[0].resources.terminal.energy=0.5; }],
+  ['unsafe terminal stock', l => { l.rooms[0].resources.terminal.energy=
+    Number.MAX_SAFE_INTEGER+1; }],
+  ['negative gross stock', l => { l.rooms[0].resources.structures.energy=-1; }],
+  ['fractional gross stock', l => { l.rooms[0].resources.structures.energy=1.5; }],
+  ['null gross stock', l => { l.rooms[0].resources.structures.energy=null; }],
+  ['no terminal hardware', l => {
+    l.rooms.find(r=>r.roomName==='E8N1').productionInfrastructure.terminals=0;
+  }],
+  ['terminal snapshot array', l => { l.rooms[0].resources.terminal=[]; }],
+  ['gross stock snapshot array', l => { l.rooms[0].resources.structures=[]; }]
+]) {
+  const contradiction=JSON.parse(JSON.stringify(ledger));
+  corrupt(contradiction);
+  const p=plan(contradiction);
+  assert.equal(p.status,'HOLD',name);
+  assert.deepEqual(p.reasonCodes,['LEDGER_UNVERIFIED'],name);
+  assert.equal(p.selected,null,name);
+  assert.deepEqual(p.alternatives,[],name);
+  assert.equal(p.command,'NO_ACTION',name);
+  assert.equal(p.verifiedAvailableToCommit,null,name);
+}
+{
+  // Genuine gross inventory includes terminal-local stock but can also hold
+  // nonterminal storage stock. A zero-stock terminal is observable without
+  // inventing additional resources or an executable quote.
+  const withEmptyTerminal=ledgerModule.snapshot([stock,{
+    ...target,structures:[{
+      ...target.structures[0],store:{energy:0}
+    }]
+  }],tick);
+  assert.equal(withEmptyTerminal.status,'OBSERVED');
+  const advisory=plan(withEmptyTerminal,request,{
+    internal:[internal],market:[],marketAvailable:false
+  });
+  assert.equal(advisory.status,'ADVISORY');
+  assert.equal(advisory.actionEnabled,false);
+  assert.equal(advisory.selected.readyForExecution,false);
+}
 for(const replacement of [
   { ...ledger, status:'PARTIAL'},
   { ...ledger, availableToCommit:0 },
