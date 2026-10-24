@@ -65,7 +65,9 @@ function decision(descriptor, state, context) {
     : null;
   const deadlineTick = Number.isFinite(descriptor.deadlineTick) ? descriptor.deadlineTick : null;
 
-  const neverRun = state.lastRunTick === null;
+  // A server tick reset invalidates a persisted last-run timestamp. Treat
+  // that timestamp as stale rather than sleeping until the old tick returns.
+  const neverRun = state.lastRunTick === null || state.lastRunTick > tick;
   const age = neverRun ? Infinity : Math.max(0, tick - state.lastRunTick);
   const intervalDue = neverRun || age >= minimumInterval;
   const overdue = deadlineTick !== null && tick >= deadlineTick;
