@@ -191,10 +191,33 @@ assert.equal(dispatch([donor,victim],game,memory).reason,
   'RESCUE_CADENCE_OR_CPU');
 reset();enabled=false;
 assert.equal(dispatch([donor,victim],game,memory).status,'HOLD');
+// A nominal WORK+CARRY+MOVE role must actually run construction work:
+// upgraders always return after upgradeController and harvesters/haulers
+// never reach the worker-build priority. R2 may dispatch a safeguarded donor.
+for(const role of ['upgrader','harvester','hauler','scout','defender',null]) {
+  reset();victim.creeps=[{my:true,spawning:false,room:target,
+    memory:{role},
+    getActiveBodyparts(which){
+      return ['work','carry','move'].includes(which)?1:0;
+    }}];
+  assert.equal(dispatch([donor,victim],game,memory).status,'ASSIGNED',
+    'non-builder role '+String(role)+' must not suppress safe donor rescue');
+  assert.equal(summary(memory).active.target,'E1N2');
+}
+for(const role of ['worker','builder','repairer']) {
+  reset();victim.creeps=[{my:true,spawning:false,room:target,
+    memory:{role},
+    getActiveBodyparts(which){
+      return ['work','carry','move'].includes(which)?1:0;
+    }}];
+  assert.equal(dispatch([donor,victim],game,memory).status,'HOLD',
+    'existing executable local '+role+' must retain R2 singleton');
+}
 reset();victim.creeps=[{my:true,spawning:false,room:target,
-  getActiveBodyparts(which){return ['work','carry'].includes(which)?1:0;}}];
-assert.equal(dispatch([donor,victim],game,memory).status,'HOLD',
-  'target already has own labor so no extra donor is needed');
+  memory:{role:'worker'},
+  getActiveBodyparts(which){return which==='move'?0:1;}}];
+assert.equal(dispatch([donor,victim],game,memory).status,'ASSIGNED',
+  'immobile worker is not executable on a distant rebuild tile');
 reset();
 assert.equal(dispatch([donor,victim],game,memory).status,'ASSIGNED');
 delete game.creeps.A;

@@ -29,7 +29,14 @@ function store(memory) {
   return raw;
 }
 function productive(creep) {
-  if(!creep || creep.my!==true || creep.spawning ||
+  // A WORK/CARRY/MOVE body is not sufficient evidence of executable build
+  // work: the dedicated upgrader returns after upgradeController(), and
+  // harvesters/haulers/scouts never take the builder branch. Otherwise R1
+  // can place an irreversible Spawn site and strand the colony forever
+  // instead of permitting R2's independently guarded donor worker.
+  const role=creep?.memory?.role;
+  if(!['worker','builder','repairer'].includes(role) ||
+     !creep || creep.my!==true || creep.spawning ||
      typeof creep.getActiveBodyparts!=='function' ||
      typeof WORK==='undefined' || typeof CARRY==='undefined' ||
      typeof MOVE==='undefined')return false;

@@ -20,6 +20,7 @@ const ownedRoom={name:'E1N1',
 const live={name:'Spawn1',id:'owned-id-1',my:true,
   pos:{x:25,y:25,roomName:'E1N1'}};
 const labor={my:true,spawning:false,room:ownedRoom,
+  memory:{role:'worker'},
   getActiveBodyparts(part){return ['work','carry','move'].includes(part)?1:0;}};
 const state={room:ownedRoom,spawn:live,creeps:[labor],
   hostileCreeps:[]};
@@ -95,6 +96,32 @@ memory.bot.ownedSpawnRecovery.rooms.E1N1={
   observedTick:1000,lastSpawnId:'owned-id-1',
   pos:{roomName:'E1N1',x:25,y:25}
 };
+
+// Active WORK+CARRY+MOVE does not imply that a role actually constructs
+// the authorized Spawn site. Upgrader returns early to controller work;
+// harvester/hauler/scout/defender do not invoke the builder branch. R1 must
+// leave a spawnless room eligible for the guarded R2 donor instead of
+// recording a build intent with no builder-capable labor.
+for(const role of ['upgrader','harvester','hauler','scout','defender',null]) {
+  reset();
+  state.creeps=[{...labor,memory:{role}}];
+  assert.equal(execute().reason,'LOCAL_WORKER_OR_ROOM_DEFENSE_UNSAFE',
+    'R1 must not mistake non-building role '+String(role)+' for labor');
+  assert.equal(siteCalls.length,0);
+}
+for(const role of ['worker','builder','repairer']) {
+  reset();
+  state.creeps=[{...labor,memory:{role}}];
+  assert.equal(execute().status,'SITE_INTENT_ACCEPTED',
+    'R1 may reuse its already authorized tile with executable build role '+role);
+  assert.equal(siteCalls.length,1);
+}
+reset();
+state.creeps=[{...labor,memory:{role:'builder'},
+  getActiveBodyparts(part){return part==='move'?0:1;}}];
+assert.equal(execute().reason,'LOCAL_WORKER_OR_ROOM_DEFENSE_UNSAFE',
+  'immobile nominal builder cannot support rebuild site intent');
+assert.equal(siteCalls.length,0);
 
 reset();game.time=1026;
 assert.equal(execute().reason,'RECOVERY_CADENCE_OR_CPU_DEFERRED');
