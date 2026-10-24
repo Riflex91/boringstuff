@@ -429,6 +429,39 @@ const zeroLevel=assessWorldRuntime({...good,room:{objects:
 }},WORLD_PROFILE.branch);
 assert.equal(zeroLevel.controllerLevel,0);
 
+// Impossible or malformed supplied controller levels must fail closed.
+// Progress from that same controller cannot be treated as valid evidence.
+for(const [label,level] of [
+  ['above Screeps maximum',9],
+  ['very large level',Number.MAX_SAFE_INTEGER],
+  ['negative level',-1],
+  ['fractional level',2.5],
+  ['null level',null],
+  ['string level','5']
+]) {
+  const invalid=assessWorldRuntime({...good,room:{objects:
+    good.room.objects.map(o=>o.type==='controller'?
+      {...o,level,progress:123}:o)
+  }},WORLD_PROFILE.branch);
+  assert.equal(invalid.ok,false,label);
+  assert.ok(invalid.failures.includes('CONTROLLER_LEVEL_INVALID'),label);
+  assert.equal(invalid.controllerLevel,null,label);
+  assert.equal(invalid.controllerProgress,null,label);
+  assert.equal(invalid.operationalReadiness.status,'HOLD',label);
+  assert.ok(invalid.operationalReadiness.reasons.includes(
+    'CONTROLLER_LEVEL_INVALID'),label);
+  assert.equal(invalid.operationalReadiness.executionAuthority,false,label);
+}
+const maxValidController=assessWorldRuntime({...good,room:{objects:
+  good.room.objects.map(o=>o.type==='controller'?
+    {...o,level:8,progress:0}:o)
+}},WORLD_PROFILE.branch);
+assert.equal(maxValidController.ok,true);
+assert.equal(maxValidController.controllerLevel,8);
+assert.equal(maxValidController.controllerProgress,0);
+assert.equal(maxValidController.failures.includes('CONTROLLER_LEVEL_INVALID'),
+  false);
+
 // World GET values are untrusted observations: null, strings, booleans,
 // negative values and fractions cannot be converted into fabricated energy
 // or controller progress. A genuine numeric zero remains observable.
