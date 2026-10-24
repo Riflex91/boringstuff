@@ -74,6 +74,47 @@ for(const [label,badObject] of [
   assert.equal(malformedRoom.operationalReadiness.executionAuthority,false,label);
 }
 
+// Opaque object entries without either a type or structureType are not
+// trustworthy room evidence. Do not infer a missing Spawn, zero owned creeps,
+// or controller progress by silently dropping an untyped GET object.
+for(const [label,opaque] of [
+  ['missing discriminator',{}],
+  ['null type',{type:null}],
+  ['numeric type',{type:42}],
+  ['blank type',{type:'   '}],
+  ['malformed structureType',{structureType:{untrusted:true}}]
+]) {
+  const unknown=assessWorldRuntime({...good,room:{objects:[
+    ...good.room.objects,opaque
+  ]}},WORLD_PROFILE.branch);
+  assert.equal(unknown.ok,false,label);
+  assert.ok(unknown.failures.includes('ROOM_OBJECTS_MALFORMED'),label);
+  assert.equal(unknown.spawnVerified,null,label);
+  assert.equal(unknown.ownedCreepCount,null,label);
+  assert.equal(unknown.ownedCreepRoles,null,label);
+  assert.equal(unknown.controllerLevel,null,label);
+  assert.equal(unknown.controllerProgress,null,label);
+  assert.equal(unknown.warnings.includes('NO_OWNED_CREEPS_OBSERVED'),false,label);
+  assert.equal(unknown.operationalReadiness.status,'HOLD',label);
+  assert.equal(unknown.operationalReadiness.executionAuthority,false,label);
+}
+// Older GET shapes may use structureType instead of type. Do not turn a
+// recognizable Spawn into an opaque object or manufacture a missing Spawn.
+const structureOnlySpawn=assessWorldRuntime({...good,room:{objects:[
+  {structureType:'spawn',x:37,y:26,name:'Spawn1',user:'me',
+    energy:300,energyCapacity:300},...good.room.objects.slice(1)
+]}},WORLD_PROFILE.branch);
+assert.equal(structureOnlySpawn.ok,true);
+assert.equal(structureOnlySpawn.spawnVerified,true);
+assert.equal(structureOnlySpawn.ownedCreepCount,1);
+assert.equal(structureOnlySpawn.operationalReadiness.status,'UNVERIFIED');
+// Unknown future object types are distinguishable from missing type evidence.
+const futureType=assessWorldRuntime({...good,room:{objects:[
+  ...good.room.objects,{type:'future-object'}
+]}},WORLD_PROFILE.branch);
+assert.equal(futureType.ok,true);
+assert.equal(futureType.ownedCreepCount,1);
+
 // Owner IDs in GET room objects must be verified strings. Numeric IDs
 // must not be coerced to authenticated IDs, and malformed owner evidence
 // cannot establish an absent owned Spawn or a zero-creep room.
