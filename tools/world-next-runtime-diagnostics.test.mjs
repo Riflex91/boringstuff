@@ -472,4 +472,41 @@ assert.equal(atSnapshot.recoveryConstructionRisk.status,'UNVERIFIED',
   'a valid confirmation at the snapshot tick supersedes the earlier intent');
 assert.equal(result.recoveryConstructionRisk.status,'UNVERIFIED');
 
+// Duplicate creep IDs or names in one GET response must not inflate the
+// current crew census or imply productive recovery. No gameplay authority.
+const crewBase=[
+  {type:'creep',id:'creep-a',name:'Alice',user:'me',memory:{role:'harvester'}},
+  {type:'creep',id:'creep-b',name:'Bob',user:'me',memory:{role:'worker'}}
+];
+for(const [label,creeps] of [
+  ['duplicate ID',[
+    crewBase[0],{...crewBase[1],id:'creep-a'}]],
+  ['duplicate name',[
+    crewBase[0],{...crewBase[1],name:'Alice'}]],
+  ['duplicate foreign identity',[
+    crewBase[0],{...crewBase[1],user:'someone-else',name:'Alice'}]]
+]) {
+  const duplicate=assessWorldRuntime({...good,room:{objects:[
+    ...good.room.objects.filter(o=>o.type!=='creep'),...creeps
+  ]}},WORLD_PROFILE.branch);
+  assert.equal(duplicate.ok,false,label);
+  assert.ok(duplicate.failures.includes('ROOM_CREEP_DUPLICATE_IDENTITY'),label);
+  assert.equal(duplicate.ownedCreepCount,null,label+' count');
+  assert.equal(duplicate.ownedCreepRoles,null,label+' roles');
+  assert.equal(duplicate.currentRoomCrewRisk.status,'UNVERIFIED',label);
+  assert.equal(duplicate.warnings.includes('NO_OWNED_CREEPS_OBSERVED'),
+    false,label);
+  assert.equal(duplicate.operationalReadiness.status,'HOLD',label);
+  assert.equal(duplicate.operationalReadiness.executionAuthority,false,label);
+}
+const uniqueCrew=assessWorldRuntime({...good,room:{objects:[
+  ...good.room.objects.filter(o=>o.type!=='creep'),...crewBase
+]}},WORLD_PROFILE.branch);
+assert.equal(uniqueCrew.ok,true);
+assert.equal(uniqueCrew.ownedCreepCount,2);
+assert.equal(uniqueCrew.ownedCreepRoles.harvester,1);
+assert.equal(uniqueCrew.ownedCreepRoles.worker,1);
+assert.equal(uniqueCrew.operationalReadiness.status,'UNVERIFIED');
+assert.equal(uniqueCrew.failures.includes('ROOM_CREEP_DUPLICATE_IDENTITY'),false);
+
 console.log('W37S79 runtime diagnostics: PASS');
