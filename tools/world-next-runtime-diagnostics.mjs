@@ -133,7 +133,10 @@ export function assessWorldRuntime({me,branches,status,room,memory},
     else if(spawnOwnerUnverified)failures.push('PINNED_SPAWN_OWNER_UNVERIFIED');
     else if(!spawn)failures.push('OWNED_PINNED_SPAWN_MISSING');
   }
-  const creepObjects=roomObjectsVerified?objects.filter(o=>o?.type==='creep'):[];
+  // A structureType-only GET discriminator must be counted consistently
+  // with room-object validation; otherwise the census can invent zero crew.
+  const creepObjects=roomObjectsVerified?objects.filter(o=>
+    o?.type==='creep'||o?.structureType==='creep'):[];
   const crewOwnerUnverified=creepObjects.some(o=>
     typeof o.user!=='string'||o.user.trim().length===0);
   // Present but malformed identity fields cannot support a unique crew
@@ -179,7 +182,10 @@ export function assessWorldRuntime({me,branches,status,room,memory},
   }
   // Multiple controller GET objects in one room are ambiguous evidence.
   // Do not publish an arbitrary first match as an authoritative level.
-  const controllers=objects.filter(o=>o?.type==='controller');
+  // The same GET alias contract applies to controllers: do not fabricate
+  // an absent controller when structureType is the only discriminator.
+  const controllers=objects.filter(o=>
+    o?.type==='controller'||o?.structureType==='controller');
   const controllerAmbiguous=controllers.length>1;
   if(roomObjectsVerified&&controllerAmbiguous)
     failures.push('CONTROLLER_GET_AMBIGUOUS');
