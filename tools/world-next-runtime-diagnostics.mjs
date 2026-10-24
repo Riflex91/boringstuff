@@ -195,6 +195,14 @@ export function assessWorldRuntime({me,branches,status,room,memory},
   if(roomObjectsVerified&&controllerAmbiguous)
     failures.push('CONTROLLER_GET_AMBIGUOUS');
   const controller=controllerAmbiguous?null:controllers[0];
+  // A supplied impossible controller level is contradictory GET evidence.
+  // Screeps controller levels are bounded to 0..8; never publish an
+  // impossible level or associated progress as recovery proof.
+  const controllerLevelInvalid=Boolean(controller)&&
+    Object.hasOwn(controller,'level')&&
+    (!Number.isSafeInteger(controller.level)||
+      controller.level<0||controller.level>8);
+  if(controllerLevelInvalid)failures.push('CONTROLLER_LEVEL_INVALID');
   if(roomObjectsVerified&&!controller&&!controllerAmbiguous)
     warnings.push('CONTROLLER_NOT_OBSERVED');
   if(crewVerified&&!creeps.length)
@@ -256,9 +264,10 @@ export function assessWorldRuntime({me,branches,status,room,memory},
     spawnEnergyCapacityEvidence:spawnNumericFieldEvidence(spawn,'energyCapacity'),
     ownedCreepCount:crewVerified?creeps.length:null,
     ownedCreepRoles:crewVerified?ownedCreepRoles:null,
-    controllerLevel:Number.isSafeInteger(controller?.level)&&controller.level>=0?
-      controller.level:null,
-    controllerProgress:Number.isSafeInteger(controller?.progress)&&controller.progress>=0?
+    controllerLevel:Number.isSafeInteger(controller?.level)&&
+      controller.level>=0&&controller.level<=8?controller.level:null,
+    controllerProgress:!controllerLevelInvalid&&
+      Number.isSafeInteger(controller?.progress)&&controller.progress>=0?
       controller.progress:null,
     memoryAvailable:recoveryEvidence.availability!=='UNKNOWN',
     recoveryEvidence,
