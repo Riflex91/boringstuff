@@ -93,10 +93,17 @@ export function assessWorldRuntime({me,branches,status,room,memory},
   // object could hide a Spawn or creep; ignoring it would fabricate an
   // absent Spawn or a zero-creep census. Some GET shapes use structureType
   // instead of type, so either nonblank string is sufficient evidence.
+  // Explicit type aliases must not contradict one another. A GET object
+  // labeled both creep and spawn could otherwise count as two different
+  // entities and fabricate a pinned Spawn or a verified crew census.
+  // Generic "structure" is a permitted wrapper for a concrete structureType.
   const roomObjectsMalformed=roomObjectsAvailable&&room.objects.some(o=>
     o===null||typeof o!=='object'||Array.isArray(o)||
     ![o.type,o.structureType].some(v=>
-      typeof v==='string'&&v.trim().length>0));
+      typeof v==='string'&&v.trim().length>0)||
+    (typeof o.type==='string'&&o.type.trim().length>0&&
+      typeof o.structureType==='string'&&o.structureType.trim().length>0&&
+      o.type!==o.structureType&&o.type!=='structure'));
   const roomObjectsVerified=roomObjectsAvailable&&!roomObjectsMalformed;
   if(!ownerVerified)failures.push('AUTH_UNVERIFIED');
   const list=Array.isArray(branches?.list)?branches.list:[];
