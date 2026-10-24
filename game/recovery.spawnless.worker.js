@@ -178,9 +178,16 @@ function dispatch(states,game,memory) {
        !witness(record,to,tick) ||
        !Array.isArray(target.creeps) ||
        target.creeps.some(c=>c?.my===true && !c.spawning &&
+         c.room?.name===to &&
+         // Upgraders and harvesters may carry WORK/CARRY/MOVE but their
+         // actual role handlers do not execute spawn construction. Never
+         // suppress the bounded R2 donor merely for their presence.
+         ['worker','builder','repairer'].includes(c.memory?.role) &&
          typeof c.getActiveBodyparts==='function' &&
          typeof WORK!=='undefined' && typeof CARRY!=='undefined' &&
-         c.getActiveBodyparts(WORK)>0 && c.getActiveBodyparts(CARRY)>0))
+         typeof MOVE!=='undefined' &&
+         c.getActiveBodyparts(WORK)>0 && c.getActiveBodyparts(CARRY)>0 &&
+         c.getActiveBodyparts(MOVE)>0))
       continue;
     // Confirm no replacement Spawn or foreign site already resolves this
     // from direct Game observations. R1 will place the actual site when
