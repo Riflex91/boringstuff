@@ -250,18 +250,41 @@ function maybePruneSeen(roomState, now) {
   return true;
 }
 
+// Evidence windows require consecutive, distinct Game.time observations. A reset,
+// missed tick, or legacy window without a last-observed tick cannot prove cadence.
+function resetDiscontinuousEvidence(roomState, now) {
+  roomState.window = newWindow(now);
+  roomState.lastWindow = null;
+  roomState.seenEpisodes = {};
+  roomState.seenTerminals = {};
+  roomState.lastController = null;
+  roomState.lastSites = {};
+  roomState.lastSeenPruneTick = null;
+}
+
 function observe(state, memoryRoot, game) {
   game = game || (typeof Game !== 'undefined' ? Game : null);
   const now = tick(game);
   const roomName = state && state.room && state.room.name;
   if (!roomName) return { current: null, completed: null };
   const roomState = ensureRoom(roomName, memoryRoot, now);
+  const previousTick = Number.isSafeInteger(roomState.lastObservedTick)
+    ? roomState.lastObservedTick : null;
+  if (previousTick === now) {
+    // Reentrant observations must not invent extra ticks or duplicate work.
+    return { current: summarize(roomState.window, now), completed: null, lastWindow: roomState.lastWindow };
+  }
+  if ((previousTick !== null && now !== previousTick + 1) ||
+      (previousTick === null && (roomState.window.ticks > 0 || roomState.lastWindow))) {
+    resetDiscontinuousEvidence(roomState, now);
+  }
   maybePruneSeen(roomState, now);
 
   observeRequestLifecycle(roomState, state.requestShadow && state.requestShadow.requests || [], now);
   observeAssignment(roomState, state);
   observeUsefulWork(roomState, state);
   roomState.window.ticks += 1;
+  roomState.lastObservedTick = now;
 
   let completed = null;
   if (roomState.window.ticks >= WINDOW_TICKS) {
