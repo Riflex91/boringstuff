@@ -330,4 +330,46 @@ for(const bad of [
   assert.deepEqual(x.totals.terminal,{});
   assert.equal(x.availableToCommit,null);
 }
+// M0 gross inventory must fail closed when a GET census contains a malformed
+// member. Silently skipping a null/array structure or creep could certify an
+// incomplete stock total as OBSERVED and feed a theoretical reserve surplus.
+for (const malformed of [null, undefined, 42, 'broken', []]) {
+  for (const category of ['structures','creeps']) {
+    const room=colony('E8N1',[
+      structure('verified-store','storage',{energy:30})
+    ],[creep('verified-carrier',{energy:5})]);
+    room[category].push(malformed);
+    const before=room[category].slice();
+    const x=ledger.snapshot([room],47);
+    assert.equal(x.status,'PARTIAL',category+' '+String(malformed));
+    assert.ok(x.reasonCodes.includes('ROOM_INVENTORY_INCOMPLETE'));
+    assert.deepEqual(x.totals.structures,{energy:30});
+    assert.deepEqual(x.totals.carried,{energy:5});
+    assert.equal(x.availableToCommit,null);
+    assert.equal(x.actionEnabled,false);
+    assert.deepEqual(room[category],before,'census must not mutate inputs');
+  }
+}
+// Arrays are not Screeps Store objects. An empty array previously certified
+// zero resources; a nonempty one could invent a numeric resource key.
+for (const [label,room] of [
+  ['owned storage',colony('E8N1',[
+    structure('array-storage','storage',[])
+  ])],
+  ['owned terminal',colony('E8N1',[
+    structure('array-terminal','terminal',[100])
+  ])],
+  ['owned creep',colony('E8N1',[],[
+    creep('array-creep',[100])
+  ])]
+]) {
+  const x=ledger.snapshot([room],48);
+  assert.equal(x.status,'PARTIAL',label);
+  assert.ok(x.reasonCodes.includes('STORE_MISSING'),label);
+  assert.deepEqual(x.totals.structures,{},label);
+  assert.deepEqual(x.totals.carried,{},label);
+  assert.deepEqual(x.totals.terminal,{},label);
+  assert.equal(x.availableToCommit,null,label);
+}
+
 console.log('M0 passive resource ledger ownership, double-count, invalid-stock and reserve HOLD PASS');
