@@ -79,13 +79,19 @@ export function assessWorldRuntime({me,branches,status,room,memory},
   const failures=[],warnings=[];
   const id=me?._id||me?.id;
   const ownerVerified=typeof id==='string'&&id.trim().length>0;
-  const roomObjectsVerified=Array.isArray(room?.objects);
+  // A partially malformed room GET is not a trustworthy census. Do not
+  // infer a missing Spawn or zero owned creeps by silently dropping entries.
+  const roomObjectsAvailable=Array.isArray(room?.objects);
+  const roomObjectsMalformed=roomObjectsAvailable&&room.objects.some(o=>
+    o===null||typeof o!=='object'||Array.isArray(o));
+  const roomObjectsVerified=roomObjectsAvailable&&!roomObjectsMalformed;
   if(!ownerVerified)failures.push('AUTH_UNVERIFIED');
   const list=Array.isArray(branches?.list)?branches.list:[];
   const active=list.filter(b=>b?.activeWorld===true);
   if(active.length!==1||active[0]?.branch!==expectedActiveBranch)failures.push('EXPECTED_BRANCH_NOT_ACTIVE');
   if(status?.status==='empty'||typeof status?.status!=='string')failures.push('WORLD_STATUS_INVALID');
-  if(!roomObjectsVerified)failures.push('ROOM_OBJECTS_UNAVAILABLE');
+  if(!roomObjectsAvailable)failures.push('ROOM_OBJECTS_UNAVAILABLE');
+  else if(roomObjectsMalformed)failures.push('ROOM_OBJECTS_MALFORMED');
   const objects=roomObjectsVerified?room.objects:[];
   // GET owner IDs must be non-empty strings. Empty/whitespace owner values
   // are unknown ownership, not evidence of a missing Spawn or empty crew.
