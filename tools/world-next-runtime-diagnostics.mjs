@@ -110,11 +110,31 @@ export function assessWorldRuntime({me,branches,status,room,memory},
   const creepObjects=roomObjectsVerified?objects.filter(o=>o?.type==='creep'):[];
   const crewOwnerUnverified=creepObjects.some(o=>
     typeof o.user!=='string'||o.user.trim().length===0);
+  // Repeated GET creep identities cannot establish a trustworthy crew
+  // census. Names are unique in Screeps; IDs provide a second independent
+  // check when supplied. Absent identity fields alone are not duplicates.
+  const seenCreepIdentities=new Set();
+  const crewDuplicate=creepObjects.some(o=>{
+    const rawId=typeof o?._id==='string'?o._id:o?.id;
+    const creepId=typeof rawId==='string'&&rawId.trim().length?
+      'id:'+rawId:null;
+    const creepName=typeof o?.name==='string'&&o.name.trim().length?
+      'name:'+o.name:null;
+    const duplicate=Boolean(
+      (creepId&&seenCreepIdentities.has(creepId))||
+      (creepName&&seenCreepIdentities.has(creepName)));
+    if(creepId)seenCreepIdentities.add(creepId);
+    if(creepName)seenCreepIdentities.add(creepName);
+    return duplicate;
+  });
   const creeps=ownerVerified&&roomObjectsVerified?
     creepObjects.filter(o=>o.user===id):[];
   if(ownerVerified&&roomObjectsVerified&&crewOwnerUnverified)
     failures.push('ROOM_CREEP_OWNER_UNVERIFIED');
-  const crewVerified=ownerVerified&&roomObjectsVerified&&!crewOwnerUnverified;
+  if(ownerVerified&&roomObjectsVerified&&crewDuplicate)
+    failures.push('ROOM_CREEP_DUPLICATE_IDENTITY');
+  const crewVerified=ownerVerified&&roomObjectsVerified&&
+    !crewOwnerUnverified&&!crewDuplicate;
   // Creep memory is untrusted. A null-prototype counter prevents inherited
   // names such as constructor/__proto__ from corrupting role observations.
   const ownedCreepRoles=Object.create(null);
