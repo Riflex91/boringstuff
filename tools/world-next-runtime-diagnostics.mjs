@@ -93,11 +93,15 @@ export function assessWorldRuntime({me,branches,status,room,memory},
   const pinnedSpawns=roomObjectsVerified?objects.filter(o=>
     (o?.type==='spawn'||o?.structureType==='spawn')&&
     o.x===target.x&&o.y===target.y&&o.name===target.spawnName):[];
+  // Conflicting pinned objects cannot establish which Spawn is current.
+  // Never expose energy or spawning state from an arbitrary first match.
+  const spawnAmbiguous=pinnedSpawns.length>1;
   const spawnOwnerUnverified=pinnedSpawns.some(o=>typeof o.user!=='string');
-  const spawn=ownerVerified&&roomObjectsVerified?pinnedSpawns.find(o=>
-    o.user===id):null;
+  const spawn=ownerVerified&&roomObjectsVerified&&!spawnAmbiguous&&
+    !spawnOwnerUnverified?pinnedSpawns.find(o=>o.user===id):null;
   if(ownerVerified&&roomObjectsVerified) {
-    if(spawnOwnerUnverified)failures.push('PINNED_SPAWN_OWNER_UNVERIFIED');
+    if(spawnAmbiguous)failures.push('PINNED_SPAWN_AMBIGUOUS');
+    else if(spawnOwnerUnverified)failures.push('PINNED_SPAWN_OWNER_UNVERIFIED');
     else if(!spawn)failures.push('OWNED_PINNED_SPAWN_MISSING');
   }
   const creepObjects=roomObjectsVerified?objects.filter(o=>o?.type==='creep'):[];
@@ -166,8 +170,8 @@ export function assessWorldRuntime({me,branches,status,room,memory},
     target:{shard:target.shard,room:target.room,x:target.x,y:target.y},
     activeBranch:active.length===1?active[0].branch:null,
     worldStatus:status?.status??null,
-    spawnVerified:ownerVerified&&roomObjectsVerified&&!spawnOwnerUnverified?
-      Boolean(spawn):null,
+    spawnVerified:ownerVerified&&roomObjectsVerified&&!spawnAmbiguous&&
+      !spawnOwnerUnverified?Boolean(spawn):null,
     spawnSpawning:spawn?.spawning??null,
     spawnEnergy:validEnergy&&!energyExceedsCapacity?energy:null,
     spawnEnergyCapacity:validCapacity?capacity:null,
