@@ -233,4 +233,69 @@ function stateAt(tick, options = {}) {
   assert.equal(bodyPartReads, 2);
 }
 
+{
+  // Reentrant reads of one engine tick cannot manufacture a 100-tick window.
+  const memory = {};
+  const first = evidence.observe(stateAt(300, { controllerProgress: 10 }), memory, { time: 300 });
+  const repeated = evidence.observe(stateAt(300, { controllerProgress: 99 }), memory, { time: 300 });
+  assert.equal(first.current.ticks, 1);
+  assert.equal(repeated.current.ticks, 1);
+  assert.equal(repeated.current.controllerProgress, 0);
+  assert.equal(repeated.completed, null);
+  assert.equal(memory.bot.assignmentEvidence.rooms.E1N1.lastObservedTick, 300);
+  const next = evidence.observe(stateAt(301, { controllerProgress: 12 }), memory, { time: 301 });
+  assert.equal(next.current.ticks, 2);
+  assert.equal(next.current.controllerProgress, 2);
+}
+
+{
+  // A skipped tick breaks the contiguous cadence and resets old work deltas.
+  const memory = {};
+  evidence.observe(stateAt(400, { controllerProgress: 5, siteProgress: 10 }), memory, { time: 400 });
+  evidence.observe(stateAt(401, { controllerProgress: 7, siteProgress: 15 }), memory, { time: 401 });
+  const gap = evidence.observe(stateAt(405, { controllerProgress: 100, siteProgress: 80 }), memory, { time: 405 });
+  assert.equal(gap.current.startTick, 405);
+  assert.equal(gap.current.ticks, 1);
+  assert.equal(gap.current.controllerProgress, 0);
+  assert.equal(gap.current.constructionProgress, 0);
+  assert.equal(gap.lastWindow, null);
+  let completed = null;
+  for (let t = 406; t <= 504; t++) {
+    const result = evidence.observe(stateAt(t, { sites: false }), memory, { time: t });
+    if (result.completed) completed = result.completed;
+  }
+  assert.ok(completed);
+  assert.equal(completed.startTick, 405);
+  assert.equal(completed.endTick, 504);
+  assert.equal(completed.ticks, 100);
+}
+
+{
+  // A server tick rewind invalidates even a previously completed evidence window.
+  const memory = {};
+  for (let t = 1000; t < 1100; t++) evidence.observe(stateAt(t, { sites: false }), memory, { time: t });
+  assert.ok(evidence.snapshot('E1N1', memory).lastWindow);
+  const rewind = evidence.observe(stateAt(5, { requests: [request({ createdTick: 5, updatedTick: 5 })] }), memory, { time: 5 });
+  assert.equal(rewind.current.startTick, 5);
+  assert.equal(rewind.current.ticks, 1);
+  assert.equal(rewind.current.requestsOpened, 1);
+  assert.equal(rewind.current.controllerProgress, 0);
+  assert.equal(rewind.lastWindow, null);
+  assert.equal(evidence.snapshot('E1N1', memory).lastWindow, null);
+}
+
+{
+  // Legacy persisted partial windows lack proof of last observation; fail closed.
+  const memory = { bot: { assignmentEvidence: { schemaVersion: 1, rooms: {
+    E1N1: { window: evidence._test.newWindow(1), lastWindow: null,
+      seenEpisodes: { stale: 1 }, seenTerminals: {}, lastController: { level: 3, progress: 1 }, lastSites: {} }
+  } } } };
+  memory.bot.assignmentEvidence.rooms.E1N1.window.ticks = 50;
+  const result = evidence.observe(stateAt(50, { controllerProgress: 99 }), memory, { time: 50 });
+  assert.equal(result.current.startTick, 50);
+  assert.equal(result.current.ticks, 1);
+  assert.equal(result.current.controllerProgress, 0);
+  assert.deepEqual(memory.bot.assignmentEvidence.rooms.E1N1.seenEpisodes, {});
+}
+
 console.log('assignment evidence tests passed');
