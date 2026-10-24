@@ -221,7 +221,10 @@ function freshness(roomName, nowTick, maxAge, memoryRoot) {
   }
   const fallbackNow = typeof Game !== 'undefined' && Number.isFinite(Game.time) ? Game.time : record.observation.lastSeenTick;
   const currentTick = Number.isFinite(nowTick) ? nowTick : fallbackNow;
-  const age = Math.max(0, currentTick - record.observation.lastSeenTick);
+  const age = currentTick - record.observation.lastSeenTick;
+  // A private-server tick rewind invalidates future-dated observations.
+  // Never turn negative age into zero: that would authorize stale intel.
+  if (age < 0) return { known: true, fresh: false, age: null, confidence: 0 };
   return {
     known: true,
     fresh: age <= maxAge,

@@ -168,4 +168,35 @@ function makeRoom(name, hostileCount = 0) {
   assert.deepEqual(unknown, { known: false, fresh: false, age: null, confidence: 0 });
 }
 
+{
+  const memory = {};
+  const game = { time: 500, rooms: {}, map: {} };
+  global.Game = game;
+  const room = makeRoom('W9N9');
+  worldIntel.observeRoom(room, memory, game, 'test-visible');
+  assert.deepEqual(worldIntel.freshness('W9N9', 500, 0, memory),
+    { known: true, fresh: true, age: 0, confidence: 1 });
+  assert.equal(worldIntel.freshness('W9N9', 2000, 1500, memory).fresh, true,
+    'Maximum allowed intel age is inclusive');
+  assert.equal(worldIntel.freshness('W9N9', 2001, 1500, memory).fresh, false);
+
+  // A private-server reset can rewind Game.time while durable Memory remains.
+  // The old observation must not be presented as freshly reobserved intel.
+  game.time = 450;
+  const expected = { known: true, fresh: false, age: null, confidence: 0 };
+  assert.deepEqual(worldIntel.freshness('W9N9', undefined, 1500, memory),
+    expected, 'Implicit Game.time rewind must fail closed');
+  assert.deepEqual(worldIntel.freshness('W9N9', 450, 1500, memory),
+    expected, 'Explicit rewind must fail closed');
+  assert.deepEqual(worldIntel.freshness('W9N9', 450, 0, memory),
+    expected, 'Zero maxAge must not mask future-dated intel');
+  assert.equal(worldIntel.get('W9N9', memory).observation.lastSeenTick, 500,
+    'Read-only freshness must not mutate durable observations');
+
+  // Genuine room visibility after reset reestablishes current-tick evidence.
+  worldIntel.observeRoom(room, memory, game, 'test-visible');
+  assert.deepEqual(worldIntel.freshness('W9N9', undefined, 1500, memory),
+    { known: true, fresh: true, age: 0, confidence: 1 });
+}
+
 console.log('world intel tests passed');
