@@ -119,8 +119,15 @@ export function assessWorldRuntime({me,branches,status,room,memory},
     if(typeof role==='string'&&role.length>0&&role.length<50)
       ownedCreepRoles[role]=(ownedCreepRoles[role]||0)+1;
   }
-  const controller=objects.find(o=>o?.type==='controller');
-  if(roomObjectsVerified&&!controller)warnings.push('CONTROLLER_NOT_OBSERVED');
+  // Multiple controller GET objects in one room are ambiguous evidence.
+  // Do not publish an arbitrary first match as an authoritative level.
+  const controllers=objects.filter(o=>o?.type==='controller');
+  const controllerAmbiguous=controllers.length>1;
+  if(roomObjectsVerified&&controllerAmbiguous)
+    failures.push('CONTROLLER_GET_AMBIGUOUS');
+  const controller=controllerAmbiguous?null:controllers[0];
+  if(roomObjectsVerified&&!controller&&!controllerAmbiguous)
+    warnings.push('CONTROLLER_NOT_OBSERVED');
   if(crewVerified&&!creeps.length)
     warnings.push('NO_OWNED_CREEPS_OBSERVED');
   // Do not coerce absent/null/string GET fields into fabricated energy.
