@@ -74,6 +74,36 @@ assert.equal(malformedCreep.ownedCreepCount,null);
 assert.equal(malformedCreep.ownedCreepRoles,null);
 assert.ok(malformedCreep.failures.includes('ROOM_CREEP_OWNER_UNVERIFIED'));
 assert.equal(malformedCreep.warnings.includes('NO_OWNED_CREEPS_OBSERVED'),false);
+// A blank GET identity is no more trustworthy than a numeric owner ID.
+// Do not mistake a malformed Spawn/creep owner for confirmed absence.
+for(const [label,blank] of [['empty',''],['whitespace','  ']]) {
+  const unknownAuth=assessWorldRuntime({...good,me:{_id:blank}},
+    WORLD_PROFILE.branch);
+  assert.ok(unknownAuth.failures.includes('AUTH_UNVERIFIED'),label);
+  assert.equal(unknownAuth.spawnVerified,null,label);
+  assert.equal(unknownAuth.ownedCreepCount,null,label);
+  assert.equal(unknownAuth.operationalReadiness.status,'HOLD',label);
+  const unknownSpawn=assessWorldRuntime({...good,room:{objects:
+    good.room.objects.map(o=>o.type==='spawn'?{...o,user:blank}:o)
+  }},WORLD_PROFILE.branch);
+  assert.ok(unknownSpawn.failures.includes('PINNED_SPAWN_OWNER_UNVERIFIED'),label);
+  assert.equal(unknownSpawn.spawnVerified,null,label);
+  assert.equal(unknownSpawn.ownedCreepCount,1,label);
+  assert.equal(unknownSpawn.failures.includes('OWNED_PINNED_SPAWN_MISSING'),
+    false,label);
+  assert.equal(unknownSpawn.operationalReadiness.status,'HOLD',label);
+  const unknownCrew=assessWorldRuntime({...good,room:{objects:
+    good.room.objects.map(o=>o.type==='creep'?{...o,user:blank}:o)
+  }},WORLD_PROFILE.branch);
+  assert.ok(unknownCrew.failures.includes('ROOM_CREEP_OWNER_UNVERIFIED'),label);
+  assert.equal(unknownCrew.spawnVerified,true,label);
+  assert.equal(unknownCrew.ownedCreepCount,null,label);
+  assert.equal(unknownCrew.ownedCreepRoles,null,label);
+  assert.equal(unknownCrew.warnings.includes('NO_OWNED_CREEPS_OBSERVED'),
+    false,label);
+  assert.equal(unknownCrew.operationalReadiness.status,'HOLD',label);
+  assert.equal(unknownCrew.operationalReadiness.executionAuthority,false,label);
+}
 const stringOwner=assessWorldRuntime({...numericOwnerRoom,room:{objects:
   numericOwnerRoom.room.objects.map(o=>o.type==='spawn'||o.type==='creep'?
     {...o,user:'42'}:o)
