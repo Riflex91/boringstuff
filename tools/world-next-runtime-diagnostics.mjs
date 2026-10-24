@@ -78,7 +78,7 @@ export function assessWorldRuntime({me,branches,status,room,memory},
   expectedActiveBranch=STAGING_BRANCH){
   const failures=[],warnings=[];
   const id=me?._id||me?.id;
-  const ownerVerified=typeof id==='string'&&id.length>0;
+  const ownerVerified=typeof id==='string'&&id.trim().length>0;
   const roomObjectsVerified=Array.isArray(room?.objects);
   if(!ownerVerified)failures.push('AUTH_UNVERIFIED');
   const list=Array.isArray(branches?.list)?branches.list:[];
@@ -87,7 +87,9 @@ export function assessWorldRuntime({me,branches,status,room,memory},
   if(status?.status==='empty'||typeof status?.status!=='string')failures.push('WORLD_STATUS_INVALID');
   if(!roomObjectsVerified)failures.push('ROOM_OBJECTS_UNAVAILABLE');
   const objects=roomObjectsVerified?room.objects:[];
-  // GET owner IDs must be strings. Coercing numeric/object owners with
+  // GET owner IDs must be non-empty strings. Empty/whitespace owner values
+  // are unknown ownership, not evidence of a missing Spawn or empty crew.
+  // Coercing numeric/object owners with
   // String(...) can fabricate ownership, and a malformed owner cannot
   // establish that a pinned Spawn or owned creep is absent.
   const pinnedSpawns=roomObjectsVerified?objects.filter(o=>
@@ -96,7 +98,8 @@ export function assessWorldRuntime({me,branches,status,room,memory},
   // Conflicting pinned objects cannot establish which Spawn is current.
   // Never expose energy or spawning state from an arbitrary first match.
   const spawnAmbiguous=pinnedSpawns.length>1;
-  const spawnOwnerUnverified=pinnedSpawns.some(o=>typeof o.user!=='string');
+  const spawnOwnerUnverified=pinnedSpawns.some(o=>
+    typeof o.user!=='string'||o.user.trim().length===0);
   const spawn=ownerVerified&&roomObjectsVerified&&!spawnAmbiguous&&
     !spawnOwnerUnverified?pinnedSpawns.find(o=>o.user===id):null;
   if(ownerVerified&&roomObjectsVerified) {
@@ -105,7 +108,8 @@ export function assessWorldRuntime({me,branches,status,room,memory},
     else if(!spawn)failures.push('OWNED_PINNED_SPAWN_MISSING');
   }
   const creepObjects=roomObjectsVerified?objects.filter(o=>o?.type==='creep'):[];
-  const crewOwnerUnverified=creepObjects.some(o=>typeof o.user!=='string');
+  const crewOwnerUnverified=creepObjects.some(o=>
+    typeof o.user!=='string'||o.user.trim().length===0);
   const creeps=ownerVerified&&roomObjectsVerified?
     creepObjects.filter(o=>o.user===id):[];
   if(ownerVerified&&roomObjectsVerified&&crewOwnerUnverified)
