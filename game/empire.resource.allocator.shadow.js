@@ -40,6 +40,30 @@ function terminalCanPay(room, offer) {
   return safeAmount(offer.transactionEnergy) && energy !== null &&
     energy >= offer.transactionEnergy;
 }
+// An observed terminal Store is a component of gross owned structures,
+// never an independent source of inventory. A malformed or independently
+// inflated terminal census must not create a nominal MARKET_BUY fee payer or
+// a source terminal with resources absent from the room's gross stock.
+function terminalProvenanceConsistent(room) {
+  const gross = room?.resources?.structures;
+  const terminal = room?.resources?.terminal;
+  const count = room?.productionInfrastructure?.terminals;
+  if (!gross || typeof gross !== 'object' || Array.isArray(gross) ||
+      !terminal || typeof terminal !== 'object' ||
+      Array.isArray(terminal) || !Number.isSafeInteger(count) ||
+      count < 0) return false;
+  for (const amount of Object.values(gross))
+    if (!Number.isSafeInteger(amount) || amount < 0) return false;
+  const terminalEntries = Object.entries(terminal);
+  if (count === 0 && terminalEntries.length > 0) return false;
+  for (const [resource, amount] of terminalEntries) {
+    const observed = Object.prototype.hasOwnProperty.call(gross, resource)
+      ? gross[resource] : 0;
+    if (!Number.isSafeInteger(amount) || amount < 0 ||
+        !Number.isSafeInteger(observed) || amount > observed) return false;
+  }
+  return true;
+}
 function validatedLedger(ledger) {
   return ledger && ledger.schemaVersion === 1 &&
     ledger.authority === 'SHADOW' && ledger.actionEnabled === false &&
@@ -50,6 +74,7 @@ function validatedLedger(ledger) {
       r.resources && r.resources.structures &&
       r.resources.terminal && typeof r.resources.terminal === 'object' &&
       r.productionInfrastructure &&
+      terminalProvenanceConsistent(r) &&
       r.availableToCommit === null) &&
     new Set(ledger.rooms.map(r => r.roomName)).size === ledger.rooms.length &&
     ledger.availableToCommit === null;
