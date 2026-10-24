@@ -253,7 +253,11 @@ function reconcile(roomName, activeDedupeKeys, memoryRoot, game, terminalRetenti
     const request = room.requests[key];
     expireReservations(request, tick);
     maybeUnblock(request, tick);
-    if (Number.isFinite(request.deadlineTick) && tick > request.deadlineTick && request.status !== STATUS.SATISFIED) {
+    // Terminal outcomes are immutable: repeated reconciliation must not re-expire
+    // them or refresh their retention timestamp (including CANCELLED requests).
+    const terminal = request.status === STATUS.SATISFIED ||
+      request.status === STATUS.EXPIRED || request.status === STATUS.CANCELLED;
+    if (!terminal && Number.isFinite(request.deadlineTick) && tick > request.deadlineTick) {
       request.status = STATUS.EXPIRED;
       request.updatedTick = tick;
       request.reservations = [];
