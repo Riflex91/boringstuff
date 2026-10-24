@@ -77,8 +77,15 @@ function spawnNumericFieldEvidence(spawn,field) {
 export function assessWorldRuntime({me,branches,status,room,memory},
   expectedActiveBranch=STAGING_BRANCH){
   const failures=[],warnings=[];
-  const id=me?._id||me?.id;
-  const ownerVerified=typeof id==='string'&&id.trim().length>0;
+  // The authenticated GET may expose both _id and id. Conflicting or
+  // malformed supplied aliases cannot prove ownership of room objects.
+  // Never select one alias and silently discard contradictory evidence.
+  const authIds=me&&typeof me==='object'&&!Array.isArray(me)?
+    ['_id','id'].filter(field=>Object.hasOwn(me,field)).map(field=>me[field]):[];
+  const ownerVerified=authIds.length>0&&authIds.every(value=>
+    typeof value==='string'&&value.trim().length>0)&&
+    new Set(authIds).size===1;
+  const id=ownerVerified?authIds[0]:null;
   // A partially malformed room GET is not a trustworthy census. Do not
   // infer a missing Spawn or zero owned creeps by silently dropping entries.
   const roomObjectsAvailable=Array.isArray(room?.objects);
