@@ -150,4 +150,43 @@ function spec(key, amount = 5) {
   assert.equal(summary.byDomain.logistics, 1);
 }
 
+
+{
+  // K0: a deadline is a one-time terminal transition, not a recurring event.
+  // Re-expiring used to refresh updatedTick forever, preventing GC.
+  const memory = {};
+  const deadline = spec('terminal:expiry');
+  deadline.deadlineTick = 100;
+  registry.upsert('E1N1', deadline, memory, { time: 99 });
+  assert.equal(registry.reconcile('E1N1', ['terminal:expiry'], memory, { time: 101 }).expired, 1);
+  let request = registry.list('E1N1', memory)[0];
+  assert.equal(request.status, registry.STATUS.EXPIRED);
+  assert.equal(request.updatedTick, 101);
+  assert.equal(registry.reconcile('E1N1', [], memory, { time: 102 }).expired, 0);
+  request = registry.list('E1N1', memory)[0];
+  assert.equal(request.status, registry.STATUS.EXPIRED);
+  assert.equal(request.updatedTick, 101);
+  assert.equal(registry.reconcile('E1N1', [], memory, { time: 112 }, 10).pruned, 1);
+  assert.equal(registry.list('E1N1', memory).length, 0);
+}
+
+{
+  // CANCELLED and SATISFIED are also terminal, even if their deadline passes.
+  for (const status of [registry.STATUS.CANCELLED, registry.STATUS.SATISFIED]) {
+    const memory = {};
+    const deadline = spec('terminal:' + status);
+    deadline.deadlineTick = 200;
+    registry.upsert('E1N1', deadline, memory, { time: 199 });
+    if (status === registry.STATUS.CANCELLED) {
+      registry.setStatus('E1N1', deadline.dedupeKey, status, memory, { time: 200 });
+    } else {
+      registry.progress('E1N1', deadline.dedupeKey, 5, memory, { time: 200 });
+    }
+    assert.equal(registry.reconcile('E1N1', [deadline.dedupeKey], memory, { time: 201 }).expired, 0);
+    assert.equal(registry.list('E1N1', memory)[0].status, status);
+    assert.equal(registry.list('E1N1', memory)[0].updatedTick, 200);
+    assert.equal(registry.reconcile('E1N1', [], memory, { time: 211 }, 10).pruned, 1);
+  }
+}
+
 console.log('request registry tests passed');
