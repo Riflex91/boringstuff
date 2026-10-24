@@ -462,6 +462,48 @@ assert.equal(maxValidController.controllerProgress,0);
 assert.equal(maxValidController.failures.includes('CONTROLLER_LEVEL_INVALID'),
   false);
 
+// A supplied malformed controller progress is contradictory evidence, not
+// merely an unobserved optional value. It must hold operational readiness.
+for(const [label,progress] of [
+  ['null',null],['undefined',undefined],['string','100'],
+  ['boolean',false],['negative',-1],['fraction',1.25],
+  ['unsafe integer',Number.MAX_SAFE_INTEGER+1]
+]) {
+  const invalid=assessWorldRuntime({...good,room:{objects:
+    good.room.objects.map(o=>o.type==='controller'?
+      {...o,progress}:o)
+  }},WORLD_PROFILE.branch);
+  assert.equal(invalid.ok,false,label);
+  assert.ok(invalid.failures.includes('CONTROLLER_PROGRESS_INVALID'),label);
+  assert.equal(invalid.controllerLevel,1,label+' valid level preserved');
+  assert.equal(invalid.controllerProgress,null,label);
+  assert.equal(invalid.operationalReadiness.status,'HOLD',label);
+  assert.ok(invalid.operationalReadiness.reasons.includes(
+    'CONTROLLER_PROGRESS_INVALID'),label);
+  assert.equal(invalid.operationalReadiness.executionAuthority,false,label);
+}
+const missingControllerProgress=assessWorldRuntime({...good,room:{objects:
+  good.room.objects.map(o=>{
+    if(o.type!=='controller')return o;
+    const copy={...o};delete copy.progress;return copy;
+  })
+}},WORLD_PROFILE.branch);
+assert.equal(missingControllerProgress.ok,true,
+  'absent optional progress is not a malformed supplied value');
+assert.equal(missingControllerProgress.controllerLevel,1);
+assert.equal(missingControllerProgress.controllerProgress,null);
+assert.equal(missingControllerProgress.failures.includes(
+  'CONTROLLER_PROGRESS_INVALID'),false);
+for(const progress of [0,Number.MAX_SAFE_INTEGER]) {
+  const valid=assessWorldRuntime({...good,room:{objects:
+    good.room.objects.map(o=>o.type==='controller'?
+      {...o,progress}:o)
+  }},WORLD_PROFILE.branch);
+  assert.equal(valid.ok,true,'safe integer controller progress remains valid');
+  assert.equal(valid.controllerProgress,progress);
+  assert.equal(valid.failures.includes('CONTROLLER_PROGRESS_INVALID'),false);
+}
+
 // World GET values are untrusted observations: null, strings, booleans,
 // negative values and fractions cannot be converted into fabricated energy
 // or controller progress. A genuine numeric zero remains observable.
