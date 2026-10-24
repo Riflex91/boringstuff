@@ -484,7 +484,16 @@ for(const [label,creeps] of [
   ['duplicate name',[
     crewBase[0],{...crewBase[1],name:'Alice'}]],
   ['duplicate foreign identity',[
-    crewBase[0],{...crewBase[1],user:'someone-else',name:'Alice'}]]
+    crewBase[0],{...crewBase[1],user:'someone-else',name:'Alice'}]],
+  ['duplicate secondary id despite unique _id',[
+    {...crewBase[0],_id:'primary-a',id:'shared'},
+    {...crewBase[1],_id:'primary-b',id:'shared'}]],
+  ['cross-field alias collision',[
+    {...crewBase[0],_id:'shared',id:'first'},
+    {...crewBase[1],id:'shared'}]],
+  ['duplicate _id despite unique secondary id',[
+    {...crewBase[0],_id:'shared',id:'first'},
+    {...crewBase[1],_id:'shared',id:'second'}]]
 ]) {
   const duplicate=assessWorldRuntime({...good,room:{objects:[
     ...good.room.objects.filter(o=>o.type!=='creep'),...creeps
@@ -508,5 +517,15 @@ assert.equal(uniqueCrew.ownedCreepRoles.harvester,1);
 assert.equal(uniqueCrew.ownedCreepRoles.worker,1);
 assert.equal(uniqueCrew.operationalReadiness.status,'UNVERIFIED');
 assert.equal(uniqueCrew.failures.includes('ROOM_CREEP_DUPLICATE_IDENTITY'),false);
+// The same identifier exposed in both fields of one creep is not a
+// duplicate. Distinct creeps with unique aliases remain countable.
+const uniqueDualIds=assessWorldRuntime({...good,room:{objects:[
+  ...good.room.objects.filter(o=>o.type!=='creep'),
+  {...crewBase[0],_id:'creep-a'},
+  {...crewBase[1],_id:'creep-b'}
+]}},WORLD_PROFILE.branch);
+assert.equal(uniqueDualIds.ok,true);
+assert.equal(uniqueDualIds.ownedCreepCount,2);
+assert.equal(uniqueDualIds.operationalReadiness.status,'UNVERIFIED');
 
 console.log('W37S79 runtime diagnostics: PASS');
