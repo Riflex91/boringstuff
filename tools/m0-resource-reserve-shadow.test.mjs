@@ -178,4 +178,57 @@ for(const bad of [
   assert.equal(x.status,'HOLD');
   assert.deepEqual(x.reasonCodes,['ROOM_STOCK_UNVERIFIED']);
 }
+// A room's gross stock and the empire-wide gross sum are one observed
+// census. Contradictory upstream snapshots cannot certify hypothetical
+// excess, even when the selected room's individual amount looks plausible.
+for(const [label,damage] of [
+  ['fabricated selected-room gross energy',l=>{
+    l.rooms.find(r=>r.roomName==='E8N1').resources.structures.energy+=1;
+  }],
+  ['fabricated unrelated-room gross energy',l=>{
+    l.rooms.find(r=>r.roomName==='E7N1').resources.structures.energy+=1;
+  }],
+  ['underreported empire gross energy',l=>{
+    l.totals.structures.energy-=1;
+  }],
+  ['invented empire resource entry',l=>{
+    l.totals.structures.power=100;
+  }],
+  ['missing empire totals',l=>{delete l.totals;}],
+  ['missing empire structures',l=>{delete l.totals.structures;}],
+  ['noninteger unrelated resource',l=>{
+    l.rooms.find(r=>r.roomName==='E7N1').resources.structures.Z=1.5;
+  }],
+  ['noninteger empire amount',l=>{l.totals.structures.Z='50';}],
+  ['invalid room stock container',l=>{
+    l.rooms.find(r=>r.roomName==='E8N1').resources.structures=[];
+  }],
+  ['overflow across rooms',l=>{
+    l.rooms.find(r=>r.roomName==='E7N1').resources.structures.energy=
+      Number.MAX_SAFE_INTEGER;
+    l.totals.structures.energy=Number.MAX_SAFE_INTEGER;
+  }]
+]) {
+  const inconsistent=structuredClone(ledger);
+  damage(inconsistent);
+  const before=JSON.stringify(inconsistent);
+  const x=run(inconsistent);
+  assert.equal(x.status,'HOLD',label);
+  assert.deepEqual(x.reasonCodes,['LEDGER_UNVERIFIED'],label);
+  assert.equal(x.upperBoundPotentialExcess,null,label);
+  assert.equal(x.availableToCommit,null,label);
+  assert.equal(x.command,'NO_ACTION',label);
+  assert.equal(JSON.stringify(inconsistent),before,
+    'gross inventory audit is read-only: '+label);
+}
+// Legitimate zero quantities retain exact room/empire accounting.
+{
+  const withZero=structuredClone(ledger);
+  withZero.rooms[0].resources.structures.power=0;
+  withZero.totals.structures.power=0;
+  const x=run(withZero);
+  assert.equal(x.status,'ADVISORY');
+  assert.equal(x.availableToCommit,null);
+  assert.equal(x.command,'NO_ACTION');
+}
 console.log('M0 reserve obligation census, expiry, optimistic inbound exclusion, overflow and no-action contracts PASS');
