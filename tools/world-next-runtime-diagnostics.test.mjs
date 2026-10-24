@@ -30,6 +30,35 @@ assert.equal(result.ownedCreepCount,1);
      'OWNED_PINNED_SPAWN_MISSING'),false,
      label+' must not claim missing Spawn from unverifiable GET');
  }
+ // Authentication GET aliases are independent untrusted evidence. A
+ // contradictory or malformed supplied id must not be silently ignored.
+ for(const [label,me] of [
+   ['conflicting aliases',{_id:'me',id:'another-user'}],
+   ['numeric secondary alias',{_id:'me',id:42}],
+   ['null secondary alias',{_id:'me',id:null}],
+   ['blank secondary alias',{_id:'me',id:'   '}],
+   ['malformed primary alias',{_id:{bad:true},id:'me'}]
+ ]) {
+   const unverified=assessWorldRuntime({...good,me},WORLD_PROFILE.branch);
+   assert.equal(unverified.ok,false,label);
+   assert.ok(unverified.failures.includes('AUTH_UNVERIFIED'),label);
+   assert.equal(unverified.spawnVerified,null,label);
+   assert.equal(unverified.ownedCreepCount,null,label);
+   assert.equal(unverified.ownedCreepRoles,null,label);
+   assert.equal(unverified.currentRoomCrewRisk.status,'UNVERIFIED',label);
+   assert.equal(unverified.warnings.includes('NO_OWNED_CREEPS_OBSERVED'),
+     false,label);
+   assert.equal(unverified.operationalReadiness.status,'HOLD',label);
+   assert.equal(unverified.operationalReadiness.executionAuthority,false,label);
+ }
+ // Matching aliases and legacy single-id GET responses remain observable.
+ for(const me of [{_id:'me',id:'me'},{id:'me'}]) {
+   const verified=assessWorldRuntime({...good,me},WORLD_PROFILE.branch);
+   assert.equal(verified.ok,true);
+   assert.equal(verified.spawnVerified,true);
+   assert.equal(verified.ownedCreepCount,1);
+   assert.equal(verified.failures.includes('AUTH_UNVERIFIED'),false);
+ }
  const validEmpty=assessWorldRuntime({...good,room:{objects:
    good.room.objects.filter(o=>o.type!=='creep')
  }},WORLD_PROFILE.branch);
