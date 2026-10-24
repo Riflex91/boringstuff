@@ -115,16 +115,17 @@ export function assessWorldRuntime({me,branches,status,room,memory},
   // check when supplied. Absent identity fields alone are not duplicates.
   const seenCreepIdentities=new Set();
   const crewDuplicate=creepObjects.some(o=>{
-    const rawId=typeof o?._id==='string'?o._id:o?.id;
-    const creepId=typeof rawId==='string'&&rawId.trim().length?
-      'id:'+rawId:null;
+    // GET may expose both _id and id. Check both: preferring _id alone
+    // would miss duplicate id aliases when the _id fields differ.
+    // Deduplicate aliases within one object before comparing with others.
+    const ids=[o?._id,o?.id].filter(v=>
+      typeof v==='string'&&v.trim().length>0).map(v=>'id:'+v);
     const creepName=typeof o?.name==='string'&&o.name.trim().length?
       'name:'+o.name:null;
-    const duplicate=Boolean(
-      (creepId&&seenCreepIdentities.has(creepId))||
-      (creepName&&seenCreepIdentities.has(creepName)));
-    if(creepId)seenCreepIdentities.add(creepId);
-    if(creepName)seenCreepIdentities.add(creepName);
+    const keys=[...new Set(ids)];
+    if(creepName)keys.push(creepName);
+    const duplicate=keys.some(key=>seenCreepIdentities.has(key));
+    for(const key of keys)seenCreepIdentities.add(key);
     return duplicate;
   });
   const creeps=ownerVerified&&roomObjectsVerified?
